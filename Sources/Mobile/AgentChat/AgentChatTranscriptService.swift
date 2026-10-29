@@ -19,6 +19,8 @@ final class AgentChatTranscriptService {
     private var tailers: [String: AgentChatTranscriptTailer] = [:]
     private let hasEventSubscribers: @MainActor () -> Bool
     private let emitEventPayload: @MainActor ([String: Any]) -> Void
+    /// Typed observers of every published frame (ShellX Link), by token.
+    private var frameObservers: [UUID: @MainActor (ChatSessionEventFrame) -> Void] = [:]
     private let now: () -> Date
     /// Drives the live agent-prose streaming preview.
     private var proseStreamer: AgentChatProseStreamer!
@@ -150,6 +152,29 @@ final class AgentChatTranscriptService {
         self.proseWakeDriver.start()
     }
 
+    /// Adds a typed observer of every frame this service publishes (the frames mobile clients receive as
+    /// `chat.message`). While any observer is registered the service tails transcripts and publishes
+    /// session changes as if a mobile client were subscribed. The live prose preview stays reserved for
+    /// mobile subscribers. Returns the token for ``removeFrameObserver(_:)``.
+    func addFrameObserver(_ handler: @escaping @MainActor (ChatSessionEventFrame) -> Void) -> UUID {
+        let token = UUID()
+        guard !didShutdown else { return token }
+        frameObservers[token] = handler
+        return token
+    }
+
+    func removeFrameObserver(_ token: UUID) {
+        frameObservers[token] = nil
+    }
+
+    /// Registered frame observers (tests).
+    var frameObserverCount: Int { frameObservers.count }
+
+    /// Whether anyone receives published frames: a mobile `chat.message` subscriber or a frame observer.
+    private var hasFrameSubscribers: Bool {
+        !frameObservers.isEmpty || hasEventSubscribers()
+    }
+
     /// Stops streaming resources while the application still owns its service.
     ///
     /// App termination calls this on the main actor so observer removal,
@@ -162,6 +187,7 @@ final class AgentChatTranscriptService {
         registry.onRecordChanged = nil
         registry.onRecordRemoved = nil
         proseTurnStates.removeAll()
+        frameObservers.removeAll()
         let activeTailers = Array(tailers.values)
         tailers.removeAll()
         for tailer in activeTailers {
@@ -294,11 +320,13 @@ final class AgentChatTranscriptService {
         }
         // Tail eagerly only while someone is listening, and never for an
         // ended session (its transcript can no longer grow; recreating the
-        // tailer here would undo the ended-state eviction).
+        // tailer here would undo the ended-state eviction). A new session's
+        // transcript is tailed before the agent creates it, so its first turn
+        // is live too.
         if record.state != .ended,
-           hasEventSubscribers() {
+           hasFrameSubscribers {
             ensureTailer(for: record) {
-                resolver.boundedTranscriptPath(for: record)
+                resolver.liveTranscriptPath(for: record)
             }
         }
         // Drive the live prose-streaming preview off the turn lifecycle: a
@@ -332,6 +360,18 @@ final class AgentChatTranscriptService {
     func noteExplicitInput(surfaceID: String, at: Date = Date()) -> Int {
         guard !didShutdown else { return 0 }
         return registry.noteUserInput(surfaceID: surfaceID, at: at)
+    }
+
+    /// Reflects an interrupt (Esc or ctrl-C) the session's terminal accepted:
+    /// the agent stops its turn and waits for input, and Claude Code fires no
+    /// hook for it. The next hook stays authoritative.
+    ///
+    /// - Returns: Whether the session left working or needs-input.
+    @discardableResult
+    func noteInterrupted(sessionID: String, at: Date = Date()) -> Bool {
+        guard !didShutdown, registry.noteInterrupted(sessionID: sessionID, at: at) else { return false }
+        endProseTurn(sessionID: sessionID)
+        return true
     }
 
     /// Lists chat-capable sessions.
@@ -468,19 +508,58 @@ final class AgentChatTranscriptService {
             }
             guard let currentRecord = registry.record(sessionID: sessionID) else { return nil }
             failedResolutions.remove(sessionID)
+            // A live session whose agent has not written its transcript yet
+            // gets a tailer that waits for it, as a hook event would start.
+            let awaitedPath = currentRecord.state == .ended ? nil : resolver.recordedTranscriptLocation(for: currentRecord)
             guard let resolvedTailer = ensureTailer(for: currentRecord, resolvePath: {
-                resolver.boundedTranscriptPath(for: currentRecord) ?? fallbackPath
+                resolver.boundedTranscriptPath(for: currentRecord) ?? fallbackPath ?? awaitedPath
             }) else {
                 return nil
             }
             tailer = resolvedTailer
         }
         await tailer.start()
+        // A live session's tailer can wait for a transcript its agent has not
+        // written yet: until then there is no transcript to page (see
+        // ``isAwaitingTranscript(sessionID:)``), while live entries follow from
+        // its first line. A tailer that read its file serves its cache even if
+        // the file is gone now.
+        if await tailer.isWaitingForTranscript { return nil }
         let page = await tailer.history(beforeSeq: beforeSeq, limit: limit)
         if record.title == nil, let title = await tailer.title {
             registry.update(sessionID: sessionID) { $0.title = title }
         }
         return page
+    }
+
+    /// Whether a live session's tailer waits for a transcript its agent has not written yet, so the session
+    /// has no history so far (``history(sessionID:beforeSeq:limit:)`` answers nil for it) rather than a
+    /// transcript the Mac cannot read. ShellX Link answers such a session with an empty page.
+    func isAwaitingTranscript(sessionID: String) async -> Bool {
+        guard let record = registry.record(sessionID: sessionID), record.state != .ended,
+              let tailer = tailers[sessionID] else {
+            return false
+        }
+        return await tailer.isWaitingForTranscript
+    }
+
+    /// ``history(sessionID:beforeSeq:limit:)``, retried once when the session is known but its transcript
+    /// did not resolve: the recorded path can be stale the same way terminal bindings are, so the record's
+    /// bindings are re-adopted from the hook store first. `mobile.chat.history` and ShellX Link share it.
+    func historyRebindingIfStale(sessionID: String, beforeSeq: Int?, limit: Int) async -> ChatHistoryPage? {
+        if let page = await history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit) { return page }
+        guard let staleRecord = registry.record(sessionID: sessionID) else { return nil }
+        #if DEBUG
+        cmuxDebugLog("agentChat.history transcript unresolved session=\(sessionID.prefix(8)); refreshing bindings")
+        #endif
+        let refreshed = await refreshSessionBindings(sessionID: sessionID)
+        // Retry only when the refresh changed the resolution inputs (a pointless retry re-runs the codex
+        // directory walk).
+        guard refreshed?.transcriptPath != staleRecord.transcriptPath
+            || refreshed?.workingDirectory != staleRecord.workingDirectory else {
+            return nil
+        }
+        return await history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
     }
 
     /// Debug-socket dump of every registry record plus tailer liveness.
@@ -514,7 +593,16 @@ final class AgentChatTranscriptService {
     ) -> AgentChatTranscriptTailer? {
         guard !didShutdown else { return nil }
         if let existing = tailers[record.sessionID] {
-            return existing
+            // A tailer still waiting for a transcript the agent never wrote
+            // yields to the one its hooks name now (a pending Claude alias
+            // that picks up the next session after `/clear`).
+            guard let recorded = resolver.recordedTranscriptLocation(for: record),
+                  recorded != existing.path,
+                  !FileManager.default.fileExists(atPath: existing.path) else {
+                return existing
+            }
+            tailers[record.sessionID] = nil
+            Task { await existing.stop() }
         }
         guard !failedResolutions.contains(record.sessionID) else { return nil }
         guard let path = resolvePath() else {
@@ -651,10 +739,10 @@ final class AgentChatTranscriptService {
                 Task { await tailer.stop() }
             }
         }
-        guard hasEventSubscribers() else { return }
+        guard hasFrameSubscribers else { return }
         if transcriptBecameAvailable, record.state != .ended {
             ensureTailer(for: record) {
-                resolver.boundedTranscriptPath(for: record)
+                resolver.liveTranscriptPath(for: record)
             }
         }
         if record.state == .ended, !endedRecordIsListable {
@@ -682,13 +770,20 @@ final class AgentChatTranscriptService {
         }
         failedResolutions.remove(record.sessionID)
         endedListability.remove(sessionID: record.sessionID)
-        guard hasEventSubscribers() else { return }
+        guard hasFrameSubscribers else { return }
         emit(frame: ChatSessionEventFrame(sessionID: record.sessionID, event: .sessionRemoved(version: record.version)))
     }
 
     private func emit(frame: ChatSessionEventFrame) {
-        guard !didShutdown, let payload = wirePayload(frame) else { return }
-        emitEventPayload(payload)
+        guard !didShutdown else { return }
+        // With only frame observers listening, skip the mobile payload encoding.
+        if frameObservers.isEmpty || hasEventSubscribers(), let payload = wirePayload(frame) {
+            emitEventPayload(payload)
+        }
+        // A copy: an observer may add or remove observers while it runs.
+        for handler in Array(frameObservers.values) {
+            handler(frame)
+        }
     }
 
     private func settleProseTurn(sessionID: String, turnState: ProseTurnState) {

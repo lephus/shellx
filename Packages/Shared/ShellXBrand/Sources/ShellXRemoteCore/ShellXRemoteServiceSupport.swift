@@ -13,10 +13,12 @@ struct LoginReply: Decodable, Sendable {
     let device_id: String
 }
 
-/// `machines.register` → `{machine_id, slot}`.
+/// `machines.register` → `{machine_id, slot, link_slot}`; `link_slot` is null (or absent) from a relay that
+/// predates the ShellX Link lane.
 struct RegisterReply: Decodable, Sendable {
     let machine_id: String
     let slot: String
+    let link_slot: String?
 }
 
 /// `tickets.mint {write_to}` → `{path, expires_at_unix, relay_url}` (the ticket stays in the file).

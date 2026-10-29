@@ -46,17 +46,18 @@ struct ShellXThemeTests {
         #expect(Glyph(kind: .running, tooltip: "").color(isActive: true, selected: .white, secondary: .gray) == .white)
     }
 
-    @Test func darkSidebarSelectionIsTheRaiseToken() {
+    @Test func darkSidebarSelectionIsTheTintedAccent() {
         let selected = sidebarSelectedWorkspaceBackgroundNSColor(
             for: .dark,
             sidebarSelectionColorHex: nil,
             activeTabIndicatorStyle: .leftRail,
             subtleSelection: false
         )
-        #expect(selected.hexString() == "#171128")
+        // Spec §6.1: ShellX primary at 22% over `panel`, with `#f1f5ff` names.
+        #expect(selected.hexString() == "#222D4E")
         #expect(sidebarIsShellXSelectionFill(selected))
         let foreground = sidebarSelectedWorkspaceForegroundNSColor(on: selected, opacity: 1)
-        #expect(foreground.hexString() == "#E6E2F2")
+        #expect(foreground.hexString() == "#F1F5FF")
         // A configured selection color still wins.
         let configured = sidebarSelectedWorkspaceBackgroundNSColor(
             for: .dark,

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hiệu ứng agent: ba phương án</title>
+<style>
+  :root { --bg-primary:#f5f5f7; --bg-secondary:#fff; --text-primary:#1d1d1f; --text-secondary:#6e6e73; --border:#d1d1d6; --accent:#0071e3; }
+  @media (prefers-color-scheme: dark) { :root { --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --text-primary:#f5f5f7; --text-secondary:#98989d; --border:#424245; --accent:#0a84ff; } }
+  body { margin:0; padding:2rem; font-family:system-ui,-apple-system,sans-serif; background:var(--bg-primary); color:var(--text-primary); line-height:1.5; }
+  h2 { font-size:1.5rem; margin:0 0 .5rem; } h3 { font-size:1.05rem; margin:0 0 .25rem; }
+  .subtitle { color:var(--text-secondary); margin:0 0 1.5rem; }
+  .label { font-size:.7rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.05em; }
+  .cards { display:grid; gap:1rem; }
+  .card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .card.selected { outline:2px solid var(--accent); }
+  .chosen { display:inline-block; margin:0 0 1rem; padding:.2rem .6rem; border-radius:6px; background:rgba(10,132,255,.12); color:var(--accent); font-size:.85rem; }
+</style>
+<script>function toggleSelect(el){var c=el.closest('.cards');if(c)c.querySelectorAll('.card').forEach(function(o){o.classList.remove('selected')});el.classList.add('selected');}</script>
+</head><body>
+<div class="chosen">Người dùng chọn: C · Tên phiên đổi màu (23/10/2026)</div>
+<style>
+  @property --fxa { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+  .fx { --bg:#0b0716; --panel:#100b1d; --line:#211a37; --border:#2a2145; --tx:#cdc7e0; --hi:#e6e2f2; --mu:#8a83a6;
+        --pri:#60a5fa; --pri-soft:rgba(96,165,250,.12); --pri-line:rgba(96,165,250,.45); --pri-tx:#93c5fd; --run:#e8c468; --ok:#6fd49a; }
+  .fx .legend { display:flex; flex-wrap:wrap; gap:10px 22px; margin:-6px 0 22px; font-size:.85rem; color:var(--text-secondary); }
+  .fx .legend b { color:var(--text-primary); font-weight:600; }
+  .fx .stack { display:flex; flex-direction:column; gap:20px; }
+  .fx .card { cursor:pointer; }
+  .fx .cap { padding:12px 14px 14px; }
+  .fx .cap h3 { margin:0 0 4px; }
+  .fx .cap p { margin:0; color:var(--text-secondary); font-size:.85rem; }
+
+  .fx .win { display:flex; height:206px; background:var(--bg); border-radius:10px 10px 0 0; overflow:hidden;
+             font:12px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; color:var(--tx); text-align:left; }
+  .fx .side { width:268px; flex:none; background:var(--panel); border-right:1px solid var(--line); padding:8px 0; }
+  .fx .row { position:relative; margin:3px 8px; padding:5px 10px 5px 12px; border-radius:7px; }
+  .fx .row.sel { background:rgba(96,165,250,.22); }
+  .fx .row .n { display:flex; align-items:center; gap:6px; color:var(--hi); }
+  .fx .row.sel .n { font-weight:600; color:#f1f5ff; }
+  .fx .row .a { display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--mu); white-space:nowrap; }
+  .fx .row.sel .a { color:#b4c6e6; }
+  .fx .pill { margin-left:auto; font-size:9.5px; line-height:15px; padding:0 6px; border-radius:8px; }
+  .fx .p-wait { background:var(--pri-soft); color:var(--pri-tx); box-shadow:inset 0 0 0 1px var(--pri-line); }
+  .fx .p-ok { background:rgba(111,212,154,.12); color:var(--ok); }
+
+  .fx .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .fx .tabs { display:flex; height:30px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .fx .tab { position:relative; display:flex; align-items:center; gap:6px; padding:0 14px; color:var(--mu); border-right:1px solid var(--line); white-space:nowrap; }
+  .fx .tab.on { background:rgba(96,165,250,.16); color:#f1f5ff; font-weight:600; }
+  .fx .tab.on::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--pri); }
+  .fx .term { flex:1; padding:10px 12px; font:11.5px/1.5 "JetBrains Mono",ui-monospace,Menlo,monospace; overflow:hidden; }
+  .fx .term .c { color:var(--pri); } .fx .term .mu { color:var(--mu); } .fx .term .w { color:var(--hi); }
+
+  /* ✻ xoay giống Claude Code */
+  .fx .spin { display:inline-block; width:10px; text-align:center; font-weight:400; }
+  .fx .spin::before { content:"✻"; animation:fxGlyph 1.1s steps(1,end) infinite; }
+  @keyframes fxGlyph { 0%{content:"·"} 17%{content:"✢"} 33%{content:"✳"} 50%{content:"✶"} 67%{content:"✻"} 83%{content:"✽"} }
+  .fx .spin.y { color:var(--run); }
+  .fx .spin.rb { animation:fxHue 3s linear infinite; }
+  @keyframes fxHue { 0%,100%{color:#f4a7c0} 20%{color:#f2c879} 40%{color:#8fd9a8} 60%{color:#7cc8e8} 80%{color:#9fb0f5} }
+
+  /* chữ ánh vàng: một vệt sáng lướt qua */
+  .fx .sh-y { background:linear-gradient(90deg,#b39550 0%,#b39550 38%,#fff3cf 50%,#b39550 62%,#b39550 100%);
+              background-size:250% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+              animation:fxSweep 2.2s linear infinite; }
+  @keyframes fxSweep { from{background-position:100% 0} to{background-position:0% 0} }
+  /* chữ cầu vồng dịu kiểu ultracode */
+  .fx .rb { background:linear-gradient(90deg,#f4a7c0,#f2c879,#8fd9a8,#7cc8e8,#9fb0f5,#c9a7f2,#f4a7c0);
+            background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+            animation:fxFlow 3s linear infinite; }
+  @keyframes fxFlow { from{background-position:0% 0} to{background-position:-200% 0} }
+
+  /* viền ánh sáng chạy quanh dòng */
+  .fx .ring { position:absolute; inset:0; border-radius:7px; padding:1.3px; pointer-events:none;
+              -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude;
+              animation:fxRot 2.6s linear infinite; }
+  .fx .ring.y { background:conic-gradient(from var(--fxa),transparent 0deg 240deg,rgba(232,196,104,.85) 320deg,#fff3cf 352deg,transparent 360deg); }
+  .fx .ring.rb { background:conic-gradient(from var(--fxa),#f4a7c0,#f2c879,#8fd9a8,#7cc8e8,#9fb0f5,#c9a7f2,#f4a7c0); opacity:.85; }
+  @keyframes fxRot { to { --fxa:360deg; } }
+  /* vệt sáng chạy trên đầu tab */
+  .fx .streak { position:absolute; left:0; right:0; top:0; height:2px; overflow:hidden; }
+  .fx .streak::before { content:""; position:absolute; top:0; bottom:0; width:50%; left:-50%;
+                        background:linear-gradient(90deg,transparent,var(--run),transparent); animation:fxStreak 1.8s ease-in-out infinite; }
+  .fx .streak.rb::before { background:linear-gradient(90deg,transparent,#f4a7c0,#f2c879,#8fd9a8,#7cc8e8,#9fb0f5,transparent); }
+  @keyframes fxStreak { from{left:-50%} to{left:100%} }
+
+  /* khoảnh khắc gọi skill/workflow: lóe sáng ngắn, diễn lại mỗi 6 giây */
+  .fx .flash::after { content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; animation:fxFlash 6s ease-out infinite; }
+  @keyframes fxFlash { 0%,100%{background:rgba(214,196,255,0)} 3%{background:rgba(214,196,255,.26)} 16%{background:rgba(214,196,255,0)} }
+  .fx .tab.flash::after { height:auto; bottom:0; }
+  .fx .tab.on.flash::after { background:none; }
+
+  @media (prefers-reduced-motion: reduce) { .fx * { animation:none !important; } }
+</style>
+
+<h2>Hiệu ứng khi agent đang làm việc</h2>
+<p class="subtitle">Cả ba bản đều có biểu tượng ✻ đổi hình liên tục giống Claude Code, và cách tô tab đang chọn theo phương án B. Chúng chỉ khác nhau ở <b>chỗ</b> dải màu chạy. Bản phác tự diễn lại khoảnh khắc "gọi skill/workflow" (lóe sáng một nhịp) sau mỗi 6 giây.</p>
+
+<div class="fx">
+  <div class="legend">
+    <span><b>Đang nghĩ</b>: vệt vàng lướt qua (vàng là màu "đang chạy" của ShellX)</span>
+    <span><b>Gọi skill / workflow</b>: lóe sáng một nhịp, rồi dải màu cầu vồng dịu chạy suốt lúc skill còn chạy</span>
+    <span><b>Chờ bạn, xong, lỗi</b>: giữ nhãn như cũ, đứng yên</span>
+  </div>
+
+  <div class="cards stack">
+    <!-- A -->
+    <div class="card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="win">
+        <div class="side">
+          <div class="row sel"><div class="n">api-server</div><div class="a"><span class="spin y"></span><span class="sh-y">Đang nghĩ…</span></div></div>
+          <div class="row flash"><div class="n">web</div><div class="a"><span class="spin rb"></span><span class="rb">Skill · brainstorming</span></div></div>
+          <div class="row"><div class="n">docs</div><div class="a"><span class="spin rb"></span><span class="rb">Workflow · review · 3/8 agent</span></div></div>
+          <div class="row"><div class="n">infra <span class="pill p-wait">chờ bạn</span></div><div class="a">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs">
+            <div class="tab on"><span class="spin y"></span>claude</div>
+            <div class="tab flash"><span class="spin rb"></span>claude 2</div>
+            <div class="tab">zsh</div>
+          </div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><br><span class="spin y" style="color:var(--run)"></span> <span class="sh-y">Đang nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>A · Dòng hoạt động ánh màu</h3><p>Dưới tên phiên là một dòng cho biết agent đang làm gì. Màu chạy trên dòng chữ đó: vệt vàng khi đang nghĩ, cầu vồng khi gọi skill hoặc workflow. Tên phiên và tên tab đứng yên nên luôn dễ đọc.</p></div>
+    </div>
+
+    <!-- B -->
+    <div class="card" data-choice="b" onclick="toggleSelect(this)">
+      <div class="win">
+        <div class="side">
+          <div class="row sel"><span class="ring y"></span><div class="n">api-server</div><div class="a"><span class="spin y"></span>Đang nghĩ…</div></div>
+          <div class="row flash"><span class="ring rb"></span><div class="n">web</div><div class="a"><span class="spin rb"></span>Skill · brainstorming</div></div>
+          <div class="row"><span class="ring rb"></span><div class="n">docs</div><div class="a"><span class="spin rb"></span>Workflow · review · 3/8 agent</div></div>
+          <div class="row"><div class="n">infra <span class="pill p-wait">chờ bạn</span></div><div class="a">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs">
+            <div class="tab on"><span class="streak"></span><span class="spin y"></span>claude</div>
+            <div class="tab flash"><span class="streak rb"></span><span class="spin rb"></span>claude 2</div>
+            <div class="tab">zsh</div>
+          </div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><br><span class="spin y" style="color:var(--run)"></span> <span class="sh-y">Đang nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>B · Viền ánh sáng chạy</h3><p>Một vệt sáng chạy vòng quanh viền phiên và chạy ngang trên đầu tab: màu vàng khi đang nghĩ, cầu vồng khi gọi skill hoặc workflow. Nhìn từ khóe mắt cũng thấy, nhưng đây là bản chuyển động nhiều nhất.</p></div>
+    </div>
+
+    <!-- C -->
+    <div class="card selected" data-choice="c" onclick="toggleSelect(this)">
+      <div class="win">
+        <div class="side">
+          <div class="row sel"><div class="n"><span class="sh-y">api-server</span></div><div class="a"><span class="spin y"></span>Đang nghĩ…</div></div>
+          <div class="row flash"><div class="n"><span class="rb">web</span></div><div class="a"><span class="spin rb"></span>Skill · brainstorming</div></div>
+          <div class="row"><div class="n"><span class="rb">docs</span></div><div class="a"><span class="spin rb"></span>Workflow · review · 3/8 agent</div></div>
+          <div class="row"><div class="n">infra <span class="pill p-wait">chờ bạn</span></div><div class="a">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs">
+            <div class="tab on"><span class="spin y"></span><span class="sh-y">claude</span></div>
+            <div class="tab flash"><span class="spin rb"></span><span class="rb">claude 2</span></div>
+            <div class="tab">zsh</div>
+          </div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><br><span class="spin y" style="color:var(--run)"></span> <span class="sh-y">Đang nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>C · Tên phiên đổi màu (giống ultracode nhất)</h3><p>Chính tên phiên và tên tab ánh vàng khi đang nghĩ, chạy màu cầu vồng khi gọi skill hoặc workflow, đúng kiểu chữ "ultracode". Nổi bật nhất, nhưng tên đang chạy màu thì khó đọc hơn.</p></div>
+    </div>
+  </div>
+</div>
+
+</body></html>

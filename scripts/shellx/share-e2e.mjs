@@ -26,7 +26,13 @@ const BUILD = !process.argv.includes('--no-build');
 
 const requireRelay = createRequire(join(RELAY_DIR, 'package.json'));
 const fileUrl = (p) => pathToFileURL(p).href;
-const { register: registerTsx } = await import(fileUrl(requireRelay.resolve('tsx/esm/api')));
+// `require.resolve` picks tsx's "require" build of `tsx/esm/api`, whose `register()` looks for its loader
+// next to itself (dist/esm/api/esm/index.mjs, which does not exist); the "import" build resolves it.
+const tsxManifest = requireRelay.resolve('tsx/package.json');
+const tsxEsmApi = JSON.parse(readFileSync(tsxManifest, 'utf8')).exports['./esm/api'].import;
+const { register: registerTsx } = await import(
+  new URL(typeof tsxEsmApi === 'string' ? tsxEsmApi : tsxEsmApi.default, pathToFileURL(tsxManifest)).href
+);
 registerTsx();
 const WS = (await import(fileUrl(requireRelay.resolve('ws')))).default;
 const { startRelay } = await import(fileUrl(join(RELAY_DIR, 'src/relay.ts')));

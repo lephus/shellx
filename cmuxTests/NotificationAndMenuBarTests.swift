@@ -2607,4 +2607,39 @@ final class MenuBarIconRendererTests: XCTestCase {
         XCTAssertEqual(noBadge.size.width, 18, accuracy: 0.001)
         XCTAssertEqual(withBadge.size.width, 18, accuracy: 0.001)
     }
+
+    func testStatusItemDrawsShellXMarkAsTemplate() {
+        let image = MenuBarIconRenderer.makeImage(unreadCount: 0)
+        XCTAssertTrue(image.isTemplate)
+
+        // ShellX mark: ">" on the left, "<" on the right, cursor bar under the "<".
+        // Points are in the 18pt icon, origin bottom-left.
+        XCTAssertGreaterThan(Self.alpha(of: image, atPoint: NSPoint(x: 3.81, y: 14.5)), 0.5, "upper arm of the \">\"")
+        XCTAssertGreaterThan(Self.alpha(of: image, atPoint: NSPoint(x: 14.19, y: 14.5)), 0.5, "upper arm of the \"<\"")
+        XCTAssertGreaterThan(Self.alpha(of: image, atPoint: NSPoint(x: 12.92, y: 2.09)), 0.5, "cursor bar")
+    }
+
+    private static func alpha(of image: NSImage, atPoint point: NSPoint) -> CGFloat {
+        let scale: CGFloat = 2
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(image.size.width * scale),
+            pixelsHigh: Int(image.size.height * scale),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return 0 }
+        rep.size = image.size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(origin: .zero, size: image.size))
+        NSGraphicsContext.restoreGraphicsState()
+        let x = Int(point.x * scale)
+        let y = rep.pixelsHigh - 1 - Int(point.y * scale)
+        return rep.colorAt(x: x, y: y)?.alphaComponent ?? 0
+    }
 }

@@ -2,7 +2,7 @@ name: shellx-relay2
 
 on:
   push:
-    branches: [feat/relay-v2, main]
+    branches: [feat/relay-v2, main, develop]
     paths:
       - cmux-tui/crates/cmux-relay/**
       - cmux-tui/crates/cmux-remote-protocol/**

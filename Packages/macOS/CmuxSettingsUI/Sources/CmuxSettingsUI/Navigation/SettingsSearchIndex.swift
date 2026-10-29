@@ -94,6 +94,11 @@ public struct SettingsSearchIndex: Sendable {
     /// dotted synonym tokens for legacy entries.
     private let pathAnchorIDs: [String: String]
 
+    /// Builds the shipped search index from the catalog-backed default entry table.
+    public init(catalog: SettingCatalog) {
+        self.init(catalog: catalog, curatedEntries: .cmuxDefault(catalog: catalog))
+    }
+
     /// Builds an index from the section list and supplied curated entries.
     ///
     /// - Parameters:
@@ -105,17 +110,20 @@ public struct SettingsSearchIndex: Sendable {
     ///     localized title + synonyms. Tests can pass an empty array or a
     ///     focused subset; hosts can append their own entries to expose
     ///     additional rows.
-    /// Builds the shipped search index from the catalog-backed default entry table.
-    public init(catalog: SettingCatalog) {
-        self.init(catalog: catalog, curatedEntries: .cmuxDefault(catalog: catalog))
-    }
-
+    ///   - sectionKeywords: Words that replace a section's
+    ///     ``SettingsSectionID/searchKeywords`` for a host whose section
+    ///     shows other rows, for example Mobile in a host that pairs phones
+    ///     through ShellX Link. Sections not listed keep their own words.
     public init(
         catalog: SettingCatalog,
-        curatedEntries: [CuratedSettingEntry]
+        curatedEntries: [CuratedSettingEntry],
+        sectionKeywords: [SettingsSectionID: String] = [:]
     ) {
         let matcher = SettingsSearchMatcher()
         var built: [Entry] = []
+        let keywords = { (section: SettingsSectionID) -> String in
+            sectionKeywords[section] ?? section.searchKeywords
+        }
 
         for section in SettingsSectionID.allCases {
             built.append(Entry(
@@ -124,7 +132,7 @@ public struct SettingsSearchIndex: Sendable {
                 title: section.title,
                 symbolName: section.symbolName,
                 normalizedSearchText: matcher.normalize(
-                    "\(section.rawValue) \(section.title) \(section.searchKeywords) \(matcher.humanizedIdentifier(section.rawValue))"
+                    "\(section.rawValue) \(section.title) \(keywords(section)) \(matcher.humanizedIdentifier(section.rawValue))"
                 ),
                 anchorID: "section:\(section.rawValue)"
             ))
@@ -147,7 +155,7 @@ public struct SettingsSearchIndex: Sendable {
                     [
                         entry.section.rawValue,
                         entry.section.title,
-                        entry.section.searchKeywords,
+                        keywords(entry.section),
                         entry.id,
                         entry.title,
                         entry.detailText,

@@ -59,21 +59,32 @@ public struct ShellXRemoteEnvironment: Sendable {
     /// `config.set api_base`.
     public var apiBase: URL
     public var device: ShellXRemoteDevice
-    /// `ShellXFeatures.remoteMachines || (DEBUG && SHELLX_REMOTE_MACHINES == "1")`, read at start.
+    /// Whether the service runs at all: the session (sign-in, `machines.register`, heartbeat) and the ShellX
+    /// Link host that serves phones. The app passes `ShellXRemoteGate.servesPhones`; read at start.
     public var gateEnabled: @Sendable () -> Bool
+    /// Whether the session also serves and uses the account's other machines: the cmux-tui host daemon and
+    /// its bridge, access requests to and from them, links to them and the machine list. The app passes
+    /// `ShellXRemoteGate.isEnabled` (`ShellXFeatures.remoteMachines || (DEBUG && SHELLX_REMOTE_MACHINES == "1")`).
+    public var remoteMachinesEnabled: @Sendable () -> Bool
     public var devCredentials: ShellXRemoteDevCredentials?
     public var bridge: any RemoteBridgeControlling
     public var workspaceOpener: any RemoteWorkspaceOpening
     public var store: RemoteLinkStore
+    /// The ShellX Link host (agent Feed for phones), or nil when the app does not serve one.
+    public var linkHost: (any RemoteLinkHosting)?
 
+    /// - Parameter remoteMachinesEnabled: Nil follows `gateEnabled`, so a running service serves other machines.
     public init(core: ShellXCoreClient, launcher: any SidecarLaunching, clock: any RemoteClock, paths: RemotePaths,
                 cmuxTui: URL, apiBase: URL, device: ShellXRemoteDevice, gateEnabled: @escaping @Sendable () -> Bool,
                 devCredentials: ShellXRemoteDevCredentials? = nil, bridge: any RemoteBridgeControlling,
-                workspaceOpener: any RemoteWorkspaceOpening, store: RemoteLinkStore? = nil) {
+                workspaceOpener: any RemoteWorkspaceOpening, store: RemoteLinkStore? = nil,
+                linkHost: (any RemoteLinkHosting)? = nil, remoteMachinesEnabled: (@Sendable () -> Bool)? = nil) {
         self.core = core; self.launcher = launcher; self.clock = clock; self.paths = paths
         self.cmuxTui = cmuxTui; self.apiBase = apiBase; self.device = device; self.gateEnabled = gateEnabled
+        self.remoteMachinesEnabled = remoteMachinesEnabled ?? gateEnabled
         self.devCredentials = devCredentials; self.bridge = bridge; self.workspaceOpener = workspaceOpener
         self.store = store ?? RemoteLinkStore(paths: paths)
+        self.linkHost = linkHost
     }
 }
 

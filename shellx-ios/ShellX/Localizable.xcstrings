@@ -1,0 +1,3660 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "agent.busy": {
+      "comment": "The agent did not take the message because it is busy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The agent is busy; try again later"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent đang bận, thử lại sau"
+          }
+        }
+      }
+    },
+    "agent.cut": {
+      "comment": "Under a chat entry the Mac cut short.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (cut; see it in full on the Mac)"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (đã cắt, xem đầy đủ trên Mac)"
+          }
+        }
+      }
+    },
+    "agent.empty": {
+      "comment": "An agent's chat with no messages yet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No messages yet. New ones show up here as the agent writes them."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có tin nhắn nào. Tin mới sẽ hiện ở đây khi agent viết."
+          }
+        }
+      }
+    },
+    "agent.empty.failed": {
+      "comment": "An agent's chat whose first messages could not be loaded; a Try again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the messages."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tải được tin nhắn."
+          }
+        }
+      }
+    },
+    "agent.empty.offline %@": {
+      "comment": "An agent's chat with no copy on the phone while its Mac is offline. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline. Messages show up here when it's back."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline. Tin nhắn sẽ hiện ở đây khi Mac kết nối lại."
+          }
+        }
+      }
+    },
+    "agent.forceStop": {
+      "comment": "Confirm button of Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Stop"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng hẳn"
+          }
+        }
+      }
+    },
+    "agent.forceStop.menu": {
+      "comment": "Menu item under Stop: a stronger stop, asks to confirm first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Stop…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng hẳn…"
+          }
+        }
+      }
+    },
+    "agent.forceStop.message": {
+      "comment": "Message of the Force Stop confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This sends Ctrl+C to the agent. Use it when Stop doesn't work."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lệnh này gửi Ctrl+C tới agent. Dùng khi Dừng không có tác dụng."
+          }
+        }
+      }
+    },
+    "agent.forceStop.title %@ %@": {
+      "comment": "Title of the Force Stop confirmation. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force stop %1$@ in %2$@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng hẳn %1$@ ở %2$@?"
+          }
+        }
+      }
+    },
+    "agent.gone": {
+      "comment": "The Mac no longer has this agent session.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This session is gone from the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên này không còn trên Mac"
+          }
+        }
+      }
+    },
+    "agent.newMessages": {
+      "comment": "Button over the bottom of an agent's chat: newer messages came while the user read older ones.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New messages"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin mới"
+          }
+        }
+      }
+    },
+    "agent.newMessages.hint": {
+      "comment": "VoiceOver hint of the New messages button.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrolls to the newest message"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuộn tới tin mới nhất"
+          }
+        }
+      }
+    },
+    "agent.older.failed": {
+      "comment": "At the top of an agent's chat when older messages could not be loaded; a Try again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load older messages."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tải được tin cũ hơn."
+          }
+        }
+      }
+    },
+    "agent.olderOnMac": {
+      "comment": "At the top of an agent's chat when the phone keeps no older messages.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Older messages are only on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin cũ hơn chỉ còn trên Mac."
+          }
+        }
+      }
+    },
+    "agent.open.hint": {
+      "comment": "VoiceOver hint of an agent chip or a done note: activating it opens that agent's chat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the agent's chat"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở cuộc trò chuyện với agent"
+          }
+        }
+      }
+    },
+    "agent.sent": {
+      "comment": "Shown after the agent took a message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi"
+          }
+        }
+      }
+    },
+    "agent.state.done": {
+      "comment": "An agent session finished its turn (idle).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
+        }
+      }
+    },
+    "agent.state.ended": {
+      "comment": "An agent session has ended.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã kết thúc"
+          }
+        }
+      }
+    },
+    "agent.state.needsYou": {
+      "comment": "An agent session waits for the user.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn"
+          }
+        }
+      }
+    },
+    "agent.state.offline": {
+      "comment": "An agent session whose Mac is not online (its last known state is not shown).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac offline"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đang offline"
+          }
+        }
+      }
+    },
+    "agent.state.running": {
+      "comment": "An agent session is working (since when is not known).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy"
+          }
+        }
+      }
+    },
+    "agent.state.running %@": {
+      "comment": "An agent session is working; the argument is how long (\"4 minutes\").",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running for %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy %@"
+          }
+        }
+      }
+    },
+    "agent.stop": {
+      "comment": "The agent screen's Stop button: interrupts the agent's current turn.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng"
+          }
+        }
+      }
+    },
+    "agent.stop.failed": {
+      "comment": "Shown when the Mac could not stop the agent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac couldn't stop the agent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không dừng được agent"
+          }
+        }
+      }
+    },
+    "agent.stop.noAnswer": {
+      "comment": "Shown when the Mac did not answer a Stop or Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac didn't answer. The agent may still be running."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không trả lời. Agent có thể vẫn đang chạy."
+          }
+        }
+      }
+    },
+    "agent.stop.sent": {
+      "comment": "Shown after the Mac took a Stop or Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi lệnh dừng"
+          }
+        }
+      }
+    },
+    "agent.thought": {
+      "comment": "Label of the agent's collapsed reasoning; tapping it shows the text.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suy nghĩ"
+          }
+        }
+      }
+    },
+    "agent.tool.expandHint": {
+      "comment": "VoiceOver hint of a one-line tool call: activating it shows the whole call.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows all of it"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện toàn bộ"
+          }
+        }
+      }
+    },
+    "common.cancel": {
+      "comment": "Cancel button of alerts.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Huỷ"
+          }
+        }
+      }
+    },
+    "common.close": {
+      "comment": "Closes a sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng"
+          }
+        }
+      }
+    },
+    "common.ok": {
+      "comment": "Dismisses an alert that only informs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "composer.attach": {
+      "comment": "VoiceOver label of the composer's + button, which opens Photos and Files.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attach"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm"
+          }
+        }
+      }
+    },
+    "composer.attach.cancelLoading": {
+      "comment": "VoiceOver label of the x on a placeholder tile in the composer while a picked photo or file is being read: stops reading it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop adding attachment"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng thêm tệp đính kèm"
+          }
+        }
+      }
+    },
+    "composer.attach.files": {
+      "comment": "Menu item of the composer's + button: pick files with the Files app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tệp"
+          }
+        }
+      }
+    },
+    "composer.attach.loading": {
+      "comment": "VoiceOver label of a placeholder tile in the composer while a picked photo or file is being read.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding attachment"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang thêm tệp đính kèm"
+          }
+        }
+      }
+    },
+    "composer.attach.photos": {
+      "comment": "Menu item of the composer's + button: pick photos from the photo library.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ảnh"
+          }
+        }
+      }
+    },
+    "composer.attach.pickFailed": {
+      "comment": "Red line under the composer: the Files picker could not hand over what was picked.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open what you picked"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không mở được mục đã chọn"
+          }
+        }
+      }
+    },
+    "composer.attach.tooLarge %@": {
+      "comment": "Red line under the composer: a photo or file is bigger than 10 MB and was not added (or cannot be sent). The argument is its file name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is over 10 MB"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ lớn hơn 10 MB"
+          }
+        }
+      }
+    },
+    "composer.attach.tooMany": {
+      "comment": "Red line under the composer: a message carries at most 5 photos and files.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 5 attachments"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tối đa 5 tệp đính kèm"
+          }
+        }
+      }
+    },
+    "composer.attach.unreadable %@": {
+      "comment": "Red line under the composer: a picked photo or file could not be read (or is empty). The argument is its file name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't read %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không đọc được %@"
+          }
+        }
+      }
+    },
+    "composer.attachment.remove %@": {
+      "comment": "VoiceOver label of the x on an attachment waiting in the composer. The argument is its file name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bỏ %@"
+          }
+        }
+      }
+    },
+    "composer.placeholder": {
+      "comment": "Placeholder of the message field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message the agent…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhắn cho agent…"
+          }
+        }
+      }
+    },
+    "composer.send": {
+      "comment": "VoiceOver label of the send button of the message field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
+          }
+        }
+      }
+    },
+    "composer.sending": {
+      "comment": "VoiceOver label of the progress ring on the send button while a message's attachments upload.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending attachments"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang gửi tệp đính kèm"
+          }
+        }
+      }
+    },
+    "composer.target %@": {
+      "comment": "Chip above the message field: where the message goes (\"Claude Code · shellx\").",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send to: %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi tới: %@"
+          }
+        }
+      }
+    },
+    "composer.target.automatic": {
+      "comment": "Menu choice: send to the session messaged last, or the newest on the default Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tự động"
+          }
+        }
+      }
+    },
+    "composer.target.none": {
+      "comment": "Where the message goes when no session is running.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no running session"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "chưa có phiên nào"
+          }
+        }
+      }
+    },
+    "composer.tooLong %@ %@": {
+      "comment": "The message is over the byte limit. 1: its length, 2: the limit (16,384), both formatted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too long: %1$@ / %2$@ bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dài quá: %1$@ / %2$@ byte"
+          }
+        }
+      }
+    },
+    "firstMac.scan": {
+      "comment": "Primary button of the first-Mac screen: opens the scanner.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan QR Code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quét mã QR"
+          }
+        }
+      }
+    },
+    "firstMac.step2": {
+      "comment": "Second step of the first-Mac screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan the QR code it shows with this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quét mã QR hiện ra bằng iPhone này."
+          }
+        }
+      }
+    },
+    "firstMac.subtitle": {
+      "comment": "Under the title of the first-Mac screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See and answer Claude Code on your Mac from this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem và trả lời Claude Code trên Mac ngay từ iPhone này."
+          }
+        }
+      }
+    },
+    "home.attachments %lld": {
+      "comment": "Line in a message bubble on the home screen: how many photos and files the message carried.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "📎 %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "📎 %lld files"
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "📎 %lld tệp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "home.empty": {
+      "comment": "The home conversation before anything was said.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send work to a Claude Code session running on your Mac. Anything that needs you is pinned at the top."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhắn việc cho một phiên Claude Code đang chạy trên Mac. Việc nào cần bạn sẽ được ghim ở trên cùng."
+          }
+        }
+      }
+    },
+    "home.macPill.hint": {
+      "comment": "VoiceOver hint of the default Mac at the top of the home.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Your Macs."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Máy của bạn."
+          }
+        }
+      }
+    },
+    "home.needsYou.hint": {
+      "comment": "VoiceOver hint of the \"Needs you · N\" bar over a conversation: activating it opens the page with the pending requests.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the requests waiting for you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở các yêu cầu đang chờ bạn"
+          }
+        }
+      }
+    },
+    "home.note.attachmentsUnsupported %@ %@": {
+      "comment": "ShellX note: a message with photos or files was not sent, because the Mac no longer takes attachments. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent to %1$@ in %2$@: this Mac no longer takes photos or files."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi tới %1$@ ở %2$@: Mac này không còn nhận ảnh hay tệp."
+          }
+        }
+      }
+    },
+    "home.note.busy %@ %@": {
+      "comment": "ShellX note: the agent was busy and did not take the message. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %1$@ in %2$@ is busy. Try again later."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: %1$@ ở %2$@ đang bận. Thử lại sau."
+          }
+        }
+      }
+    },
+    "home.note.ended %@ %@": {
+      "comment": "ShellX note: the session the message was started for stopped running before it was sent; it was sent nowhere else. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %1$@ in %2$@ is no longer running."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: %1$@ ở %2$@ không còn chạy."
+          }
+        }
+      }
+    },
+    "home.note.failed %@ %@": {
+      "comment": "ShellX note: the Mac could not type the message in. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't send to %1$@ in %2$@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không gửi được tới %1$@ ở %2$@."
+          }
+        }
+      }
+    },
+    "home.note.finished %@ %@ %@": {
+      "comment": "ShellX note: an agent finished. 1: agent name, 2: workspace, 3: first line of its last reply.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in %2$@ is done: %3$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ở %2$@ đã xong: %3$@"
+          }
+        }
+      }
+    },
+    "home.note.finished.noSummary %@ %@": {
+      "comment": "ShellX note: an agent finished (its reply is not known). 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in %2$@ is done."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ở %2$@ đã xong."
+          }
+        }
+      }
+    },
+    "home.note.needsPairing %@": {
+      "comment": "ShellX note: nothing was sent because the Mac removed this iPhone or its key changed; it will not come back by itself. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %@ needs to be paired again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: cần ghép cặp lại %@."
+          }
+        }
+      }
+    },
+    "home.note.noAnswer %@ %@": {
+      "comment": "ShellX note: the Mac did not answer; the message may not have arrived. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answer from the Mac. The message may not have reached %1$@ in %2$@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac chưa trả lời. Có thể tin chưa tới %1$@ ở %2$@."
+          }
+        }
+      }
+    },
+    "home.note.noLiveSession": {
+      "comment": "ShellX note: no agent session is running to send the message to.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Claude Code session is running. Start Claude Code in ShellX on your Mac, then try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có phiên Claude Code nào đang chạy. Mở Claude Code trong ShellX trên Mac rồi nhắn lại."
+          }
+        }
+      }
+    },
+    "home.note.notFound %@ %@": {
+      "comment": "ShellX note: the session is gone from the Mac. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %1$@ in %2$@ is no longer on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: %1$@ ở %2$@ không còn trên Mac."
+          }
+        }
+      }
+    },
+    "home.note.offline %@": {
+      "comment": "ShellX note: the Mac is offline, nothing was sent. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline."
+          }
+        }
+      }
+    },
+    "home.note.sent %@ %@": {
+      "comment": "ShellX note: a message reached an agent. 1: agent name (Claude Code), 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to %1$@ in %2$@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi tới %1$@ ở %2$@."
+          }
+        }
+      }
+    },
+    "home.sender.you": {
+      "comment": "VoiceOver: who said a message in the home conversation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bạn"
+          }
+        }
+      }
+    },
+    "home.voice": {
+      "comment": "VoiceOver: the message was spoken, not typed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spoken"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bằng giọng nói"
+          }
+        }
+      }
+    },
+    "machine.state.connecting": {
+      "comment": "Status of a paired Mac: connecting or reconnecting.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kết nối…"
+          }
+        }
+      }
+    },
+    "machine.state.hostKeyChanged": {
+      "comment": "Status of a Mac whose Link key is not the one pinned at pairing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac's key changed. Pair again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khoá của Mac đã đổi. Ghép cặp lại."
+          }
+        }
+      }
+    },
+    "machine.state.needsUpdate": {
+      "comment": "Status of a Mac that speaks another protocol version.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update ShellX"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần cập nhật ShellX"
+          }
+        }
+      }
+    },
+    "machine.state.offline %@": {
+      "comment": "Status of a paired Mac that cannot be reached; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline"
+          }
+        }
+      }
+    },
+    "machine.state.online": {
+      "comment": "Status of a paired Mac: the link is live.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã kết nối"
+          }
+        }
+      }
+    },
+    "machine.state.revoked": {
+      "comment": "Status of a Mac that removed this iPhone from its paired phones.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac removed this iPhone"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac này đã gỡ iPhone"
+          }
+        }
+      }
+    },
+    "machines.default": {
+      "comment": "Badge on the default Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mặc định"
+          }
+        }
+      }
+    },
+    "machines.footer": {
+      "comment": "Footer under the list of paired Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touch and hold a Mac to make it the default or unpair it."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chạm và giữ một Mac để đặt làm mặc định hoặc gỡ ghép cặp."
+          }
+        }
+      }
+    },
+    "machines.makeDefault": {
+      "comment": "Context menu and swipe action: make this Mac the default.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make Default"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đặt làm mặc định"
+          }
+        }
+      }
+    },
+    "machines.pairAgain": {
+      "comment": "Button on a Mac whose key changed: scan its new code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair Again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp lại"
+          }
+        }
+      }
+    },
+    "machines.remove": {
+      "comment": "Button on a Mac that already removed this iPhone: take it off the list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá"
+          }
+        }
+      }
+    },
+    "machines.title": {
+      "comment": "Title of the list of paired Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Macs"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Máy của bạn"
+          }
+        }
+      }
+    },
+    "machines.unpair": {
+      "comment": "Context menu and swipe action, and the confirm button: remove this iPhone from the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unpair"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ ghép cặp"
+          }
+        }
+      }
+    },
+    "machines.unpair.failed.message %@": {
+      "comment": "Message of the alert when unpairing failed; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is still paired. Check your connection and try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ vẫn đang được ghép cặp. Kiểm tra kết nối rồi thử lại."
+          }
+        }
+      }
+    },
+    "machines.unpair.failed.title": {
+      "comment": "Title of the alert when unpairing failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't Unpair"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không gỡ được ghép cặp"
+          }
+        }
+      }
+    },
+    "machines.unpair.message": {
+      "comment": "Message of the unpair confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone will stop getting requests from this Mac. To use it again, pair again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone này sẽ không còn nhận việc chờ từ Mac này. Muốn dùng lại thì ghép cặp lại."
+          }
+        }
+      }
+    },
+    "machines.unpair.title %@": {
+      "comment": "Title of the unpair confirmation; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unpair %@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ ghép cặp %@?"
+          }
+        }
+      }
+    },
+    "pairing.camera.denied": {
+      "comment": "Shown instead of the scanner when the camera is not allowed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX can't use the camera. Allow it in Settings to scan the code, or paste the pairing code."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX không dùng được camera. Hãy cho phép trong Cài đặt để quét mã, hoặc dán mã ghép cặp."
+          }
+        }
+      }
+    },
+    "pairing.camera.label": {
+      "comment": "VoiceOver label of the camera viewfinder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR code scanner"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Máy quét mã QR"
+          }
+        }
+      }
+    },
+    "pairing.camera.openSettings": {
+      "comment": "Button that opens the app's page in Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Cài đặt"
+          }
+        }
+      }
+    },
+    "pairing.camera.unavailable": {
+      "comment": "Shown instead of the scanner on a device without a camera.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device has no camera. Paste the pairing code instead."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Máy này không có camera. Hãy dán mã ghép cặp."
+          }
+        }
+      }
+    },
+    "pairing.confirm.button": {
+      "comment": "Primary button: send the pairing request.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp"
+          }
+        }
+      }
+    },
+    "pairing.confirm.message": {
+      "comment": "Under the pairing question: a link from elsewhere must not pair by itself.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only pair if you just opened this code on your own Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chỉ ghép cặp nếu bạn vừa mở mã này trên Mac của mình."
+          }
+        }
+      }
+    },
+    "pairing.confirm.title %@": {
+      "comment": "Asked before any pairing request is sent; %@ is the Mac's name from the code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair with %@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp với %@?"
+          }
+        }
+      }
+    },
+    "pairing.done": {
+      "comment": "Closes the sheet after pairing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
+        }
+      }
+    },
+    "pairing.error.damagedCode": {
+      "comment": "A ShellX code with a missing or malformed field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The pairing code is damaged. Open it again on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã ghép cặp bị hỏng. Mở lại mã trên Mac."
+          }
+        }
+      }
+    },
+    "pairing.error.denied": {
+      "comment": "The user pressed Deny on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac declined."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đã từ chối."
+          }
+        }
+      }
+    },
+    "pairing.error.expired": {
+      "comment": "Nobody pressed Allow in time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code expired. Open it again on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã đã hết hạn. Mở lại mã trên Mac."
+          }
+        }
+      }
+    },
+    "pairing.error.needsUpdate": {
+      "comment": "The code comes from a newer ShellX.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This code is from a newer ShellX. Update ShellX on this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã này từ bản ShellX mới hơn. Hãy cập nhật ShellX trên iPhone này."
+          }
+        }
+      }
+    },
+    "pairing.error.network": {
+      "comment": "The relay could not be reached while pairing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't reach ShellX."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không kết nối được tới ShellX."
+          }
+        }
+      }
+    },
+    "pairing.error.notShellXCode": {
+      "comment": "The scanned or pasted text is not a ShellX pairing code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This isn't a ShellX pairing code."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đây không phải mã ghép cặp ShellX."
+          }
+        }
+      }
+    },
+    "pairing.error.otherAccount": {
+      "comment": "The Mac is signed in to another ShellX account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac belongs to another account."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac này thuộc tài khoản khác."
+          }
+        }
+      }
+    },
+    "pairing.error.server %@": {
+      "comment": "Any other pairing error; %@ is the server's error code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't pair (%@). Try again later."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không ghép cặp được (%@). Thử lại sau."
+          }
+        }
+      }
+    },
+    "pairing.instructions": {
+      "comment": "Where to find the pairing QR code on the Mac. “This Mac” and Pair iPhone… name items of the Mac app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On your Mac, open ShellX, right-click “This Mac” and choose Pair iPhone…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trên Mac, mở ShellX, bấm chuột phải vào “Mac này” rồi chọn Ghép cặp iPhone…"
+          }
+        }
+      }
+    },
+    "pairing.paired %@": {
+      "comment": "Pairing succeeded; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paired with %@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã ghép cặp với %@."
+          }
+        }
+      }
+    },
+    "pairing.paste": {
+      "comment": "Button: read the pairing code from the pasteboard.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste Pairing Code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dán mã ghép cặp"
+          }
+        }
+      }
+    },
+    "pairing.retry": {
+      "comment": "Back to scanning after a failure.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thử lại"
+          }
+        }
+      }
+    },
+    "pairing.title": {
+      "comment": "Title of the pairing sheet and of the first-Mac screen; the add button of Your Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair a Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp Mac"
+          }
+        }
+      }
+    },
+    "pairing.waiting %@": {
+      "comment": "While the Mac shows the request; %@ is the Mac's name. Allow is the Mac's button.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click Allow on %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bấm Đồng ý trên %@"
+          }
+        }
+      }
+    },
+    "pairing.waiting.detail": {
+      "comment": "Under the waiting title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep ShellX open on this iPhone until the Mac answers."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ ShellX mở trên iPhone này cho tới khi Mac trả lời."
+          }
+        }
+      }
+    },
+    "pending.allow": {
+      "comment": "Primary button of a permission card: allow this one call.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cho phép"
+          }
+        }
+      }
+    },
+    "pending.allowAllTools": {
+      "comment": "Menu item of a permission card: allow every tool from now on.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All tools"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tất cả công cụ"
+          }
+        }
+      }
+    },
+    "pending.allowAlways": {
+      "comment": "Menu item of a permission card: allow this kind of call from now on.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always allow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Luôn cho phép"
+          }
+        }
+      }
+    },
+    "pending.answer": {
+      "comment": "Button of a question card: opens the answer sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trả lời"
+          }
+        }
+      }
+    },
+    "pending.bytes %lld %lld": {
+      "comment": "Byte counter under a field; %1$lld is used, %2$lld the limit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld byte"
+          }
+        }
+      }
+    },
+    "pending.deny": {
+      "comment": "Button refusing a permission or a plan.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ chối"
+          }
+        }
+      }
+    },
+    "pending.fullText.title": {
+      "comment": "Title of the full-text sheet when the tool has no name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chi tiết"
+          }
+        }
+      }
+    },
+    "pending.kind.other": {
+      "comment": "Card header: a request this app cannot show.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "needs you on the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cần bạn trên Mac"
+          }
+        }
+      }
+    },
+    "pending.kind.permission %@": {
+      "comment": "Card header: an agent asks to run a tool; %@ is the tool's name (Bash, Edit).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wants to run %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "muốn chạy %@"
+          }
+        }
+      }
+    },
+    "pending.kind.permission.noTool": {
+      "comment": "Card header: an agent asks for permission, tool unknown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "asks for permission"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "xin phép"
+          }
+        }
+      }
+    },
+    "pending.kind.plan": {
+      "comment": "Card header: an agent proposes a plan to approve.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "proposes a plan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "đề xuất plan"
+          }
+        }
+      }
+    },
+    "pending.kind.question": {
+      "comment": "Card header: an agent asks the user a question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "asks"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hỏi"
+          }
+        }
+      }
+    },
+    "pending.list.empty": {
+      "comment": "Every pending request was handled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing needs you right now."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện không có việc nào cần bạn."
+          }
+        }
+      }
+    },
+    "pending.list.title": {
+      "comment": "Title of the screen with every pending request.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs You"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn"
+          }
+        }
+      }
+    },
+    "pending.mayBeCut": {
+      "comment": "Under a preview that may have been cut by the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This may be cut short. See all of it on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nội dung có thể đã bị cắt bớt. Xem đầy đủ trên Mac."
+          }
+        }
+      }
+    },
+    "pending.more": {
+      "comment": "VoiceOver label of the … menu on a permission card.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More options"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lựa chọn khác"
+          }
+        }
+      }
+    },
+    "pending.openOnMac": {
+      "comment": "Card for a request the phone cannot answer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open on the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở trên Mac"
+          }
+        }
+      }
+    },
+    "pending.plan.approve": {
+      "comment": "Primary button of the plan sheet: approve (manual mode).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approve"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duyệt"
+          }
+        }
+      }
+    },
+    "pending.plan.autoAccept": {
+      "comment": "Approve the plan and accept its edits automatically.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-accept edits"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tự chấp nhận chỉnh sửa"
+          }
+        }
+      }
+    },
+    "pending.plan.feedback": {
+      "comment": "Placeholder of the plan feedback field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feedback for the agent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Góp ý cho agent"
+          }
+        }
+      }
+    },
+    "pending.plan.missing": {
+      "comment": "The plan text did not fit in the message to the phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This plan is too long to send to the phone. Open it on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan này quá dài để gửi tới điện thoại. Mở trên Mac để xem."
+          }
+        }
+      }
+    },
+    "pending.plan.otherModes": {
+      "comment": "Menu of the other approval modes in the plan sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other modes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chế độ khác"
+          }
+        }
+      }
+    },
+    "pending.plan.revise": {
+      "comment": "Sends the plan back with feedback.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revise…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chỉnh sửa…"
+          }
+        }
+      }
+    },
+    "pending.plan.sendFeedback": {
+      "comment": "Sends the plan feedback.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send feedback"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi góp ý"
+          }
+        }
+      }
+    },
+    "pending.plan.title": {
+      "comment": "Title of the plan review sheet (the Vietnamese UI also says plan).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        }
+      }
+    },
+    "pending.plan.ultraplan": {
+      "comment": "Approval mode name (product term, not translated).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultraplan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultraplan"
+          }
+        }
+      }
+    },
+    "pending.plan.voice": {
+      "comment": "The plan sheet's mic beside the feedback field (VoiceOver label).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dictate feedback"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói góp ý"
+          }
+        }
+      }
+    },
+    "pending.question.back": {
+      "comment": "Goes to the previous question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trước"
+          }
+        }
+      }
+    },
+    "pending.question.choicesTooLong %lld %lld": {
+      "comment": "Under a multiple-choice question whose picked options join to more than the limit; %1$lld is used, %2$lld the limit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These choices together are too long: %1$lld / %2$lld bytes. Pick fewer."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các lựa chọn này cộng lại dài quá: %1$lld / %2$lld byte. Hãy bỏ bớt."
+          }
+        }
+      }
+    },
+    "pending.question.next": {
+      "comment": "Goes to the next question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếp"
+          }
+        }
+      }
+    },
+    "pending.question.other": {
+      "comment": "Last row of a question's options: answer in your own words.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khác…"
+          }
+        }
+      }
+    },
+    "pending.question.otherPlaceholder": {
+      "comment": "Placeholder of the free-text answer field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your answer"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Câu trả lời của bạn"
+          }
+        }
+      }
+    },
+    "pending.question.page %lld %lld": {
+      "comment": "Title of the question sheet; %1$lld is the question shown, %2$lld how many.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question %1$lld of %2$lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Câu %1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "pending.question.pickMany": {
+      "comment": "Hint under a multiple-choice question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose one or more"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn một hoặc nhiều"
+          }
+        }
+      }
+    },
+    "pending.question.pickOne": {
+      "comment": "Hint under a single-choice question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose one"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn một"
+          }
+        }
+      }
+    },
+    "pending.question.title": {
+      "comment": "Title of the question sheet (one question).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Câu hỏi"
+          }
+        }
+      }
+    },
+    "pending.question.tooLong": {
+      "comment": "Under the question sheet's buttons: Send is off because an answer is over 1024 bytes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An answer is too long. Shorten it to send."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Có câu trả lời dài quá. Rút gọn để gửi."
+          }
+        }
+      }
+    },
+    "pending.question.voice": {
+      "comment": "The question sheet's mic (label under it and VoiceOver label).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer by voice"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trả lời bằng giọng nói"
+          }
+        }
+      }
+    },
+    "pending.question.voice.noMatch": {
+      "comment": "A spoken answer picked no option; it became the typed answer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That didn't match an option; pick one by hand"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không khớp đáp án nào, hãy chọn bằng tay"
+          }
+        }
+      }
+    },
+    "pending.reviewPlan": {
+      "comment": "Button of a plan card: opens the plan review sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review plan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duyệt plan"
+          }
+        }
+      }
+    },
+    "pending.section.title %lld": {
+      "comment": "Title of the pinned pending cards; %lld is how many.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs you · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn · %lld"
+          }
+        }
+      }
+    },
+    "pending.send": {
+      "comment": "Sends the answers of the question sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
+          }
+        }
+      }
+    },
+    "pending.showMore": {
+      "comment": "Under a card's cut preview: opens the full text.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show more"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem thêm"
+          }
+        }
+      }
+    },
+    "pending.status.handledElsewhere": {
+      "comment": "The request was decided on the Mac or another phone first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already handled elsewhere"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã được xử lý ở nơi khác"
+          }
+        }
+      }
+    },
+    "pending.status.needsPairing %@": {
+      "comment": "Under an open question or plan: nothing can be sent because the Mac removed this iPhone or its key changed. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ needs to be paired again · Not sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần ghép cặp lại %@ · Chưa gửi"
+          }
+        }
+      }
+    },
+    "pending.status.noAnswer": {
+      "comment": "The Mac did not answer a decision in time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answer from the Mac yet"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa nhận được trả lời của Mac"
+          }
+        }
+      }
+    },
+    "pending.status.offline %@": {
+      "comment": "A tap while the Mac is unreachable; %@ is the Mac's name. Nothing was sent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline · Not sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline · Chưa gửi"
+          }
+        }
+      }
+    },
+    "pending.status.reconnecting": {
+      "comment": "A card's buttons are off until the link to the Mac is back and synced.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kết nối lại…"
+          }
+        }
+      }
+    },
+    "pending.status.rejected": {
+      "comment": "The Mac refused the decision.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac didn't take this decision. Open it on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không nhận quyết định này. Mở trên Mac."
+          }
+        }
+      }
+    },
+    "pending.status.retry": {
+      "comment": "Sends the decision again after no answer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thử lại"
+          }
+        }
+      }
+    },
+    "pending.status.sending": {
+      "comment": "A decision is on its way to the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang gửi…"
+          }
+        }
+      }
+    },
+    "pending.tooLong %lld %lld": {
+      "comment": "Byte counter past the limit; %1$lld is used, %2$lld the limit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too long: %1$lld / %2$lld bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dài quá: %1$lld / %2$lld byte"
+          }
+        }
+      }
+    },
+    "root.title": {
+      "comment": "The app's name, shown under the logo on the first screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX"
+          }
+        }
+      }
+    },
+    "settings.about.license": {
+      "comment": "Row label for the open-source licence note.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenses"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giấy phép"
+          }
+        }
+      }
+    },
+    "settings.about.license.value": {
+      "comment": "Which open-source package is MIT licensed; the package name is not translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "shellx-link: MIT"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "shellx-link: MIT"
+          }
+        }
+      }
+    },
+    "settings.about.title": {
+      "comment": "Settings section header.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giới thiệu"
+          }
+        }
+      }
+    },
+    "settings.about.version": {
+      "comment": "Row label for the app version.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên bản"
+          }
+        }
+      }
+    },
+    "settings.account.signOut": {
+      "comment": "Destructive button that signs out, also the title of its confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign out"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng xuất"
+          }
+        }
+      }
+    },
+    "settings.account.signOut.confirm": {
+      "comment": "Message of the sign-out confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone will be removed from every paired Mac, and its history will be deleted."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone này sẽ bị gỡ khỏi mọi Mac đã ghép cặp, và lịch sử trên iPhone sẽ bị xoá."
+          }
+        }
+      }
+    },
+    "settings.account.title": {
+      "comment": "Settings section header.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tài khoản"
+          }
+        }
+      }
+    },
+    "settings.appearance.dark": {
+      "comment": "Appearance choice: always dark.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tối"
+          }
+        }
+      }
+    },
+    "settings.appearance.light": {
+      "comment": "Appearance choice: always light.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sáng"
+          }
+        }
+      }
+    },
+    "settings.appearance.mode": {
+      "comment": "Label of the light/dark picker in Settings (VoiceOver reads it; the segments show the choices).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Color mode"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chế độ màu"
+          }
+        }
+      }
+    },
+    "settings.appearance.system": {
+      "comment": "Appearance choice: follow the iPhone's own light/dark setting.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Match iPhone"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theo máy"
+          }
+        }
+      }
+    },
+    "settings.appearance.title": {
+      "comment": "Settings section header: light or dark look of the app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giao diện"
+          }
+        }
+      }
+    },
+    "settings.title": {
+      "comment": "Title of the Settings screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cài đặt"
+          }
+        }
+      }
+    },
+    "settings.voice.language": {
+      "comment": "Settings › Voice: the language picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spoken language"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ngôn ngữ nói"
+          }
+        }
+      }
+    },
+    "settings.voice.onDevice": {
+      "comment": "Settings › Voice: speech is recognised on the iPhone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognized on this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhận dạng ngay trên iPhone."
+          }
+        }
+      }
+    },
+    "settings.voice.server %@": {
+      "comment": "Settings › Voice: speech goes to Apple's servers (the spoken language's name).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone can't recognize %@ on device, so your voice goes to Apple's servers for recognition. ShellX never receives your voice."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone này chưa nhận dạng được %@ ngay trên máy, nên giọng nói được gửi tới máy chủ của Apple để nhận dạng. ShellX không nhận giọng nói của bạn."
+          }
+        }
+      }
+    },
+    "settings.voice.title": {
+      "comment": "Settings section header.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giọng nói"
+          }
+        }
+      }
+    },
+    "settings.voice.unavailable": {
+      "comment": "No speech recognizer can run right now (Settings › Voice, and above the composer).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition isn't available right now. You can still type."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lúc này không nhận dạng giọng nói được. Bạn vẫn gõ được."
+          }
+        }
+      }
+    },
+    "signin.button": {
+      "comment": "Primary button of the sign-in screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập"
+          }
+        }
+      }
+    },
+    "signin.email": {
+      "comment": "Label of the email field, also the email row in Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email"
+          }
+        }
+      }
+    },
+    "signin.error.invalidCredentials": {
+      "comment": "Sign-in error: credentials refused.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wrong email or password."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email hoặc mật khẩu không đúng."
+          }
+        }
+      }
+    },
+    "signin.error.localWipePending": {
+      "comment": "Sign-in error: the previous account's data could not be removed from this iPhone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't clear the previous account's data on this iPhone. Try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không xoá được dữ liệu của tài khoản trước trên iPhone này. Thử lại."
+          }
+        }
+      }
+    },
+    "signin.error.network": {
+      "comment": "Sign-in error: no connection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't reach ShellX."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không kết nối được tới ShellX."
+          }
+        }
+      }
+    },
+    "signin.error.rateLimited": {
+      "comment": "Sign-in error: too many attempts.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again in a few minutes."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thử lại sau ít phút."
+          }
+        }
+      }
+    },
+    "signin.error.server": {
+      "comment": "Sign-in error: unexpected server or storage error.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX is having a problem. Try again later."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX đang gặp sự cố. Thử lại sau."
+          }
+        }
+      }
+    },
+    "signin.expired": {
+      "comment": "Shown on the sign-in screen after the relay refused the stored session.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session expired. Sign in again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên đăng nhập đã hết hạn. Đăng nhập lại."
+          }
+        }
+      }
+    },
+    "signin.password": {
+      "comment": "Label of the password field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mật khẩu"
+          }
+        }
+      }
+    },
+    "signin.subtitle": {
+      "comment": "Explains which account to use on the sign-in screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the ShellX account you signed in with on your Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng tài khoản ShellX bạn đã đăng nhập trên Mac."
+          }
+        }
+      }
+    },
+    "signin.title": {
+      "comment": "Heading of the sign-in screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to ShellX"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập ShellX"
+          }
+        }
+      }
+    },
+    "voice.denied": {
+      "comment": "The microphone or speech recognition permission is off.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX needs microphone and speech recognition access to hear you."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX cần quyền micro và nhận dạng giọng nói để nghe bạn."
+          }
+        }
+      }
+    },
+    "voice.keyboard": {
+      "comment": "The keyboard button beside the mic, and the mic's VoiceOver action.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type instead"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gõ phím"
+          }
+        }
+      }
+    },
+    "voice.language.english": {
+      "comment": "A spoken language in Settings › Voice.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếng Anh"
+          }
+        }
+      }
+    },
+    "voice.language.vietnamese": {
+      "comment": "A spoken language in Settings › Voice.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vietnamese"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếng Việt"
+          }
+        }
+      }
+    },
+    "voice.limit %@": {
+      "comment": "A dictation stopped at the byte limit (the number, formatted).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped at the %@-byte limit. Read it over before sending."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã dừng ở giới hạn %@ byte. Xem lại trước khi gửi."
+          }
+        }
+      }
+    },
+    "voice.listening": {
+      "comment": "Above the composer while the mic listens and no word came yet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang nghe…"
+          }
+        }
+      }
+    },
+    "voice.mic": {
+      "comment": "The mic button's VoiceOver label in the composer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói"
+          }
+        }
+      }
+    },
+    "voice.mic.hint": {
+      "comment": "The mic button's VoiceOver hint.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold to talk and release to finish. With VoiceOver, double-tap to start and double-tap again to finish."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ để nói, thả ra là xong. Với VoiceOver, chạm hai lần để bắt đầu, chạm hai lần nữa là xong."
+          }
+        }
+      }
+    },
+    "voice.mic.stop": {
+      "comment": "The mic button's VoiceOver label while it listens.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish talking"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói xong"
+          }
+        }
+      }
+    },
+    "voice.openSettings": {
+      "comment": "Opens the app's page in the Settings app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Cài đặt"
+          }
+        }
+      }
+    },
+    "voice.releaseToCancel": {
+      "comment": "Above the composer once the finger dragged left on the mic.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Release to cancel"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thả để huỷ"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

@@ -1,3 +1,4 @@
+import CmuxSidebar
 import CmuxWorkspaces
 
 extension SidebarWorkspaceSnapshotBuilder.Snapshot {
@@ -23,6 +24,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let compactStatusGlyph: SidebarCompactStatusGlyph?
         let taskStatusInput: SidebarWorkspaceTaskStatusSnapshot
         let hostTitleSuffix: String?
+        let nameEffect: AgentNameEffect?
+        let agentActivityText: String?
     }
 
     var contextMenuImmediateFields: ContextMenuImmediateFields {
@@ -47,7 +50,9 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             activeCodingAgentCount: activeCodingAgentCount,
             compactStatusGlyph: compactStatusGlyph,
             taskStatusInput: taskStatusInput,
-            hostTitleSuffix: hostTitleSuffix
+            hostTitleSuffix: hostTitleSuffix,
+            nameEffect: nameEffect,
+            agentActivityText: agentActivityText
         )
     }
 
@@ -101,6 +106,12 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             // The status glyph is resolved against the spinner state, so it
             // updates with the spinner while the menu is open.
             compactStatusGlyph: snapshot.compactStatusGlyph,
+            // The name effect stands in for the loading spinner and the activity
+            // text names it, so both update with the spinner while the menu is open.
+            nameEffect: snapshot.nameEffect,
+            agentActivityText: snapshot.agentActivityText,
+            // Names a row of the metadata entries above, so it stays with them.
+            agentActivityStatusKey: agentActivityStatusKey,
             // The host after a colliding title is part of the title the row shows, so it updates with it.
             hostTitleSuffix: snapshot.hostTitleSuffix
         )

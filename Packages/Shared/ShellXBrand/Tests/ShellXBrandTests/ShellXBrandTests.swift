@@ -55,6 +55,7 @@ import Foundation
         #expect(ShellXBrand.contactEmail == "phule9225@gmail.com")
         #expect(ShellXBrand.updateFeedURL.absoluteString == "https://download.shellx.pro/desktop/appcast.xml")
         #expect(ShellXFeatures.remoteMachines == false)
+        #expect(ShellXFeatures.phonePairing == true)   // 1.5.1: iPhone pairing without remote machines
         #expect(ShellXFeatures.upstreamDeviceMirroring == false)
         #expect(ShellXBrand.apiBaseURL.absoluteString == "https://relay.shellx.pro")
     }

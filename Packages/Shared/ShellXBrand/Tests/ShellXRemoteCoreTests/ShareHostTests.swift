@@ -478,7 +478,8 @@ final class ShareHostTests: XCTestCase {
         source.emit(pane: "p1", flood) // 4th resync within 10 s
         try await shareEventually { viewer.socket.isClosed }
         try await shareEventually { await host.viewers.isEmpty }
-        XCTAssertEqual(source.subscriberCount(pane: "p1"), 0)
+        // The pane subscription is released after the viewer is removed, not with it.
+        try await shareEventually { source.subscriberCount(pane: "p1") == 0 }
         await host.stop(reason: .revoked)
     }
 

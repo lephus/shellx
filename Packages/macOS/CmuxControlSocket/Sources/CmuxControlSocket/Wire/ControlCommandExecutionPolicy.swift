@@ -270,6 +270,11 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         // Keep that wait off the main actor.
         "debug.mobile.transport.disconnect",
         "debug.mobile.transport.reconnect_loop",
+        // ShellX Link phone pairing (DEBUG only): the offer reads the host
+        // key from the Keychain and the approval calls shellx-core (blocking
+        // HTTP), so both wait on the socket worker, never on the main actor.
+        "shellx.link.debug_pairing_offer",
+        "shellx.link.debug_pairing_approve",
         // Presents the Cloud tree style gallery window: one v2MainSync hop for
         // the presentation, like debug.window.screenshot's capture wait.
         "debug.cloudtree.gallery",

@@ -1,4 +1,5 @@
 import Foundation
+import SystemConfiguration
 import ShellXBrand
 import ShellXRemoteCore
 
@@ -37,15 +38,32 @@ extension ShellXRemoteEnvironment {
             #endif
             return nil
         }()
-        // The host name is only looked up when the feature can run.
-        let hostName = ShellXRemoteGate.isEnabled ? (Host.current().localizedName ?? processInfo.hostName) : ShellXBrand.appName
+        // The host name is only looked up when remote machines can run. Otherwise (serving phones only, or
+        // Settings → Account signing in with everything off) the device gets the Mac's computer name, a local
+        // read, unlike `Host.current()`.
+        let hostName = ShellXRemoteGate.isEnabled
+            ? (Host.current().localizedName ?? processInfo.hostName)
+            : (SCDynamicStoreCopyComputerName(nil, nil) as String? ?? ShellXBrand.appName)
         let system = processInfo.operatingSystemVersion
         let device = ShellXRemoteDevice(
             machineName: ShellXRemoteDevice.machineName(base: hostName, bundleID: bundleID),
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
             osVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")
+        let core = ShellXCoreClient(ShellXCoreFFI.shared)
+        // ShellX Link: the agent Feed, sessions and chat for phones. The service starts it only while it serves
+        // phones (`ShellXRemoteGate.servesPhones`) and has a `link_slot` from `machines.register`.
+        let linkHost = ShellXLinkHostController(
+            core: core,
+            storage: FallbackLinkSecretStorage.standard(onFallback: {
+                ShellXLinkHostController.log.notice("link keys: the Keychain refuses this build; using the development file store")
+            }),
+            feed: ShellXLinkFeedSource(coordinator: .shared),
+            sessions: ShellXLinkSessionSource(),
+            chat: ShellXLinkChatSource(),
+            hostVersion: device.appVersion,
+            machineName: device.machineName)
         return ShellXRemoteEnvironment(
-            core: ShellXCoreClient(ShellXCoreFFI.shared),
+            core: core,
             launcher: ShellXSidecarProcess(),
             clock: SystemRemoteClock(),
             paths: RemotePaths(bundleID: bundleID, home: FileManager.default.homeDirectoryForCurrentUser,
@@ -53,10 +71,12 @@ extension ShellXRemoteEnvironment {
             cmuxTui: bundle.bundleURL.appendingPathComponent("Contents/Resources/bin/cmux-tui"),
             apiBase: apiBase,
             device: device,
-            gateEnabled: { ShellXRemoteGate.isEnabled },
+            gateEnabled: { ShellXRemoteGate.servesPhones },
             devCredentials: devCredentials,
             bridge: ShellXAppBridgeController(),
-            workspaceOpener: ShellXTabWorkspaceOpener())
+            workspaceOpener: ShellXTabWorkspaceOpener(),
+            linkHost: linkHost,
+            remoteMachinesEnabled: { ShellXRemoteGate.isEnabled })
     }
 }
 

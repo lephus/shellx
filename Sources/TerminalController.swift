@@ -1896,6 +1896,19 @@ class TerminalController {
                     )
                 )
             }
+            // Skill and workflow markers are read here, before the queue, which
+            // can drop a best-effort tool event such as a Skill or Workflow call.
+            if let activity = AgentActivityHookObserver().observation(for: event) {
+                Task { @MainActor in
+                    AppDelegate.shared?
+                        .workspaceContainingPanel(
+                            panelId: activity.surfaceId,
+                            preferredWorkspaceId: activity.workspaceId
+                        )?
+                        .workspace
+                        .applyAgentActivity(activity.signal, surfaceId: activity.surfaceId)
+                }
+            }
             guard agentHookDeliveryQueue.enqueue(event) else {
                 return v2Error(
                     id: request.id,
@@ -2247,6 +2260,10 @@ class TerminalController {
                 code: "invalid_dispatch",
                 message: "debug.global_search.query requires asynchronous socket dispatch"
             )
+        case "shellx.link.debug_pairing_offer":
+            return v2ShellXLinkDebugPairingOffer(id: request.id, params: request.params)
+        case "shellx.link.debug_pairing_approve":
+            return v2ShellXLinkDebugPairingApprove(id: request.id, params: request.params)
         case "debug.mobile.transport.disconnect":
             let selectedConnectionID: UUID?
             if let rawConnectionID = request.params["connection_id"] {
@@ -2364,6 +2381,8 @@ class TerminalController {
                 || request.method == "debug.global_search.query"
                 || request.method == "debug.window.screenshot"
                 || request.method == "debug.mobile.transport.disconnect"
+                || request.method == "shellx.link.debug_pairing_offer"
+                || request.method == "shellx.link.debug_pairing_approve"
                 || request.method == "debug.cloudtree.gallery"
                 || request.method == "debug.window_hints" {
                 return v2Error(id: request.id, code: "method_not_found", message: "Unknown method")
@@ -6875,7 +6894,8 @@ class TerminalController {
     // The three feed reply handlers are internal (not private) because the
     // mobile data plane dispatches the same bodies from
     // `TerminalController+MobileFeed.swift`'s verb family; every entrypoint
-    // resolves through the single `FeedCoordinator.deliverReply` path.
+    // resolves through the single `FeedCoordinator.deliverReply` path, and
+    // `delivered` reports whether a waiting hook took the decision.
     nonisolated func v2FeedPermissionReply(params: [String: Any]) -> V2CallResult {
         guard let requestId = params["request_id"] as? String else {
             return .err(
@@ -6893,11 +6913,11 @@ class TerminalController {
                 data: nil
             )
         }
-        FeedCoordinator.shared.deliverReply(
+        let delivered = FeedCoordinator.shared.deliverReply(
             requestId: requestId,
             decision: .permission(mode)
         )
-        return .ok(["delivered": true])
+        return .ok(["delivered": delivered])
     }
 
     nonisolated func v2FeedQuestionReply(params: [String: Any]) -> V2CallResult {
@@ -6915,11 +6935,11 @@ class TerminalController {
                 data: nil
             )
         }
-        FeedCoordinator.shared.deliverReply(
+        let delivered = FeedCoordinator.shared.deliverReply(
             requestId: requestId,
             decision: .question(selections: selections)
         )
-        return .ok(["delivered": true])
+        return .ok(["delivered": delivered])
     }
 
     nonisolated func v2FeedExitPlanReply(params: [String: Any]) -> V2CallResult {
@@ -6940,11 +6960,11 @@ class TerminalController {
             )
         }
         let feedback = params["feedback"] as? String
-        FeedCoordinator.shared.deliverReply(
+        let delivered = FeedCoordinator.shared.deliverReply(
             requestId: requestId,
             decision: .exitPlan(mode, feedback: feedback)
         )
-        return .ok(["delivered": true])
+        return .ok(["delivered": delivered])
     }
 
     // MARK: - V2 Browser Methods
@@ -16620,6 +16640,47 @@ class TerminalController {
             return .err(code: "invalid_params", message: "Missing or invalid image_base64", data: nil)
         }
         let format = v2RawString(params, "image_format") ?? "png"
+        return mobileTerminalPasteSavedAttachment(
+            params: params,
+            debugEvent: "mobile.terminal.paste_image",
+            debugDetail: "bytes=\(imageData.count) format=\(format)",
+            rejectionMessage: "Image payload was empty or exceeded the size limit"
+        ) {
+            GhosttyApp.terminalPasteboard.saveImageData(imageData, fileExtension: format)
+        }
+    }
+
+    /// The file counterpart of ``v2MobileTerminalPasteImage(params:)``, for a file ShellX Link's phone attached:
+    /// saves the bytes under a name the Mac sanitizes, in a folder it names
+    /// (``TerminalPasteboardService/saveAttachmentData(_:fileName:)``), and injects the shell-escaped path as
+    /// terminal input into the terminal `terminalParams` names (the binding of a chat session).
+    ///
+    /// Typed values only, and called only by ``agentChatSend(sessionID:text:items:)``: no socket method reaches
+    /// this function and no socket parameter becomes its name or bytes.
+    func v2MobileTerminalPasteFile(name: String, data: Data, terminalParams: [String: Any]) -> V2CallResult {
+        guard !data.isEmpty else {
+            return .err(code: "invalid_params", message: "Missing file data", data: nil)
+        }
+        return mobileTerminalPasteSavedAttachment(
+            params: terminalParams,
+            debugEvent: "mobile.terminal.paste_file",
+            debugDetail: "bytes=\(data.count)",
+            rejectionMessage: "File payload was empty or exceeded the size limit"
+        ) {
+            GhosttyApp.terminalPasteboard.saveAttachmentData(data, fileName: name)
+        }
+    }
+
+    /// The shared tail of the mobile paste-image and paste-file paths: resolves the terminal, saves the
+    /// attachment with `save` (which returns its shell-escaped path), and injects that path as terminal input.
+    /// `debugDetail` carries counts only, never a name or bytes.
+    private func mobileTerminalPasteSavedAttachment(
+        params: [String: Any],
+        debugEvent: String,
+        debugDetail: String,
+        rejectionMessage: String,
+        save: () -> String?
+    ) -> V2CallResult {
         if let error = mobileWorkspaceIDValidationError(params: params) {
             return error
         }
@@ -16639,10 +16700,10 @@ class TerminalController {
 
         _ = applyMobileViewportReport(params: params, terminalTarget: terminalTarget)
 
-        guard let escapedPath = GhosttyApp.terminalPasteboard.saveImageData(imageData, fileExtension: format) else {
+        guard let escapedPath = save() else {
             return mobileInputWriteFailure(
                 code: "invalid_params",
-                message: "Image payload was empty or exceeded the size limit",
+                message: rejectionMessage,
                 surfaceID: surfaceId,
                 acknowledgement: MobileHostTerminalInputApplier.shared.reject(delivery)
             )
@@ -16664,7 +16725,7 @@ class TerminalController {
         }
         #if DEBUG
         cmuxDebugLog(
-            "mobile.terminal.paste_image workspace=\(resolved.workspace.id.uuidString.prefix(8)) surface=\(surfaceId.uuidString.prefix(8)) bytes=\(imageData.count) format=\(format)"
+            "\(debugEvent) workspace=\(resolved.workspace.id.uuidString.prefix(8)) surface=\(surfaceId.uuidString.prefix(8)) \(debugDetail)"
         )
         #endif
         return .ok(mobileInputSuccessPayload([

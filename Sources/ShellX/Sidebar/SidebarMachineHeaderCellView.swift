@@ -165,6 +165,32 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
         ShellXRemoteUIActions.requestAccess(to: machineID)
     }
 
+    /// The This Mac header's menu: "Pair iPhone…", the one way into phone pairing. Other headers, and
+    /// every header while ShellX remote machines are off, have none.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let header else { return super.menu(for: event) }
+        return Self.contextMenu(for: header, pairingAvailable: ShellXRemoteGate.isEnabled, target: self)
+            ?? super.menu(for: event)
+    }
+
+    static func contextMenu(for header: SidebarMachineHeaderModel, pairingAvailable: Bool,
+                            target: AnyObject?) -> NSMenu? {
+        guard pairingAvailable, header.key == .local else { return nil }
+        let menu = NSMenu()
+        let item = NSMenuItem(
+            title: String(localized: "remote.phonePairing.menu", defaultValue: "Pair iPhone…"),
+            action: #selector(SidebarMachineHeaderCellView.pairIPhoneFromMenu),
+            keyEquivalent: ""
+        )
+        item.target = target
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func pairIPhoneFromMenu() {
+        ShellXRemoteUIActions.presentPhonePairing()
+    }
+
     override func layout() {
         super.layout()
         let leading = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding

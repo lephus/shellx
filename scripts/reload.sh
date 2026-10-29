@@ -1021,6 +1021,28 @@ set_plist_url_scheme() {
     || true
 }
 
+# PRODUCT_BUNDLE_IDENTIFIER on the xcodebuild line reaches every target, so each
+# SwiftPM resource bundle comes out carrying the app's own identifier. Asset
+# catalogs are looked up by bundle identifier, so the app's catalog then answers
+# for the bundle's: every ShellXIcons coolicon drawn through SwiftUI is blank in
+# a reload.sh build (release builds keep `shellxbrand.ShellXIcons.resources`).
+# Give each such bundle an identifier of its own; run before the app is signed.
+give_resource_bundles_own_identifiers() {
+  local app_path="$1"
+  local app_bundle_id="$2"
+  local resource_bundle plist bundle_id name
+  for resource_bundle in "$app_path"/Contents/Resources/*.bundle; do
+    [[ -d "$resource_bundle" && ! -L "$resource_bundle" ]] || continue
+    plist="$resource_bundle/Contents/Info.plist"
+    [[ -f "$plist" ]] || continue
+    bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist" 2>/dev/null || true)"
+    [[ "$bundle_id" == "$app_bundle_id" ]] || continue
+    name="$(basename "$resource_bundle" .bundle)"
+    # Bundle identifiers allow letters, digits, hyphens and periods only.
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${app_bundle_id}.resources.${name//_/-}" "$plist"
+  done
+}
+
 # Prints the selected Xcode's version ("26.3"), or nothing when xcodebuild cannot say.
 selected_xcode_version() {
   xcodebuild -version 2>/dev/null | awk 'NR == 1 && $1 == "Xcode" { print $2 }' || true
@@ -2140,6 +2162,7 @@ fi
 # ShellX never bundles CodeRouter (a Manaflow service; the CLI refuses `cr`),
 # so it skips scripts/install-coderouter-client.sh, which downloads Manaflow's
 # binary from GitHub into Contents/Resources/bin.
+give_resource_bundles_own_identifiers "$APP_PATH" "$BUNDLE_ID"
 if command -v xattr >/dev/null 2>&1; then
   xattr -cr "$APP_PATH" || true
 fi

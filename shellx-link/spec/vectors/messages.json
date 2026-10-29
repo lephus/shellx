@@ -1,0 +1,1994 @@
+{
+  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names. `nonce` is a plain JSON number; 18446744073709551615 must be parsed as an unsigned 64-bit integer, never through a double. `decode_errors` entries may carry `call_id`: the call id the decoder reports with the error (absent means none). In `message`, `attach_chunk.data` and `attach_end.sha256` carry the wire strings (standard base64 with padding; 64 lowercase hex characters), which an implementation turns into bytes; `welcome.features` and `chat_send.attachments` are omitted when empty and decode to an empty list when absent.",
+  "vectors": [
+    {
+      "name": "hello",
+      "message": {
+        "case": "hello",
+        "client_version": "1.0.0",
+        "device_name": "Phu's iPhone"
+      },
+      "json": {
+        "v": 1,
+        "t": "hello",
+        "client_version": "1.0.0",
+        "device_name": "Phu's iPhone"
+      }
+    },
+    {
+      "name": "welcome",
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.3.0",
+        "machine_name": "Phu's MacBook"
+      },
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.3.0",
+        "machine_name": "Phu's MacBook"
+      }
+    },
+    {
+      "name": "welcome_with_features",
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Phu's MacBook",
+        "features": [
+          "attachments"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Phu's MacBook",
+        "features": [
+          "attachments"
+        ]
+      }
+    },
+    {
+      "name": "error",
+      "message": {
+        "case": "error",
+        "code": "protocol_mismatch",
+        "message": "unsupported protocol version 2"
+      },
+      "json": {
+        "v": 1,
+        "t": "error",
+        "code": "protocol_mismatch",
+        "message": "unsupported protocol version 2"
+      }
+    },
+    {
+      "name": "snapshot_get",
+      "message": {
+        "case": "snapshot_get",
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot.get",
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "snapshot_empty",
+      "message": {
+        "case": "snapshot",
+        "revision": 0,
+        "pending": [],
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "revision": 0,
+        "pending": [],
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "snapshot_with_items",
+      "message": {
+        "case": "snapshot",
+        "revision": 7,
+        "pending": [
+          {
+            "request_id": "req-1",
+            "kind": "permission",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "tool_name": "Bash",
+            "tool_input_preview": "rm -rf build \"quoted\" \u00e9 \ud83d\ude80",
+            "created_at_ms": 1789000000000,
+            "modes": [
+              "once",
+              "always",
+              "all",
+              "deny"
+            ]
+          },
+          {
+            "request_id": "req-2",
+            "kind": "question",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "created_at_ms": 1789000001000,
+            "modes": []
+          }
+        ],
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "revision": 7,
+        "pending": [
+          {
+            "request_id": "req-1",
+            "kind": "permission",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "tool_name": "Bash",
+            "tool_input_preview": "rm -rf build \"quoted\" \u00e9 \ud83d\ude80",
+            "created_at_ms": 1789000000000,
+            "modes": [
+              "once",
+              "always",
+              "all",
+              "deny"
+            ]
+          },
+          {
+            "request_id": "req-2",
+            "kind": "question",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "created_at_ms": 1789000001000,
+            "modes": []
+          }
+        ],
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "changed",
+      "message": {
+        "case": "changed",
+        "revision": 8,
+        "added": [
+          {
+            "request_id": "req-3",
+            "kind": "exit_plan",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000002000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ]
+          }
+        ],
+        "resolved": [
+          "req-1",
+          "req-2"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.changed",
+        "revision": 8,
+        "added": [
+          {
+            "request_id": "req-3",
+            "kind": "exit_plan",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000002000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ]
+          }
+        ],
+        "resolved": [
+          "req-1",
+          "req-2"
+        ]
+      }
+    },
+    {
+      "name": "reply_once",
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      }
+    },
+    {
+      "name": "reply_always",
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "always"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "always"
+        }
+      }
+    },
+    {
+      "name": "reply_all",
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "all"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "all"
+        }
+      }
+    },
+    {
+      "name": "reply_deny",
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "deny"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "deny"
+        }
+      }
+    },
+    {
+      "name": "reply_result_delivered",
+      "message": {
+        "case": "reply_result",
+        "request_id": "req-1",
+        "outcome": "delivered",
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "request_id": "req-1",
+        "outcome": "delivered",
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "reply_result_already_handled",
+      "message": {
+        "case": "reply_result",
+        "request_id": "req-1",
+        "outcome": "already_handled",
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "request_id": "req-1",
+        "outcome": "already_handled",
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "reply_result_unknown",
+      "message": {
+        "case": "reply_result",
+        "request_id": "req-9",
+        "outcome": "unknown",
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "request_id": "req-9",
+        "outcome": "unknown",
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "ping",
+      "message": {
+        "case": "ping",
+        "nonce": 42
+      },
+      "json": {
+        "v": 1,
+        "t": "ping",
+        "nonce": 42
+      }
+    },
+    {
+      "name": "pong_max_nonce",
+      "message": {
+        "case": "pong",
+        "nonce": 18446744073709551615
+      },
+      "json": {
+        "v": 1,
+        "t": "pong",
+        "nonce": 18446744073709551615
+      }
+    },
+    {
+      "name": "reply_permission",
+      "message": {
+        "case": "reply",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      }
+    },
+    {
+      "name": "reply_question",
+      "message": {
+        "case": "reply",
+        "call_id": "c3",
+        "request_id": "req-2",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "SQLite \u00e9"
+          ]
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c3",
+        "request_id": "req-2",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "SQLite \u00e9"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reply_question_free_text",
+      "message": {
+        "case": "reply",
+        "call_id": "c21",
+        "request_id": "req-12",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Other: MySQL 8"
+          ]
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c21",
+        "request_id": "req-12",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Other: MySQL 8"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reply_question_two_questions",
+      "message": {
+        "case": "reply",
+        "call_id": "c22",
+        "request_id": "req-13",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "Redis and a queue"
+          ]
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c22",
+        "request_id": "req-13",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "Redis and a queue"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reply_exit_plan",
+      "message": {
+        "case": "reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "manual",
+          "feedback": "split step 2 \ud83d\ude80"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "manual",
+          "feedback": "split step 2 \ud83d\ude80"
+        }
+      }
+    },
+    {
+      "name": "reply_exit_plan_no_feedback",
+      "message": {
+        "case": "reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "auto_accept"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "auto_accept"
+        }
+      }
+    },
+    {
+      "name": "reply_result",
+      "message": {
+        "case": "reply_result",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "outcome": "delivered"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "outcome": "delivered"
+      }
+    },
+    {
+      "name": "snapshot_get_call_id",
+      "message": {
+        "case": "snapshot_get",
+        "call_id": "c7"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot.get",
+        "call_id": "c7"
+      }
+    },
+    {
+      "name": "snapshot_with_question",
+      "message": {
+        "case": "snapshot",
+        "call_id": "c5",
+        "revision": 9,
+        "pending": [
+          {
+            "request_id": "req-2",
+            "kind": "question",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000003000,
+            "modes": [],
+            "questions": [
+              {
+                "id": "q-1",
+                "header": "Database",
+                "prompt": "Which database should the app use?",
+                "multi_select": false,
+                "options": [
+                  {
+                    "id": "o-1",
+                    "label": "Postgres",
+                    "description": "Hosted, relational"
+                  },
+                  {
+                    "id": "o-2",
+                    "label": "SQLite \u00e9"
+                  }
+                ]
+              },
+              {
+                "id": "q-2",
+                "prompt": "Which extras?",
+                "multi_select": true,
+                "options": [
+                  {
+                    "id": "o-3",
+                    "label": "Auth"
+                  },
+                  {
+                    "id": "o-4",
+                    "label": "Metrics"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c5",
+        "revision": 9,
+        "pending": [
+          {
+            "request_id": "req-2",
+            "kind": "question",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000003000,
+            "modes": [],
+            "questions": [
+              {
+                "id": "q-1",
+                "header": "Database",
+                "prompt": "Which database should the app use?",
+                "multi_select": false,
+                "options": [
+                  {
+                    "id": "o-1",
+                    "label": "Postgres",
+                    "description": "Hosted, relational"
+                  },
+                  {
+                    "id": "o-2",
+                    "label": "SQLite \u00e9"
+                  }
+                ]
+              },
+              {
+                "id": "q-2",
+                "prompt": "Which extras?",
+                "multi_select": true,
+                "options": [
+                  {
+                    "id": "o-3",
+                    "label": "Auth"
+                  },
+                  {
+                    "id": "o-4",
+                    "label": "Metrics"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "snapshot_with_plan",
+      "message": {
+        "case": "snapshot",
+        "call_id": "c6",
+        "revision": 10,
+        "pending": [
+          {
+            "request_id": "req-3",
+            "kind": "exit_plan",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000004000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ],
+            "plan_preview": "1. Add the codec\n2. Add the tests \ud83d\ude80"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c6",
+        "revision": 10,
+        "pending": [
+          {
+            "request_id": "req-3",
+            "kind": "exit_plan",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000004000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ],
+            "plan_preview": "1. Add the codec\n2. Add the tests \ud83d\ude80"
+          }
+        ]
+      }
+    },
+    {
+      "name": "error_with_call_id",
+      "message": {
+        "case": "error",
+        "code": "bad_request",
+        "message": "the frame could not be decoded",
+        "call_id": "c9"
+      },
+      "json": {
+        "v": 1,
+        "t": "error",
+        "code": "bad_request",
+        "message": "the frame could not be decoded",
+        "call_id": "c9"
+      }
+    },
+    {
+      "name": "sessions_get",
+      "message": {
+        "case": "sessions_get",
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions.get",
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "sessions_empty",
+      "message": {
+        "case": "sessions",
+        "call_id": "c2",
+        "revision": 0,
+        "sessions": []
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions",
+        "call_id": "c2",
+        "revision": 0,
+        "sessions": []
+      }
+    },
+    {
+      "name": "sessions",
+      "message": {
+        "case": "sessions",
+        "call_id": "c3",
+        "revision": 4,
+        "sessions": [
+          {
+            "session_id": "s-1",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "title": "Fix the relay",
+            "state": "working",
+            "state_since_ms": 1700000000000,
+            "last_activity_ms": 1700000005000
+          },
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions",
+        "call_id": "c3",
+        "revision": 4,
+        "sessions": [
+          {
+            "session_id": "s-1",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "title": "Fix the relay",
+            "state": "working",
+            "state_since_ms": 1700000000000,
+            "last_activity_ms": 1700000005000
+          },
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sessions_changed",
+      "message": {
+        "case": "sessions_changed",
+        "revision": 5,
+        "upserted": [
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ],
+        "removed": [
+          "s-1"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions.changed",
+        "revision": 5,
+        "upserted": [
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ],
+        "removed": [
+          "s-1"
+        ]
+      }
+    },
+    {
+      "name": "chat_history_get_latest",
+      "message": {
+        "case": "chat_history_get",
+        "call_id": "c4",
+        "session_id": "s-1",
+        "limit": 50
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history.get",
+        "call_id": "c4",
+        "session_id": "s-1",
+        "limit": 50
+      }
+    },
+    {
+      "name": "chat_history_get_before",
+      "message": {
+        "case": "chat_history_get",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "before_seq": 40,
+        "limit": 20
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history.get",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "before_seq": 40,
+        "limit": 20
+      }
+    },
+    {
+      "name": "chat_history",
+      "message": {
+        "case": "chat_history",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-1",
+            "seq": 1,
+            "role": "user",
+            "kind": "prose",
+            "text": "Fix the relay",
+            "ts_ms": 1700000001000,
+            "rev": 11
+          },
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000,
+            "rev": 21
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000,
+            "rev": 31
+          }
+        ],
+        "has_more": true
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-1",
+            "seq": 1,
+            "role": "user",
+            "kind": "prose",
+            "text": "Fix the relay",
+            "ts_ms": 1700000001000,
+            "rev": 11
+          },
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000,
+            "rev": 21
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000,
+            "rev": 31
+          }
+        ],
+        "has_more": true
+      }
+    },
+    {
+      "name": "chat_history_empty",
+      "message": {
+        "case": "chat_history",
+        "call_id": "c6",
+        "session_id": "s-2",
+        "entries": [],
+        "has_more": false
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history",
+        "call_id": "c6",
+        "session_id": "s-2",
+        "entries": [],
+        "has_more": false
+      }
+    },
+    {
+      "name": "chat_entries",
+      "message": {
+        "case": "chat_entries",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000,
+            "rev": 21
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000,
+            "rev": 31
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.entries",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000,
+            "rev": 21
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000,
+            "rev": 31
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat_reset",
+      "message": {
+        "case": "chat_reset",
+        "session_id": "s-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.reset",
+        "session_id": "s-1"
+      }
+    },
+    {
+      "name": "chat_send",
+      "message": {
+        "case": "chat_send",
+        "call_id": "c7",
+        "session_id": "s-1",
+        "text": "Go ahead"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c7",
+        "session_id": "s-1",
+        "text": "Go ahead"
+      }
+    },
+    {
+      "name": "chat_send_with_attachments",
+      "message": {
+        "case": "chat_send",
+        "call_id": "c60",
+        "session_id": "s-1",
+        "text": "fix this error",
+        "attachments": [
+          "a1",
+          "a2"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c60",
+        "session_id": "s-1",
+        "text": "fix this error",
+        "attachments": [
+          "a1",
+          "a2"
+        ]
+      }
+    },
+    {
+      "name": "chat_send_attachments_only",
+      "message": {
+        "case": "chat_send",
+        "call_id": "c61",
+        "session_id": "s-1",
+        "text": "",
+        "attachments": [
+          "a1"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c61",
+        "session_id": "s-1",
+        "text": "",
+        "attachments": [
+          "a1"
+        ]
+      }
+    },
+    {
+      "name": "chat_send_result_submitted",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c7",
+        "outcome": "submitted"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c7",
+        "outcome": "submitted"
+      }
+    },
+    {
+      "name": "chat_send_result_not_found",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c8",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c8",
+        "outcome": "not_found"
+      }
+    },
+    {
+      "name": "chat_send_result_busy",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c9",
+        "outcome": "busy"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c9",
+        "outcome": "busy"
+      }
+    },
+    {
+      "name": "chat_send_result_failed",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c10",
+        "outcome": "failed"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c10",
+        "outcome": "failed"
+      }
+    },
+    {
+      "name": "chat_interrupt_soft",
+      "message": {
+        "case": "chat_interrupt",
+        "call_id": "c11",
+        "session_id": "s-1",
+        "hard": false
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt",
+        "call_id": "c11",
+        "session_id": "s-1",
+        "hard": false
+      }
+    },
+    {
+      "name": "chat_interrupt_hard",
+      "message": {
+        "case": "chat_interrupt",
+        "call_id": "c12",
+        "session_id": "s-1",
+        "hard": true
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt",
+        "call_id": "c12",
+        "session_id": "s-1",
+        "hard": true
+      }
+    },
+    {
+      "name": "chat_interrupt_result_sent",
+      "message": {
+        "case": "chat_interrupt_result",
+        "call_id": "c11",
+        "outcome": "sent"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt.result",
+        "call_id": "c11",
+        "outcome": "sent"
+      }
+    },
+    {
+      "name": "chat_interrupt_result_not_found",
+      "message": {
+        "case": "chat_interrupt_result",
+        "call_id": "c13",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt.result",
+        "call_id": "c13",
+        "outcome": "not_found"
+      }
+    },
+    {
+      "name": "chat_interrupt_result_failed",
+      "message": {
+        "case": "chat_interrupt_result",
+        "call_id": "c14",
+        "outcome": "failed"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt.result",
+        "call_id": "c14",
+        "outcome": "failed"
+      }
+    },
+    {
+      "name": "attach_begin_image",
+      "message": {
+        "case": "attach_begin",
+        "call_id": "c62",
+        "kind": "image",
+        "name": "screenshot.jpg",
+        "size": 482113
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c62",
+        "kind": "image",
+        "name": "screenshot.jpg",
+        "size": 482113
+      }
+    },
+    {
+      "name": "attach_begin_file",
+      "message": {
+        "case": "attach_begin",
+        "call_id": "c63",
+        "kind": "file",
+        "name": "build log.txt",
+        "size": 10485760
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c63",
+        "kind": "file",
+        "name": "build log.txt",
+        "size": 10485760
+      }
+    },
+    {
+      "name": "attach_ready",
+      "message": {
+        "case": "attach_ready",
+        "call_id": "c62",
+        "attachment_id": "a1"
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.ready",
+        "call_id": "c62",
+        "attachment_id": "a1"
+      }
+    },
+    {
+      "name": "attach_chunk_first",
+      "message": {
+        "case": "attach_chunk",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "aGVsbG8gd29ybGQ="
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "aGVsbG8gd29ybGQ="
+      }
+    },
+    {
+      "name": "attach_chunk_two_padding_characters",
+      "message": {
+        "case": "attach_chunk",
+        "call_id": "c65",
+        "attachment_id": "a1",
+        "offset": 11,
+        "data": "QQ=="
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c65",
+        "attachment_id": "a1",
+        "offset": 11,
+        "data": "QQ=="
+      }
+    },
+    {
+      "name": "attach_chunk_result",
+      "message": {
+        "case": "attach_chunk_result",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "received": 11
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.chunk.result",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "received": 11
+      }
+    },
+    {
+      "name": "attach_end",
+      "message": {
+        "case": "attach_end",
+        "call_id": "c66",
+        "attachment_id": "a1",
+        "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c66",
+        "attachment_id": "a1",
+        "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+      }
+    },
+    {
+      "name": "attach_end_result",
+      "message": {
+        "case": "attach_end_result",
+        "call_id": "c66",
+        "attachment_id": "a1"
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.end.result",
+        "call_id": "c66",
+        "attachment_id": "a1"
+      }
+    }
+  ],
+  "decode_only": [
+    {
+      "name": "unknown_type_is_forward_compatible",
+      "json": {
+        "v": 1,
+        "t": "future.thing",
+        "anything": [
+          1,
+          2,
+          3
+        ]
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.thing"
+      }
+    },
+    {
+      "name": "unknown_type_keeps_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": "c42",
+        "anything": {
+          "x": 1
+        }
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call",
+        "call_id": "c42"
+      }
+    },
+    {
+      "name": "unknown_type_drops_invalid_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call"
+      }
+    },
+    {
+      "name": "unknown_type_drops_non_string_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": 7
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call"
+      }
+    },
+    {
+      "name": "unknown_fields_ignored",
+      "json": {
+        "v": 1,
+        "t": "ping",
+        "nonce": 5,
+        "extra": true
+      },
+      "message": {
+        "case": "ping",
+        "nonce": 5
+      }
+    },
+    {
+      "name": "reply_unknown_mode",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "bypass2"
+        }
+      },
+      "message": {
+        "case": "reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "bypass2"
+        }
+      }
+    },
+    {
+      "name": "pending_unknown_kind",
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c1",
+        "revision": 1,
+        "pending": [
+          {
+            "request_id": "r",
+            "kind": "hologram",
+            "agent": "claude",
+            "workspace_id": "w",
+            "workspace_title": "t",
+            "created_at_ms": 1,
+            "modes": [
+              "wave"
+            ],
+            "future_field": 1
+          }
+        ]
+      },
+      "message": {
+        "case": "snapshot",
+        "call_id": "c1",
+        "revision": 1,
+        "pending": [
+          {
+            "request_id": "r",
+            "kind": "hologram",
+            "agent": "claude",
+            "workspace_id": "w",
+            "workspace_title": "t",
+            "created_at_ms": 1,
+            "modes": [
+              "wave"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "reply_unknown_decision_kind",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "teleport",
+          "where": "moon"
+        }
+      },
+      "message": {
+        "case": "reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "teleport"
+        }
+      }
+    },
+    {
+      "name": "reply_result_unknown_outcome",
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "call_id": "c1",
+        "request_id": "r",
+        "outcome": "later"
+      },
+      "message": {
+        "case": "reply_result",
+        "call_id": "c1",
+        "request_id": "r",
+        "outcome": "later"
+      }
+    },
+    {
+      "name": "session_unknown_state",
+      "message": {
+        "case": "sessions",
+        "call_id": "c20",
+        "revision": 1,
+        "sessions": [
+          {
+            "session_id": "s-9",
+            "agent": "codex",
+            "workspace_id": "ws-9",
+            "workspace_title": "lab",
+            "state": "sleeping"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions",
+        "call_id": "c20",
+        "revision": 1,
+        "sessions": [
+          {
+            "session_id": "s-9",
+            "agent": "codex",
+            "workspace_id": "ws-9",
+            "workspace_title": "lab",
+            "state": "sleeping",
+            "future_field": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "entry_unknown_kind",
+      "message": {
+        "case": "chat_entries",
+        "session_id": "s-9",
+        "entries": [
+          {
+            "id": "e-9",
+            "seq": 9,
+            "role": "tool",
+            "kind": "diagram",
+            "text": "?",
+            "ts_ms": 1700000009000,
+            "rev": 91
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.entries",
+        "session_id": "s-9",
+        "entries": [
+          {
+            "id": "e-9",
+            "seq": 9,
+            "role": "tool",
+            "kind": "diagram",
+            "text": "?",
+            "ts_ms": 1700000009000,
+            "rev": 91
+          }
+        ]
+      }
+    },
+    {
+      "name": "attach_begin_unknown_kind",
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c67",
+        "kind": "audio",
+        "name": "memo.m4a",
+        "size": 9
+      },
+      "message": {
+        "case": "attach_begin",
+        "call_id": "c67",
+        "kind": "audio",
+        "name": "memo.m4a",
+        "size": 9
+      }
+    },
+    {
+      "name": "welcome_unknown_feature_is_kept",
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac",
+        "features": [
+          "attachments",
+          "teleport"
+        ]
+      },
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac",
+        "features": [
+          "attachments",
+          "teleport"
+        ]
+      }
+    },
+    {
+      "name": "welcome_empty_features",
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac",
+        "features": []
+      },
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac"
+      }
+    },
+    {
+      "name": "chat_send_empty_attachments",
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c68",
+        "session_id": "s-1",
+        "text": "hi",
+        "attachments": []
+      },
+      "message": {
+        "case": "chat_send",
+        "call_id": "c68",
+        "session_id": "s-1",
+        "text": "hi"
+      }
+    }
+  ],
+  "decode_errors": [
+    {
+      "name": "wrong_version",
+      "json": {
+        "v": 2,
+        "t": "ping",
+        "nonce": 1
+      },
+      "error": "wrong_version"
+    },
+    {
+      "name": "wrong_version_unknown_type",
+      "json": {
+        "v": 2,
+        "t": "future.thing"
+      },
+      "error": "wrong_version"
+    },
+    {
+      "name": "missing_version",
+      "json": {
+        "t": "ping",
+        "nonce": 1
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "missing_type",
+      "json": {
+        "v": 1
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "known_type_missing_field",
+      "json": {
+        "v": 1,
+        "t": "ping"
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "known_type_missing_decision_mode",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission"
+        }
+      },
+      "error": "bad_json",
+      "call_id": "c1"
+    },
+    {
+      "name": "version_float",
+      "json_text": "{\"v\":1.0,\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "version_exponent",
+      "json_text": "{\"v\":1e0,\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "version_string",
+      "json_text": "{\"v\":\"1\",\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "version_bool",
+      "json_text": "{\"v\":true,\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_without_call_id",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_call_id_65_bytes",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_empty_call_id",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_missing_request_id",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json",
+      "call_id": "c1"
+    },
+    {
+      "name": "pending_missing_modes",
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c1",
+        "revision": 1,
+        "pending": [
+          {
+            "request_id": "r",
+            "kind": "permission",
+            "agent": "claude",
+            "workspace_id": "w",
+            "workspace_title": "t",
+            "created_at_ms": 1
+          }
+        ]
+      },
+      "error": "bad_json",
+      "call_id": "c1"
+    },
+    {
+      "name": "chat_reset_missing_session_id",
+      "json": {
+        "v": 1,
+        "t": "chat.reset"
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "attach_chunk_data_not_base64",
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c70",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "%%%"
+      },
+      "error": "bad_json",
+      "call_id": "c70"
+    },
+    {
+      "name": "attach_chunk_data_missing_padding",
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c70",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "QQ"
+      },
+      "error": "bad_json",
+      "call_id": "c70"
+    },
+    {
+      "name": "attach_chunk_data_url_safe_alphabet",
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c70",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "-_8="
+      },
+      "error": "bad_json",
+      "call_id": "c70"
+    },
+    {
+      "name": "attach_end_sha256_uppercase",
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c71",
+        "attachment_id": "a1",
+        "sha256": "B94D27B9934D3E08A52E52D7DA7DABFAC484EFE37A5380EE9088F7ACE2EFCDE9"
+      },
+      "error": "bad_json",
+      "call_id": "c71"
+    },
+    {
+      "name": "attach_end_sha256_63_characters",
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c71",
+        "attachment_id": "a1",
+        "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde"
+      },
+      "error": "bad_json",
+      "call_id": "c71"
+    },
+    {
+      "name": "attach_end_sha256_not_hex",
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c71",
+        "attachment_id": "a1",
+        "sha256": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+      },
+      "error": "bad_json",
+      "call_id": "c71"
+    },
+    {
+      "name": "attach_begin_missing_kind",
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c72",
+        "name": "a.jpg",
+        "size": 3
+      },
+      "error": "bad_json",
+      "call_id": "c72"
+    },
+    {
+      "name": "attach_ready_missing_attachment_id",
+      "json": {
+        "v": 1,
+        "t": "attach.ready",
+        "call_id": "c73"
+      },
+      "error": "bad_json",
+      "call_id": "c73"
+    }
+  ],
+  "boundary_frames": {
+    "comment": "Frame text = prefix + filler + suffix, filler = concatenation of text repeated count times. Size limit 65519 counts UTF-8 BYTES, not characters. Decoding must give the message in `ok` entries, and error `frame_too_large` otherwise; encoding the same `error` message must succeed / fail identically.",
+    "prefix": "{\"v\":1,\"t\":\"error\",\"code\":\"x\",\"message\":\"",
+    "suffix": "\"}",
+    "cases": [
+      {
+        "name": "exactly_65519_bytes",
+        "filler": [
+          {
+            "text": "a",
+            "count": 65476
+          }
+        ],
+        "bytes": 65519,
+        "result": "ok"
+      },
+      {
+        "name": "65520_bytes",
+        "filler": [
+          {
+            "text": "a",
+            "count": 65477
+          }
+        ],
+        "bytes": 65520,
+        "result": "frame_too_large"
+      },
+      {
+        "name": "multibyte_bytes_over_limit_chars_under",
+        "filler": [
+          {
+            "text": "a",
+            "count": 1
+          },
+          {
+            "text": "\u00e9",
+            "count": 32738
+          }
+        ],
+        "bytes": 65520,
+        "chars": 32782,
+        "result": "frame_too_large"
+      },
+      {
+        "name": "multibyte_exactly_65519_bytes",
+        "filler": [
+          {
+            "text": "a",
+            "count": 2
+          },
+          {
+            "text": "\u00e9",
+            "count": 32737
+          }
+        ],
+        "bytes": 65519,
+        "result": "ok"
+      }
+    ]
+  }
+}

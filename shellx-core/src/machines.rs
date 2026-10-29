@@ -1,6 +1,6 @@
 //! `machines.register` / `machines.list` / `machines.heartbeat` and `machine.json`.
 //!
-//! `machine.json` = `{machine_id, slot}` in the state dir. It is removed by
+//! `machine.json` = `{machine_id, slot, link_slot?}` in the state dir. It is removed by
 //! `auth.logout` and by an `auth.login` that changes the account.
 
 use crate::api::{ListResponse, MachineFile, RegisterRequest, RegisterResponse};
@@ -73,10 +73,11 @@ pub fn register(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &
     if resp.machine_id.is_empty() || resp.slot.is_empty() {
         return Err(CoreError::new("server", format!("{PATH}: response is missing machine_id or slot")));
     }
-    let file = MachineFile { machine_id: resp.machine_id.clone(), slot: resp.slot.clone() };
+    let link_slot = resp.link_slot.filter(|s| !s.is_empty());
+    let file = MachineFile { machine_id: resp.machine_id.clone(), slot: resp.slot.clone(), link_slot: link_slot.clone() };
     let bytes = serde_json::to_vec(&file).map_err(|_| CoreError::new("io", "machine record is not serializable"))?;
     store.write_secret(MACHINE_FILE, &bytes)?;
-    Ok(json!({"machine_id": resp.machine_id, "slot": resp.slot}))
+    Ok(json!({"machine_id": resp.machine_id, "slot": resp.slot, "link_slot": link_slot}))
 }
 
 pub fn list(agent: &ureq::Agent, cfg: &Config, store: &StateStore) -> Result<Value, CoreError> {

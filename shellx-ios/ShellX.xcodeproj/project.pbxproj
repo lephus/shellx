@@ -1,0 +1,331 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5E11A0000000000000000025 /* ShellXAppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A0000000000000000024 /* ShellXAppCore */; };
+		5E11A0000000000000000027 /* ShellXAppTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A0000000000000000026 /* ShellXAppTestSupport */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5E11A0000000000000000018 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5E11A0000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5E11A0000000000000000010;
+			remoteInfo = ShellX;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		5E11A0000000000000000007 /* ShellX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShellX.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E11A0000000000000000008 /* ShellXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShellXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E11A0000000000000000009 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		5E11A000000000000000000A /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		5E11A000000000000000000B /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		5E11A000000000000000000C /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
+		5E11A000000000000000000D /* ShellXTests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = ShellXTests.xcconfig; sourceTree = "<group>"; };
+		5E11A000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5E11A000000000000000000F /* ShellX.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShellX.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		5E11A0000000000000000005 /* ShellX */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShellX;
+			sourceTree = "<group>";
+		};
+		5E11A0000000000000000006 /* ShellXTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShellXTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5E11A0000000000000000013 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5E11A0000000000000000025 /* ShellXAppCore in Frameworks */,
+				5E11A0000000000000000027 /* ShellXAppTestSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E11A0000000000000000016 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5E11A0000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				5E11A0000000000000000005 /* ShellX */,
+				5E11A0000000000000000006 /* ShellXTests */,
+				5E11A0000000000000000004 /* Config */,
+				5E11A0000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5E11A0000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5E11A0000000000000000007 /* ShellX.app */,
+				5E11A0000000000000000008 /* ShellXTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5E11A0000000000000000004 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				5E11A0000000000000000009 /* Base.xcconfig */,
+				5E11A000000000000000000A /* Debug.xcconfig */,
+				5E11A000000000000000000B /* Release.xcconfig */,
+				5E11A000000000000000000C /* Version.xcconfig */,
+				5E11A000000000000000000D /* ShellXTests.xcconfig */,
+				5E11A000000000000000000E /* Info.plist */,
+				5E11A000000000000000000F /* ShellX.entitlements */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5E11A0000000000000000010 /* ShellX */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E11A000000000000000001B /* Build configuration list for PBXNativeTarget "ShellX" */;
+			buildPhases = (
+				5E11A0000000000000000012 /* Sources */,
+				5E11A0000000000000000013 /* Frameworks */,
+				5E11A0000000000000000014 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5E11A0000000000000000005 /* ShellX */,
+			);
+			name = ShellX;
+			packageProductDependencies = (
+				5E11A0000000000000000024 /* ShellXAppCore */,
+				5E11A0000000000000000026 /* ShellXAppTestSupport */,
+			);
+			productName = ShellX;
+			productReference = 5E11A0000000000000000007 /* ShellX.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5E11A0000000000000000011 /* ShellXTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E11A000000000000000001C /* Build configuration list for PBXNativeTarget "ShellXTests" */;
+			buildPhases = (
+				5E11A0000000000000000015 /* Sources */,
+				5E11A0000000000000000016 /* Frameworks */,
+				5E11A0000000000000000017 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5E11A0000000000000000019 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5E11A0000000000000000006 /* ShellXTests */,
+			);
+			name = ShellXTests;
+			packageProductDependencies = (
+			);
+			productName = ShellXTests;
+			productReference = 5E11A0000000000000000008 /* ShellXTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5E11A0000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					5E11A0000000000000000010 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					5E11A0000000000000000011 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 5E11A0000000000000000010;
+					};
+				};
+			};
+			buildConfigurationList = 5E11A000000000000000001A /* Build configuration list for PBXProject "ShellX" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				vi,
+				Base,
+			);
+			mainGroup = 5E11A0000000000000000002;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5E11A0000000000000000023 /* XCLocalSwiftPackageReference "Packages/ShellXAppCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5E11A0000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5E11A0000000000000000010 /* ShellX */,
+				5E11A0000000000000000011 /* ShellXTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5E11A0000000000000000014 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E11A0000000000000000017 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5E11A0000000000000000012 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5E11A0000000000000000015 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5E11A0000000000000000019 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5E11A0000000000000000010 /* ShellX */;
+			targetProxy = 5E11A0000000000000000018 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5E11A000000000000000001D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5E11A000000000000000000A /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		5E11A000000000000000001E /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5E11A000000000000000000B /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		5E11A000000000000000001F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		5E11A0000000000000000020 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		5E11A0000000000000000021 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5E11A000000000000000000D /* ShellXTests.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		5E11A0000000000000000022 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5E11A000000000000000000D /* ShellXTests.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5E11A000000000000000001A /* Build configuration list for PBXProject "ShellX" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E11A000000000000000001D /* Debug */,
+				5E11A000000000000000001E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E11A000000000000000001B /* Build configuration list for PBXNativeTarget "ShellX" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E11A000000000000000001F /* Debug */,
+				5E11A0000000000000000020 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E11A000000000000000001C /* Build configuration list for PBXNativeTarget "ShellXTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E11A0000000000000000021 /* Debug */,
+				5E11A0000000000000000022 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		5E11A0000000000000000023 /* XCLocalSwiftPackageReference "Packages/ShellXAppCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/ShellXAppCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5E11A0000000000000000024 /* ShellXAppCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E11A0000000000000000023 /* XCLocalSwiftPackageReference "Packages/ShellXAppCore" */;
+			productName = ShellXAppCore;
+		};
+		5E11A0000000000000000026 /* ShellXAppTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E11A0000000000000000023 /* XCLocalSwiftPackageReference "Packages/ShellXAppCore" */;
+			productName = ShellXAppTestSupport;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 5E11A0000000000000000001 /* Project object */;
+}

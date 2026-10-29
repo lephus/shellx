@@ -263,11 +263,14 @@ final class BonsplitTabDragUITests: XCTestCase {
             )
 
             if let referenceTopInset {
+                // ShellX: outside minimal mode the titlebar row holds the
+                // ShellX accessory, so the mode bar sits one row lower.
+                let expectedShift: CGFloat = presentationMode == .minimal ? 0 : expectedModeBarHeight
                 XCTAssertEqual(
-                    modeBarMinY,
-                    referenceTopInset,
+                    abs(modeBarMinY - referenceTopInset),
+                    expectedShift,
                     accuracy: 2,
-                    "Expected right sidebar mode bar top position not to shift between presentation modes. mode=\(presentationMode.rawValue) geometry=\(geometry) window=\(window.frame)"
+                    "Expected right sidebar mode bar to sit \(expectedShift)pt below its minimal-mode position. mode=\(presentationMode.rawValue) geometry=\(geometry) window=\(window.frame)"
                 )
             } else {
                 referenceTopInset = modeBarMinY

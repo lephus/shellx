@@ -7,6 +7,12 @@ import ShellXIcons
 /// cmux on iOS: the pairing-host toggle, the preferred listener port (with a
 /// live bound-port indicator), an optional display-name override, and
 /// connection/route diagnostics.
+///
+/// A host that pairs phones through ShellX Link
+/// (``SettingsHostActions/pairsPhonesThroughShellXLink``) gets one "Pair
+/// iPhone" row instead, whose button opens the pairing QR. The rows above
+/// drive cmux's own pairing host and phone push, which such a host does not
+/// run, so they are hidden there.
 @MainActor
 public struct MobileSection: View {
     @State private var iOSPairingHost: DefaultsValueModel<Bool>
@@ -86,48 +92,10 @@ public struct MobileSection: View {
     public var body: some View {
         Group {
             SettingsSectionHeader(String(localized: "settings.section.mobile", defaultValue: "Mobile"), section: .mobile)
-            SettingsCard {
-                iOSPairingHostRow
-                SettingsCardDivider()
-                if remoteControlManagedByPolicy {
-                    SettingsCardNote(String(
-                        localized: "settings.mobile.managedByOrganization",
-                        defaultValue: "Remote control from the iOS app is disabled by your organization."
-                    ))
-                    SettingsCardDivider()
-                }
-                // Phone-push forwarding is outbound-only and explicitly out of
-                // the DisableRemoteControl policy's scope, so its rows stay
-                // editable even while the remote-control rows are managed.
-                phonePushForwardingRow
-                SettingsCardDivider()
-                phonePushModeRow
-                SettingsCardDivider()
-                phonePushHideContentRow
-                SettingsCardDivider()
-                Group {
-                    pairDeviceRow
-                    SettingsCardDivider()
-                    portRow
-                    boundPortStatusRow
-                    SettingsCardDivider()
-                    displayNameRow
-                    SettingsCardDivider()
-                    artifactFolderAccessRow
-                    SettingsCardDivider()
-                    browserTunnelRow
-                    // Keep diagnostics visible while a live endpoint is draining
-                    // after the user turns pairing off.
-                    if iOSPairingHost.current || status.current?.isRunning == true {
-                        SettingsCardDivider()
-                        diagnostics
-                    }
-                    SettingsCardNote(String(
-                        localized: "settings.mobile.port.note",
-                        defaultValue: "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, ShellX chooses an available port."
-                    ))
-                }
-                .disabled(remoteControlManagedByPolicy)
+            if hostActions.pairsPhonesThroughShellXLink {
+                shellXLinkCard
+            } else {
+                cmuxCard
             }
         }
         .task { startObservingSettings() }
@@ -138,7 +106,86 @@ public struct MobileSection: View {
         }
     }
 
+    /// The one row of a host that pairs phones through ShellX Link. Pairing
+    /// stays locked while a profile disables remote control from iOS.
+    @ViewBuilder
+    private var shellXLinkCard: some View {
+        SettingsCard {
+            if remoteControlManagedByPolicy {
+                SettingsCardNote(String(
+                    localized: "settings.mobile.managedByOrganization",
+                    defaultValue: "Remote control from the iOS app is disabled by your organization."
+                ))
+                SettingsCardDivider()
+            }
+            SettingsCardRow(
+                configurationReview: .action,
+                searchAnchorID: "setting:mobile:\(Self.pairDeviceEntryID)",
+                Self.shellXLinkPairingTitle,
+                subtitle: Self.shellXLinkPairingSubtitle
+            ) {
+                Button(String(localized: "settings.mobile.pairIPhone.button", defaultValue: "Show QR Code…")) {
+                    hostActions.openPhonePairing()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("SettingsMobilePairIPhoneButton")
+            }
+            .disabled(remoteControlManagedByPolicy)
+        }
+    }
+
+    /// cmux's rows: the iOS pairing host, phone push and diagnostics.
+    @ViewBuilder
+    private var cmuxCard: some View {
+        SettingsCard {
+            iOSPairingHostRow
+            SettingsCardDivider()
+            if remoteControlManagedByPolicy {
+                SettingsCardNote(String(
+                    localized: "settings.mobile.managedByOrganization",
+                    defaultValue: "Remote control from the iOS app is disabled by your organization."
+                ))
+                SettingsCardDivider()
+            }
+            // Phone-push forwarding is outbound-only and explicitly out of
+            // the DisableRemoteControl policy's scope, so its rows stay
+            // editable even while the remote-control rows are managed.
+            phonePushForwardingRow
+            SettingsCardDivider()
+            phonePushModeRow
+            SettingsCardDivider()
+            phonePushHideContentRow
+            SettingsCardDivider()
+            Group {
+                pairDeviceRow
+                SettingsCardDivider()
+                portRow
+                boundPortStatusRow
+                SettingsCardDivider()
+                displayNameRow
+                SettingsCardDivider()
+                artifactFolderAccessRow
+                SettingsCardDivider()
+                browserTunnelRow
+                // Keep diagnostics visible while a live endpoint is draining
+                // after the user turns pairing off.
+                if iOSPairingHost.current || status.current?.isRunning == true {
+                    SettingsCardDivider()
+                    diagnostics
+                }
+                SettingsCardNote(String(
+                    localized: "settings.mobile.port.note",
+                    defaultValue: "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, ShellX chooses an available port."
+                ))
+            }
+            .disabled(remoteControlManagedByPolicy)
+        }
+    }
+
     private func startObservingSettings() {
+        // The ShellX Link row reads none of these settings or the cmux pairing status.
+        guard !hostActions.pairsPhonesThroughShellXLink else { return }
         let models: [any SettingObservationStarting] = [
             iOSPairingHost,
             port,
@@ -492,6 +539,22 @@ public struct MobileSection: View {
             .controlSize(.small)
             .accessibilityIdentifier("SettingsMobileBrowserTunnelAllowOtherHostsToggle")
         }
+    }
+
+    /// The search entry id of the pairing row, the same for both hosts.
+    nonisolated static let pairDeviceEntryID = "pairDevice"
+
+    /// The ShellX Link pairing row's title, also its search entry's.
+    nonisolated static var shellXLinkPairingTitle: String {
+        String(localized: "settings.mobile.pairIPhone", defaultValue: "Pair iPhone")
+    }
+
+    /// The ShellX Link pairing row's subtitle, also its search entry's detail.
+    nonisolated static var shellXLinkPairingSubtitle: String {
+        String(
+            localized: "settings.mobile.pairIPhone.subtitle",
+            defaultValue: "Scan the QR code with ShellX on your iPhone, then allow the phone here on this Mac."
+        )
     }
 
     private var artifactFolderAccessSubtitle: String {

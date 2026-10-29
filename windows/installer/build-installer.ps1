@@ -1,5 +1,5 @@
 # Compiles windows/installer/shellx-native.iss with Inno Setup 6 into
-# <OutputDir>\ShellX-Setup-<Version>-sprint.exe. SourceDir must contain shellx-desktop.exe
+# <OutputDir>\ShellX-Setup-<Version>.exe. SourceDir must contain shellx-desktop.exe
 # (statically linked CRT, no VC++ redistributable needed). Used by the "installer" CI job.
 param(
   [Parameter(Mandatory = $true)][string]$Version,
@@ -43,6 +43,6 @@ if ($code -ne 0) {
   throw "ISCC failed with exit code ${code}: $errorLine"
 }
 
-$setup = Join-Path $OutputDir "ShellX-Setup-$Version-sprint.exe"
+$setup = Join-Path $OutputDir "ShellX-Setup-$Version.exe"
 if (-not (Test-Path $setup)) { throw "ISCC did not produce $setup" }
 Write-Host "Built $setup"

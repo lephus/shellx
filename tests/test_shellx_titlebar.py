@@ -59,7 +59,12 @@ class ShellXTitlebarTests(unittest.TestCase):
         src = read(VIEW)
         catalog = json.loads(read(CATALOG))["strings"]
         keys = re.findall(r'String\(localized: "([^"]+)"', src)
-        self.assertEqual(sorted(keys), ["titlebar.search.placeholder", "titlebar.settings.accessibilityLabel"])
+        self.assertEqual(sorted(keys), [
+            "menu.view.toggleRightSidebar",
+            "rightSidebar.toggle.tooltip",
+            "titlebar.search.placeholder",
+            "titlebar.settings.accessibilityLabel",
+        ])
         for key in keys:
             locs = catalog[key]["localizations"]
             self.assertIn("en", locs)

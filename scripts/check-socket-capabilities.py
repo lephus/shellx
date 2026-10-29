@@ -103,6 +103,8 @@ remote.tmux.sizing_settled
 remote.tmux.test_exec
 remote.tmux.test_perturb_divider
 remote.tmux.test_set_frame
+shellx.link.debug_pairing_approve
+shellx.link.debug_pairing_offer
 sidebar.custom.reload
 sidebar.custom.select
 sidebar.custom.validate

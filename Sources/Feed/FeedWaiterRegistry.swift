@@ -202,6 +202,15 @@ final class FeedWaiterRegistry: Sendable {
         }
     }
 
+    /// True once a decision or a terminal result is recorded for `requestID`, even before the store shows
+    /// it (a socket-thread reply resolves here first and updates the store on the main actor later).
+    func hasDecision(_ requestID: String) -> Bool {
+        groups.withLock { groups in
+            guard let group = groups[requestID] else { return false }
+            return group.decision != nil || group.terminalResult != nil
+        }
+    }
+
     func isAwaiting(_ requestID: String) -> Bool {
         groups.withLock { groups in
             guard let group = groups[requestID] else { return false }

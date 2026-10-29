@@ -63,6 +63,9 @@ impl fmt::Debug for SessionFile {
 pub struct MachineFile {
     pub machine_id: String,
     pub slot: String,
+    /// ShellX Link relay slot. Absent in files written before it existed; `machines.register` refreshes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_slot: Option<String>,
 }
 
 /// `POST /v2/machines` body.
@@ -80,6 +83,9 @@ pub struct RegisterRequest<'a> {
 pub struct RegisterResponse {
     pub machine_id: String,
     pub slot: String,
+    /// Missing from a relay that predates ShellX Link.
+    #[serde(default)]
+    pub link_slot: Option<String>,
 }
 
 /// One item of `GET /v2/machines`.
@@ -113,6 +119,9 @@ pub struct MintRequest<'a> {
     pub permission: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_machine_id: Option<&'a str>,
+    /// `"link"` selects the machine's ShellX Link slot.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lane: Option<&'a str>,
 }
 
 /// `POST /v2/relay/tickets` 200 response. `Debug` hides the ticket.

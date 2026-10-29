@@ -2684,13 +2684,15 @@ mod tests {
         // the new attach replays Resized at the pane's current grid
         let second = r.connector.host(1).unwrap();
         assert_eq!(second.attach_count(), 1);
-        let events = r.events();
-        assert!(
+        // The pump thread forwards that Reset after the view is attached, so
+        // `accepts_input` can turn true before it arrives: keep collecting.
+        let mut events = Vec::new();
+        wait("the replayed Reset", || {
+            events.extend(r.events());
             events.contains(&PaneEvent::Reset {
                 cols: 120,
-                rows: 40
-            }),
-            "{events:?}"
-        );
+                rows: 40,
+            })
+        });
     }
 }

@@ -1519,6 +1519,9 @@ class TabManager: ObservableObject {
                 to: newWorkspace,
                 from: sourceWorkspace ?? capturedTabs.first
             )
+            // ShellX: new workspaces start Purple. Session restore and explicit
+            // colors (CLI, layouts) set their own color after this.
+            newWorkspace.setCustomColor(WorkspaceTabColorSettings.newWorkspaceColorHex())
             newWorkspace.owningTabManager = self
             if applyCreationTitleAsCustomTitle {
                 applyCreationWorkspaceCustomization(

@@ -68,7 +68,8 @@ struct WorkspaceRecoveryReviewRegressionTests {
         ))
 
         #expect(proWorkspace.title == "cmux Pro")
-        #expect(proWorkspace.customColor == nil)
+        // ShellX: a new workspace starts Purple, not another workspace's color.
+        #expect(proWorkspace.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
     }
 
     @Test

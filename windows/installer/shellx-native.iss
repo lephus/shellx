@@ -1,36 +1,39 @@
-﻿; ShellX 2 (native) installer, Inno Setup 6.7.1. Unsigned, per-user, coexists with the Flutter ShellX.
+﻿; ShellX (native) installer, Inno Setup 6.7.1. Unsigned, per-user, installs next to the Flutter ShellX.
 ; Compiled by windows/installer/build-installer.ps1:
-;   ISCC.exe /DAppVersion=2.0.0 /DSourceDir=<folder with shellx-desktop.exe> /DOutputDir=<folder>
+;   ISCC.exe /DAppVersion=1.2.0 /DSourceDir=<folder with shellx-desktop.exe> /DOutputDir=<folder>
 ;            [/DAppIcon=<app_icon.ico>] shellx-native.iss
-; Output: <OutputDir>\ShellX-Setup-<AppVersion>-sprint.exe
+; Output: <OutputDir>\ShellX-Setup-<AppVersion>.exe
 ; Coexistence with the Flutter app is checked by check_coexistence.py: nothing here may share its
-; AppId, exe name, install dir, Start-menu name or data dirs, and nothing may stop or delete them.
+; AppId, exe name, install dir or data dirs, and nothing may stop or delete them. The display name
+; and the Start-menu shortcut are "ShellX" like the Flutter app's: the native app replaces it, so
+; its shortcut takes over the Flutter one (uninstalling the Flutter app later removes that shortcut;
+; reinstalling ShellX restores it).
 
 #ifndef AppVersion
-  #error Define AppVersion, for example /DAppVersion=2.0.0
+  #error Define AppVersion, for example /DAppVersion=1.2.0
 #endif
 #ifndef SourceDir
   #error Define SourceDir (the folder holding shellx-desktop.exe)
 #endif
 #define AppExeName "shellx-desktop.exe"
-#define ShortcutName "ShellX 2 (thử nghiệm)"
+#define ShortcutName "ShellX"
 #ifndef OutputDir
   #define OutputDir "dist"
 #endif
 
 [Setup]
-; AppId identifies ShellX 2 for upgrades and uninstall. Never change it.
+; AppId identifies the native ShellX for upgrades and uninstall. Never change it.
 AppId={{D322DA97-3B0D-49C7-BDB2-8EBFADBA1004}
-AppName=ShellX 2
+AppName=ShellX
 AppVersion={#AppVersion}
-AppVerName=ShellX 2 {#AppVersion}
+AppVerName=ShellX {#AppVersion}
 AppPublisher=ShellX
 AppPublisherURL=https://shellx.pro/
 AppSupportURL=https://shellx.pro/
 AppUpdatesURL=https://shellx.pro/
 VersionInfoVersion={#AppVersion}
 DefaultDirName={autopf}\ShellX Native
-DefaultGroupName=ShellX 2
+DefaultGroupName=ShellX Native
 DisableProgramGroupPage=yes
 ; Per-user install, no UAC prompt.
 PrivilegesRequired=lowest
@@ -39,11 +42,11 @@ MinVersion=10.0.17763
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=ShellX-Setup-{#AppVersion}-sprint
+OutputBaseFilename=ShellX-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayName=ShellX 2
+UninstallDisplayName=ShellX
 UninstallDisplayIcon={app}\{#AppExeName}
 ; Restart Manager only closes processes holding files this installer replaces (our own exe).
 CloseApplications=yes
@@ -68,7 +71,7 @@ Name: "{autoprograms}\{#ShortcutName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#ShortcutName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX 2}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX}"; Flags: nowait postinstall skipifsilent
 
 ; No [UninstallDelete] or [InstallDelete]: only {app} is removed. User state in
 ; %LOCALAPPDATA%\ShellX\native stays after uninstall; delete that folder by hand to remove it.

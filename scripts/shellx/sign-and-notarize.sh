@@ -17,6 +17,10 @@
 # Optional env:
 #   SHELLX_SIGNING_IDENTITY  default "Developer ID Application: Phu Le huu (W4RF3W4VTZ)"
 #   SHELLX_NOTARY_PROFILE    default shellx-notary
+#   SHELLX_UNIVERSAL=1       --build makes an arm64 + x86_64 app (public releases)
+#
+# Signing writes the Sparkle update key from scripts/shellx/release/sparkle-ed25519.pub
+# into SUPublicEDKey first, so the signature covers it and the app can verify updates.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,6 +29,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 IDENTITY="${SHELLX_SIGNING_IDENTITY:-Developer ID Application: Phu Le huu (W4RF3W4VTZ)}"
 NOTARY_PROFILE="${SHELLX_NOTARY_PROFILE:-shellx-notary}"
 PRODUCT_NAME="ShellX"
+SPARKLE_PUBLIC_KEY_FILE="$REPO_ROOT/scripts/shellx/release/sparkle-ed25519.pub"
 ENTITLEMENTS="$REPO_ROOT/shellx.release.entitlements"
 
 usage() {
@@ -34,27 +39,25 @@ usage() {
 
 build_app() {
   local derived="${1:-$REPO_ROOT/build-shellx}"
+  local archs=(ARCHS=arm64 ONLY_ACTIVE_ARCH=YES)
+  [[ "${SHELLX_UNIVERSAL:-0}" == 1 ]] && archs=("ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
   cd "$REPO_ROOT"
   "$REPO_ROOT/scripts/ensure-ghosttykit.sh" >&2
   # No Go toolchain is needed: the app no longer embeds the tunnel extension,
   # so its wireguard-go archive may be the stub (Release otherwise requires Go).
-  # SWIFT_OPTIMIZATION_LEVEL=-Onone: with Xcode 26.2 (Swift 6.2.3) an -O build dies
-  # in the SIL linker ("SILFunction type mismatch for ghostty_surface_clear_selection"):
-  # CmuxTerminalCore declares it via @_silgen_name while the app imports it from the
-  # GhosttyKit header. W0 only needs a signable bundle; W1 must fix the duplicate
-  # declaration (or pin Xcode 26.3+) before shipping an optimized build.
-  # ENABLE_DEBUG_DYLIB=NO: -Onone otherwise splits the app into cmux.debug.dylib
-  # and __preview.dylib, which the inside-out signer never signs (notary rejects).
+  # The Xcode 26.2 -O SIL linker crash on ghostty_surface_clear_selection is gone
+  # since 122037ee4d (the app calls the GhosttyKit header symbol only), so this is
+  # an optimized build.
+  # ENABLE_DEBUG_DYLIB=NO: never split the app into cmux.debug.dylib and
+  # __preview.dylib, which the inside-out signer never signs (notary rejects).
   CMUX_WIREGUARD_GO_REQUIRE=0 xcodebuild \
     -project cmux.xcodeproj \
     -scheme cmux \
     -configuration Release \
     -destination 'platform=macOS' \
     -derivedDataPath "$derived" \
-    SWIFT_OPTIMIZATION_LEVEL=-Onone \
     ENABLE_DEBUG_DYLIB=NO \
-    ARCHS=arm64 \
-    ONLY_ACTIVE_ARCH=YES \
+    "${archs[@]}" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGN_ENTITLEMENTS= \
     build >&2
@@ -78,6 +81,13 @@ sign_and_notarize() {
   # leaving CMUX_TUI_CLIENT_LOCAL empty (the installer would then download one).
   local tui; tui="$(scripts/shellx/build-cmux-tui.sh --release --arch universal)"
   CMUX_TUI_CLIENT_LOCAL="$tui" scripts/install-cmux-tui-client.sh "$app"
+
+  local sparkle_key; sparkle_key="$(tr -d '[:space:]' < "$SPARKLE_PUBLIC_KEY_FILE")"
+  if [[ ! "$sparkle_key" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+    echo "error: $SPARKLE_PUBLIC_KEY_FILE is not a Sparkle Ed25519 public key" >&2
+    exit 1
+  fi
+  /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $sparkle_key" "$app/Contents/Info.plist"
 
   echo "==> signing $app"
   "$REPO_ROOT/scripts/sign-cmux-bundle.sh" "$app" "$ENTITLEMENTS" "$IDENTITY"

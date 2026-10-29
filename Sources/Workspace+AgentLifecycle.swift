@@ -547,6 +547,10 @@ extension Workspace {
     }
 
     func clearAgentLifecycleStates(panelId: UUID) {
+        // ShellX: the pane's skill or workflow marker belongs to the agent state being
+        // cleared (a closed pane, a resumed hibernated agent); a kept workflow marker
+        // would replay on the pane's next Claude turn.
+        agentActivity.removePanel(panelId)
         guard let removed = agentLifecycleStatesByPanelId.removeValue(forKey: panelId) else { return }
         for key in removed.keys {
             removePanelStatusEntry(key: key, panelId: panelId)
@@ -570,6 +574,9 @@ extension Workspace {
     }
 
     func clearAllAgentLifecycleStates() {
+        // Skill and workflow markers belong to the agent state being cleared:
+        // a kept workflow marker would replay on the pane's next Claude turn.
+        agentActivity.removeAll()
         let panelIds = Array(agentLifecycleStatesByPanelId.keys)
         guard !panelIds.isEmpty else { return }
         agentLifecycleStatesByPanelId.removeAll()

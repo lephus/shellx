@@ -1870,7 +1870,7 @@ enum CmuxEmbeddedConfigSchema {
         },
         "subtleSelection": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Show the selected workspace as a faint accent tint with a thin edge instead of a solid fill. A custom selectionColor still uses a solid fill."
         },
         "brightenInDarkMode": {

@@ -292,7 +292,7 @@ mod tests {
         let (_, params) = &fake.calls()[2];
         assert_eq!(
             *params,
-            json!({"name":"TEST-PC","platform":"windows","os_version":"10.0.26100","app_version":"2.0.0"})
+            json!({"name":"TEST-PC","platform":"windows","os_version":"10.0.26100","app_version":shellx_model::VERSION})
         );
         // unknown_method (a method L5 has not implemented) is a readable error
         assert!(matches!(

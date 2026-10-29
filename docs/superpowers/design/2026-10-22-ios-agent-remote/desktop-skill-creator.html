@@ -1,0 +1,82 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>desktop-skill-creator</title><style>:root{--bg-secondary:#1a1d23;--border:#2a2e35}body{background:#0b0d10;color:#e6e8ec;font-family:-apple-system,system-ui,sans-serif;padding:24px}.subtitle{color:#8b919c}</style></head><body>
+<style>
+  .win { max-width:980px; margin:14px auto; border-radius:12px; background:#0f1115; border:1px solid #2a2e35; color:#e6e8ec;
+         font:13px -apple-system, system-ui, sans-serif; overflow:hidden; }
+  .bar { height:34px; display:flex; align-items:center; gap:7px; padding:0 12px; background:#16191e; border-bottom:1px solid #22262d; }
+  .tl { width:11px; height:11px; border-radius:50%; background:#3a3f47; }
+  .bar span { margin-left:12px; color:#8b919c; font-size:12px; }
+  .body { display:grid; grid-template-columns:210px 1fr 300px; min-height:470px; }
+  .side { background:#13161b; border-right:1px solid #22262d; padding:12px; display:flex; flex-direction:column; gap:6px; }
+  .sec { color:#8b919c; font-size:10px; letter-spacing:.06em; text-transform:uppercase; margin:6px 0 2px; }
+  .it { padding:7px 9px; border-radius:8px; display:flex; gap:8px; align-items:center; }
+  .it.on { background:#1f2a3a; color:#cfe2ff; }
+  .new { margin-top:auto; padding:8px; border-radius:8px; border:1px dashed #3a3f47; color:#8b919c; text-align:center; }
+  .chat { padding:14px 16px; display:flex; flex-direction:column; gap:10px; border-right:1px solid #22262d; }
+  .bubble { background:#1a1d23; border-radius:12px; padding:9px 12px; max-width:85%; line-height:1.45; }
+  .bubble.me { background:#24364f; align-self:flex-end; }
+  .input { margin-top:auto; display:flex; gap:8px; align-items:center; background:#1a1d23; border-radius:10px; padding:9px 12px; color:#8b919c; }
+  .card { padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .prev { background:#1a1d23; border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .f { display:flex; justify-content:space-between; gap:10px; font-size:12px; }
+  .f b { color:#8b919c; font-weight:500; }
+  .chip { display:inline-block; background:#1a1d23; border-radius:99px; padding:6px 11px; font-size:12px; }
+  .btn { text-align:center; padding:9px 0; border-radius:10px; background:#262a31; font-weight:600; }
+  .btn.p { background:#60a5fa; color:#0b1220; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .y { background:#facc15; } .g { background:#4ade80; }
+  .steps { max-width:980px; margin:8px auto 0; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .st { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:13px; line-height:1.45; }
+  .st b { display:block; margin-bottom:3px; }
+</style>
+
+<h2>Desktop: tạo skill với AI rồi đồng bộ sang điện thoại</h2>
+<p class="subtitle">Bản phác một màn, không phải lựa chọn A/B. Xem luồng 4 bước bên dưới rồi cho tôi biết chỗ nào sai.</p>
+
+<div class="win">
+  <div class="bar"><div class="tl"></div><div class="tl"></div><div class="tl"></div><span>ShellX · Skill</span></div>
+  <div class="body">
+    <div class="side">
+      <div class="sec">Skill của bạn</div>
+      <div class="it">☕ Hôm nay thế nào?</div>
+      <div class="it">🛠 Sửa CI đỏ</div>
+      <div class="it">👀 Review PR</div>
+      <div class="it on">📝 Làm issue… <span style="margin-left:auto;font-size:10px;color:#facc15">nháp</span></div>
+      <div class="sec">Từ Claude Code</div>
+      <div class="it" style="color:#8b919c">frontend-design</div>
+      <div class="it" style="color:#8b919c">seo-master</div>
+      <div class="new">＋ Skill mới</div>
+    </div>
+
+    <div class="chat">
+      <div class="bubble me">Tạo skill: mình nói số issue, agent đọc issue trên GitHub, làm trong nhánh mới, chạy test rồi mở PR</div>
+      <div class="bubble">Mình dùng skill-creator để viết. Hỏi nhanh 2 câu:<br>1. Chạy trong repo nào? <span class="chip">shellx</span> <span class="chip">mọi repo</span><br>2. Mở PR xong thì dừng, hay chờ CI xanh?</div>
+      <div class="bubble me">shellx. Mở PR là dừng</div>
+      <div class="bubble">Xong bản nháp ✓ Đã chạy thử với issue #42 (không push): <span class="dot g"></span> đạt. Bạn xem thẻ bên phải rồi bấm Lưu.</div>
+      <div class="input">🎙 <span>Sửa gì thì nói hoặc gõ ở đây…</span></div>
+    </div>
+
+    <div class="card">
+      <div class="sec" style="margin:0">Thẻ trên điện thoại</div>
+      <div class="prev">
+        <div style="font-size:15px;font-weight:700">📝 Làm issue…</div>
+        <div class="f"><b>Bấm xong hỏi</b><span>"Số issue?" (nói hoặc gõ)</span></div>
+        <div class="f"><b>Chạy trên</b><span>MacBook Pro · ~/…/shellx</span></div>
+        <div class="f"><b>Agent</b><span>Claude Code</span></div>
+        <div class="f"><b>Hỏi lại trước khi chạy</b><span>Không</span></div>
+        <div class="f"><b>Câu nói kích hoạt</b><span>"làm issue…"</span></div>
+      </div>
+      <div class="btn">▶ Chạy thử</div>
+      <div class="btn p">Lưu & đồng bộ</div>
+      <div style="color:#8b919c;font-size:11px;line-height:1.45">Lưu thành skill Claude Code thật (dùng được cả khi gõ trong terminal). Điện thoại thấy ngay lần kết nối tới.</div>
+    </div>
+  </div>
+</div>
+
+<div class="steps">
+  <div class="st"><b>1. Mô tả</b>Bấm "＋ Skill mới", nói hoặc gõ bạn muốn skill làm gì.</div>
+  <div class="st"><b>2. AI viết</b>Claude Code trên Mac dùng skill-creator viết skill, hỏi lại vài câu nếu thiếu.</div>
+  <div class="st"><b>3. Chạy thử</b>Chạy thử an toàn (không push/deploy) để thấy nó làm đúng.</div>
+  <div class="st"><b>4. Lưu</b>Thành skill thật trên Mac, hiện thành chip trên điện thoại. Bấm là chạy.</div>
+</div>
+
+</body></html>

@@ -83,7 +83,7 @@ enum ShellXRemoteServiceProvider {
         }
 #endif
         // ShellX: bind ShellXRemoteService.shared here when L5 Task 13 lands
-        // ShellX: once it lands, ShellXRemoteUIGate.isEnabled must follow ShellXRemoteGate.
+        // ShellX: once it lands, ShellXRemoteUIGate.isEnabled must follow ShellXRemoteGate.isEnabled.
         return nil
     }
 }

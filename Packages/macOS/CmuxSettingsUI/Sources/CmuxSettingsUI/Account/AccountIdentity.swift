@@ -21,15 +21,21 @@ public struct AccountIdentity: Sendable, Hashable {
     /// Optional avatar URL the host has resolved to a fetchable image.
     public let avatarURL: URL?
 
+    /// Optional host-formatted line shown under the email when there is no
+    /// display name, such as when the account last signed in.
+    public let detail: String?
+
     public init(
         id: String,
         displayName: String,
         email: String,
-        avatarURL: URL? = nil
+        avatarURL: URL? = nil,
+        detail: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
         self.email = email
         self.avatarURL = avatarURL
+        self.detail = detail
     }
 }

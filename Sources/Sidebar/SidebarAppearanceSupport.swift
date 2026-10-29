@@ -339,10 +339,11 @@ struct CmuxSelectionFill: Equatable {
 }
 
 /// Opaque color the selected workspace row reads as, used to choose readable
-/// row foregrounds. A configured `sidebarSelectionColorHex`, the solid-fill
-/// indicator style, and the default (non-subtle) selection paint a solid
-/// fill; the opt-in subtle selection composites its tint over an approximate
-/// sidebar surface for the scheme.
+/// row foregrounds. ShellX's dark sidebar selects with the accent tinted over
+/// `panel` (``ShellXSelectionTint``), softer while `isEmphasized` is false.
+/// A configured `sidebarSelectionColorHex`, the solid-fill indicator style,
+/// and a light sidebar paint a solid fill; the opt-in subtle selection
+/// composites its tint over an approximate sidebar surface for the scheme.
 func sidebarSelectedWorkspaceBackgroundNSColor(
     for colorScheme: ColorScheme,
     sidebarSelectionColorHex: String? = UserDefaults.standard.string(forKey: "sidebarSelectionColorHex"),
@@ -352,6 +353,17 @@ func sidebarSelectedWorkspaceBackgroundNSColor(
     increaseContrast: Bool = false,
     accent: CmuxAccentColor = CmuxAccentColor()
 ) -> NSColor {
+    if let tint = ShellXSelectionTint(
+        sidebarColorScheme: colorScheme,
+        sidebarSelectionColorHex: sidebarSelectionColorHex,
+        activeTabIndicatorStyle: activeTabIndicatorStyle,
+        subtleSelection: subtleSelection,
+        accent: accent
+    ) {
+        // ShellX (spec §6.1): the accent at 22% over `panel`, 16% while the
+        // window is inactive.
+        return tint.sidebarFill(isEmphasized: isEmphasized).nsColor
+    }
     if let hex = sidebarSelectionColorHex,
        let parsed = NSColor(hex: hex) {
         return parsed
@@ -360,10 +372,8 @@ func sidebarSelectedWorkspaceBackgroundNSColor(
         return accent.nsColor(for: colorScheme)
     }
     if !subtleSelection {
-        // ShellX (spec §7.4): the default selection is the flat `raise`
-        // block in a dark sidebar. A light sidebar (a matched light terminal
-        // theme) keeps the accent fill.
-        return colorScheme == .dark ? ShellXPalette.raise.nsColor : accent.nsColor(for: colorScheme)
+        // A light sidebar (a matched light terminal theme) keeps the accent fill.
+        return accent.nsColor(for: colorScheme)
     }
     let surface = NSColor(white: colorScheme == .dark ? 0.16 : 0.93, alpha: 1)
     let fill = CmuxSelectionFill.resolve(
@@ -381,25 +391,35 @@ func sidebarSelectedWorkspaceForegroundNSColor(opacity: CGFloat) -> NSColor {
     )
 }
 
-/// Whether `color` is ShellX's default selection fill (`ShellXPalette.raise`).
-func sidebarIsShellXSelectionFill(_ color: NSColor) -> Bool {
-    guard let candidate = color.usingColorSpace(.sRGB),
-          let raise = ShellXPalette.raise.nsColor.usingColorSpace(.sRGB) else { return false }
+/// Whether `color` is ShellX's tinted selection fill for `accent`, at either
+/// strength (``ShellXSelectionTint/sidebarFill(isEmphasized:)``).
+func sidebarIsShellXSelectionFill(
+    _ color: NSColor,
+    accent: CmuxAccentColor = CmuxAccentColor()
+) -> Bool {
+    guard let candidate = color.usingColorSpace(.sRGB) else { return false }
+    let tint = ShellXSelectionTint(sidebarAccent: accent)
     let tolerance: CGFloat = 0.5 / 255
-    return abs(candidate.redComponent - raise.redComponent) < tolerance
-        && abs(candidate.greenComponent - raise.greenComponent) < tolerance
-        && abs(candidate.blueComponent - raise.blueComponent) < tolerance
-        && abs(candidate.alphaComponent - raise.alphaComponent) < tolerance
+    return [true, false].contains { isEmphasized in
+        guard let fill = tint.sidebarFill(isEmphasized: isEmphasized).nsColor.usingColorSpace(.sRGB) else {
+            return false
+        }
+        return abs(candidate.redComponent - fill.redComponent) < tolerance
+            && abs(candidate.greenComponent - fill.greenComponent) < tolerance
+            && abs(candidate.blueComponent - fill.blueComponent) < tolerance
+            && abs(candidate.alphaComponent - fill.alphaComponent) < tolerance
+    }
 }
 
 func sidebarSelectedWorkspaceForegroundNSColor(
     on backgroundColor: NSColor,
-    opacity: CGFloat
+    opacity: CGFloat,
+    accent: CmuxAccentColor = CmuxAccentColor()
 ) -> NSColor {
     let clampedOpacity = max(0, min(opacity, 1))
-    // ShellX: names on the default `raise` selection draw in `text-hi`.
-    if sidebarIsShellXSelectionFill(backgroundColor) {
-        return ShellXPalette.textHi.nsColor.withAlphaComponent(clampedOpacity)
+    // ShellX: names on the tinted selection draw in `selection-title`.
+    if sidebarIsShellXSelectionFill(backgroundColor, accent: accent) {
+        return ShellXPalette.selectionTitle.nsColor.withAlphaComponent(clampedOpacity)
     }
     let whiteContrast = cmuxContrastRatio(foreground: .white, background: backgroundColor)
     guard whiteContrast < 2.75 else {
@@ -495,6 +515,13 @@ func sidebarWorkspaceRowBackgroundStyle(
         accent: accent
     )
     let accentBackground = accent.nsColor(for: colorScheme)
+    let shellXTint = ShellXSelectionTint(
+        sidebarColorScheme: colorScheme,
+        sidebarSelectionColorHex: sidebarSelectionColorHex,
+        activeTabIndicatorStyle: activeTabIndicatorStyle,
+        subtleSelection: subtleSelection,
+        accent: accent
+    )
     let usesSubtleSelection = sidebarUsesSubtleSelection(
         activeTabIndicatorStyle: activeTabIndicatorStyle,
         subtleSelection: subtleSelection,
@@ -529,6 +556,14 @@ func sidebarWorkspaceRowBackgroundStyle(
         }
         if isMultiSelected {
             if usesSubtleSelection { return calmFill(isSecondary: true) }
+            // ShellX (spec §6.1): ⌘-click members get an opaque, lighter tint
+            // than the selected row.
+            if let shellXTint {
+                return SidebarWorkspaceRowBackgroundStyle(
+                    color: shellXTint.multiSelectionFill(increaseContrast: increaseContrast).nsColor,
+                    opacity: 1
+                )
+            }
             return SidebarWorkspaceRowBackgroundStyle(color: accentBackground, opacity: multiSelectionOpacity)
         }
         return .clear

@@ -17,7 +17,7 @@ ShellX fixes that. The agent keeps running on your Mac or PC, and you open **tha
 
 ## What you need
 
-- ShellX on your computer (macOS 12 or later, Windows 10 version 1809 or later).
+- ShellX on your computer (macOS 14 or later, Windows 10 version 1809 or later).
 - The ShellX app on your phone (iOS 15 or later, Android 8.0 or later), signed in with the same account and paired with a QR code.
 - Claude Code, Codex or another command-line agent installed on the computer, as usual.
 

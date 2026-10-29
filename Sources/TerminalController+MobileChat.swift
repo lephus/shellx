@@ -237,22 +237,7 @@ extension TerminalController {
         guard let service = agentChatTranscriptService else {
             return .err(code: "unavailable", message: Self.chatServiceUnavailableErrorMessage, data: nil)
         }
-        var page = await service.history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
-        if page == nil, let staleRecord = service.sessionRecord(sessionID: sessionID) {
-            // The record exists but its transcript didn't resolve — the
-            // recorded path can be stale the same way terminal bindings
-            // are. Re-adopt from the hook store and retry once, but only
-            // when the refresh actually changed the resolution inputs (a
-            // pointless retry re-runs the codex directory walk).
-            #if DEBUG
-            cmuxDebugLog("mobile.chat.history transcript unresolved session=\(sessionID.prefix(8)); refreshing bindings")
-            #endif
-            let refreshed = await service.refreshSessionBindings(sessionID: sessionID)
-            if refreshed?.transcriptPath != staleRecord.transcriptPath
-                || refreshed?.workingDirectory != staleRecord.workingDirectory {
-                page = await service.history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
-            }
-        }
+        let page = await service.historyRebindingIfStale(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
         guard let page else {
             #if DEBUG
             cmuxDebugLog("mobile.chat.history not_found session=\(sessionID.prefix(8))")
@@ -270,17 +255,89 @@ extension TerminalController {
         return .ok(payload)
     }
 
+    /// One image or file a chat send types the path of, next to the message text (``typingOrder(_:text:)``).
+    enum AgentChatPasteItem: Equatable {
+        /// An image, as the `data_b64` and `format` of a socket attachment. `base64` is nil when the attachment
+        /// has no payload; that is refused when the item's turn comes, after the prompt is cleared.
+        case image(base64: String?, format: String)
+        /// A file, as typed values. Only ShellX Link builds one: no socket parameter becomes a file.
+        case file(name: String, data: Data)
+
+        /// The order ``TerminalController/agentChatSend(sessionID:text:items:)`` types `items` and `text` in
+        /// (PROTOCOL.md section 10): the images' paths, then the text, then the files' paths, each kind in the
+        /// order the client sent it, then the submit key. A message with text so never starts with the raw path of
+        /// a file, which Claude Code could take for a slash command; an image path first is safe, as Claude Code
+        /// turns it into an attached image. Without text, the files follow the images.
+        static func typingOrder(
+            _ items: [AgentChatPasteItem], text: String
+        ) -> (beforeText: [AgentChatPasteItem], afterText: [AgentChatPasteItem]) {
+            let images = items.filter(\.isImage)
+            let files = items.filter { !$0.isImage }
+            return text.isEmpty ? (images + files, []) : (images, files)
+        }
+
+        private var isImage: Bool {
+            if case .image = self { return true }
+            return false
+        }
+    }
+
     /// `mobile.chat.send`: deliver attachments then inject the prompt into
-    /// the session's terminal (bracketed paste + submit key).
+    /// the session's terminal (bracketed paste + submit key), through
+    /// ``agentChatSend(sessionID:text:attachments:)``. Images only: see
+    /// ``mobileChatSendAttachmentsError(_:)``.
     func v2MobileChatSend(params: [String: Any]) async -> V2CallResult {
         guard let sessionID = v2RawString(params, "session_id") else {
             return .err(code: "invalid_params", message: "Missing session_id", data: nil)
         }
         let text = v2RawString(params, "text") ?? ""
         let attachments = params["attachments"] as? [[String: Any]] ?? []
+        if let error = mobileChatSendAttachmentsError(attachments) {
+            return error
+        }
         guard !text.isEmpty || !attachments.isEmpty else {
             return .err(code: "invalid_params", message: "Nothing to send", data: nil)
         }
+        return await agentChatSend(sessionID: sessionID, text: text, attachments: attachments)
+    }
+
+    /// `mobile.chat.send` pastes images only. A socket attachment of `kind` `file` is refused with
+    /// `invalid_params` before the prompt is cleared, anything is typed or any file is written: a file reaches a
+    /// terminal only as an ``AgentChatPasteItem/file(name:data:)`` that ShellX Link builds from its own typed
+    /// values, never from socket parameters.
+    func mobileChatSendAttachmentsError(_ attachments: [[String: Any]]) -> V2CallResult? {
+        guard attachments.contains(where: { ($0["kind"] as? String) == "file" }) else { return nil }
+        return .err(code: "invalid_params", message: "mobile.chat.send takes image attachments only", data: nil)
+    }
+
+    /// Types a message into an agent session's terminal: clears the agent's prompt, pastes each attachment,
+    /// then pastes `text` and submits it. The send path behind `mobile.chat.send`.
+    ///
+    /// - Parameters:
+    ///   - sessionID: The chat session to type into.
+    ///   - text: The message; may be empty only when `attachments` is not.
+    ///   - attachments: Images to paste first (`data_b64`, optional `format`). Every attachment is pasted as an
+    ///     image, whatever its `kind`: a file cannot arrive as a dictionary.
+    func agentChatSend(sessionID: String, text: String, attachments: [[String: Any]] = []) async -> V2CallResult {
+        await agentChatSend(sessionID: sessionID, text: text, items: attachments.map { attachment in
+            .image(
+                base64: attachment["data_b64"] as? String,
+                format: (attachment["format"] as? String) ?? "png"
+            )
+        })
+    }
+
+    /// Types a message into an agent session's terminal: clears the agent's prompt, types the path of each image,
+    /// pastes `text` followed by the path of each file, and submits it, all separated by spaces
+    /// (``AgentChatPasteItem/typingOrder(_:text:)``). Without text, the files' paths follow the images' and the
+    /// submit key comes last. The one send path behind `mobile.chat.send` and ShellX Link's `chat.send`.
+    ///
+    /// - Parameters:
+    ///   - sessionID: The chat session to type into.
+    ///   - text: The message; may be empty only when `items` is not.
+    ///   - items: The images and files whose paths go with the text, each kind in the order the client sent
+    ///     them. A file's name is only a label the Mac sanitizes.
+    func agentChatSend(sessionID: String, text: String, items: [AgentChatPasteItem]) async -> V2CallResult {
         guard let terminalParams = await mobileChatTerminalParams(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
                 "session_id": sessionID
@@ -295,14 +352,22 @@ extension TerminalController {
         guard clearResult.accepted else {
             return mobileChatInputError(clearResult)
         }
-        for (index, attachment) in attachments.enumerated() {
-            guard let base64 = attachment["data_b64"] as? String else {
-                return .err(code: "invalid_params", message: "Attachment missing data_b64", data: nil)
+        let order = AgentChatPasteItem.typingOrder(items, text: text)
+        let typedFirst = order.beforeText
+        for (index, item) in typedFirst.enumerated() {
+            let result: V2CallResult
+            switch item {
+            case .image(let base64, let format):
+                guard let base64 else {
+                    return .err(code: "invalid_params", message: "Attachment missing data_b64", data: nil)
+                }
+                var imageParams = terminalParams
+                imageParams["image_base64"] = base64
+                imageParams["image_format"] = format
+                result = v2MobileTerminalPasteImage(params: imageParams)
+            case .file(let name, let data):
+                result = v2MobileTerminalPasteFile(name: name, data: data, terminalParams: terminalParams)
             }
-            var imageParams = terminalParams
-            imageParams["image_base64"] = base64
-            imageParams["image_format"] = (attachment["format"] as? String) ?? "png"
-            let result = v2MobileTerminalPasteImage(params: imageParams)
             if case .err = result {
                 return result
             }
@@ -311,7 +376,7 @@ extension TerminalController {
             // detects the paths and the echo is "<path> <path> <text>" —
             // the shape the client's pending-row reconcile matches. A
             // dropped separator corrupts that shape; surface it.
-            let needsSeparator = index < attachments.count - 1 || !text.isEmpty
+            let needsSeparator = index < typedFirst.count - 1 || !text.isEmpty
             if needsSeparator {
                 guard let currentTarget = mobileCanonicalTerminalTarget(params: terminalParams)?.target else {
                     return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
@@ -343,18 +408,35 @@ extension TerminalController {
             let keyResult = currentTarget.sendNamedKeyResult("return")
             return .ok(["submitted": keyResult.accepted])
         }
+        // The files' paths go after the text, in the same paste, so its submit key (the one the text needs)
+        // comes last, once.
+        var pasted = text
+        for item in order.afterText {
+            guard case .file(let name, let data) = item else { continue }
+            guard let escapedPath = GhosttyApp.terminalPasteboard.saveAttachmentData(data, fileName: name) else {
+                return .err(code: "invalid_params", message: "File payload was empty or exceeded the size limit", data: nil)
+            }
+            pasted += " " + escapedPath
+        }
         var pasteParams = terminalParams
-        pasteParams["text"] = text
+        pasteParams["text"] = pasted
         return await v2MobileTerminalPaste(params: pasteParams)
     }
 
     /// `mobile.chat.interrupt`: polite (Esc) or hard (ctrl-C) interrupt of
-    /// the session's agent.
+    /// the session's agent (``agentChatInterrupt(sessionID:hard:)``).
     func v2MobileChatInterrupt(params: [String: Any]) async -> V2CallResult {
         guard let sessionID = v2RawString(params, "session_id") else {
             return .err(code: "invalid_params", message: "Missing session_id", data: nil)
         }
         let hard = (params["hard"] as? Bool) ?? false
+        return await agentChatInterrupt(sessionID: sessionID, hard: hard)
+    }
+
+    /// Interrupts an agent session's current turn: Esc, or ctrl-C when `hard`. The one interrupt path behind
+    /// `mobile.chat.interrupt` and ShellX Link's `chat.interrupt`. Once the terminal takes the key the session
+    /// is idle: the agent waits for input, and Claude Code fires no hook that would say so.
+    func agentChatInterrupt(sessionID: String, hard: Bool) async -> V2CallResult {
         guard let terminalTarget = await mobileChatTerminalTarget(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
                 "session_id": sessionID
@@ -367,6 +449,7 @@ extension TerminalController {
                 defaultValue: "Interrupt key was not accepted"
             ), data: nil)
         }
+        agentChatTranscriptService?.noteInterrupted(sessionID: sessionID)
         terminalTarget.forceRefresh(reason: "mobileHost.chatInterrupt")
         return .ok(["interrupted": true, "hard": hard])
     }

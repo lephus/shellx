@@ -29,6 +29,21 @@ private func makeScratchDirectory() throws -> URL {
     return url
 }
 
+/// What `/bin/sh` passes to a command for `typed`, the way an agent's shell tool would read a typed path:
+/// `printf '%s'` joins the words it gets, so an unescaped space, quote or `$(...)` shows as a change.
+private func shellReads(_ typed: String) throws -> String {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", "printf '%s' " + typed]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    return String(decoding: data, as: UTF8.self)
+}
+
 private func tinyPNGData() throws -> Data {
     let bitmap = try #require(NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8,
@@ -423,6 +438,108 @@ struct ImageMaterializationTests {
         let plainPath = escapedPath.replacingOccurrences(of: "\\", with: "")
         #expect(plainPath.hasPrefix(scratchDir.path))
         #expect(service.isOwnedTemporaryImageFile(URL(fileURLWithPath: plainPath)))
+        service.cleanupAllOwnedTemporaryImageFiles()
+    }
+
+    /// A phone-chosen attachment name is a label, never a path: whatever it holds, the file lands one level
+    /// below `shellx-attachments/<uuid>/` (folders 0700, file 0600) with a name that cannot climb out, hide,
+    /// break the typed line, or overrun a path component even when the file system stores it decomposed; and
+    /// the path a shell reads from the typed text is that file's, with nothing in the name run.
+    @Test(arguments: [
+        "../../.ssh/authorized_keys",
+        "a\u{0}b",
+        "...",
+        String(repeating: "é", count: 300),
+        String(repeating: "한", count: 80) + ".txt",
+        "",
+        "line\none.txt",
+        "line\rone.txt",
+        "line\u{2028}one.txt",
+        "back\\slash.txt",
+        "$(x).txt",
+        "it's \"quoted\".txt",
+    ])
+    func saveAttachmentDataKeepsHostileNamesInsideItsFolder(name: String) throws {
+        let scratchDir = try makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratchDir) }
+        let service = TerminalPasteboardService(temporaryDirectory: scratchDir)
+        let payload = Data("attachment bytes".utf8)
+
+        let escapedPath = try #require(service.saveAttachmentData(payload, fileName: name))
+        let plainPath = escapedPath.replacingOccurrences(of: "\\", with: "")
+        let fileURL = URL(fileURLWithPath: plainPath)
+
+        let uuidFolder = fileURL.deletingLastPathComponent()
+        let attachmentsFolder = uuidFolder.deletingLastPathComponent()
+        #expect(UUID(uuidString: uuidFolder.lastPathComponent) != nil)
+        #expect(attachmentsFolder.lastPathComponent == "shellx-attachments")
+        #expect(attachmentsFolder.deletingLastPathComponent().path == scratchDir.path)
+
+        // The last path component as typed, not `URL.lastPathComponent`, which re-normalizes the name.
+        let storedName = String(plainPath.split(separator: "/").last ?? "")
+        #expect(!storedName.isEmpty)
+        #expect(!storedName.contains("/"))
+        #expect(!storedName.hasPrefix("."))
+        #expect(!storedName.contains("\\"))
+        #expect(!storedName.unicodeScalars.contains { scalar in
+            [.control, .lineSeparator, .paragraphSeparator].contains(scalar.properties.generalCategory)
+        })
+        #expect(storedName.utf8.count <= 100)
+        // Finding M6: the cap holds for the decomposed form too, which some file systems store.
+        #expect(storedName.decomposedStringWithCanonicalMapping.utf8.count <= 100)
+        if name.isEmpty || name == "..." {
+            #expect(storedName == "file")
+        }
+
+        #expect(try Data(contentsOf: fileURL) == payload)
+        let permissions = try FileManager.default.attributesOfItem(atPath: fileURL.path)[.posixPermissions] as? NSNumber
+        #expect(permissions?.intValue == 0o600)
+        for folder in [uuidFolder, attachmentsFolder] {
+            let mode = try FileManager.default.attributesOfItem(atPath: folder.path)[.posixPermissions] as? NSNumber
+            #expect(mode?.intValue == 0o700, "\(folder.lastPathComponent) is not private")
+        }
+        #expect(try shellReads(escapedPath) == plainPath)
+
+        // Registered for the usual temp cleanup, which takes the folder with it.
+        #expect(service.isOwnedTemporaryImageFile(fileURL))
+        service.cleanupAllOwnedTemporaryImageFiles()
+        #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(!FileManager.default.fileExists(atPath: uuidFolder.path))
+    }
+
+    @Test func saveAttachmentDataKeepsAReadableNameAndItsExtension() throws {
+        let scratchDir = try makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratchDir) }
+        let service = TerminalPasteboardService(temporaryDirectory: scratchDir)
+
+        let plain = try #require(service.saveAttachmentData(Data([0x1]), fileName: "report final (v2).pdf"))
+        #expect(plain.hasSuffix("/report\\ final\\ \\(v2\\).pdf"))
+
+        // A name cut to 100 bytes still ends in its extension, so the agent can tell what the file is.
+        let longName = String(repeating: "x", count: 300) + ".pdf"
+        let cut = try #require(service.saveAttachmentData(Data([0x1]), fileName: longName))
+        let cutName = URL(fileURLWithPath: cut).lastPathComponent
+        #expect(cutName.hasSuffix(".pdf"))
+        #expect(cutName.utf8.count == 100)
+
+        // Two attachments with one name never share a folder.
+        let first = try #require(service.saveAttachmentData(Data([0x1]), fileName: "a.txt"))
+        let second = try #require(service.saveAttachmentData(Data([0x2]), fileName: "a.txt"))
+        #expect(first != second)
+        service.cleanupAllOwnedTemporaryImageFiles()
+    }
+
+    @Test func saveAttachmentDataRefusesOversize() throws {
+        let scratchDir = try makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratchDir) }
+        let service = TerminalPasteboardService(temporaryDirectory: scratchDir)
+
+        #expect(service.saveAttachmentData(Data(count: 10_485_761), fileName: "big.bin") == nil)
+        #expect(service.saveAttachmentData(Data(), fileName: "empty.txt") == nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: scratchDir.path).isEmpty)
+
+        // The cap itself is still taken.
+        #expect(service.saveAttachmentData(Data(count: 10_485_760), fileName: "edge.bin") != nil)
         service.cleanupAllOwnedTemporaryImageFiles()
     }
 

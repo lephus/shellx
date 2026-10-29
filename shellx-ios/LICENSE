@@ -1,0 +1,13 @@
+Copyright (c) 2026 ShellX. All rights reserved.
+
+This directory (shellx-ios/) holds the source code of the ShellX iOS app. It is
+proprietary software. It is not covered by the GNU General Public License, the
+Business Source License or any other licence that applies elsewhere in this
+repository. No permission is granted to use, copy, modify, merge, publish,
+distribute, sublicense or sell this code, in whole or in part, without the prior
+written permission of the copyright holder.
+
+The app is built only from this directory, Apple frameworks and the shellx-link
+package (MIT License, see shellx-link/LICENSE). It contains no code from ios/,
+Packages/, Sources/, cmux-tui/ or shellx-core/; scripts/shellx/check-ios-license.sh
+enforces this boundary.

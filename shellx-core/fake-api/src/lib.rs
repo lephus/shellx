@@ -11,7 +11,10 @@
 //!
 //! Routes so far: `POST /v1/auth/login`, `POST /v1/auth/logout`, `GET /v1/version`,
 //! `POST|GET /v2/machines`, `POST /v2/machines/<id>/heartbeat`, `POST /v2/relay/tickets`,
-//! `POST|GET /v2/pairings`, `POST /v2/pairings/<id>/approve|deny`.
+//! `POST|GET /v2/pairings`, `POST /v2/pairings/<id>/approve|deny`, and the desktop side of
+//! ShellX Link phone pairing: `GET /v2/phone-pairings?role=target`,
+//! `POST /v2/phone-pairings/<id>/approve|deny`, `GET /v2/phone-grants`, `DELETE /v2/phone-grants/<id>`.
+//! Phone requests are created with `FakeApi::add_phone_pairing` (no phone-side routes here).
 //!
 //! Machines: registering again with the same (user, key) updates the same machine.
 //! `online` = heartbeat within 90 s. Tickets follow the ledger "Ticket format"
@@ -145,6 +148,48 @@ struct State {
     shares: HashMap<String, Share>,
     /// Test hook: `GET /v2/pairings` returns every pairing of the account, ignoring `role`.
     list_all_pairings: bool,
+    /// id → phone pairing request (`/v2/phone-pairings`, desktop side).
+    phone_pairings: HashMap<String, PhonePairing>,
+    /// id → phone grant (`/v2/phone-grants`).
+    phone_grants: HashMap<String, PhoneGrant>,
+    /// Creation counter for phone rows (oldest first ordering).
+    phone_seq: u64,
+}
+
+#[derive(Clone)]
+struct PhonePairing {
+    user_id: String,
+    device_id: String,
+    device_name: String,
+    platform: String,
+    machine_id: String,
+    client_key: Vec<u8>,
+    proof_b64: String,
+    status: String,
+    created_at: u64,
+    seq: u64,
+}
+
+impl PhonePairing {
+    fn current_status(&self, now: u64) -> &str {
+        if self.status == "pending" && now.saturating_sub(self.created_at) > PAIRING_TTL_SECS {
+            "expired"
+        } else {
+            &self.status
+        }
+    }
+}
+
+#[derive(Clone)]
+struct PhoneGrant {
+    user_id: String,
+    device_id: String,
+    device_name: String,
+    platform: String,
+    machine_id: String,
+    client_key: Vec<u8>,
+    created_at: u64,
+    seq: u64,
 }
 
 #[derive(Clone)]
@@ -195,6 +240,7 @@ struct Machine {
     app_version: String,
     noise_public_key_b64: String,
     slot: String,
+    link_slot: String,
     last_heartbeat: Option<u64>,
 }
 
@@ -348,6 +394,46 @@ impl FakeApi {
         self.shared.lock().grants.contains(&(from_machine.to_string(), target_machine.to_string()))
     }
 
+    /// A phone of the machine's account asks to pair with `machine_id`; returns the
+    /// pairing id. Test hook (the phone side routes live in the real relay only).
+    pub fn add_phone_pairing(&self, machine_id: &str, device_name: &str, platform: &str, client_key: [u8; 32]) -> String {
+        let mut st = self.shared.lock();
+        let user_id = st.machines.get(machine_id).map(|m| m.user_id.clone()).expect("add_phone_pairing: unknown machine");
+        st.phone_seq += 1;
+        let seq = st.phone_seq;
+        let id = random_id();
+        let pairing = PhonePairing {
+            user_id,
+            device_id: random_id(),
+            device_name: device_name.to_string(),
+            platform: platform.to_string(),
+            machine_id: machine_id.to_string(),
+            client_key: client_key.to_vec(),
+            proof_b64: base64::engine::general_purpose::STANDARD.encode(Sha256::digest(client_key)),
+            status: "pending".to_string(),
+            created_at: now_unix(),
+            seq,
+        };
+        st.phone_pairings.insert(id.clone(), pairing);
+        id
+    }
+
+    /// Age a phone pairing past its 5-minute expiry. Test hook.
+    pub fn expire_phone_pairing(&self, pairing_id: &str) {
+        if let Some(p) = self.shared.lock().phone_pairings.get_mut(pairing_id) {
+            p.created_at = p.created_at.saturating_sub(PAIRING_TTL_SECS + 1);
+        }
+    }
+
+    /// Whether a phone with `client_key` holds a grant on `machine_id`. Test helper.
+    pub fn has_phone_grant(&self, machine_id: &str, client_key: [u8; 32]) -> bool {
+        self.shared
+            .lock()
+            .phone_grants
+            .values()
+            .any(|g| g.machine_id == machine_id && g.client_key == client_key)
+    }
+
     /// Make `GET /v2/pairings` return every pairing of the account whatever the
     /// role (a misbehaving server). Test hook.
     pub fn set_list_all_pairings(&self, on: bool) {
@@ -476,6 +562,17 @@ fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
             let id = &p["/v2/shares/".len()..p.len() - "/host-ticket".len()];
             share_host_ticket(rec, id, opts, st)
         }
+        ("GET", "/v2/phone-pairings") => list_phone_pairings(rec, st),
+        ("POST", p) if p.starts_with("/v2/phone-pairings/") && p.ends_with("/approve") => {
+            let id = &p["/v2/phone-pairings/".len()..p.len() - "/approve".len()];
+            approve_phone_pairing(rec, id, st)
+        }
+        ("POST", p) if p.starts_with("/v2/phone-pairings/") && p.ends_with("/deny") => {
+            let id = &p["/v2/phone-pairings/".len()..p.len() - "/deny".len()];
+            deny_phone_pairing(rec, id, st)
+        }
+        ("GET", "/v2/phone-grants") => list_phone_grants(rec, st),
+        ("DELETE", p) if p.starts_with("/v2/phone-grants/") => delete_phone_grant(rec, &p["/v2/phone-grants/".len()..], st),
         ("POST", "/v2/pairings") => create_pairing(rec, st),
         ("GET", "/v2/pairings") => list_pairings(rec, st),
         ("POST", p) if p.starts_with("/v2/pairings/") && p.ends_with("/approve") => {
@@ -536,6 +633,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
         .map(|(id, _)| id.clone());
     let id = existing.unwrap_or_else(random_id);
     let slot = st.machines.get(&id).map(|m| m.slot.clone()).unwrap_or_else(|| random_b64url(16));
+    let link_slot = st.machines.get(&id).map(|m| m.link_slot.clone()).unwrap_or_else(|| random_b64url(16));
     let last = st.machines.get(&id).and_then(|m| m.last_heartbeat);
     st.machines.insert(
         id.clone(),
@@ -548,10 +646,11 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
             app_version: app.to_string(),
             noise_public_key_b64: key.to_string(),
             slot: slot.clone(),
+            link_slot: link_slot.clone(),
             last_heartbeat: last,
         },
     );
-    Reply::json(200, json!({"machine_id": id, "slot": slot}))
+    Reply::json(200, json!({"machine_id": id, "slot": slot, "link_slot": link_slot}))
 }
 
 fn list_machines(rec: &Recorded, st: &State) -> Reply {
@@ -599,13 +698,18 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
         return Reply::error(404, "machine_not_found", "Machine not found");
     };
     let target = b["target_machine_id"].as_str();
+    let link = match b.get("lane") {
+        None => false,
+        Some(l) if l == "link" => true,
+        Some(_) => return Reply::error(400, "bad_request", "lane must be link"),
+    };
     let (permission, role, slot) = match b["permission"].as_str() {
         Some("register") => {
             // Only ever for the caller's own machine.
             if target.is_some_and(|t| t != machine_id) {
                 return Reply::error(400, "bad_request", "register tickets are for the caller's own machine");
             }
-            ("register", "daemon", own.slot.clone())
+            ("register", "daemon", if link { own.link_slot.clone() } else { own.slot.clone() })
         }
         Some("connect") => {
             let Some(target) = target else {
@@ -618,7 +722,7 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
             if target != machine_id && !st.grants.contains(&(machine_id.to_string(), target.to_string())) {
                 return Reply::error(403, "not_granted", "No approved pairing for that machine");
             }
-            ("connect", "client", t.slot.clone())
+            ("connect", "client", if link { t.link_slot.clone() } else { t.slot.clone() })
         }
         _ => return Reply::error(400, "bad_request", "permission must be register or connect"),
     };
@@ -949,6 +1053,135 @@ fn deny_pairing(rec: &Recorded, id: &str, st: &mut State) -> Reply {
         "denied" => Reply::empty(204),
         _ => Reply::error(409, "pairing_not_pending", "Pairing is not pending"),
     }
+}
+
+/// Phone pairing of the caller's account targeting the caller's own machine (relay `phones.ts` rules).
+fn target_phone_pairing<'a>(who: &TokenInfo, id: &str, st: &'a State) -> Result<&'a PhonePairing, Reply> {
+    let p = st
+        .phone_pairings
+        .get(id)
+        .filter(|p| p.user_id == who.user_id)
+        .ok_or_else(|| Reply::error(404, "pairing_not_found", "Pairing not found"))?;
+    if own_machine_id(who, st).as_deref() != Some(p.machine_id.as_str()) {
+        return Err(Reply::error(403, "forbidden", "Forbidden"));
+    }
+    Ok(p)
+}
+
+fn list_phone_pairings(rec: &Recorded, st: &State) -> Reply {
+    use base64::engine::general_purpose::STANDARD;
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    if !rec.query.split('&').any(|kv| kv == "role=target") {
+        return Reply::error(400, "bad_request", "Malformed request");
+    }
+    let Some(own) = own_machine_id(&who, st) else { return Reply::json(200, json!({"pairings": []})) };
+    let now = now_unix();
+    let mut items: Vec<(&String, &PhonePairing)> = st
+        .phone_pairings
+        .iter()
+        .filter(|(_, p)| p.machine_id == own && p.user_id == who.user_id && p.current_status(now) == "pending")
+        .collect();
+    items.sort_by_key(|(_, p)| std::cmp::Reverse(p.seq));
+    let pairings: Vec<Value> = items
+        .into_iter()
+        .map(|(id, p)| {
+            json!({
+                "pairing_id": id,
+                "device_name": p.device_name,
+                "platform": p.platform,
+                "client_key_b64": STANDARD.encode(&p.client_key),
+                "proof_b64": p.proof_b64,
+                "created_at_unix": p.created_at,
+            })
+        })
+        .collect();
+    Reply::json(200, json!({"pairings": pairings}))
+}
+
+fn approve_phone_pairing(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let p = match target_phone_pairing(&who, id, st) {
+        Ok(p) => p.clone(),
+        Err(r) => return r,
+    };
+    if p.current_status(now_unix()) != "pending" {
+        return if p.status == "pending" {
+            Reply::error(410, "pairing_expired", "Pairing expired")
+        } else {
+            Reply::error(409, "pairing_not_pending", "Pairing is not pending")
+        };
+    }
+    st.phone_pairings.get_mut(id).expect("checked above").status = "approved".to_string();
+    // One grant per (phone, machine): a re-approval replaces the old row.
+    st.phone_grants.retain(|_, g| !(g.device_id == p.device_id && g.machine_id == p.machine_id));
+    st.phone_seq += 1;
+    let seq = st.phone_seq;
+    st.phone_grants.insert(
+        random_id(),
+        PhoneGrant {
+            user_id: p.user_id,
+            device_id: p.device_id,
+            device_name: p.device_name,
+            platform: p.platform,
+            machine_id: p.machine_id,
+            client_key: p.client_key,
+            created_at: now_unix(),
+            seq,
+        },
+    );
+    Reply::empty(204)
+}
+
+fn deny_phone_pairing(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let p = match target_phone_pairing(&who, id, st) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    match p.current_status(now_unix()) {
+        "pending" => {
+            st.phone_pairings.get_mut(id).expect("checked above").status = "denied".to_string();
+            Reply::empty(204)
+        }
+        "denied" => Reply::empty(204),
+        _ => Reply::error(409, "pairing_not_pending", "Pairing is not pending"),
+    }
+}
+
+fn list_phone_grants(rec: &Recorded, st: &State) -> Reply {
+    use base64::engine::general_purpose::STANDARD;
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let Some(own) = own_machine_id(&who, st) else { return Reply::json(200, json!({"grants": []})) };
+    let mut items: Vec<(&String, &PhoneGrant)> =
+        st.phone_grants.iter().filter(|(_, g)| g.machine_id == own && g.user_id == who.user_id).collect();
+    items.sort_by_key(|(_, g)| g.seq);
+    let grants: Vec<Value> = items
+        .into_iter()
+        .map(|(id, g)| {
+            json!({
+                "grant_id": id,
+                "device_id": g.device_id,
+                "device_name": g.device_name,
+                "platform": g.platform,
+                "client_key_b64": STANDARD.encode(&g.client_key),
+                "created_at_unix": g.created_at,
+                "last_seen_unix": Value::Null,
+            })
+        })
+        .collect();
+    Reply::json(200, json!({"grants": grants}))
+}
+
+fn delete_phone_grant(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let Some(g) = st.phone_grants.get(id).filter(|g| g.user_id == who.user_id) else {
+        return Reply::error(404, "not_found", "Not found");
+    };
+    if own_machine_id(&who, st).as_deref() != Some(g.machine_id.as_str()) {
+        return Reply::error(403, "forbidden", "Forbidden");
+    }
+    st.phone_grants.remove(id);
+    Reply::empty(204)
 }
 
 /// `{kind, name, platform, public_key}` per v1 `parseDevice` (+ kind `desktop`).

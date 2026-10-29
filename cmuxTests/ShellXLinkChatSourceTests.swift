@@ -1,0 +1,739 @@
+import CMUXAgentLaunch
+import CmuxAgentChat
+import CmuxMobileHost
+import Foundation
+import ShellXLinkCore
+import ShellXLinkSession
+import Testing
+
+#if canImport(cmux_DEV)
+@testable import cmux_DEV
+#elseif canImport(cmux)
+@testable import cmux
+#endif
+
+/// The host's attachment type; a bare `ChatAttachment` is ambiguous with `CmuxAgentChat`'s.
+private typealias LinkAttachment = ShellXLinkChatSource.Attachment
+
+/// ShellX Link's `AgentChatSource` over the agent chat transcript service: history pages, live entries, and
+/// the send / interrupt commands a phone runs.
+@Suite("ShellX Link chat source", .serialized, .timeLimit(.minutes(1)))
+struct ShellXLinkChatSourceTests {
+    private final class Calls: @unchecked Sendable {
+        private let lock = NSLock()
+        private var recorded: [String] = []
+        func record(_ call: String) { lock.lock(); recorded.append(call); lock.unlock() }
+        var all: [String] { lock.lock(); defer { lock.unlock() }; return recorded }
+    }
+
+    /// The pushes one `entries()` subscriber received, filled by its consumer task.
+    private final class Pushes: @unchecked Sendable {
+        private let lock = NSLock()
+        private var recorded: [ChatPush] = []
+        func record(_ push: ChatPush) { lock.lock(); recorded.append(push); lock.unlock() }
+        var all: [ChatPush] { lock.lock(); defer { lock.unlock() }; return recorded }
+        var entries: [ChatEntry] { all.flatMap(\.entries) }
+    }
+
+    private static func makeHome() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shellx-link-chat-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    /// A service over a private hook store with no mobile client subscribed.
+    @MainActor
+    private static func makeService(home: URL) -> AgentChatTranscriptService {
+        AgentChatTranscriptService(
+            registry: AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home)),
+            resolver: AgentChatTranscriptResolver(homeDirectory: home, environment: [:]),
+            hasEventSubscribers: { false },
+            emitEventPayload: { _ in }
+        )
+    }
+
+    private static func json(_ object: [String: Any]) -> String {
+        String(decoding: try! JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+    }
+
+    private static func userLine(_ uuid: String, _ text: String) -> String {
+        json(["type": "user", "message": ["role": "user", "content": text], "uuid": uuid,
+              "timestamp": "2026-10-27T05:00:00.000Z", "sessionId": "s"])
+    }
+
+    private static func assistantLine(_ uuid: String, _ blocks: [[String: Any]]) -> String {
+        json(["type": "assistant", "message": ["role": "assistant", "content": blocks], "uuid": uuid,
+              "timestamp": "2026-10-27T05:00:01.000Z", "sessionId": "s"])
+    }
+
+    /// A Claude session (or `source`) whose transcript holds `lines`, run by agent process `pid` (none when nil).
+    @MainActor
+    private static func addSession(_ service: AgentChatTranscriptService, home: URL, lines: [String],
+                                   source: String = "claude", pid: Int? = nil) throws -> (id: String, transcript: URL) {
+        let id = UUID().uuidString
+        let transcript = home.appendingPathComponent("\(id).jsonl")
+        try lines.map { $0 + "\n" }.joined().write(to: transcript, atomically: true, encoding: .utf8)
+        service.noteHookEvent(WorkstreamEvent(sessionId: id, hookEventName: .sessionStart, source: source,
+                                              transcriptPath: transcript.path, cwd: "/Users/example/project", ppid: pid))
+        return (id, transcript)
+    }
+
+    /// A live process for a session's agent: this test process.
+    private static var livePID: Int { Int(getpid()) }
+
+    @MainActor
+    private static func tailerActive(_ service: AgentChatTranscriptService, _ sessionID: String) -> Bool {
+        service.debugSessionDump().first { $0["session_id"] as? String == sessionID }?["tailer_active"] as? Bool ?? false
+    }
+
+    @MainActor
+    private static func waitUntil(seconds: Double = 5, _ condition: @MainActor () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return condition()
+    }
+
+    @Test func testHistoryMapsMessages() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let (session, codex) = try await MainActor.run { () throws -> (String, String) in
+            let claude = try Self.addSession(service, home: home, lines: [
+                Self.userLine("u-1", "Fix the build"),
+                Self.assistantLine("a-1", [
+                    ["type": "text", "text": "Looking into it"],
+                    ["type": "thinking", "thinking": "The linker fails"],
+                    ["type": "tool_use", "id": "t-read", "name": "Read", "input": ["file_path": "/tmp/a.swift"]],
+                    ["type": "tool_use", "id": "t-bash", "name": "Bash", "input": ["command": "swift build"]],
+                    ["type": "tool_use", "id": "t-edit", "name": "Edit",
+                     "input": ["file_path": "/tmp/a.swift", "old_string": "a", "new_string": "b"]],
+                ]),
+            ])
+            let codex = try Self.addSession(service, home: home, lines: [Self.userLine("u-1", "hi")], source: "codex")
+            return (claude.id, codex.id)
+        }
+
+        let page = try #require(await source.history(sessionId: session, beforeSeq: nil, limit: 50))
+
+        #expect(page.hasMore == false)
+        let entries = page.entries
+        let user = try #require(entries.first)
+        #expect(user.role == .user)
+        #expect(user.kind == .prose)
+        #expect(user.text == "Fix the build")
+        #expect(user.seq == 0)
+        #expect(user.tsMs == 1_793_077_200_000)   // 2026-10-27T05:00:00Z
+        #expect(user.truncated == nil)
+        let agent = entries.dropFirst()
+        #expect(agent.allSatisfy { $0.role == .agent && $0.seq == 1 })
+        #expect(agent.first { $0.kind == .prose }?.text == "Looking into it")
+        #expect(agent.first { $0.kind == .thought }?.text == "The linker fails")
+        let tools = agent.filter { $0.kind == .toolUse }
+        #expect(tools.map(\.toolName) == ["Read", "Bash", "Edit"])
+        #expect(tools.map(\.text) == ["Read /tmp/a.swift", "swift build", "/tmp/a.swift"])
+        // Every emission carries a revision; a later emission of the same entry carries a higher one.
+        #expect(Set(entries.map(\.id)).count == entries.count)
+        let again = try #require(await source.history(sessionId: session, beforeSeq: nil, limit: 50)).entries
+        #expect(again.map(\.id) == entries.map(\.id))
+        #expect(zip(entries, again).allSatisfy { $1.rev > $0.rev })
+        // Claude Code only, and an unknown session has no history.
+        #expect(await source.history(sessionId: codex, beforeSeq: nil, limit: 50) == nil)
+        #expect(await source.history(sessionId: "no-such-session", beforeSeq: nil, limit: 50) == nil)
+    }
+
+    @Test func testEntryTextCutTo4096Bytes() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let long = "x" + String(repeating: "€", count: 5000)   // 15 001 bytes; 4096 falls inside a character
+        let session = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [Self.assistantLine("a-1", [["type": "text", "text": long]])]).id
+        }
+
+        let entry = try #require(await source.history(sessionId: session, beforeSeq: nil, limit: 50)?.entries.first)
+
+        #expect(entry.text.utf8.count <= ChatEntry.maxTextBytes)
+        #expect(entry.text.utf8.count > ChatEntry.maxTextBytes - 3)
+        #expect(long.hasPrefix(entry.text))
+        #expect(entry.truncated == true)
+    }
+
+    /// `chat.send` and `chat.interrupt` run the same `TerminalController` functions as `mobile.chat.send` and
+    /// `mobile.chat.interrupt`, and their errors map to Link outcomes.
+    @Test func testSendUsesSharedPathAndMapsBusy() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        let sendResults: [TerminalController.V2CallResult] = [
+            .err(code: "input_queue_full", message: "full", data: nil),
+            .err(code: "busy", message: "busy", data: nil),
+            .err(code: "not_found", message: "moved", data: nil),
+            .err(code: "surface_unavailable", message: "gone", data: nil),
+            .ok(["submitted": true]),
+            .ok(["submitted": false, "submit_error": "surface_changed"]),
+        ]
+        let interruptResults: [TerminalController.V2CallResult] = [
+            .ok(["interrupted": true]),
+            .err(code: "not_found", message: "moved", data: nil),
+            .err(code: "surface_unavailable", message: "no", data: nil),
+        ]
+        let (source, session, codex) = try await MainActor.run { () throws -> (ShellXLinkChatSource, String, String) in
+            var sends = sendResults[...]
+            var interrupts = interruptResults[...]
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text, _ in
+                    calls.record("send \(sessionID) \(text)")
+                    return sends.popFirst() ?? .err(code: "internal_error", message: "", data: nil)
+                },
+                interrupt: { sessionID, hard in
+                    calls.record("interrupt \(sessionID) \(hard)")
+                    return interrupts.popFirst() ?? .err(code: "internal_error", message: "", data: nil)
+                }
+            )
+            let session = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            let codex = try Self.addSession(service, home: home, lines: [], source: "codex", pid: Self.livePID).id
+            return (source, session, codex)
+        }
+
+        var outcomes: [ChatSendOutcome] = []
+        for _ in sendResults { outcomes.append(await source.send(sessionId: session, text: "hello")) }
+        #expect(outcomes == [.busy, .busy, .notFound, .failed, .submitted, .failed])
+        #expect(await source.interrupt(sessionId: session, hard: true) == .sent)
+        #expect(await source.interrupt(sessionId: session, hard: false) == .notFound)
+        #expect(await source.interrupt(sessionId: session, hard: false) == .failed)
+        // Another agent's session, or one the Mac does not know, is not found before any terminal is touched.
+        let before = calls.all.count
+        #expect(await source.send(sessionId: codex, text: "hello") == .notFound)
+        #expect(await source.send(sessionId: "no-such-session", text: "hello") == .notFound)
+        #expect(await source.interrupt(sessionId: codex, hard: true) == .notFound)
+        #expect(calls.all.count == before)
+        #expect(calls.all.first == "send \(session) hello")
+        #expect(calls.all.contains("interrupt \(session) true"))
+
+        // The default commands are the shared `TerminalController` functions: a session whose terminal cannot
+        // be resolved is `not_found` there, as `mobile.chat.send` reports it.
+        let shared = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        #expect(await shared.send(sessionId: session, text: "hello") == .notFound)
+        #expect(await shared.interrupt(sessionId: session, hard: false) == .notFound)
+        let mobile = await MainActor.run { TerminalController.shared }
+        guard case .err(let code, _, _) = await mobile.v2MobileChatSend(params: ["session_id": session, "text": "hello"]) else {
+            Issue.record("mobile.chat.send must fail for an unbound session")
+            return
+        }
+        #expect(code == "not_found")
+    }
+
+    /// A phone's message or ctrl-C reaches only a live agent (PROTOCOL.md, Phone commands): an ended session, or
+    /// one whose agent process the Mac cannot name or that has exited, is `not_found` before any terminal is touched,
+    /// so the text never falls through to the shell (or whatever now runs) in that terminal.
+    @Test func testSendAndInterruptReachOnlyALiveAgent() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        // A process that has exited (reaped), so its pid names no agent.
+        let exited = Process()
+        exited.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try exited.run()
+        exited.waitUntilExit()
+        let deadPID = Int(exited.processIdentifier)
+        let (source, live, ended, unnamed, dead) = try await MainActor.run {
+            () throws -> (ShellXLinkChatSource, String, String, String, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text, _ in
+                    calls.record("send \(sessionID) \(text)")
+                    return .ok(["submitted": true])
+                },
+                interrupt: { sessionID, hard in
+                    calls.record("interrupt \(sessionID) \(hard)")
+                    return .ok(["interrupted": true])
+                }
+            )
+            let live = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            let ended = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionEnd, source: "claude"))
+            let unnamed = try Self.addSession(service, home: home, lines: [], pid: nil).id
+            let dead = try Self.addSession(service, home: home, lines: [], pid: deadPID).id
+            return (source, live, ended, unnamed, dead)
+        }
+        #expect(await MainActor.run { service.sessionRecord(sessionID: ended)?.state } == .ended)
+
+        for session in [ended, unnamed, dead] {
+            #expect(await source.send(sessionId: session, text: "rm -rf build") == .notFound)
+            #expect(await source.interrupt(sessionId: session, hard: true) == .notFound)
+        }
+        #expect(calls.all.isEmpty, "a command ran for a session without a live agent: \(calls.all)")
+
+        #expect(await source.send(sessionId: live, text: "go on") == .submitted)
+        #expect(await source.interrupt(sessionId: live, hard: false) == .sent)
+        #expect(calls.all == ["send \(live) go on", "interrupt \(live) false"])
+    }
+
+    /// A phone's attachments reach the send command as the host handed them over: same order, same bytes and
+    /// names, and the outcome maps like a text-only send. The source takes attachments (so `welcome` offers
+    /// the feature) and the text may be empty.
+    @Test func testAttachmentsGoToTheSendCommandInOrder() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        final class Sent: @unchecked Sendable {
+            private let lock = NSLock()
+            private var recorded: [(session: String, text: String, attachments: [LinkAttachment])] = []
+            func record(_ session: String, _ text: String, _ attachments: [LinkAttachment]) {
+                lock.lock(); recorded.append((session, text, attachments)); lock.unlock()
+            }
+            var all: [(session: String, text: String, attachments: [LinkAttachment])] {
+                lock.lock(); defer { lock.unlock() }; return recorded
+            }
+        }
+        let sent = Sent()
+        let (source, session) = try await MainActor.run { () throws -> (ShellXLinkChatSource, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text, attachments in
+                    sent.record(sessionID, text, attachments)
+                    return .ok(["submitted": true])
+                }
+            )
+            return (source, try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id)
+        }
+        #expect(source.acceptsAttachments)
+
+        let attachments = [
+            LinkAttachment(kind: .image, name: "screen.jpg", data: Data([0xFF, 0xD8, 0x01])),
+            LinkAttachment(kind: .file, name: "notes.txt", data: Data("hello".utf8)),
+            LinkAttachment(kind: .image, name: "second.jpg", data: Data([0xFF, 0xD8, 0x02])),
+        ]
+        #expect(await source.send(sessionId: session, text: "fix this", attachments: attachments) == .submitted)
+        #expect(await source.send(sessionId: session, text: "", attachments: [attachments[1]]) == .submitted)
+        // Text alone is still the plain send, with no attachments.
+        #expect(await source.send(sessionId: session, text: "just text") == .submitted)
+
+        let calls = sent.all
+        #expect(calls.count == 3)
+        #expect(calls[0].session == session)
+        #expect(calls[0].text == "fix this")
+        #expect(calls[0].attachments == attachments)
+        #expect(calls[1].text == "")
+        #expect(calls[1].attachments == [attachments[1]])
+        #expect(calls[2].text == "just text")
+        #expect(calls[2].attachments.isEmpty)
+    }
+
+    /// The items the shared send path pastes: the images first, then the files, each in the order the phone sent
+    /// them (ruling R13). An image keeps the extension of the name the phone gave (`jpg` without one) and carries
+    /// its bytes as base64; a file carries its name and its bytes as typed values.
+    @Test func testAttachmentsBecomePasteItemsImagesFirst() {
+        let bytes = Data([0x01, 0x02, 0x03])
+        let items = ShellXLinkChatSource.pasteItems([
+            LinkAttachment(kind: .file, name: "report.pdf", data: bytes),
+            LinkAttachment(kind: .image, name: "Photo.PNG", data: bytes),
+            LinkAttachment(kind: .file, name: "notes.txt", data: bytes),
+            LinkAttachment(kind: .image, name: "no-extension", data: bytes),
+        ])
+        #expect(items == [
+            .image(base64: bytes.base64EncodedString(), format: "png"),
+            .image(base64: bytes.base64EncodedString(), format: "jpg"),
+            .file(name: "report.pdf", data: bytes),
+            .file(name: "notes.txt", data: bytes),
+        ])
+    }
+
+    /// Finding I4, ruling R13: the send path types the images' paths, then the text, then the files' paths, so a
+    /// message with text never starts with a raw file path (which Claude Code could read as a slash command).
+    /// Without text, the files follow the images and the submit key comes last.
+    @Test func testFilePathsAreTypedAfterTheText() {
+        typealias Item = TerminalController.AgentChatPasteItem
+        let image = Item.image(base64: "AQ==", format: "png")
+        let otherImage = Item.image(base64: "Ag==", format: "jpg")
+        let file = Item.file(name: "report.pdf", data: Data([1]))
+        let otherFile = Item.file(name: "notes.txt", data: Data([2]))
+
+        let withText = Item.typingOrder([file, image, otherFile, otherImage], text: "fix this")
+        #expect(withText.beforeText == [image, otherImage])
+        #expect(withText.afterText == [file, otherFile])
+
+        let filesOnly = Item.typingOrder([file, image, otherFile], text: "")
+        #expect(filesOnly.beforeText == [image, file, otherFile])
+        #expect(filesOnly.afterText.isEmpty)
+
+        let imagesOnly = Item.typingOrder([image, otherImage], text: "look")
+        #expect(imagesOnly.beforeText == [image, otherImage])
+        #expect(imagesOnly.afterText.isEmpty)
+    }
+
+    /// Finding M3: the host reaches the source only as `any AgentChatSource`, so a signature that drifted from the
+    /// protocol would fall back to its defaults (no attachments, `.failed`). Through the protocol, the source takes
+    /// attachments and they reach its send command.
+    @Test func testAttachmentsReachTheSendCommandThroughTheProtocol() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        let (chat, session) = try await MainActor.run { () throws -> (any AgentChatSource, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text, attachments in
+                    calls.record("send \(sessionID) \(text) \(attachments.map(\.name))")
+                    return .ok(["submitted": true])
+                }
+            )
+            return (source, try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id)
+        }
+        #expect(chat.acceptsAttachments)
+
+        let attachment = LinkAttachment(kind: .file, name: "notes.txt", data: Data("hello".utf8))
+        #expect(await chat.send(sessionId: session, text: "look", attachments: [attachment]) == .submitted)
+        #expect(calls.all == ["send \(session) look [\"notes.txt\"]"])
+    }
+
+    /// `mobile.chat.send` pastes images only: a `file` attachment is `invalid_params`, before the session is
+    /// even looked up (the session here is unbound, which would be `not_found`), so nothing is cleared, typed
+    /// or written. An image attachment still goes on to the session lookup, as before. A file reaches a terminal
+    /// only through ShellX Link's typed items.
+    @Test func testMobileChatSendRefusesFileAttachments() async throws {
+        let mobile = await MainActor.run { TerminalController.shared }
+        let attachmentsRoot = FileManager.default.temporaryDirectory.appendingPathComponent("shellx-attachments")
+        let before = (try? FileManager.default.contentsOfDirectory(atPath: attachmentsRoot.path)) ?? []
+        let file: [String: Any] = ["kind": "file", "name": "notes.txt", "data_b64": Data("hello".utf8).base64EncodedString()]
+        let image: [String: Any] = ["data_b64": Data([0x01]).base64EncodedString(), "format": "png"]
+
+        for attachments in [[file], [image, file], [file, image]] {
+            let result = await mobile.v2MobileChatSend(params: [
+                "session_id": "unbound-session", "text": "look", "attachments": attachments,
+            ])
+            guard case .err(let code, _, _) = result else {
+                Issue.record("mobile.chat.send must refuse a file attachment")
+                continue
+            }
+            #expect(code == "invalid_params")
+        }
+        // Only a file with no text is refused too, not reported as "nothing to send" or as a missing session.
+        let fileOnly = await mobile.v2MobileChatSend(params: ["session_id": "unbound-session", "attachments": [file]])
+        guard case .err(let fileOnlyCode, let fileOnlyMessage, _) = fileOnly else {
+            Issue.record("mobile.chat.send must refuse a file-only message")
+            return
+        }
+        #expect(fileOnlyCode == "invalid_params")
+        #expect(fileOnlyMessage.contains("image attachments only"))
+
+        // Images are unchanged: the unbound session is what stops them.
+        let imageResult = await mobile.v2MobileChatSend(params: [
+            "session_id": "unbound-session", "text": "look", "attachments": [image],
+        ])
+        guard case .err(let imageCode, _, _) = imageResult else {
+            Issue.record("an unbound session must not take an image")
+            return
+        }
+        #expect(imageCode == "not_found")
+
+        let after = (try? FileManager.default.contentsOfDirectory(atPath: attachmentsRoot.path)) ?? []
+        #expect(Set(after) == Set(before), "a refused file attachment wrote \(Set(after).subtracting(before))")
+    }
+
+    /// Attachments follow the text's rule: a session without a live agent is `not_found` before anything
+    /// is written, so no file lands on the Mac for an agent that is gone.
+    @Test func testAttachmentsToADeadSessionWriteNothing() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        let exited = Process()
+        exited.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try exited.run()
+        exited.waitUntilExit()
+        let deadPID = Int(exited.processIdentifier)
+        let (source, ended, unnamed, dead) = try await MainActor.run {
+            () throws -> (ShellXLinkChatSource, String, String, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, _, _ in
+                    calls.record("send \(sessionID)")
+                    return .ok(["submitted": true])
+                }
+            )
+            let ended = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionEnd, source: "claude"))
+            let unnamed = try Self.addSession(service, home: home, lines: [], pid: nil).id
+            let dead = try Self.addSession(service, home: home, lines: [], pid: deadPID).id
+            return (source, ended, unnamed, dead)
+        }
+
+        let attachment = LinkAttachment(kind: .file, name: "notes.txt", data: Data("hello".utf8))
+        for session in [ended, unnamed, dead, "no-such-session"] {
+            #expect(await source.send(sessionId: session, text: "look", attachments: [attachment]) == .notFound)
+        }
+        #expect(calls.all.isEmpty, "a send command ran for a session without a live agent: \(calls.all)")
+    }
+
+    /// A phone connected over Link (no mobile client subscribed to `chat.message`) still gets live entries:
+    /// its frame observer counts as a subscriber, so hook events start the transcript tailer.
+    @Test func testFrameObserverKeepsTranscriptTailing() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let unobserved = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [Self.userLine("u-1", "first")]).id
+        }
+        #expect(await MainActor.run { Self.tailerActive(service, unobserved) } == false)
+
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        let (session, transcript) = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [Self.userLine("u-1", "first")])
+        }
+        #expect(await MainActor.run { Self.tailerActive(service, session) })
+        // Waits for the tailer's first read, so the next line arrives as a live append.
+        _ = await service.history(sessionID: session, beforeSeq: nil, limit: 1)
+
+        let handle = try FileHandle(forWritingTo: transcript)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((Self.assistantLine("a-1", [["type": "text", "text": "Done"]]) + "\n").utf8))
+        try handle.close()
+
+        #expect(await Self.waitUntil { pushes.entries.contains { $0.text == "Done" } })
+        let pushed = try #require(pushes.entries.first { $0.text == "Done" })
+        #expect(pushed.role == .agent)
+        #expect(pushed.kind == .prose)
+        let paged = try #require(await source.history(sessionId: session, beforeSeq: nil, limit: 50)?.entries
+            .first { $0.id == pushed.id })
+        #expect(paged.rev > pushed.rev)
+
+        consumer.cancel()
+        _ = await consumer.value
+        #expect(await Self.waitUntil { service.frameObserverCount == 0 })
+    }
+
+    /// Claude Code writes a new session's transcript only after its first prompt hook, so SessionStart and the
+    /// first UserPromptSubmit name a file (in a project folder) that does not exist yet. A phone connected
+    /// before the session started still gets the whole first turn live, not only from the second prompt on.
+    @Test func testFirstTurnOfNewSessionIsPushed() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        let session = UUID().uuidString
+        let project = home.appendingPathComponent("projects/-private-tmp-first-turn", isDirectory: true)
+        let transcript = project.appendingPathComponent("\(session).jsonl")
+        func hook(_ name: WorkstreamEvent.HookEventName, tool: String? = nil) -> WorkstreamEvent {
+            WorkstreamEvent(sessionId: session, hookEventName: name, source: "claude", transcriptPath: transcript.path,
+                            cwd: "/private/tmp/first-turn", toolName: tool)
+        }
+        func append(_ line: String) throws {
+            if !FileManager.default.fileExists(atPath: transcript.path) {
+                try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+                try Data().write(to: transcript)
+            }
+            let handle = try FileHandle(forWritingTo: transcript)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data((line + "\n").utf8))
+            try handle.close()
+        }
+
+        await MainActor.run {
+            service.noteHookEvent(hook(.sessionStart))
+            service.noteHookEvent(hook(.userPromptSubmit))
+        }
+        // No transcript yet: a listed session has an empty history, not `not_found`; live entries still follow.
+        let early = try #require(await source.history(sessionId: session, beforeSeq: nil, limit: 10))
+        #expect(early.entries.isEmpty)
+        #expect(early.hasMore == false)
+        try append(Self.userLine("u-1", "Create the file"))
+        await MainActor.run { service.noteHookEvent(hook(.preToolUse, tool: "Bash")) }
+        try append(Self.assistantLine("a-1", [
+            ["type": "tool_use", "id": "t-touch", "name": "Bash", "input": ["command": "touch first.txt"]],
+        ]))
+        try append(Self.assistantLine("a-2", [["type": "text", "text": "Created first.txt"]]))
+        await MainActor.run { service.noteHookEvent(hook(.stop)) }
+
+        #expect(await Self.waitUntil {
+            let texts = Set(pushes.entries.map(\.text))
+            return texts.isSuperset(of: ["Create the file", "touch first.txt", "Created first.txt"])
+        })
+        let entries = pushes.entries
+        #expect(entries.first { $0.text == "Create the file" }?.role == .user)
+        #expect(entries.first { $0.text == "touch first.txt" }?.toolName == "Bash")
+        #expect(entries.first { $0.text == "Created first.txt" }?.kind == .prose)
+    }
+
+    /// A listed (not ended) session whose transcript its agent has not written yet answers an empty page, even
+    /// with no phone subscribed when it started; `not_found` stays for sessions the Mac cannot read: unknown,
+    /// another agent's, or ended without a transcript. `mobile.chat.history` keeps its "transcript not
+    /// readable" answer for the waiting session.
+    @Test func testHistoryOfNewSessionIsEmptyUntilItsTranscriptExists() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let waiting = UUID().uuidString, ended = UUID().uuidString
+        let transcript = home.appendingPathComponent("projects/-tmp-new/\(waiting).jsonl")
+        await MainActor.run {
+            service.noteHookEvent(WorkstreamEvent(sessionId: waiting, hookEventName: .sessionStart, source: "claude",
+                                                  transcriptPath: transcript.path, cwd: "/tmp/new"))
+            let missing = home.appendingPathComponent("projects/-tmp-new/\(ended).jsonl").path
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionStart, source: "claude",
+                                                  transcriptPath: missing, cwd: "/tmp/new"))
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionEnd, source: "claude",
+                                                  transcriptPath: missing, cwd: "/tmp/new"))
+        }
+
+        let page = try #require(await source.history(sessionId: waiting, beforeSeq: nil, limit: 10))
+        #expect(page.entries.isEmpty)
+        #expect(page.hasMore == false)
+        #expect(await service.historyRebindingIfStale(sessionID: waiting, beforeSeq: nil, limit: 10) == nil)
+        #expect(await source.history(sessionId: ended, beforeSeq: nil, limit: 10) == nil)
+        #expect(await source.history(sessionId: "no-such-session", beforeSeq: nil, limit: 10) == nil)
+
+        // Once the agent writes it, the history is the transcript.
+        try FileManager.default.createDirectory(at: transcript.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try (Self.userLine("u-1", "First prompt") + "\n").write(to: transcript, atomically: false, encoding: .utf8)
+        var texts: [String] = []
+        for _ in 0..<300 where texts.isEmpty {
+            texts = await source.history(sessionId: waiting, beforeSeq: nil, limit: 10)?.entries.map(\.text) ?? []
+            if texts.isEmpty { try? await Task.sleep(nanoseconds: 10_000_000) }
+        }
+        #expect(texts == ["First prompt"])
+    }
+
+    /// A session whose transcript was read and then removed still serves the history it read.
+    @Test func testHistorySurvivesTheTranscriptBeingRemoved() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let (session, transcript) = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [Self.userLine("u-1", "Kept")])
+        }
+        #expect(await source.history(sessionId: session, beforeSeq: nil, limit: 10)?.entries.map(\.text) == ["Kept"])
+
+        try FileManager.default.removeItem(at: transcript)
+
+        #expect(await source.history(sessionId: session, beforeSeq: nil, limit: 10)?.entries.map(\.text) == ["Kept"])
+        #expect(await service.history(sessionID: session, beforeSeq: nil, limit: 10)?.messages.count == 1)
+    }
+
+    /// The tailer updates its cache before it publishes the batch, so a history read can return an entry
+    /// older than a push that reached the main actor while the read was in flight. The page then carries the
+    /// pushed content under a new revision; a stale copy never outranks the push on the phone.
+    @Test func testStaleHistoryCopyNeverOutranksAPush() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let (source, session) = try await MainActor.run { () throws -> (ShellXLinkChatSource, String) in
+            (ShellXLinkChatSource(service: { service }), try Self.addSession(service, home: home, lines: []).id)
+        }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        let running = ChatMessage(id: "tool-1", seq: 3, role: .agent, timestamp: Date(timeIntervalSince1970: 1),
+                                  kind: .terminal(ChatTerminalCapture(command: "make", isRunning: true)))
+        let finished = ChatMessage(id: "tool-1", seq: 3, role: .agent, timestamp: Date(timeIntervalSince1970: 1),
+                                   kind: .terminal(ChatTerminalCapture(command: "make && echo ok", isRunning: false)))
+
+        let page = await MainActor.run { () -> [ChatEntry] in
+            let read = source.beginHistoryRead(sessionId: session)
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .updated([finished])))
+            return source.finishHistoryRead(read, page: ChatHistoryPage(messages: [running], hasMore: false)).entries
+        }
+
+        #expect(await Self.waitUntil { pushes.entries.contains { $0.id == "tool-1" } })
+        let pushed = try #require(pushes.entries.first { $0.id == "tool-1" })
+        let paged = try #require(page.first)
+        #expect(paged.text == "make && echo ok")
+        #expect(paged.rev > pushed.rev)
+        #expect(ChatEntry.newer(pushed, paged).text == "make && echo ok")
+    }
+
+    /// A transcript the service reloaded from scratch reaches the phone as a reset, in order with the entries
+    /// around it, for Claude Code sessions only: the phone drops what it held and pages again.
+    @Test func testTranscriptResetIsPushedInOrder() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let (source, session, codex) = try await MainActor.run { () throws -> (ShellXLinkChatSource, String, String) in
+            (ShellXLinkChatSource(service: { service }),
+             try Self.addSession(service, home: home, lines: []).id,
+             try Self.addSession(service, home: home, lines: [], source: "codex").id)
+        }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        func message(_ id: String, _ seq: Int) -> ChatMessage {
+            ChatMessage(id: id, seq: seq, role: .agent, timestamp: Date(timeIntervalSince1970: 1),
+                        kind: .terminal(ChatTerminalCapture(command: id, isRunning: false)))
+        }
+
+        await MainActor.run {
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .appended([message("old", 7)])))
+            source.receive(ChatSessionEventFrame(sessionID: codex, event: .reset))
+            source.receive(ChatSessionEventFrame(sessionID: "no-such-session", event: .reset))
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .reset))
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .appended([message("new", 0)])))
+        }
+
+        #expect(await Self.waitUntil { pushes.all.count >= 3 })
+        let all = pushes.all
+        #expect(all.map(\.sessionId) == [session, session, session])
+        #expect(all.map { push -> String in
+            if case .reset = push { return "reset" }
+            return push.entries.map(\.id).joined(separator: ",")
+        } == ["old", "reset", "new"])
+    }
+
+    /// The real path: a tailed transcript that is cut and rewritten (the tailer's truncation/rotation reload,
+    /// as after `claude --resume` or a fork's oversized first read) pushes a reset, and history is then the
+    /// new transcript.
+    @Test func testReloadedTranscriptPushesAReset() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        let (session, transcript) = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [
+                Self.userLine("u-1", "A long first prompt of the old transcript"),
+                Self.assistantLine("a-1", [["type": "text", "text": "An equally long answer of the old transcript"]]),
+            ])
+        }
+        #expect(await MainActor.run { Self.tailerActive(service, session) })
+        _ = await service.history(sessionID: session, beforeSeq: nil, limit: 1)   // the tailer's first read is done
+
+        let handle = try FileHandle(forWritingTo: transcript)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data((Self.userLine("u-9", "New") + "\n").utf8))
+        try handle.close()
+
+        #expect(await Self.waitUntil { pushes.all.contains(.reset(sessionId: session)) })
+        var texts: [String] = []
+        for _ in 0..<300 where texts != ["New"] {
+            texts = await source.history(sessionId: session, beforeSeq: nil, limit: 10)?.entries.map(\.text) ?? []
+            if texts != ["New"] { try? await Task.sleep(nanoseconds: 10_000_000) }
+        }
+        #expect(texts == ["New"])
+    }
+}

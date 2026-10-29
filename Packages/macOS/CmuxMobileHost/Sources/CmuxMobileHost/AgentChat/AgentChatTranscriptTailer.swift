@@ -9,6 +9,10 @@ import Foundation
 /// Seq stability: `seq` equals the absolute transcript line index. The
 /// initial backfill may skip a long head (bounded memory), in which case
 /// pages before the cache report `hasMore` honestly.
+///
+/// A tailer created before its transcript exists (a new Claude Code session
+/// names the file in its first hooks and writes it after them) has no
+/// backfill: every line the agent writes is live, from the first one.
 public actor AgentChatTranscriptTailer {
     /// A live transcript change: newly appended messages and in-place
     /// updates (tool results that completed earlier messages).
@@ -26,11 +30,18 @@ public actor AgentChatTranscriptTailer {
 
     private let sessionID: String
     private let agentKind: ChatAgentKind
-    private let path: String
+    /// Absolute transcript JSONL path.
+    public nonisolated let path: String
+    /// The transcript did not exist when this tailer was created: it is read
+    /// as live growth from its first line instead of backfilled.
+    private let followsFromFirstLine: Bool
     private let onBatch: @Sendable (Batch) async -> Void
 
     private let maxInitialLines: Int
     private let maxCachedMessages: Int
+    /// A transcript created after this tailer started is published live from
+    /// its first line, unless it first appears larger than this.
+    static let maxLiveFirstReadBytes: UInt64 = 256 * 1024
 
     private var cache: [ChatMessage] = []
     private var parseState = ChatTranscriptParseState()
@@ -67,6 +78,7 @@ public actor AgentChatTranscriptTailer {
         self.sessionID = sessionID
         self.agentKind = agentKind
         self.path = path
+        self.followsFromFirstLine = !FileManager.default.fileExists(atPath: path)
         self.maxInitialLines = maxInitialLines
         self.maxCachedMessages = maxCachedMessages
         self.onBatch = onBatch
@@ -77,10 +89,19 @@ public actor AgentChatTranscriptTailer {
     public func start() async {
         guard !started else { return }
         started = true
-        loadInitialTail()
+        let followsFromFirstLine = followsFromFirstLine
+        if !followsFromFirstLine {
+            loadInitialTail()
+        }
         let watcher = FileWatcher(path: path, throttle: .milliseconds(200))
         self.watcher = watcher
         watchTask = Task { [weak self] in
+            // The watcher is already attached, so a transcript created after
+            // this drain still wakes the loop. Draining here, not in `start`,
+            // keeps every live batch in this one task, in file order.
+            if followsFromFirstLine {
+                await self?.drainNewContent()
+            }
             for await _ in watcher.events {
                 guard let self else { return }
                 await self.drainNewContent()
@@ -128,6 +149,14 @@ public actor AgentChatTranscriptTailer {
             messages: page,
             hasMore: start > eligible.startIndex || headTruncated
         )
+    }
+
+    /// Whether this tailer waits for a transcript its agent has not written
+    /// yet: it was created before the file existed and has never seen it. A
+    /// tailer that read its file once keeps serving its cache even if the file
+    /// is removed later.
+    public var isWaitingForTranscript: Bool {
+        followsFromFirstLine && fileInode == nil && !FileManager.default.fileExists(atPath: path)
     }
 
     /// First user prompt in the cache, for the session title.
@@ -193,21 +222,25 @@ public actor AgentChatTranscriptTailer {
             // new file's head). Reset, re-read from scratch, and tell
             // clients explicitly: the seq space restarted, and id-based
             // heuristics can't always detect that (codex line-N ids repeat).
-            byteOffset = 0
-            lineCount = 0
-            pendingFragment = Data()
-            cache = []
-            parseState = ChatTranscriptParseState()
-            headTruncated = false
-            // A rotated/replaced transcript (e.g. `claude --resume` rewriting
-            // the file) carries a new first prompt; allow it to be rediscovered
-            // and re-emitted as the title instead of keeping the stale one.
-            reportedTitle = false
-            loadInitialTail()
-            await onBatch(Batch(appended: [], updated: [], discoveredTitle: nil, didReset: true))
+            await reloadAsBackfill()
             return
         }
+        if fileInode == nil {
+            // First sight of a transcript created after this tailer started:
+            // remember it so a later replacement is detected.
+            fileInode = currentInode
+        }
         guard size > byteOffset else { return }
+        // The first lines of a transcript created after this tailer started
+        // are the session's first turn, published live. One that first appears
+        // already holding a whole history (cmux's Claude fork writes the
+        // parent's history into the new session's file) is backfilled instead,
+        // like an existing transcript, rather than pushed as one huge batch.
+        let isFirstRead = followsFromFirstLine && lineCount == 0
+        if isFirstRead, size > Self.maxLiveFirstReadBytes {
+            await reloadAsBackfill()
+            return
+        }
         try? handle.seek(toOffset: byteOffset)
         guard let newData = try? handle.readToEnd(), !newData.isEmpty else { return }
         byteOffset += UInt64(newData.count)
@@ -222,6 +255,10 @@ public actor AgentChatTranscriptTailer {
         }
         pendingFragment = Data(buffer[sliceStart...])
         guard !lines.isEmpty else { return }
+        if isFirstRead, lines.count > maxInitialLines {
+            await reloadAsBackfill()
+            return
+        }
 
         let startingSeq = lineCount
         lineCount += lines.count
@@ -251,6 +288,23 @@ public actor AgentChatTranscriptTailer {
                 discoveredTitle: discoveredTitle
             )
         )
+    }
+
+    /// Re-reads the transcript from scratch as a bounded backfill and tells
+    /// clients to re-anchor (page it with history); later lines are live.
+    private func reloadAsBackfill() async {
+        byteOffset = 0
+        lineCount = 0
+        pendingFragment = Data()
+        cache = []
+        parseState = ChatTranscriptParseState()
+        headTruncated = false
+        // A rotated/replaced transcript (e.g. `claude --resume` rewriting
+        // the file) carries a new first prompt; allow it to be rediscovered
+        // and re-emitted as the title instead of keeping the stale one.
+        reportedTitle = false
+        loadInitialTail()
+        await onBatch(Batch(appended: [], updated: [], discoveredTitle: nil, didReset: true))
     }
 
     private func parse(lines: [String], startingSeq: Int) -> ChatTranscriptParseResult {

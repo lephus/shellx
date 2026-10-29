@@ -677,13 +677,13 @@ enum MenuBarIconDebugSettings {
     static let multiDigitXAdjustKey = "menubarDebugMultiDigitXAdjust"
     static let textRectWidthAdjustKey = "menubarDebugTextRectWidthAdjust"
 
-    static let defaultBadgeRect = NSRect(x: 5.38, y: 6.43, width: 10.75, height: 11.58)
+    static let defaultBadgeRect = NSRect(x: 9.13, y: 6.43, width: 10.75, height: 11.58)
     static let defaultSingleDigitFontSize: CGFloat = 6.7
     static let defaultMultiDigitFontSize: CGFloat = 6.7
     static let defaultSingleDigitYOffset: CGFloat = 0.6
     static let defaultMultiDigitYOffset: CGFloat = 0.6
     static let defaultSingleDigitXAdjust: CGFloat = -1.1
-    static let defaultMultiDigitXAdjust: CGFloat = 2.42
+    static let defaultMultiDigitXAdjust: CGFloat = -2.0
     static let defaultTextRectWidthAdjust: CGFloat = 1.8
 
     static func displayedUnreadCount(actualUnreadCount: Int, defaults: UserDefaults = .standard) -> Int {
@@ -784,7 +784,7 @@ enum MenuBarIconRenderer {
         image.lockFocus()
         defer { image.unlockFocus() }
 
-        let glyphRect = NSRect(x: 1.2, y: 1.5, width: 11.6, height: 15.0)
+        let glyphRect = NSRect(x: 1.5, y: 1.5, width: 15.0, height: 15.0)
         drawGlyph(in: glyphRect)
 
         if let text = badgeText {
@@ -796,40 +796,64 @@ enum MenuBarIconRenderer {
     }
 
     private static func drawGlyph(in rect: NSRect) {
-        // Match the canonical cmux center-mark path from Icon Center Image Artwork.svg.
-        let srcMinX: CGFloat = 384.0
-        let srcMinY: CGFloat = 255.0
-        let srcWidth: CGFloat = 369.0
-        let srcHeight: CGFloat = 513.0
+        // The ShellX mark from web/public/favicon.svg (512-unit viewBox): a ">"
+        // for the computer, a "<" for the phone and a cursor bar. The source box
+        // below is the mark's ink bounds, round caps included. Strokes are a
+        // little thinner than the favicon so the two chevrons stay apart at 18pt.
+        let srcMinX: CGFloat = 101.0
+        let srcMinY: CGFloat = 95.0
+        let srcWidth: CGFloat = 310.0
+        let srcHeight: CGFloat = 329.0
+        let strokeWidth: CGFloat = 44.0
+
+        let scale = min(rect.width / srcWidth, rect.height / srcHeight)
+        let originX = rect.midX - srcWidth * scale / 2
+        let originY = rect.midY - srcHeight * scale / 2
 
         func map(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
-            let nx = (x - srcMinX) / srcWidth
-            let ny = (y - srcMinY) / srcHeight
-            return NSPoint(
-                x: rect.minX + nx * rect.width,
-                y: rect.minY + (1.0 - ny) * rect.height
+            NSPoint(
+                x: originX + (x - srcMinX) * scale,
+                y: originY + (srcHeight - (y - srcMinY)) * scale
             )
         }
 
-        let path = NSBezierPath()
-        path.move(to: map(384.0, 255.0))
-        path.line(to: map(753.0, 511.5))
-        path.line(to: map(384.0, 768.0))
-        path.line(to: map(384.0, 654.0))
-        path.line(to: map(582.692, 511.5))
-        path.line(to: map(384.0, 369.0))
-        path.close()
+        let chevrons = NSBezierPath()
+        chevrons.move(to: map(128.0, 122.0))
+        chevrons.line(to: map(222.0, 234.0))
+        chevrons.line(to: map(128.0, 346.0))
+        chevrons.move(to: map(384.0, 122.0))
+        chevrons.line(to: map(290.0, 234.0))
+        chevrons.line(to: map(384.0, 346.0))
+        chevrons.lineWidth = strokeWidth * scale
+        chevrons.lineCapStyle = .round
+        chevrons.lineJoinStyle = .round
 
+        let cursorTopLeft = map(300.0, 398.0)
+        let cursorBottomRight = map(384.0, 424.0)
+        let cursor = NSBezierPath(
+            roundedRect: NSRect(
+                x: cursorTopLeft.x,
+                y: cursorBottomRight.y,
+                width: cursorBottomRight.x - cursorTopLeft.x,
+                height: cursorTopLeft.y - cursorBottomRight.y
+            ),
+            xRadius: 8.0 * scale,
+            yRadius: 8.0 * scale
+        )
+
+        NSColor.black.setStroke()
+        chevrons.stroke()
         NSColor.black.setFill()
-        path.fill()
+        cursor.fill()
     }
 
     private static func drawBadge(text: String, in rect: NSRect, config: MenuBarBadgeRenderConfig) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let fontSize: CGFloat = text.count > 1 ? config.multiDigitFontSize : config.singleDigitFontSize
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .bold) // Fixed 18x18 status-item bitmap.
         let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: fontSize, weight: .bold), // Fixed 18x18 status-item bitmap.
+            .font: font,
             .foregroundColor: NSColor.systemBlue,
             .paragraphStyle: paragraph,
         ]
@@ -841,6 +865,22 @@ enum MenuBarIconRenderer {
             width: rect.width + config.textRectWidthAdjust,
             height: rect.height
         )
+
+        // The count sits over the "<" of the mark; clear a pill around the
+        // digits so they stay readable in the one-color template image.
+        let textWidth = (text as NSString).size(withAttributes: attrs).width
+        let digitBounds = NSRect(
+            x: textRect.midX - textWidth / 2,
+            y: textRect.maxY - font.ascender,
+            width: textWidth,
+            height: font.capHeight
+        )
+        let knockout = digitBounds.insetBy(dx: -1.4, dy: -1.4)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current?.compositingOperation = .clear
+        NSBezierPath(roundedRect: knockout, xRadius: knockout.height / 2, yRadius: knockout.height / 2).fill()
+        NSGraphicsContext.restoreGraphicsState()
+
         (text as NSString).draw(in: textRect, withAttributes: attrs)
     }
 }

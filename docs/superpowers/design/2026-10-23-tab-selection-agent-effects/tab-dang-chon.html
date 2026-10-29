@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tab đang chọn: bốn phương án</title>
+<style>
+  :root { --bg-primary:#f5f5f7; --bg-secondary:#fff; --text-primary:#1d1d1f; --text-secondary:#6e6e73; --border:#d1d1d6; --accent:#0071e3; }
+  @media (prefers-color-scheme: dark) { :root { --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --text-primary:#f5f5f7; --text-secondary:#98989d; --border:#424245; --accent:#0a84ff; } }
+  body { margin:0; padding:2rem; font-family:system-ui,-apple-system,sans-serif; background:var(--bg-primary); color:var(--text-primary); line-height:1.5; }
+  h2 { font-size:1.5rem; margin:0 0 .5rem; } h3 { font-size:1.05rem; margin:0 0 .25rem; }
+  .subtitle { color:var(--text-secondary); margin:0 0 1.5rem; }
+  .label { font-size:.7rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.05em; }
+  .cards { display:grid; gap:1rem; }
+  .card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .card.selected { outline:2px solid var(--accent); }
+  .chosen { display:inline-block; margin:0 0 1rem; padding:.2rem .6rem; border-radius:6px; background:rgba(10,132,255,.12); color:var(--accent); font-size:.85rem; }
+</style>
+<script>function toggleSelect(el){var c=el.closest('.cards');if(c)c.querySelectorAll('.card').forEach(function(o){o.classList.remove('selected')});el.classList.add('selected');}</script>
+</head><body>
+<div class="chosen">Người dùng chọn: B · Nền xanh dịu (23/10/2026)</div>
+<style>
+  .sx { --bg:#0b0716; --panel:#100b1d; --raise:#171128; --line:#211a37; --border:#2a2145;
+        --tx:#cdc7e0; --hi:#e6e2f2; --mu:#8a83a6; --pri:#60a5fa; --pri-soft:rgba(96,165,250,.12);
+        --pri-line:rgba(96,165,250,.45); --pri-tx:#93c5fd; --run:#e8c468; --ok:#6fd49a; }
+  .sx .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(470px,1fr)); gap:18px; }
+  .sx .card { cursor:pointer; }
+  .sx .cap { padding:12px 14px 14px; }
+  .sx .cap h3 { margin:0 0 4px; }
+  .sx .cap p { margin:0; color:var(--text-secondary); font-size:.85rem; }
+  .sx .now { max-width:560px; margin-bottom:26px; }
+  .sx .now .label { margin-bottom:8px; }
+
+  .sx .mini { display:flex; height:236px; background:var(--bg); border-radius:10px 10px 0 0; overflow:hidden;
+              font:12px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; color:var(--tx); text-align:left; }
+  .sx .now .mini { border-radius:10px; border:1px solid var(--border); }
+  .sx .side { width:214px; flex:none; background:var(--panel); border-right:1px solid var(--line); padding:8px 0; }
+  .sx .sh { color:var(--mu); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; padding:2px 14px 6px; }
+  .sx .mach { display:flex; align-items:center; gap:6px; padding:2px 14px 5px; color:var(--hi); font-weight:600; font-size:11.5px; }
+  .sx .mach i { width:6px; height:6px; border-radius:50%; background:var(--ok); margin-left:auto; }
+  .sx .row { position:relative; margin:2px 7px; padding:5px 9px 5px 12px; border-radius:7px; }
+  .sx .row .n { display:flex; align-items:center; gap:6px; color:var(--hi); }
+  .sx .row .m { color:var(--mu); font-size:10.5px; }
+  .sx .pill { margin-left:auto; font-size:9.5px; line-height:15px; padding:0 6px; border-radius:8px; }
+  .sx .p-run { background:rgba(232,196,104,.12); color:var(--run); }
+  .sx .p-wait { background:var(--pri-soft); color:var(--pri-tx); box-shadow:inset 0 0 0 1px var(--pri-line); }
+  .sx .p-ok { background:rgba(111,212,154,.12); color:var(--ok); }
+
+  .sx .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .sx .tabs { display:flex; height:30px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .sx .tab { position:relative; display:flex; align-items:center; gap:6px; padding:0 14px; color:var(--mu); border-right:1px solid var(--line); white-space:nowrap; }
+  .sx .term { flex:1; padding:10px 12px; font:11.5px/1.5 "JetBrains Mono",ui-monospace,Menlo,monospace; color:var(--tx); overflow:hidden; }
+  .sx .term .c { color:var(--pri); } .sx .term .mu { color:var(--mu); } .sx .term .w { color:var(--hi); } .sx .term .y { color:var(--run); }
+
+  /* Hiện tại: nền #171128 trên #100b1d, tab trên pane chỉ sáng hơn một chút */
+  .sx .v-now .row.sel { background:var(--raise); }
+  .sx .v-now .tab.on { background:#1a1428; color:var(--hi); }
+
+  /* A: vạch xanh bên trái + nền sáng hơn; tab dính liền terminal, gạch xanh trên đầu */
+  .sx .v-a .row.sel { background:#241c40; }
+  .sx .v-a .row.sel::before { content:""; position:absolute; left:2px; top:7px; bottom:7px; width:3px; border-radius:2px; background:var(--pri); }
+  .sx .v-a .row.sel .n { font-weight:600; }
+  .sx .v-a .tab.on { background:var(--bg); color:var(--hi); font-weight:600; margin-bottom:-1px; }
+  .sx .v-a .tab.on::before { content:""; position:absolute; left:0; right:0; top:0; height:2px; background:var(--pri); }
+
+  /* B: nền xanh dịu đặc + chữ đậm; tab có nền xanh dịu + gạch chân xanh */
+  .sx .v-b .row.sel { background:rgba(96,165,250,.22); }
+  .sx .v-b .row.sel .n { font-weight:600; color:#f1f5ff; }
+  .sx .v-b .row.sel .m { color:#b4c6e6; }
+  .sx .v-b .tab.on { background:rgba(96,165,250,.16); color:#f1f5ff; font-weight:600; }
+  .sx .v-b .tab.on::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--pri); }
+
+  /* C: làm mờ phần còn lại; tab đang chọn sáng rõ, tab khác mờ đi (nhãn trạng thái giữ nguyên màu) */
+  .sx .v-c .row.sel { background:#2a2145; box-shadow:inset 0 0 0 1px rgba(230,226,242,.16); }
+  .sx .v-c .row.sel .n { font-weight:600; }
+  .sx .v-c .row:not(.sel) .n > span:first-child, .sx .v-c .row:not(.sel) .m { opacity:.45; }
+  .sx .v-c .tab { color:rgba(138,131,166,.6); }
+  .sx .v-c .tab.on { background:var(--bg); color:var(--hi); font-weight:600; margin-bottom:-1px; box-shadow:inset 0 1px 0 rgba(230,226,242,.22); }
+  .sx .v-c .term-dim { opacity:1; }
+
+  /* D: khối sáng đảo màu (mạnh nhất) */
+  .sx .v-d .row.sel { background:var(--hi); }
+  .sx .v-d .row.sel .n { color:#0b0716; font-weight:600; }
+  .sx .v-d .row.sel .m { color:#4a4366; }
+  .sx .v-d .row.sel .p-run { background:rgba(150,110,10,.16); color:#7a5a00; }
+  .sx .v-d .tab.on { background:var(--hi); color:#0b0716; font-weight:600; }
+</style>
+
+<h2>Nhìn là biết đang ở tab nào</h2>
+<p class="subtitle">Hiện tại phiên đang chọn ở sidebar chỉ đổi nền từ #100b1d sang #171128, độ tương phản khoảng 1.05:1, gần như không thấy. Mỗi phương án dưới đây áp dụng cùng một cách cho cả danh sách phiên bên trái lẫn thanh tab trên pane. Trong cả bốn bản, phiên đang chọn là <b>api-server</b> và tab đang chọn là <b>claude</b>.</p>
+
+<div class="sx">
+  <div class="now">
+    <div class="label">Hiện tại (dựng lại theo code, để so sánh)</div>
+    <div class="mini v-now">
+      <div class="side">
+        <div class="sh">Máy của bạn</div>
+        <div class="mach">MacBook Pro <span style="color:var(--mu);font-weight:400">· máy này</span><i></i></div>
+        <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+        <div class="row"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div>
+        <div class="row"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs</div></div>
+        <div class="row"><div class="n"><span>infra</span></div><div class="m">~/infra</div></div>
+      </div>
+      <div class="main">
+        <div class="tabs"><div class="tab on">claude</div><div class="tab">zsh</div><div class="tab">pnpm dev</div></div>
+        <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><span class="mu">&nbsp; src/session.ts +8</span><br><br><span class="y">✻ Đang suy nghĩ…</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cards grid">
+    <div class="card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="mini v-a">
+        <div class="side">
+          <div class="sh">Máy của bạn</div>
+          <div class="mach">MacBook Pro <span style="color:var(--mu);font-weight:400">· máy này</span><i></i></div>
+          <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+          <div class="row"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div>
+          <div class="row"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs</div></div>
+          <div class="row"><div class="n"><span>infra</span></div><div class="m">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs"><div class="tab on">claude</div><div class="tab">zsh</div><div class="tab">pnpm dev</div></div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><span class="mu">&nbsp; src/session.ts +8</span><br><br><span class="y">✻ Đang suy nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>A · Vạch xanh</h3><p>Vạch dọc màu chủ đạo bên trái, nền sáng hơn một bậc, tên in đậm. Tab đang chọn dính liền vào terminal, có gạch xanh trên đầu. Dịu mắt nhất.</p></div>
+    </div>
+
+    <div class="card selected" data-choice="b" onclick="toggleSelect(this)">
+      <div class="mini v-b">
+        <div class="side">
+          <div class="sh">Máy của bạn</div>
+          <div class="mach">MacBook Pro <span style="color:var(--mu);font-weight:400">· máy này</span><i></i></div>
+          <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+          <div class="row"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div>
+          <div class="row"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs</div></div>
+          <div class="row"><div class="n"><span>infra</span></div><div class="m">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs"><div class="tab on">claude</div><div class="tab">zsh</div><div class="tab">pnpm dev</div></div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><span class="mu">&nbsp; src/session.ts +8</span><br><br><span class="y">✻ Đang suy nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>B · Nền xanh dịu</h3><p>Cả dòng phủ màu chủ đạo nhạt (màu đặc, không gradient), chữ trắng đậm. Tab có nền xanh nhạt và gạch chân xanh. Giống cách macOS tô mục đang chọn.</p></div>
+    </div>
+
+    <div class="card" data-choice="c" onclick="toggleSelect(this)">
+      <div class="mini v-c">
+        <div class="side">
+          <div class="sh">Máy của bạn</div>
+          <div class="mach">MacBook Pro <span style="color:var(--mu);font-weight:400">· máy này</span><i></i></div>
+          <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+          <div class="row"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div>
+          <div class="row"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs</div></div>
+          <div class="row"><div class="n"><span>infra</span></div><div class="m">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs"><div class="tab on">claude</div><div class="tab">zsh</div><div class="tab">pnpm dev</div></div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><span class="mu">&nbsp; src/session.ts +8</span><br><br><span class="y">✻ Đang suy nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>C · Làm mờ phần còn lại</h3><p>Phiên và tab đang chọn sáng rõ có viền mảnh, mọi phiên và tab khác mờ đi. Nhãn trạng thái (chạy, chờ bạn, xong) vẫn giữ đủ màu để không bỏ lỡ.</p></div>
+    </div>
+
+    <div class="card" data-choice="d" onclick="toggleSelect(this)">
+      <div class="mini v-d">
+        <div class="side">
+          <div class="sh">Máy của bạn</div>
+          <div class="mach">MacBook Pro <span style="color:var(--mu);font-weight:400">· máy này</span><i></i></div>
+          <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+          <div class="row"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div>
+          <div class="row"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs</div></div>
+          <div class="row"><div class="n"><span>infra</span></div><div class="m">~/infra</div></div>
+        </div>
+        <div class="main">
+          <div class="tabs"><div class="tab on">claude</div><div class="tab">zsh</div><div class="tab">pnpm dev</div></div>
+          <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><span class="mu">&nbsp; src/session.ts +8</span><br><br><span class="y">✻ Đang suy nghĩ…</span></div>
+        </div>
+      </div>
+      <div class="cap"><h3>D · Khối sáng</h3><p>Dòng và tab đang chọn là khối sáng chữ tối. Liếc từ xa cũng thấy, nhưng đây là bản chói nhất trên nền tím đậm.</p></div>
+    </div>
+  </div>
+</div>
+
+</body></html>

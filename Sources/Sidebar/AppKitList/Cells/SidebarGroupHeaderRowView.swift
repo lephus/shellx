@@ -38,6 +38,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     private var contextMenuVisible = false
     private var contextMenuDidOpen: (() -> Void)?
     private var contextMenuDidClose: (() -> Void)?
+    private let selectionChromeObserver = SidebarSelectionChromeObserver()
 
     override var isFlipped: Bool { true }
 
@@ -50,6 +51,22 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         if changed {
             needsLayout = true
         }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        selectionChromeObserver.observe(window) { [weak self] _ in
+            MainActor.assumeIsolated { self?.repaintSelectionChrome() }
+        }
+        guard window != nil else { return }
+        repaintSelectionChrome()
+    }
+
+    /// ShellX's tinted anchor selection dims while the window is inactive;
+    /// every other header paint is independent of the window.
+    private func repaintSelectionChrome() {
+        guard let model, palette(model).usesShellXSelection else { return }
+        applyModel(model)
     }
 
     override init(frame frameRect: NSRect) {
@@ -203,9 +220,8 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
             ofSize: GlobalFontMagnification.scaledSize(metrics.nameFontSize, percent: percent),
             weight: .semibold
         )
-        nameField.textColor = model.isAnchorActive
-            ? colorResolver.resolvedColor(.labelColor, for: colorScheme)
-            : colorResolver.resolvedColor(.labelColor, for: colorScheme, opacity: 0.9)
+        let palette = palette(model)
+        nameField.textColor = palette.nameColor
 
         // In compact status mode unread folds into the glyph (blue), so the
         // count badge stays off even when no member state rolls up.
@@ -257,7 +273,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         backgroundView.layer?.cornerRadius = model.isMultiSelected && !model.isAnchorActive
             ? 6
             : 4
-        backgroundView.layer?.backgroundColor = headerBackgroundColor(for: model).cgColor
+        backgroundView.layer?.backgroundColor = palette.background.cgColor
         applySelectionEdge(headerSelectionEdgeColor(for: model))
 
         topDropIndicator.accentColor = model.accentColor
@@ -319,15 +335,14 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     /// authoritative configure reconciles.
     func showOptimisticAnchorActive() {
         guard let model, !model.isAnchorActive else { return }
-        let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
-        let labelColor = SidebarAppearanceColorResolver().resolvedColor(.labelColor, for: colorScheme)
+        let palette = palette(model)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         backgroundView.layer?.cornerRadius = 4
-        backgroundView.layer?.backgroundColor = labelColor.withAlphaComponent(0.08).cgColor
+        backgroundView.layer?.backgroundColor = palette.anchorActiveBackground.cgColor
         applySelectionEdge(model.anchorActiveEdgeColor)
         CATransaction.commit()
-        nameField.textColor = labelColor
+        nameField.textColor = palette.anchorActiveNameColor
     }
 
     /// Modifier-click preview: paints the same dim membership tint as an
@@ -337,7 +352,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         backgroundView.layer?.cornerRadius = 6
-        backgroundView.layer?.backgroundColor = headerMultiSelectionBackgroundColor(for: model).cgColor
+        backgroundView.layer?.backgroundColor = palette(model).multiSelectionBackground.cgColor
         applySelectionEdge(model.multiSelectionBackgroundStyle.edgeColor)
         CATransaction.commit()
     }
@@ -352,12 +367,7 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         backgroundView.layer?.backgroundColor = NSColor.clear.cgColor
         applySelectionEdge(nil)
         CATransaction.commit()
-        let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
-        nameField.textColor = SidebarAppearanceColorResolver().resolvedColor(
-            .labelColor,
-            for: colorScheme,
-            opacity: 0.9
-        )
+        nameField.textColor = palette(model).unselectedNameColor
     }
 
     /// Rollback for optimistic press paint: reapplies the stored model
@@ -371,19 +381,11 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
         applyModel(model)
     }
 
-    private func headerBackgroundColor(for model: SidebarGroupHeaderRowModel) -> NSColor {
-        if model.isAnchorActive {
-            let colorScheme: ColorScheme = model.colorSchemeIsDark ? .dark : .light
-            return SidebarAppearanceColorResolver().resolvedColor(
-                .labelColor,
-                for: colorScheme,
-                opacity: 0.08
-            )
-        }
-        if model.isMultiSelected {
-            return headerMultiSelectionBackgroundColor(for: model)
-        }
-        return .clear
+    private func palette(_ model: SidebarGroupHeaderRowModel) -> SidebarGroupHeaderPalette {
+        SidebarGroupHeaderPalette(
+            model: model,
+            isSelectionEmphasized: SidebarSelectionChromeObserver.isSelectionEmphasized(in: window)
+        )
     }
 
     /// Subtle-selection hairline, matching selected workspace rows.
@@ -396,16 +398,6 @@ final class SidebarGroupHeaderTableCellView: NSTableCellView {
     private func applySelectionEdge(_ edgeColor: NSColor?) {
         backgroundView.layer?.borderWidth = edgeColor == nil ? 0 : 1
         backgroundView.layer?.borderColor = edgeColor?.cgColor
-    }
-
-    private func headerMultiSelectionBackgroundColor(
-        for model: SidebarGroupHeaderRowModel
-    ) -> NSColor {
-        let style = model.multiSelectionBackgroundStyle
-        guard let color = style.color else { return .clear }
-        return color.withAlphaComponent(
-            color.alphaComponent * style.opacity
-        )
     }
 
     /// True when a press at this view should not repaint selection (chevron

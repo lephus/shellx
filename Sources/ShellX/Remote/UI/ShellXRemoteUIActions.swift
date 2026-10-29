@@ -4,7 +4,9 @@ import ShellXBrand
 import ShellXRemoteCore
 
 /// What the sidebar's remote rows do when clicked. Everything goes through
-/// `ShellXRemoteUIModel.shared.service`, so with the gate off these are no-ops.
+/// `ShellXRemoteUIModel.shared.service`, so with the gate off these are no-ops. Phone pairing is the
+/// exception: it works on this Mac's link host (`ShellXRemoteGate.servesPhones`). Settings › Mobile opens it;
+/// the This Mac header's menu item exists only with remote machines on (`ShellXRemoteGate.isEnabled`).
 @MainActor
 enum ShellXRemoteUIActions {
     static func requestAccess(to machineID: RemoteMachine.ID) {
@@ -43,6 +45,16 @@ enum ShellXRemoteUIActions {
     static func presentRequestAccess(to machineID: RemoteMachine.ID, expectedCode: String?) {
         guard let service = ShellXRemoteUIModel.shared.service else { return }
         RequestAccessSheetPresenter.shared.present(machineID: machineID, expectedCode: expectedCode, service: service)
+    }
+
+    /// Settings › Mobile › "Show QR Code…" and "Pair iPhone…" on the This Mac header: shows the pairing sheet
+    /// over this Mac's link host. With no link host running the sheet says the Mac is not ready, with no QR.
+    ///
+    /// - Parameter bringToFront: False from the DEBUG socket methods, which must not take focus.
+    /// - Returns: The open sheet's coordinator.
+    @discardableResult
+    static func presentPhonePairing(bringToFront: Bool = true) -> ShellXPhonePairingCoordinator? {
+        PhonePairingSheetPresenter.shared.present(bringToFront: bringToFront) { ShellXPhonePairingCoordinator.forApp() }
     }
 
     static func presentSignIn() {

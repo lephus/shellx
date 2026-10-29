@@ -13,6 +13,8 @@ import os
 /// * **Viewer**: `requestAccess` → `pair.request`, then `pair.poll` every 2 s for up to 300 s; on approval the
 ///   link record is saved and a `ShellXClientLinkSupervisor` enrolls with the invite file. `openSession` waits
 ///   for the link, finds or creates a remote terminal and opens a local workspace running the attach wrapper.
+/// * **Phones only** (`remoteMachinesEnabled` off): `machines.register` and the heartbeat, then the ShellX Link
+///   host. No cmux-tui runs: no daemon or bridge, no approvals, no links to other machines, no machine list.
 ///
 /// Core calls run on a global queue and cmux-tui runs in detached tasks or the supervisors' actors; only
 /// `@Published` state lives on the main actor. Signed-out answers (`not_logged_in`, `unauthorized`,
@@ -23,7 +25,8 @@ public final class ShellXRemoteService: ObservableObject {
     nonisolated static let heartbeatInterval: TimeInterval = 30
     nonisolated static let machinesInterval: TimeInterval = 15
     nonisolated static let pendingInterval: TimeInterval = 5
-    nonisolated static let pollInterval: TimeInterval = 2
+    /// How often a waiting pairing is polled; the app's phone pairing sheet polls at the same pace.
+    public nonisolated static let pollInterval: TimeInterval = 2
     nonisolated static let enrollPollInterval: TimeInterval = 1
     /// Pairings, invitations and shown requests all live 300 s.
     nonisolated static let pairingLifetime: TimeInterval = 300
@@ -50,6 +53,10 @@ public final class ShellXRemoteService: ObservableObject {
 
     var started = false
     var terminated = false
+    /// The last sign-in could not adopt its account, so `links-owner` may still name the previous one. The link
+    /// host stays off until a sign-in adopts its account: started on the previous account's key store, its first
+    /// reconcile against the new account's grants would delete that account's trusted phones for good.
+    var accountAdoptionFailed = false
     var cmuxTuiAvailable = false
     /// The launch sweep and cmux-tui check, run once and shared by `bootstrap` and `signIn`.
     var preparation: Task<Bool, Never>?
@@ -65,6 +72,8 @@ public final class ShellXRemoteService: ObservableObject {
     var listed: [MachineListReply.Item] = []
     var thisMachineID: RemoteMachine.ID?
     var hostSlot: String?
+    /// This machine's ShellX Link slot (`machines.register link_slot`); nil from a relay without the link lane.
+    var hostLinkSlot: String?
     var hostRoute: String?
     var daemon: ShellXDaemonSupervisor?
     var clients: [RemoteMachine.ID: ShellXClientLinkSupervisor] = [:]
@@ -84,6 +93,9 @@ public final class ShellXRemoteService: ObservableObject {
         env = environment
         refresher = ShellXTicketRefresher(core: environment.core, clock: environment.clock)
     }
+
+    /// The ShellX Link host this service starts and stops, for the app's DEBUG pairing method.
+    public var linkHost: (any RemoteLinkHosting)? { env.linkHost }
 
     // MARK: - App lifecycle
 
@@ -110,6 +122,7 @@ public final class ShellXRemoteService: ObservableObject {
         let clients = Array(self.clients.values), daemon = self.daemon, bridge = env.bridge, teardown = self.teardown
         self.clients = [:]
         self.daemon = nil
+        env.linkHost?.stop()
         let done = DispatchSemaphore(value: 0)
         // Nothing in here needs the main actor, which stays blocked below.
         Task.detached {
@@ -146,7 +159,7 @@ public final class ShellXRemoteService: ObservableObject {
         guard !terminated else { return }
         if isSignedIn { await beginTeardown().value }   // another account: start over cleanly
         await teardown?.value                           // a 401's stops: an old link may still save its record
-        await adoptAccount(login.user_id)
+        accountAdoptionFailed = !(await adoptAccount(login.user_id))
         guard !terminated else { return }
         RemoteLog.service.info("signed in")
         startSession(list: nil)
@@ -162,16 +175,24 @@ public final class ShellXRemoteService: ObservableObject {
     }
 
     /// `links.json` belongs to one account, whose `user_id` is kept in `links-owner` beside it (only `auth.login`
-    /// tells the user id, so a session restored at launch keeps the owner of its last sign-in). Signing in
+    /// tells the user id, so a session restored at launch keeps the owner of its last sign-in, or takes the
+    /// one in `account.json` when none was kept: ``adoptRestoredAccount()``). Signing in
     /// as a different account, or with no owner on record (links saved before owners were kept), drops every
     /// record and this Mac's invite files, so no link of another account is reconnected. Runs on the links
-    /// queue after the last session's links stopped. A failure is logged; the new account's links stay usable.
-    func adoptAccount(_ userID: String) async {
+    /// queue after the last session's links stopped. A failure is logged and returns false; the new account's
+    /// links stay usable, but the ShellX Link host does not start in this session (`accountAdoptionFailed`).
+    ///
+    /// - Parameter onlyWithoutOwner: True for a session restored at launch: an owner already on record is kept.
+    @discardableResult
+    func adoptAccount(_ userID: String, onlyWithoutOwner: Bool = false) async -> Bool {
         let store = env.store
         let tickets = env.paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
         do {
             try await Self.onLinkStore {
-                if (try? store.loadOwner()) != userID {
+                let owner = try? store.loadOwner()
+                // Read on the links queue, after any sign-in queued before it saved its owner.
+                if onlyWithoutOwner, owner != nil { return }
+                if owner != userID {
                     let dropped = try store.removeAll()
                     let invites = RemoteInviteSweep.sweep(ticketsDir: tickets, now: Date())
                     if dropped + invites > 0 {
@@ -180,8 +201,26 @@ public final class ShellXRemoteService: ObservableObject {
                 }
                 try store.saveOwner(userID)
             }
+            return true
         } catch {
             RemoteLog.service.error("link owner not updated: \(RemoteLog.code(error), privacy: .public)")
+            return false
+        }
+    }
+
+    /// A session restored at launch with no owner on record: ShellX 1.4.0 and 1.5.0 signed in from Settings ›
+    /// Account with the remote service off and kept only `account.json`, whose user id is saved after a
+    /// successful `auth.login`, the one the core's session came from. That id is adopted. Without the record
+    /// nothing is guessed and the link host waits for a sign-in.
+    func adoptRestoredAccount() async {
+        let store = env.store, file = ShellXAccount.recordFile(stateRoot: env.paths.stateRoot)
+        let found = try? await Self.offMain { () -> String? in
+            guard (try? store.loadOwner()) == nil else { return nil }
+            return ShellXAccount.readRecord(file)?.userID
+        }
+        guard let userID = found ?? nil, !userID.isEmpty else { return }
+        if await adoptAccount(userID, onlyWithoutOwner: true) {
+            RemoteLog.service.notice("restored session: link owner taken from the account record")
         }
     }
 
@@ -200,6 +239,8 @@ public final class ShellXRemoteService: ObservableObject {
         do {
             let list = try await call("machines.list", as: MachineListReply.self)
             guard !terminated, !isSignedIn else { return }
+            await adoptRestoredAccount()
+            guard !terminated, !isSignedIn else { return }
             startSession(list: list)
         } catch {
             guard !terminated, !isSignedIn else { return }
@@ -216,6 +257,8 @@ public final class ShellXRemoteService: ObservableObject {
             // The core answers not_logged_in without a local session, so any other error means a session
             // exists and the API is unreachable: keep going, the timers retry.
             RemoteLog.service.error("machines.list failed at launch: \(code, privacy: .public)")
+            await adoptRestoredAccount()
+            guard !terminated, !isSignedIn else { return }
             startSession(list: nil, listImmediately: false)
         }
     }
@@ -262,13 +305,20 @@ public final class ShellXRemoteService: ObservableObject {
         let gen = generation
         isSignedIn = true
         if let list { apply(list) }
-        setTask("list", repeating(every: Self.machinesInterval, immediate: list == nil && listImmediately, generation: gen) {
-            await $0.listTick($1)
-        })
+        if env.remoteMachinesEnabled() {
+            setTask("list", repeating(every: Self.machinesInterval, immediate: list == nil && listImmediately, generation: gen) {
+                await $0.listTick($1)
+            })
+        }
         setTask("host", Task { [weak self] in await self?.runSession(gen) })
     }
 
     func runSession(_ gen: Int) async {
+        guard env.remoteMachinesEnabled() else {
+            // Phones only: links to other machines stay as they are on disk, unused.
+            await startPhoneHost(gen)
+            return
+        }
         // Links this Mac already holds; enrolled ones reconnect by themselves while their machine is online.
         // A grant that never enrolled cannot succeed now: its invite file was swept at launch, or dropped when
         // the previous session stopped its link (R33). Such records are removed, but only once the last
@@ -306,7 +356,9 @@ public final class ShellXRemoteService: ObservableObject {
         await teardown?.value
         guard isCurrent(gen) else { return }
         hostState = .connecting
-        guard let (route, slot) = await registerHost(gen) else { return }
+        guard let registered = await registerHost(gen), let route = registered.route else { return }
+        let slot = registered.slot
+        startLinkHost()
         hostRoute = route
         let bridge = env.bridge, socket = env.paths.bridgeSocket
         do {
@@ -332,9 +384,20 @@ public final class ShellXRemoteService: ObservableObject {
         await daemon.start(route: route, slot: slot)
     }
 
-    /// `machines.register` and the first register-ticket mint (its `relay_url` is the only source of the
-    /// relay route), retried on the backoff while the API is unreachable. Nil when the host cannot start.
-    func registerHost(_ gen: Int) async -> (route: String, slot: String)? {
+    /// Phones only: `machines.register` gives this Mac its id and link slot, then the ShellX Link host serves
+    /// phones. cmux-tui is not needed. `hostState` (the cmux-tui daemon) only reports a failed registration.
+    func startPhoneHost(_ gen: Int) async {
+        await teardown?.value
+        guard isCurrent(gen) else { return }
+        guard await registerHost(gen, mintsRoute: false) != nil else { return }
+        hostState = .idle
+        startLinkHost()
+    }
+
+    /// `machines.register` and, for the cmux-tui daemon (`mintsRoute`), the first register-ticket mint (its
+    /// `relay_url` is the only source of the relay route), retried on the backoff while the API is unreachable.
+    /// Nil when the host cannot start; `route` is nil when `mintsRoute` is false.
+    func registerHost(_ gen: Int, mintsRoute: Bool = true) async -> (route: String?, slot: String)? {
         var failures = 0
         while isCurrent(gen) {
             do {
@@ -345,8 +408,10 @@ public final class ShellXRemoteService: ObservableObject {
                 guard isCurrent(gen) else { return nil }
                 thisMachineID = registered.machine_id
                 hostSlot = registered.slot
+                hostLinkSlot = registered.link_slot
                 rebuildMachines()
                 startRegisteredTimers(gen)
+                guard mintsRoute else { return (nil, registered.slot) }
                 let mint = try await call("tickets.mint", ["permission": .string("register"),
                                                            "write_to": .string(ShellXDaemonSupervisor.registerTicketName)],
                                           as: MintReply.self)
@@ -370,6 +435,25 @@ public final class ShellXRemoteService: ObservableObject {
         return nil
     }
 
+    /// Serves the ShellX Link lane once `machines.register` gave this machine a link slot. A relay that predates
+    /// the lane gives none: one line is logged and everything else runs as before.
+    func startLinkHost() {
+        guard let linkHost = env.linkHost, let machineID = thisMachineID else { return }
+        guard let linkSlot = hostLinkSlot, !linkSlot.isEmpty else {
+            RemoteLog.service.notice("link host not started: the relay gave no link slot")
+            return
+        }
+        guard !accountAdoptionFailed else {
+            RemoteLog.service.error("link host not started: \("account_not_adopted", privacy: .public)")
+            return
+        }
+        guard let accountID = accountOwnerID, !accountID.isEmpty else {
+            RemoteLog.service.notice("link host not started: no signed-in account")
+            return
+        }
+        linkHost.start(machineID: machineID, linkSlot: linkSlot, accountID: accountID)
+    }
+
     func hostChanged(_ state: LinkState, _ gen: Int) {
         guard isCurrent(gen) else { return }
         hostState = state
@@ -379,9 +463,15 @@ public final class ShellXRemoteService: ObservableObject {
         }
     }
 
+    /// The heartbeat keeps this Mac online for phones and machines (`last_seen_at`); `pair.pending` only runs
+    /// with remote machines on.
     func startRegisteredTimers(_ gen: Int) {
-        guard tasks["pending"] == nil else { return }
-        setTask("pending", repeating(every: Self.pendingInterval, immediate: true, generation: gen) { await $0.pendingTick($1) })
+        guard tasks["heartbeat"] == nil else { return }
+        if env.remoteMachinesEnabled() {
+            setTask("pending", repeating(every: Self.pendingInterval, immediate: true, generation: gen) {
+                await $0.pendingTick($1)
+            })
+        }
         setTask("heartbeat", repeating(every: Self.heartbeatInterval, immediate: false, generation: gen) {
             await $0.heartbeatTick($1)
         })
@@ -398,7 +488,8 @@ public final class ShellXRemoteService: ObservableObject {
         self.clients = [:]
         self.daemon = nil
         linkStates = [:]; records = [:]; listed = []
-        thisMachineID = nil; hostRoute = nil; hostSlot = nil
+        thisMachineID = nil; hostRoute = nil; hostSlot = nil; hostLinkSlot = nil
+        env.linkHost?.stop()
         gate = ApprovalGate(); handledPairings = []; pairingMemory = [:]
         isSignedIn = false
         machines = []; pendingApprovals = []; outgoing = []; remoteWorkspaces = [:]
@@ -426,6 +517,13 @@ public final class ShellXRemoteService: ObservableObject {
 
     func checkCurrent(_ gen: Int) throws {
         guard isCurrent(gen) else { throw ShellXCoreError(code: "cancelled", message: "the remote session ended") }
+    }
+
+    /// Throws `disabled` unless remote machines are on: this Mac then only serves phones.
+    func requireRemoteMachines() throws {
+        guard env.remoteMachinesEnabled() else {
+            throw ShellXCoreError(code: "disabled", message: "remote machines are turned off")
+        }
     }
 
     func setTask(_ key: String, _ task: Task<Void, Never>) {

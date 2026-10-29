@@ -62,7 +62,7 @@ class ShellxRelay2Tests(unittest.TestCase):
         for path in ["Cargo.toml", "rust-toolchain.toml", "vendor/**", "bindings/**", "build-support/**"]:
             self.assertIn(f"      - cmux-tui/{path}\n", text)
         self.assertIn("shellx-relay2:${{ github.sha }}", text)
-        self.assertIn("    branches: [feat/relay-v2, main]\n", text)
+        self.assertIn("    branches: [feat/relay-v2, main, develop]\n", text)
         self.assertNotIn("l4-relay2", text)
         self.assertNotIn("shellx-pro", text)
 

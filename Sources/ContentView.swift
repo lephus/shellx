@@ -1004,6 +1004,9 @@ struct ContentView: View {
     @StateObject private var fileExplorerStore = FileExplorerStore()
     @StateObject private var sessionIndexStore = SessionIndexStore()
     @StateObject private var selectedWorkspaceDirectoryObserver = SelectedWorkspaceDirectoryObserver()
+    /// `@State`, not `@StateObject`: nothing here reads it, and observing it would
+    /// re-render this view on every `repo.state` the page asks for.
+    @State private var gitGraphSidebarController = GitGraphController(placement: .sidebar, diffOpener: nil)
     @State private var commandPaletteOverlayRenderModel = CommandPaletteOverlayRenderModel()
     @State private var tmuxOverlayExperiment = TmuxOverlayExperimentTargetObserver()
     @State private var tmuxOverlayCoordinator = TmuxWorkspacePaneOverlayCoordinator()
@@ -1945,6 +1948,8 @@ struct ContentView: View {
                 )
             }
         }
+        // ShellX: below the titlebar row while the ShellX accessory sits there.
+        .modifier(ShellXRightSidebarTitlebarInsetModifier(isFullScreen: isFullScreen))
 
         return panel
     }
@@ -1952,6 +1957,7 @@ struct ContentView: View {
     private func rightSidebarPanel(appearance: WindowAppearanceSnapshot) -> some View {
         return RightSidebarPanelView(
             devicesModel: devicesModel,
+            gitGraphController: gitGraphSidebarController,
             tabManager: tabManager,
             fileExplorerStore: fileExplorerStore,
             fileExplorerState: fileExplorerState,
@@ -2211,7 +2217,15 @@ struct ContentView: View {
                     // snaps without animation (`.transaction { $0.animation = nil }`), so we match
                     // that here — otherwise this inset could animate out of step with the panel on
                     // toggle and momentarily expose (or re-cover) the mode bar mid-transition.
-                    .padding(.trailing, rightSidebarWidth)
+                    //
+                    // ShellX: the mode bar moves below this row while the ShellX
+                    // accessory shows, and the band then spans the full width.
+                    // The band only mounts outside minimal mode.
+                    .padding(.trailing, ShellXTitlebarAccessoryLayout.titlebarBandTrailingInset(
+                        rightSidebarWidth: rightSidebarWidth,
+                        isMinimalMode: false,
+                        isFullScreen: isFullScreen
+                    ))
                     .animation(nil, value: rightSidebarWidth)
             }
             .overlay(alignment: .topLeading) {
@@ -2392,7 +2406,25 @@ struct ContentView: View {
         SessionEntryResumeCoordinator.open(entry, tabManager: tabManager)
     }
 
-    func openRightSidebarToolPane(_ mode: RightSidebarMode) {
+    /// Opens `mode` as a workspace tab. A Git Graph tab pins `gitRepositoryRoot`;
+    /// without one it pins the repository the workspace is in.
+    func openRightSidebarToolPane(_ mode: RightSidebarMode, gitRepositoryRoot: String? = nil) {
+        Self.openRightSidebarToolPane(
+            mode,
+            gitRepositoryRoot: gitRepositoryRoot,
+            tabManager: tabManager,
+            sidebarSelectionState: sidebarSelectionState
+        )
+    }
+
+    /// The body of ``openRightSidebarToolPane(_:gitRepositoryRoot:)``, callable from a
+    /// closure that holds only weak references.
+    private static func openRightSidebarToolPane(
+        _ mode: RightSidebarMode,
+        gitRepositoryRoot: String?,
+        tabManager: TabManager,
+        sidebarSelectionState: SidebarSelectionState
+    ) {
         guard mode.canOpenAsPane, mode.isAvailable(),
               let workspace = tabManager.selectedWorkspace,
               let paneId = workspace.bonsplitController.focusedPaneId ?? workspace.bonsplitController.allPaneIds.first else {
@@ -2402,7 +2434,18 @@ struct ContentView: View {
 
         sidebarSelectionState.selection = .tabs
         workspace.clearSplitZoom()
-        _ = workspace.openOrFocusRightSidebarToolSurface(inPane: paneId, mode: mode, focus: true)
+        _ = workspace.openOrFocusRightSidebarToolSurface(
+            inPane: paneId,
+            mode: mode,
+            focus: true,
+            gitRepositoryRoot: gitRepositoryRoot
+        )
+    }
+
+    /// The repository the sidebar Git Graph shows, for opening it as a tab; nil
+    /// unless it shows a repository.
+    var gitGraphSidebarRepositoryRoot: String? {
+        gitGraphSidebarController.readyRepositoryRoot
     }
 
     private func openFilePreviewFromSidebar(filePath: String) {
@@ -2417,6 +2460,7 @@ struct ContentView: View {
     }
 
     private func syncFileExplorerDirectory() {
+        syncGitGraphSidebarTarget()
         guard let selectedId = tabManager.selectedTabId,
               let tab = tabManager.tabs.first(where: { $0.id == selectedId }) else {
             // No selection means we have no local cwd to scope by; clear so the
@@ -2437,6 +2481,13 @@ struct ContentView: View {
             return
         }
         fileExplorerStore.syncWorkspaceRoot(from: tab)
+    }
+
+    /// Points the sidebar Git Graph at the selected workspace's focused terminal. The
+    /// tracker ignores an unchanged target, and resolves a new one off the main actor.
+    private func syncGitGraphSidebarTarget() {
+        let target = tabManager.selectedWorkspace.map { GitGraphTargetPolicy.target(for: $0) } ?? .none
+        gitGraphSidebarController.tracker.setTarget(target)
     }
 
     private var shouldSyncFileExplorerStore: Bool {
@@ -2641,6 +2692,21 @@ struct ContentView: View {
                 }
             }
             selectedWorkspaceDirectoryObserver.wire(tabManager: tabManager)
+            // Weak captures only: capturing this view would retain the controller
+            // that stores the closure (its @State), and its watcher, past the window.
+            // Resolves the selected workspace on each open, so the sidebar follows selection.
+            gitGraphSidebarController.diffOpener = GitGraphDiffOpener(
+                workspaceProvider: { [weak tabManager] in tabManager?.selectedWorkspace }
+            )
+            gitGraphSidebarController.onOpenAsTab = { [weak tabManager, weak sidebarSelectionState] repositoryRoot in
+                guard let tabManager, let sidebarSelectionState else { return }
+                ContentView.openRightSidebarToolPane(
+                    .git,
+                    gitRepositoryRoot: repositoryRoot,
+                    tabManager: tabManager,
+                    sidebarSelectionState: sidebarSelectionState
+                )
+            }
             tabManager.applyWindowBackgroundForSelectedTab()
             reconcileMountedWorkspaceIds()
             previousSelectedWorkspaceId = tabManager.selectedTabId
@@ -2853,6 +2919,9 @@ struct ContentView: View {
             let focusTransactionId = notification.userInfo?[GhosttyNotificationKey.focusTransactionId] as? UUID
             attemptCommandPaletteFocusRestoreIfNeeded(focusTransactionId: focusTransactionId)
             scheduleTitlebarTextRefresh()
+            // The directory observer misses a focus move that leaves the workspace
+            // directory unchanged, such as onto a remote terminal.
+            syncGitGraphSidebarTarget()
         })
 
         view = AnyView(view.background {
@@ -8198,6 +8267,7 @@ struct ContentView: View {
             panelSubtitle: panelSubtitle
         )
         appendSavedLayoutCommandContributions(to: &contributions, workspaceSubtitle: workspaceSubtitle)
+        appendWorkspaceSetCommandContributions(to: &contributions)
         appendKeymapPresetCommandContributions(to: &contributions)
 
         contributions.append(
@@ -9173,6 +9243,7 @@ struct ContentView: View {
         registerCloudCommandHandlers(&registry)
         registerComputerUseCommandPaletteHandlers(&registry)
         registerSavedLayoutCommandHandlers(&registry)
+        registerWorkspaceSetCommandHandlers(&registry)
         registerKeymapPresetCommandHandlers(&registry)
         registry.register(commandId: "palette.showNotifications") {
             AppDelegate.shared?.toggleNotificationsPopover(animated: false)
@@ -11504,6 +11575,8 @@ struct VerticalTabsSidebar: View, Equatable {
     @Environment(\.sidebarLazyContractProbe) private var sidebarLazyContractProbe
 #endif
     @Environment(\.colorScheme) private var sidebarColorScheme
+    /// Read by snapshot refreshes: observation tasks hold an older copy of this view.
+    @State private var snapshotSidebarColorScheme = ColorScheme.light
     @Environment(\.sidebarReadabilityBackdrop) private var sidebarReadabilityBackdrop
     @Environment(\.cmuxGlobalFontMagnificationPercent) private var sidebarGlobalFontMagnificationPercent
     @State private var sidebarDisplayAccessibility = DisplayAccessibilityOptions.current
@@ -12146,6 +12219,13 @@ struct VerticalTabsSidebar: View, Equatable {
             }
         }
         .onChange(of: renderContext.showsAgentActivity) { _, _ in
+            if isPresented {
+                refreshWorkspaceSnapshots()
+            }
+        }
+        .onChange(of: sidebarColorScheme, initial: true) { _, colorScheme in
+            // Agent name effects play only in a dark sidebar (snapshot presentation key).
+            snapshotSidebarColorScheme = colorScheme
             if isPresented {
                 refreshWorkspaceSnapshots()
             }
@@ -13247,6 +13327,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 SidebarWorkspaceSnapshotFactory.presentationKey(
                     settings: settings,
                     showsAgentActivity: showsAgentActivity,
+                    sidebarColorScheme: snapshotSidebarColorScheme,
                     customColorHex: workspaceById[workspaceId].flatMap { workspace in
                         workspace.customColor
                             ?? originColorHex(for: workspace, mirrorDestinations: mirrorDestinations)
@@ -13281,6 +13362,7 @@ struct VerticalTabsSidebar: View, Equatable {
             workspace: workspace,
             settings: settings,
             showsAgentActivity: showsAgentActivity,
+            sidebarColorScheme: snapshotSidebarColorScheme,
             originColorHex: originColorHex(for: workspace, mirrorDestinations: mirrorDestinations),
             hostTitleSuffix: hostTitleSuffixes[workspace.id]
         ).makeSnapshot()

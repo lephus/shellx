@@ -1,4 +1,5 @@
 import type { DiffResponse } from "./diff/generated/protocol";
+import type { GitGraphEvent } from "./git-graph/types";
 
 export {};
 
@@ -65,7 +66,13 @@ declare global {
         cmuxDiff?: {
           postMessage(message: unknown): Promise<DiffResponse>;
         };
+        shellxGitGraph?: {
+          postMessage(message: unknown): Promise<unknown>;
+        };
       };
+    };
+    shellxGitGraph?: {
+      receive(event: GitGraphEvent): void;
     };
   }
 }

@@ -7,6 +7,7 @@ extension ShellXRemoteService {
     /// Starts (or waits for) the link to `machine`, ≤ 20 s, then opens a local workspace attached to the
     /// first remote terminal, creating a remote workspace when there is none.
     public func openSession(on machine: RemoteMachine.ID) async throws {
+        try requireRemoteMachines()
         guard isSignedIn else { throw ShellXCoreError(code: "not_logged_in", message: "sign in first") }
         guard cmuxTuiAvailable else { throw ShellXCoreError(code: "cmux_tui_missing", message: "cmux-tui is missing") }
         let gen = generation
