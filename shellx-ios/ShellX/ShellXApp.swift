@@ -22,6 +22,9 @@ struct ShellXApp: App {
                     // Only a launch straight into the home counts towards launchToHome.
                     if coordinator.hub?.machines.isEmpty ?? true { graph.launch.skip() }
                 }
+                // A newer App Store version: asked at launch and each time the app comes to the front.
+                .task { await graph.updatePrompt?.check() }
+                .updateAlert(graph.updatePrompt)
                 // A shellx-link:// link (the Camera app, Safari) only fills the pairing sheet's
                 // confirmation step, after sign-in if needed; it never pairs by itself.
                 .onOpenURL { url in
@@ -39,6 +42,7 @@ struct ShellXApp: App {
                         // A window made since the choice was set gets it too.
                         AppAppearance(stored: appearance).apply()
                         Task { await coordinator.protectedDataBecameAvailable() }
+                        if let prompt = graph.updatePrompt { Task { await prompt.check() } }
                         if let hub = coordinator.hub {
                             hub.appDidBecomeActive()
                             Task { await hub.refreshGrants() }

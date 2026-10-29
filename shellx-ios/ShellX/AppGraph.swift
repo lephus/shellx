@@ -14,6 +14,8 @@ struct AppGraph {
     let launch: LaunchMark
     /// Runs once before `coordinator.launch()`; the Debug demo seeds its fake account here.
     var prepare: @MainActor () async -> Void = {}
+    /// Offers a newer App Store version; nil in Debug builds, which are not on the store.
+    var updatePrompt: UpdatePrompt?
 }
 
 #if DEBUG

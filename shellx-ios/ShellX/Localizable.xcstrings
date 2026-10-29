@@ -3187,6 +3187,78 @@
         }
       }
     },
+    "update.later": {
+      "comment": "Button of the update popup: closes it; it shows again the next time the app opens.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Later"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Để sau"
+          }
+        }
+      }
+    },
+    "update.message": {
+      "comment": "Message of the popup that offers a newer App Store version.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update ShellX on the App Store to get the latest fixes and features."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cập nhật ShellX trên App Store để có các bản sửa lỗi và tính năng mới nhất."
+          }
+        }
+      }
+    },
+    "update.now": {
+      "comment": "Button of the update popup: opens the app's App Store page.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cập nhật"
+          }
+        }
+      }
+    },
+    "update.title %@": {
+      "comment": "Title of the popup shown when the App Store has a newer version of the app; the argument is that version, like 1.0.1.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ is available"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã có bản %@"
+          }
+        }
+      }
+    },
     "voice.denied": {
       "comment": "The microphone or speech recognition permission is off.",
       "extractionState": "manual",

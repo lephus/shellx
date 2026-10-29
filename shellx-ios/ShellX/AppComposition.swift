@@ -52,7 +52,25 @@ enum AppComposition {
                 return hub
             })
         owner.coordinator = coordinator
-        return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch)
+        #if DEBUG
+        let updatePrompt: UpdatePrompt? = nil
+        #else
+        let updatePrompt = makeUpdatePrompt(bundleID: bundle.bundleIdentifier, version: version)
+        #endif
+        return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch, updatePrompt: updatePrompt)
+    }
+
+    /// The App Store popup: asks the store of the phone's region about this app. Nil without a bundle id.
+    private static func makeUpdatePrompt(bundleID: String?, version: String) -> UpdatePrompt? {
+        guard let bundleID else { return nil }
+        let url = AppStoreRelease.lookupURL(bundleID: bundleID, country: Locale.current.region?.identifier.lowercased())
+        return UpdatePrompt(installedVersion: version) {
+            // The store's answer changes when a release goes live: never a cached one.
+            let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+            return data
+        }
     }
 
     /// One sign-in's scope over `hub`; each agent's chat copy lives in `history`. `voice` nil shows no
