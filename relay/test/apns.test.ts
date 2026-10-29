@@ -172,7 +172,6 @@ describe("http2Transport", () => {
       ])).rejects.toThrow("apns_timeout");
     } finally {
       transport.close();
-      server.closeAllConnections();
     }
   });
 });

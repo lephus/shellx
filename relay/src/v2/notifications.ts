@@ -32,14 +32,13 @@ interface Recipient {
  *   that request. It replaces an earlier one for the same request (`apns-collapse-id`).
  * - `resolved`: the request was handled; a background push lets the phone take the alert away.
  * 202 `{sent}`; tokens APNs reports as gone are deleted. 503 `push_unavailable` without APNs set up,
- * 404 for a desktop without a machine, 429 past the per-device limit. Nothing about the request is
+ * 404 for a desktop without a machine, 429 past the per-device limit (`needs_you` only; `resolved` is not counted). Nothing about the request is
  * logged but its kind and counts.
  */
 notificationRoutesV2.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   const apns = c.get("apns");
   if (apns === null) throw Errors.pushUnavailable();
-  if (!(await c.get("limiters").notifyAgent.limit(auth.deviceId))) throw Errors.rateLimited();
   const body = await readJsonObject(c.req.raw);
   const { kind, request_id: requestId, agent, workspace_title: workspace = "" } = body;
   if (kind !== "needs_you" && kind !== "resolved") throw Errors.badRequest();
@@ -48,6 +47,8 @@ notificationRoutesV2.post("/", requireAuth, requireDesktop, jsonBodyLimit, async
     if (typeof agent !== "string" || agent.trim() === "" || [...agent].length > AGENT_MAX_CHARS) throw Errors.badRequest();
     if (typeof workspace !== "string" || [...workspace].length > WORKSPACE_TITLE_MAX_CHARS) throw Errors.badRequest();
   }
+  // Only an alert counts against the limit, and only once its body is valid: a resolved takes an alert away.
+  if (kind === "needs_you" && !(await c.get("limiters").notifyAgent.limit(auth.deviceId))) throw Errors.rateLimited();
   const db = c.get("db");
   const machine = ownMachine(db, auth.deviceId);
   if (machine === undefined) throw Errors.notFound();
