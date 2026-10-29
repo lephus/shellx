@@ -1,183 +1,17 @@
-export type Lang = 'vi' | 'en';
-export type Page = 'home' | 'privacy' | 'terms' | 'guides';
+// The website is in English (the Vietnamese pages were removed on 2026-10-29). Pages still take
+// their strings and paths from here by language, so a language can come back without touching them.
+export type Lang = 'en';
+export type Page = 'home' | 'privacy' | 'terms' | 'guides' | 'videos';
 
 const paths: Record<Lang, Record<Page, string>> = {
-  vi: { home: '/', privacy: '/privacy/', terms: '/terms/', guides: '/guides/' },
-  en: { home: '/en/', privacy: '/en/privacy/', terms: '/en/terms/', guides: '/en/guides/' },
+  en: { home: '/', privacy: '/privacy/', terms: '/terms/', guides: '/guides/', videos: '/videos/' },
 };
 
 export function pathFor(lang: Lang, page: Page): string {
   return paths[lang][page];
 }
 
-export function otherLang(lang: Lang): Lang {
-  return lang === 'vi' ? 'en' : 'vi';
-}
-
-const vi = {
-  languageName: 'Tiếng Việt',
-  homeTitle: 'ShellX — Terminal và SSH từ điện thoại, không cần mở port',
-  homeDescription:
-    'Điều khiển terminal Mac hoặc PC từ điện thoại ở mọi nơi: SSH, tmux, Claude Code. Mã hóa đầu cuối, không cần mở port, IP tĩnh hay VPN. Miễn phí.',
-  e2e: 'Kết nối được mã hóa đầu cuối: máy chủ trung gian không đọc được nội dung terminal của bạn.',
-  heroEyebrow: 'Mã hóa đầu cuối · Miễn phí',
-  heroTitle: 'Terminal của bạn.',
-  heroTitleAccent: 'Ở mọi nơi.',
-  heroLead:
-    'ShellX là app terminal cho Mac và PC. Mở đúng phiên đang chạy trên máy tính từ điện thoại, gõ lệnh và xem output trực tiếp ở bất kỳ đâu có Internet.',
-  ctaFree: 'Tải miễn phí',
-  ctaHow: 'Xem cách hoạt động',
-  heroDemoText:
-    'Minh họa: một lệnh chạy trên terminal của máy tính và output hiện đồng thời trên điện thoại.',
-  heroPhoneStatus: 'đã ghép nối · mã hóa',
-  howEyebrow: 'Cách hoạt động',
-  howHeading: 'Một terminal, ba nơi bạn cần nó',
-  howLead: 'Làm việc trên máy tính như bình thường. Khi rời bàn, phiên vẫn chạy và đi theo bạn.',
-  pillarDesktopTitle: 'Máy tính',
-  pillarDesktopBody:
-    'App terminal đầy đủ cho macOS và Windows: nhiều workspace, chia pane, khôi phục phiên sau khi mở lại, bảng lệnh và phím tắt tùy chỉnh.',
-  pillarPhoneTitle: 'Điện thoại',
-  pillarPhoneBody:
-    'Mở đúng phiên đang chạy trên máy tính, gõ lệnh và xem output trực tiếp. Mọi byte được mã hóa đầu cuối giữa hai thiết bị.',
-  pillarNotifyTitle: 'Thông báo',
-  pillarNotifyBody:
-    'Nhận thông báo đẩy khi lệnh dài chạy xong hoặc khi một chương trình, như AI coding agent, cần bạn trả lời, kèm mã thoát và thời gian chạy.',
-  featuresHeading: 'Tính năng',
-  featuresLead: 'Mọi thứ cần để làm việc với terminal từ xa, không phải cấu hình mạng.',
-  feature1Title: 'Ở bất kỳ đâu',
-  feature1: 'Mở và điều khiển terminal của máy Mac hoặc PC từ điện thoại, ở bất kỳ đâu có Internet.',
-  feature2Title: 'Mã hóa Noise',
-  feature2: 'Mã hóa đầu cuối bằng giao thức Noise — máy chủ chuyển tiếp không đọc được nội dung.',
-  feature3Title: 'Không cần mở port',
-  feature3: 'Không cần mở port trên router, không cần IP tĩnh hay VPN.',
-  feature4Title: 'Nhiều phiên cùng lúc',
-  feature4: 'Nhiều phiên terminal cùng lúc, chuyển qua lại như đang ngồi trước máy.',
-  feature5Title: 'Ghép nối bằng QR',
-  feature5: 'Ghép nối điện thoại với máy tính bằng mã QR; khóa bí mật không bao giờ rời thiết bị.',
-  feature6Title: 'Đa nền tảng',
-  feature6: 'App cho macOS và Windows; app cho iOS và Android.',
-  stepsHeading: 'Bắt đầu trong ba bước',
-  step1: 'Cài ShellX trên máy tính và đăng ký tài khoản.',
-  step2: 'Cài app trên điện thoại và đăng nhập cùng tài khoản.',
-  step3: 'Chọn "Ghép nối điện thoại…" ở menu khay trên máy tính và quét mã QR bằng điện thoại.',
-  securityHeading: 'Bảo mật',
-  securityLead: 'Máy chủ ở giữa chỉ chuyển tiếp các gói đã mã hóa. Chỉ hai thiết bị của bạn có khóa.',
-  diagramPhone: 'Điện thoại',
-  diagramRelay: 'Máy chủ chuyển tiếp',
-  diagramDesktop: 'Máy tính',
-  diagramText:
-    'Sơ đồ: lệnh đi từ điện thoại qua máy chủ chuyển tiếp tới máy tính; ở máy chủ, dữ liệu chỉ là các byte đã mã hóa.',
-  security1: 'Nội dung terminal được mã hóa đầu cuối: chỉ điện thoại và máy tính của bạn giải mã được.',
-  security2: 'Máy chủ chuyển tiếp chỉ thấy gói dữ liệu đã mã hóa — không bao giờ thấy lệnh hay kết quả.',
-  security3: 'Mật khẩu được băm bằng argon2id; mã truy cập chỉ lưu ở dạng băm SHA-256.',
-  security4: 'Không log nội dung terminal, không analytics, không cookie.',
-  securityMore: 'Chi tiết trong Chính sách quyền riêng tư',
-  faqHeading: 'Câu hỏi thường gặp',
-  contactHeading: 'Liên hệ',
-  contactLead: 'Có câu hỏi, góp ý hay gặp lỗi khi dùng ShellX? Gửi email cho chúng tôi.',
-  faqQ1: 'Tôi có cần mở port trên router hay IP tĩnh không?',
-  faqA1: 'Không. Agent trên máy tính và app trên điện thoại đều tự kết nối ra máy chủ chuyển tiếp, nên không cần mở port, không cần IP tĩnh hay VPN.',
-  faqQ2: 'Điện thoại mất mạng giữa chừng thì sao?',
-  faqA2: 'Agent giữ tối đa 256 KiB output gần nhất của mỗi phiên trong bộ nhớ máy tính; khi điện thoại kết nối lại, phần output phát sinh trong lúc mất mạng được phát lại.',
-  faqQ3: 'ShellX lưu những dữ liệu gì trên máy chủ?',
-  faqA3: 'Chỉ email, mật khẩu đã băm, thông tin thiết bị, bản ghi ghép nối và mã thông báo đẩy (FCM token) của điện thoại đã cho phép thông báo, giữ tới khi đăng xuất. Nội dung terminal được mã hóa đầu cuối nên máy chủ không đọc được và không lưu. Riêng nội dung thông báo đẩy (tên máy, tên cửa sổ, dòng lệnh, mã thoát, thời gian hoặc chữ do chương trình gửi) đi qua máy chủ ở dạng đọc được, chỉ được chuyển tiếp qua Google/Apple tới điện thoại đã ghép nối và không được lưu (xem Chính sách quyền riêng tư).',
-  faqQ4: 'ShellX có mất phí không?',
-  faqA4: 'ShellX hiện miễn phí.',
-  faqQ5: 'ShellX chạy trên nền tảng nào?',
-  faqA5: 'Agent: macOS 12 trở lên, Windows 10 (bản 1809) trở lên. App: iOS 15 trở lên, Android 8.0 trở lên.',
-  faqQ6: 'Làm sao gỡ hẳn chia sẻ terminal sau khi đã xóa ShellX.app trên macOS?',
-  faqA6: 'Xóa ShellX.app không gỡ khối tích hợp trong ~/.zshrc, ~/.bashrc, ~/.bash_profile (khối này vô hại, terminal vẫn dùng bình thường). Để gỡ sạch, mở Terminal và chạy: ~/Library/Application\\ Support/ShellX/bin/shellx-term uninstall. Lệnh xóa khối khỏi các file đó và xóa các thư mục bin và term của ShellX. Nếu Terminal báo không tìm thấy lệnh thì không còn gì để gỡ.',
-  faqQ7: 'ShellX có phải là SSH client không?',
-  faqA7: 'Không hẳn. SSH client mở một phiên mới tới máy chủ và cần máy đó nhận kết nối từ ngoài vào (mở cổng 22, có IP truy cập được hoặc VPN). ShellX mở đúng các phiên terminal đang chạy trên máy Mac hoặc PC của bạn, qua kết nối mà cả hai thiết bị cùng gọi ra máy chủ chuyển tiếp, nên không cần mở cổng. Trong app ShellX trên máy tính bạn vẫn SSH tới server như thường (workspace SSH hoặc lệnh ssh), và điện thoại thấy các pane đó như mọi phiên khác.',
-  faqQ8: 'Dùng Claude Code hay Codex trên điện thoại được không?',
-  faqA8: 'Được. Chạy Claude Code, Codex hay AI coding agent dạng CLI khác trong terminal ShellX trên máy tính, rồi mở phiên đó từ điện thoại để đọc output, trả lời câu hỏi và duyệt thay đổi. Agent vẫn chạy trên máy tính với repo và công cụ của bạn; điện thoại chỉ là màn hình và bàn phím. Khi chương trình gửi thông báo terminal (OSC 9, OSC 777 hoặc OSC 99), ShellX đẩy thông báo đó về điện thoại.',
-  faqQ9: 'Máy tính ở sau NAT, CGNAT hay mạng công ty thì có dùng được không?',
-  faqA9: 'Được, miễn là máy tính và điện thoại kết nối ra được Internet. Cả hai đều chủ động gọi ra máy chủ chuyển tiếp, nên không cần IP tĩnh, không cần mở cổng và không cần cấu hình router. Nếu mạng chặn hẳn kết nối ra máy chủ chuyển tiếp của ShellX thì không dùng được.',
-  faqQ10: 'Có phải cài gì trên server không?',
-  faqA10: 'Không cần agent hay daemon nào trên server. Bạn chỉ cài ShellX trên máy Mac hoặc PC và app trên điện thoại. Khi SSH tới server từ app ShellX, ShellX dùng lệnh ssh và SSH agent có sẵn của hệ điều hành, và chỉ đặt một hook shell nhỏ trong thư mục cache của server để hiện thư mục và nhánh git hiện tại.',
-  faqQ11: 'ShellX khác ứng dụng remote desktop thế nào?',
-  faqA11: 'Remote desktop truyền hình ảnh cả màn hình: nặng, chữ nhỏ và khó gõ trên điện thoại. ShellX chỉ truyền văn bản terminal, nên nhẹ, chữ rõ trên màn hình nhỏ, chạy tốt trên mạng di động, và được mã hóa đầu cuối.',
-  useCasesEyebrow: 'Dùng ShellX để',
-  useCasesHeading: 'Việc bạn làm được từ điện thoại',
-  useCasesLead: 'Những tình huống người dùng ShellX gặp nhiều nhất, kèm hướng dẫn chi tiết.',
-  useCase1Title: 'Theo dõi Claude Code và AI agent',
-  useCase1Body: 'Để agent chạy trên máy tính, trả lời câu hỏi và duyệt thay đổi từ điện thoại, nhận thông báo khi nó cần bạn.',
-  useCase2Title: 'SSH từ điện thoại',
-  useCase2Body: 'Mở các pane SSH đang chạy trên máy tính, kể cả phiên tmux trên server, mà không cần mở cổng ra Internet.',
-  useCase3Title: 'Terminal từ xa không cần VPN',
-  useCase3Body: 'Vào terminal của máy ở nhà hay ở công ty khi máy nằm sau NAT, không IP tĩnh, không cấu hình router.',
-  useCase4Title: 'So sánh với công cụ khác',
-  useCase4Body: 'ShellX khác Termius và Tailscale thế nào, khi nào nên dùng cái nào, và cách dùng kết hợp.',
-  readGuide: 'Đọc hướng dẫn',
-  guidesNav: 'Hướng dẫn',
-  guidesTitle: 'Hướng dẫn ShellX: SSH và terminal từ xa trên điện thoại',
-  guidesDescription:
-    'Hướng dẫn dùng terminal máy tính từ điện thoại: SSH không cần mở port, terminal từ xa không cần VPN, Claude Code trên điện thoại, so sánh với Termius và Tailscale.',
-  guidesHeading: 'Hướng dẫn',
-  guidesLead: 'Cách dùng ShellX cho từng việc cụ thể, và so sánh thẳng thắn với các công cụ quen thuộc.',
-  breadcrumbHome: 'Trang chủ',
-  published: 'Đăng ngày',
-  relatedGuides: 'Bài liên quan',
-  guideCtaHeading: 'Dùng thử ShellX miễn phí',
-  guideCtaBody: 'Cài ShellX trên Mac hoặc PC, ghép nối điện thoại bằng mã QR, và mở terminal của bạn ở bất kỳ đâu.',
-  ctaHeading: 'Mang terminal theo bên mình',
-  ctaLead: 'Cài ShellX trên máy tính, ghép nối điện thoại, và phiên của bạn đi cùng bạn.',
-  desktopHeading: 'App cho máy tính',
-  mobileHeading: 'App cho điện thoại',
-  macos: 'Tải cho macOS',
-  macosRequirement: 'macOS 12 trở lên · tệp .dmg',
-  windows: 'Tải cho Windows',
-  windowsRequirement: 'Windows 10 (bản 1809) trở lên · tệp .exe',
-  appStore: 'App Store',
-  appStoreRequirement: 'iOS 15 trở lên',
-  googlePlay: 'Google Play',
-  googlePlayRequirement: 'Android 8.0 trở lên',
-  comingSoon: 'Sắp ra mắt',
-  footerTagline: 'Terminal máy tính của bạn, ngay trên điện thoại.',
-  privacy: 'Chính sách quyền riêng tư',
-  terms: 'Điều khoản sử dụng',
-  download: 'Tải về',
-  contact: 'Hỗ trợ',
-  mainNav: 'Điều hướng chính',
-  lastUpdated: 'Cập nhật lần cuối',
-  notFoundTitle: 'Không tìm thấy trang',
-  notFoundBody: 'Trang bạn tìm không tồn tại hoặc đã được chuyển đi.',
-  backHome: 'Về trang chủ',
-  // Share viewer (/s/<id>#<key>). The page picks vi or en from navigator.language.
-  shareTitle: 'Phiên được chia sẻ',
-  shareDescription: 'Xem phiên terminal được chia sẻ từ ShellX ngay trên trình duyệt, mã hóa đầu cuối.',
-  shareLoading: 'Đang mở link…',
-  shareConnecting: 'Đang kết nối tới máy chủ phiên…',
-  shareExpired: 'Link đã hết hạn',
-  shareExpiredBody: 'Hãy nhờ người chia sẻ gửi link mới.',
-  shareRevoked: 'Link đã bị thu hồi',
-  shareRevokedBody: 'Người chia sẻ đã dừng chia sẻ phiên này.',
-  shareUsed: 'Link đã được dùng trên thiết bị khác',
-  shareUsedBody: 'Link dùng một lần chỉ mở được trên thiết bị đầu tiên.',
-  shareHostOffline: 'Máy chủ phiên đang tắt',
-  shareHostOfflineBody: 'Máy tính chia sẻ phiên đang tắt, đang ngủ hoặc đã thoát ShellX. Hãy thử lại sau.',
-  shareNotFound: 'Không tìm thấy link',
-  shareNotFoundBody: 'Link sai, thiếu phần khoá sau dấu # hoặc không còn tồn tại.',
-  shareEnded: 'Phiên chia sẻ đã kết thúc',
-  shareEndedBody: 'Kết nối tới máy chủ phiên đã đóng.',
-  shareError: 'Không kết nối được',
-  shareErrorBody: 'Hãy kiểm tra kết nối mạng rồi thử lại.',
-  shareRetry: 'Thử lại',
-  sharePermView: 'Chỉ xem',
-  sharePermType: 'Được gõ',
-  shareExpiresAt: 'Hết hạn lúc {time}',
-  shareE2E: 'Mã hóa đầu cuối: khoá nằm sau dấu # của link, máy chủ chuyển tiếp không đọc được nội dung.',
-  sharePanes: 'Các khung',
-  shareBrowserPane: 'Khung trình duyệt chưa xem được trên web. Hãy chọn một khung terminal.',
-  shareAgentPane: 'Khung Agent Chat chưa xem được trên web. Hãy chọn một khung terminal.',
-  shareKeys: 'Phím đặc biệt',
-  shareTapToType: 'Chạm vào terminal để gõ',
-  shareNoScript: 'Trang này cần JavaScript để giải mã phiên ngay trên trình duyệt của bạn.',
-};
-
-type Strings = typeof vi;
-
-const en: Strings = {
+const en = {
   languageName: 'English',
   homeTitle: 'ShellX — Remote terminal and SSH from your phone, no open ports',
   homeDescription:
@@ -190,6 +24,7 @@ const en: Strings = {
     'ShellX is a terminal app for Mac and PC. Open the very session running on your computer from your phone, type commands and watch the output live, anywhere with an Internet connection.',
   ctaFree: 'Download free',
   ctaHow: 'See how it works',
+  ctaWatch: 'Watch the 1-minute video',
   heroDemoText:
     'Illustration: a command runs in the terminal on a computer and its output appears on a phone at the same time.',
   heroPhoneStatus: 'paired · encrypted',
@@ -306,6 +141,22 @@ const en: Strings = {
   notFoundTitle: 'Page not found',
   notFoundBody: 'The page you are looking for does not exist or has moved.',
   backHome: 'Back to home',
+  videoNav: 'Videos',
+  videoEyebrow: 'Video · 1 minute',
+  videoHeading: 'ShellX in one minute',
+  videoLead: 'A quick look at what ShellX does on your computer and on your phone.',
+  videoFull: 'Watch the full tutorial (3 minutes)',
+  stepsVideo: 'Watch every step in the video tutorial',
+  videosTitle: 'ShellX video tutorial: workspaces, AI agents and your phone',
+  videosDescription:
+    'A 1-minute intro and a 3-minute tutorial: create workspaces, split panes, run AI agents, pair your phone and answer your agents from anywhere.',
+  videosHeading: 'Video tutorials',
+  videosLead: 'From your first workspace to answering your AI agents from your phone. Jump to any chapter, or read the transcript.',
+  videoChapters: 'Chapters',
+  videoTranscript: 'Read the transcript',
+  tutorialLength: '3 min',
+  videoUnsupported: 'This browser cannot play the video.',
+  videoDownload: 'Download the video (MP4)',
   shareTitle: 'Shared session',
   shareDescription: 'View a terminal session shared from ShellX right in your browser, end-to-end encrypted.',
   shareLoading: 'Opening the link…',
@@ -337,4 +188,46 @@ const en: Strings = {
   shareNoScript: 'This page needs JavaScript to decrypt the session in your browser.',
 };
 
-export const ui: Record<Lang, Strings> = { vi, en };
+// The share viewer (/s/<id>#<key>) follows the viewer's browser language, Vietnamese or English
+// (src/share/viewer.mjs), so it keeps its Vietnamese texts.
+const shareVi: Record<string, string> = {
+  shareTitle: 'Phiên được chia sẻ',
+  shareDescription: 'Xem phiên terminal được chia sẻ từ ShellX ngay trên trình duyệt, mã hóa đầu cuối.',
+  shareLoading: 'Đang mở link…',
+  shareConnecting: 'Đang kết nối tới máy chủ phiên…',
+  shareExpired: 'Link đã hết hạn',
+  shareExpiredBody: 'Hãy nhờ người chia sẻ gửi link mới.',
+  shareRevoked: 'Link đã bị thu hồi',
+  shareRevokedBody: 'Người chia sẻ đã dừng chia sẻ phiên này.',
+  shareUsed: 'Link đã được dùng trên thiết bị khác',
+  shareUsedBody: 'Link dùng một lần chỉ mở được trên thiết bị đầu tiên.',
+  shareHostOffline: 'Máy chủ phiên đang tắt',
+  shareHostOfflineBody: 'Máy tính chia sẻ phiên đang tắt, đang ngủ hoặc đã thoát ShellX. Hãy thử lại sau.',
+  shareNotFound: 'Không tìm thấy link',
+  shareNotFoundBody: 'Link sai, thiếu phần khoá sau dấu # hoặc không còn tồn tại.',
+  shareEnded: 'Phiên chia sẻ đã kết thúc',
+  shareEndedBody: 'Kết nối tới máy chủ phiên đã đóng.',
+  shareError: 'Không kết nối được',
+  shareErrorBody: 'Hãy kiểm tra kết nối mạng rồi thử lại.',
+  shareRetry: 'Thử lại',
+  sharePermView: 'Chỉ xem',
+  sharePermType: 'Được gõ',
+  shareExpiresAt: 'Hết hạn lúc {time}',
+  shareE2E: 'Mã hóa đầu cuối: khoá nằm sau dấu # của link, máy chủ chuyển tiếp không đọc được nội dung.',
+  sharePanes: 'Các khung',
+  shareBrowserPane: 'Khung trình duyệt chưa xem được trên web. Hãy chọn một khung terminal.',
+  shareAgentPane: 'Khung Agent Chat chưa xem được trên web. Hãy chọn một khung terminal.',
+  shareKeys: 'Phím đặc biệt',
+  shareTapToType: 'Chạm vào terminal để gõ',
+  shareNoScript: 'Trang này cần JavaScript để giải mã phiên ngay trên trình duyệt của bạn.',
+};
+
+type Strings = typeof en;
+
+export const ui: Record<Lang, Strings> = { en };
+
+/** The share viewer's texts in both of its languages. */
+export const shareUi: Record<'vi' | 'en', Record<string, string>> = {
+  vi: shareVi,
+  en: Object.fromEntries(Object.entries(en).filter(([k]) => k.startsWith('share'))),
+};

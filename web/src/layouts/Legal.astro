@@ -14,7 +14,7 @@ interface Props {
 }
 
 const { lang, page, title, description, updated } = Astro.props.frontmatter;
-const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', {
+const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString('en-US', {
   year: 'numeric',
   month: 'long',
   day: 'numeric',

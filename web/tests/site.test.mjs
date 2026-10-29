@@ -12,16 +12,14 @@ const config = JSON.parse(readFileSync(join(root, 'src/site.config.json'), 'utf8
 const macUrl = `${config.downloadBaseUrl}/${config.desktopVersion}/ShellX-${config.desktopVersion}.dmg`;
 const winUrl = `${config.downloadBaseUrl}/${config.desktopVersion}/ShellX-Setup-${config.desktopVersion}.exe`;
 
-const homePages = [
-  { path: '/', lang: 'vi', other: '/en/', privacy: '/privacy/', terms: '/terms/' },
-  { path: '/en/', lang: 'en', other: '/', privacy: '/en/privacy/', terms: '/en/terms/' },
-];
+// The site is English only since 2026-10-29: the English pages moved from /en/ to / (nginx answers
+// /en/… with 301) and the Vietnamese pages were removed.
+const homePages = [{ path: '/', lang: 'en', privacy: '/privacy/', terms: '/terms/' }];
 
 const guideSlugs = ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn', 'shellx-vs-termius', 'shellx-vs-tailscale'];
-const guidePages = ['/guides/', '/en/guides/', ...guideSlugs.flatMap((s) => [`/guides/${s}/`, `/en/guides/${s}/`])];
-const videoPages = [{ path: '/videos/', lang: 'vi', home: '/' }, { path: '/en/videos/', lang: 'en', home: '/en/' }];
-const indexablePages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/',
-  ...videoPages.map((v) => v.path), ...guidePages];
+const guidePages = ['/guides/', ...guideSlugs.map((s) => `/guides/${s}/`)];
+const videoPages = [{ path: '/videos/', lang: 'en', home: '/' }];
+const indexablePages = ['/', '/privacy/', '/terms/', ...videoPages.map((v) => v.path), ...guidePages];
 const everyPage = [...indexablePages, '/404.html', '/s/'];
 
 function fileFor(pathname) {
@@ -80,9 +78,9 @@ for (const page of homePages) {
     assert.ok(nav && hrefs(nav[0]).includes(`${page.path}#contact`), `menu lacks a link to ${page.path}#contact`);
   });
 
-  test(`home ${page.path} links to the other language and to the legal pages`, () => {
+  test(`home ${page.path} links to the legal pages`, () => {
     const links = hrefs(readPage(page.path));
-    for (const target of [page.other, page.privacy, page.terms, `mailto:${config.supportEmail}`]) {
+    for (const target of [page.privacy, page.terms, `mailto:${config.supportEmail}`]) {
       assert.ok(links.includes(target), `missing link to ${target}`);
     }
   });
@@ -96,10 +94,8 @@ test('installer URLs are live (only with CHECK_DOWNLOADS=1)', { skip: process.en
 });
 
 const legalPages = [
-  { path: '/privacy/', lang: 'vi', other: '/en/privacy/' },
-  { path: '/terms/', lang: 'vi', other: '/en/terms/' },
-  { path: '/en/privacy/', lang: 'en', other: '/privacy/' },
-  { path: '/en/terms/', lang: 'en', other: '/terms/' },
+  { path: '/privacy/', lang: 'en' },
+  { path: '/terms/', lang: 'en' },
 ];
 
 function allHtmlFiles(dir = dist) {
@@ -111,18 +107,14 @@ function allHtmlFiles(dir = dist) {
 }
 
 for (const page of legalPages) {
-  test(`legal page ${page.path} is built in ${page.lang} and links to its translation`, () => {
+  test(`legal page ${page.path} is built in ${page.lang}`, () => {
     const html = readPage(page.path);
     assert.match(html, new RegExp(`<html lang="${page.lang}"`));
-    assert.ok(hrefs(html).includes(page.other), `missing link to ${page.other}`);
     assert.ok(hrefs(html).includes(`mailto:${config.supportEmail}`), 'missing support email link');
   });
 }
 
-for (const [path, inApp] of [
-  ['/privacy/', 'Cài đặt → Xóa tài khoản'],
-  ['/en/privacy/', 'Settings → Delete account'],
-]) {
+for (const [path, inApp] of [['/privacy/', 'Settings → Delete account']]) {
   test(`privacy page ${path} documents account deletion and what is stored`, () => {
     const html = readPage(path);
     assert.match(html, /id="delete-account"/);
@@ -221,17 +213,18 @@ test('every page has exactly one h1', () => {
 });
 
 test('self-hosted font files exist and are preloaded', () => {
+  // The Vietnamese subset stays for the share viewer's Vietnamese texts, loaded only when used.
   for (const f of ['JetBrainsMono-Regular', 'JetBrainsMono-Bold', 'SpaceGrotesk-Latin', 'SpaceGrotesk-Vietnamese']) {
     assert.ok(existsSync(join(dist, `fonts/${f}.woff2`)), `missing fonts/${f}.woff2`);
   }
   const html = readPage('/');
   assert.match(html, /rel="preload" as="font"[^>]*SpaceGrotesk-Latin\.woff2/);
-  assert.match(html, /rel="preload" as="font"[^>]*SpaceGrotesk-Vietnamese\.woff2/);
+  assert.doesNotMatch(html, /rel="preload" as="font"[^>]*SpaceGrotesk-Vietnamese\.woff2/);
   assert.match(html, /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
 });
 
 test('home has the landing sections: hero, how it works, features, security, steps, FAQ, download', () => {
-  for (const p of ['/', '/en/']) {
+  for (const p of ['/']) {
     const html = readPage(p);
     for (const id of ['video', 'how', 'features', 'security', 'start', 'faq', 'download']) {
       assert.match(html, new RegExp(`<section[^>]*id="${id}"`), `${p}: missing section #${id}`);
@@ -243,10 +236,7 @@ test('home has the landing sections: hero, how it works, features, security, ste
 });
 
 test('home carries the full marketing content statically (no JS needed)', () => {
-  const checks = [
-    ['/', ['Tính năng', 'Bảo mật', 'Câu hỏi thường gặp', 'argon2id', 'mã QR', 'miễn phí']],
-    ['/en/', ['Features', 'Security', 'FAQ', 'argon2id', 'QR code', 'free']],
-  ];
+  const checks = [['/', ['Features', 'Security', 'FAQ', 'argon2id', 'QR code', 'free']]];
   for (const [p, needles] of checks) {
     const html = readPage(p);
     for (const n of needles) assert.ok(html.includes(n), `${p} missing "${n}"`);
@@ -266,7 +256,7 @@ test('animations ship as a small inline script and respect reduced motion', () =
 });
 
 test('decorative animations are hidden from screen readers and have a text equivalent', () => {
-  for (const p of ['/', '/en/']) {
+  for (const p of ['/']) {
     const html = readPage(p);
     assert.match(html, /class="desk"[^>]*aria-hidden="true"/, `${p}: hero desktop must be aria-hidden`);
     assert.match(html, /class="phone"[^>]*aria-hidden="true"/, `${p}: hero phone must be aria-hidden`);
@@ -289,10 +279,10 @@ test('robots.txt welcomes search and AI crawlers; sitemap lists exactly the inde
   assert.deepEqual(locs, indexablePages.map((p) => `https://shellx.pro${p}`).sort());
 });
 
-test('OG/Twitter meta and per-language OG image on every page', () => {
-  for (const p of ['/', '/en/', '/privacy/', '/en/privacy/']) {
+test('OG/Twitter meta and the OG image on every page', () => {
+  for (const p of ['/', '/privacy/', '/videos/']) {
     const html = readPage(p);
-    const og = p.startsWith('/en') ? '/og/og-en.png' : '/og/og-vi.png';
+    const og = '/og/og-en.png';
     assert.match(html, /property="og:title"/);
     assert.match(html, /name="twitter:card" content="summary_large_image"/);
     assert.ok(html.includes(`https://shellx.pro${og}`), `${p} wrong og:image`);
@@ -301,7 +291,7 @@ test('OG/Twitter meta and per-language OG image on every page', () => {
 });
 
 test('home JSON-LD parses and declares the free app', () => {
-  for (const p of ['/', '/en/']) {
+  for (const p of ['/']) {
     const scripts = [...readPage(p).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
     assert.ok(scripts.length >= 1, `${p}: JSON-LD missing`);
     const types = scripts.map((m) => JSON.parse(m[1])).map((d) => d['@type']);
@@ -311,17 +301,14 @@ test('home JSON-LD parses and declares the free app', () => {
   }
 });
 
-const seoPages = indexablePages.map((path) => {
-  const lang = path.startsWith('/en/') ? 'en' : 'vi';
-  return { path, lang, pair: lang === 'en' ? path.slice(3) : `/en${path}` };
-});
+const seoPages = indexablePages.map((path) => ({ path, lang: 'en' }));
 
 function unescapeHtml(s) {
   return s.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 }
 
 for (const page of seoPages) {
-  test(`SEO basics on ${page.path}: title, description, canonical, reciprocal hreflang, icons`, () => {
+  test(`SEO basics on ${page.path}: title, description, canonical, one language, icons`, () => {
     const html = readPage(page.path);
     const title = unescapeHtml(html.match(/<title>([^<]*)<\/title>/)?.[1] ?? '');
     const description = unescapeHtml(html.match(/<meta name="description" content="([^"]*)"/)?.[1] ?? '');
@@ -329,11 +316,8 @@ for (const page of seoPages) {
     assert.ok(description.length >= 70 && description.length <= 165,
       `${page.path}: description is ${description.length} chars`);
     assert.ok(html.includes(`<link rel="canonical" href="https://shellx.pro${page.path}">`), `${page.path}: canonical`);
-    const otherLang = page.lang === 'vi' ? 'en' : 'vi';
-    assert.ok(html.includes(`hreflang="${otherLang}" href="https://shellx.pro${page.pair}"`), `${page.path}: hreflang to ${page.pair}`);
-    assert.ok(readPage(page.pair).includes(`hreflang="${page.lang}" href="https://shellx.pro${page.path}"`),
-      `${page.pair} does not point back to ${page.path}`);
-    assert.match(html, /hreflang="x-default"/);
+    assert.match(html, new RegExp(`<html lang="${page.lang}"`));
+    assert.ok(!html.includes('hreflang='), `${page.path}: hreflang on a one-language site`);
     assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png"/);
     assert.match(html, /rel="manifest" href="\/site\.webmanifest"/);
     assert.ok(!/name="robots" content="[^"]*noindex/.test(html), `${page.path} is noindex`);
@@ -341,7 +325,7 @@ for (const page of seoPages) {
 }
 
 test('home JSON-LD has FAQPage matching the visible FAQ, Organization and download URLs', () => {
-  for (const p of ['/', '/en/']) {
+  for (const p of ['/']) {
     const html = readPage(p);
     const docs = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
     const faq = docs.find((d) => d['@type'] === 'FAQPage');
@@ -355,12 +339,12 @@ test('home JSON-LD has FAQPage matching the visible FAQ, Organization and downlo
   }
 });
 
-test('manifest icons exist; sitemap carries lastmod and x-default for every page', () => {
+test('manifest icons exist; sitemap carries lastmod for every page and no language alternates', () => {
   const manifest = JSON.parse(readFileSync(join(dist, 'site.webmanifest'), 'utf8'));
   for (const icon of manifest.icons) assert.ok(existsSync(join(dist, icon.src.slice(1))), `missing ${icon.src}`);
   const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
   assert.equal((xml.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) ?? []).length, indexablePages.length);
-  assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, indexablePages.length);
+  assert.ok(!xml.includes('hreflang'), 'sitemap lists language alternates');
 });
 
 test('404 and the share viewer are noindex; every indexable page is index, follow', () => {
@@ -370,7 +354,7 @@ test('404 and the share viewer are noindex; every indexable page is index, follo
 });
 
 test('home links to the guides; every guide links back to downloads and to other guides', () => {
-  for (const [home, prefix] of [['/', '/guides/'], ['/en/', '/en/guides/']]) {
+  for (const [home, prefix] of [['/', '/guides/']]) {
     const links = hrefs(readPage(home));
     assert.ok(links.includes(prefix), `${home}: no link to ${prefix}`);
     for (const s of ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn']) {
@@ -380,7 +364,7 @@ test('home links to the guides; every guide links back to downloads and to other
     for (const s of guideSlugs) assert.ok(index.includes(`${prefix}${s}/`), `${prefix}: missing ${s}`);
   }
   for (const s of guideSlugs) {
-    for (const [p, home] of [[`/guides/${s}/`, '/'], [`/en/guides/${s}/`, '/en/']]) {
+    for (const [p, home] of [[`/guides/${s}/`, '/']]) {
       const links = hrefs(readPage(p));
       assert.ok(links.includes(`${home}#download`), `${p}: no download link`);
       const others = new Set(links.filter((l) => /\/guides\/[a-z-]+\/$/.test(l) && l !== p));
@@ -391,7 +375,7 @@ test('home links to the guides; every guide links back to downloads and to other
 
 test('guides carry TechArticle and BreadcrumbList JSON-LD with author and dates', () => {
   for (const s of guideSlugs) {
-    for (const p of [`/guides/${s}/`, `/en/guides/${s}/`]) {
+    for (const p of [`/guides/${s}/`]) {
       const html = readPage(p);
       const docs = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
       const art = docs.find((d) => d['@type'] === 'TechArticle');
@@ -410,7 +394,7 @@ test('guides carry TechArticle and BreadcrumbList JSON-LD with author and dates'
 });
 
 test('home JSON-LD: app with features and keywords, HowTo, ShellPro Team as author, no person', () => {
-  for (const p of ['/', '/en/']) {
+  for (const p of ['/']) {
     const docs = [...readPage(p).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
     const app = docs.find((d) => d['@type'] === 'SoftwareApplication');
     assert.ok(app.featureList.length >= 5 && app.keywords && app.isAccessibleForFree === true);
@@ -426,15 +410,13 @@ test('home JSON-LD: app with features and keywords, HowTo, ShellPro Team as auth
 test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries FAQ and guide text', () => {
   const txt = readFileSync(join(dist, 'llms.txt'), 'utf8');
   assert.match(txt, /^# ShellX\n\n> /, 'llms.txt must start with an H1 and a blockquote summary');
-  for (const s of guideSlugs) {
-    assert.ok(txt.includes(`https://shellx.pro/en/guides/${s}/`), `llms.txt: missing en guide ${s}`);
-    assert.ok(txt.includes(`https://shellx.pro/guides/${s}/`), `llms.txt: missing vi guide ${s}`);
-  }
+  for (const s of guideSlugs) assert.ok(txt.includes(`https://shellx.pro/guides/${s}/`), `llms.txt: missing guide ${s}`);
+  assert.ok(!txt.includes('https://shellx.pro/en/'), 'llms.txt links to the old /en/ pages');
   assert.ok(txt.includes(macUrl) && txt.includes(winUrl), 'llms.txt: download links');
   for (const p of videoPages) assert.ok(txt.includes(`https://shellx.pro${p.path}`), `llms.txt: missing ${p.path}`);
   if (!config.appStoreUrl) assert.match(txt, /App Store: coming soon/);
   const full = readFileSync(join(dist, 'llms-full.txt'), 'utf8');
-  for (const needle of ['Is ShellX an SSH client?', 'ShellX có phải là SSH client không?', 'shellx skills install --claude', 'ShellX vs Termius',
+  for (const needle of ['Is ShellX an SSH client?', 'shellx skills install --claude', 'ShellX vs Termius',
     'open Settings, choose Mobile, and click Show QR Code.']) {
     assert.ok(full.includes(needle), `llms-full.txt: missing "${needle}"`);
   }
@@ -442,9 +424,8 @@ test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries 
   assert.match(readPage('/'), /rel="alternate" type="text\/plain"[^>]*href="\/llms\.txt"/);
 });
 
-// Videos (src/lib/videos.ts, files in public/media/). The narration is English and English captions
-// are burned into the picture, so only the Vietnamese pages carry a subtitle track: Vietnamese, with
-// one cue per English caption and the same timings (src/videos/*.srt), drawn at the top of the frame.
+// Videos (src/lib/videos.ts, files in public/media/). The captions are burned into the picture, so the
+// players carry no <track>; src/videos/<name>.srt feeds the chapters and the transcripts.
 const videoNames = ['shellx-intro', 'shellx-tutorial'];
 
 function ldDocs(html) {
@@ -455,8 +436,8 @@ function videoTags(html) {
   return html.match(/<video\b[\s\S]*?<\/video>/g) ?? [];
 }
 
-function srtTimings(name, lang) {
-  const srt = readFileSync(join(root, `src/videos/${name}.${lang}.srt`), 'utf8');
+function srtTimings(name) {
+  const srt = readFileSync(join(root, `src/videos/${name}.srt`), 'utf8');
   return [...srt.matchAll(/^(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})$/gm)]
     .map((m) => `${m[1]} --> ${m[2]}`.replaceAll(',', '.'));
 }
@@ -480,12 +461,8 @@ for (const page of homePages) {
     assert.match(video, /\bposter="\/media\/shellx-intro\.webp"/);
     assert.match(video, /\bcontrols\b/);
     assert.match(video, /\bplaysinline\b/);
-    if (page.lang === 'vi') {
-      assert.match(video, /<track kind="subtitles" src="\/media\/shellx-intro\.vi\.vtt" srclang="vi" label="Tiếng Việt" default/);
-    } else {
-      assert.ok(!video.includes('<track'), 'English captions are in the picture already');
-    }
-    const videosPage = page.lang === 'vi' ? '/videos/' : '/en/videos/';
+    assert.ok(!video.includes('<track'), 'the captions are in the picture already');
+    const videosPage = '/videos/';
     assert.ok(hrefs(section).includes(videosPage), `the video section lacks a link to ${videosPage}`);
     const hero = html.match(/<section class="hero"[\s\S]*?<\/section>/)[0];
     assert.ok(hrefs(hero).includes('#video'), 'the hero lacks a link to #video');
@@ -507,14 +484,14 @@ for (const page of videoPages) {
     for (const [video, name] of videos.map((v, i) => [v, videoNames[1 - i]])) {
       assert.match(video, /\bpreload="none"/);
       assert.ok(video.includes(`poster="/media/${name}.webp"`), `${name}: poster`);
-      assert.equal(video.includes(`src="/media/${name}.vi.vtt"`), page.lang === 'vi', `${name}: subtitle track`);
+      assert.ok(!video.includes('<track'), `${name}: the captions are in the picture already`);
     }
     const chapters = [...html.matchAll(/data-t="(\d+)"/g)].map((m) => Number(m[1]));
     assert.ok(chapters.length >= 8, `only ${chapters.length} chapters`);
     assert.equal(chapters[0], 0);
     assert.ok(chapters.every((t, i) => i === 0 || t > chapters[i - 1]), `chapters out of order: ${chapters}`);
     assert.ok(chapters.at(-1) < 183, 'a chapter starts after the end of the video');
-    const transcript = page.lang === 'vi' ? 'mở Settings, chọn Mobile' : 'open Settings, choose Mobile, and click Show QR Code.';
+    const transcript = 'open Settings, choose Mobile, and click Show QR Code.';
     assert.ok(html.includes(transcript), `${page.path}: transcript lacks "${transcript}"`);
     assert.ok(hrefs(html).includes(`${page.home}#download`), `${page.path}: no download link`);
 
@@ -528,7 +505,7 @@ for (const page of videoPages) {
       assert.ok(d, `${v.name}: duration ${v.duration}`);
       const name = new URL(v.contentUrl).pathname.match(/^\/media\/([a-z-]+)\.mp4$/)?.[1];
       assert.ok(videoNames.includes(name), `${v.name}: contentUrl ${v.contentUrl}`);
-      const lastCue = srtTimings(name, 'en').at(-1).split(' --> ')[1];
+      const lastCue = srtTimings(name).at(-1).split(' --> ')[1];
       assert.ok(Number(d[1] ?? 0) * 60 + Number(d[2]) >= seconds(lastCue), `${v.name}: duration ends before the last caption`);
       for (const url of [v.contentUrl, ...[v.thumbnailUrl].flat()]) {
         assert.ok(url.startsWith('https://shellx.pro/media/'), `${v.name}: ${url}`);
@@ -547,15 +524,16 @@ for (const page of videoPages) {
   });
 }
 
-test('Vietnamese subtitles keep the English timings and sit at the top, clear of the burned-in captions', () => {
-  for (const name of videoNames) {
-    const vtt = readFileSync(join(dist, `media/${name}.vi.vtt`), 'utf8');
-    assert.match(vtt, /^WEBVTT\n\n/);
-    const cues = [...vtt.matchAll(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})(.*)\n(.+)$/gm)];
-    assert.deepEqual(cues.map((m) => m[1]), srtTimings(name, 'en'), `${name}: vi cues differ from the English timings`);
-    assert.deepEqual(cues.map((m) => m[1]), srtTimings(name, 'vi'), `${name}: vi.srt timings differ from the VTT`);
-    for (const m of cues) assert.equal(m[2], ' line:0', `${name}: cue ${m[1]} is not placed at the top`);
-    assert.match(vtt, /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/, `${name}: no Vietnamese text`);
+test('the site is English only: nothing is built under /en/ and no page links there', () => {
+  assert.ok(!existsSync(join(dist, 'en')), 'dist/en/ exists');
+  // Letters only Vietnamese uses; the share viewer (/s/) alone keeps Vietnamese texts.
+  const vietnamese = /[ăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i;
+  for (const p of [...indexablePages, '/404.html']) {
+    const html = readPage(p);
+    assert.match(html, /<html lang="en"/, `${p} is not lang="en"`);
+    assert.ok(!hrefs(html).some((h) => h === '/en/' || h.startsWith('/en/')), `${p} links to /en/`);
+    const text = html.replace(/<script[\s\S]*?<\/script>/g, '');
+    assert.doesNotMatch(text, vietnamese, `${p} still carries Vietnamese text`);
   }
 });
 
@@ -624,7 +602,7 @@ test('share viewer header is minimal: no marketing nav, no gradient download CTA
   assert.ok(!header.includes('class="top-nav"'), '/s/ header has the marketing nav');
   assert.ok(!html.includes('linear-gradient'), '/s/ carries a gradient');
   assert.ok(!html.includes('grad-text'), '/s/ uses gradient text');
-  for (const p of ['/', '/en/', '/privacy/', '/404.html']) {
+  for (const p of ['/', '/privacy/', '/404.html']) {
     const other = readPage(p).match(/<header class="top"[\s\S]*?<\/header>/)[0];
     assert.ok(other.includes('btn btn-primary btn-sm'), `${p} lost its header CTA`);
   }

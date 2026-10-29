@@ -1,0 +1,144 @@
+---
+// /videos/: the full tutorial with chapters and a transcript, then the 1-minute intro.
+import Base from '../layouts/Base.astro';
+import VideoPlayer from './VideoPlayer.astro';
+import { pathFor, ui, type Lang } from '../i18n/ui';
+import { breadcrumbs } from '../lib/seo';
+import { clock, video, videoLd } from '../lib/videos';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = ui[lang];
+const path = pathFor(lang, 'videos');
+const home = pathFor(lang, 'home');
+const tutorial = video(lang, 'tutorial');
+const intro = video(lang, 'intro');
+const ld = [
+  videoLd(tutorial, path),
+  videoLd(intro, path),
+  breadcrumbs([{ name: t.breadcrumbHome, path: home }, { name: t.videosHeading, path }]),
+];
+---
+<Base lang={lang} page="videos" title={t.videosTitle} description={t.videosDescription}>
+  <Fragment slot="head">
+    {ld.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
+  </Fragment>
+  <div class="wrap vp">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href={home}>{t.breadcrumbHome}</a></nav>
+    <header>
+      <h1>{t.videosHeading}</h1>
+      <p class="muted">{t.videosLead}</p>
+    </header>
+
+    <section class="watch" id="tutorial" aria-labelledby="tutorial-h">
+      <h2 id="tutorial-h">{tutorial.title} <span class="len">· {t.tutorialLength}</span></h2>
+      <div class="watch-grid">
+        <VideoPlayer video={tutorial} lang={lang} />
+        <nav class="chapters" aria-labelledby="chapters-h">
+          <div class="chapters-in">
+            <h3 id="chapters-h">{t.videoChapters}</h3>
+            <ol>
+              {tutorial.chapters.map((c) => (
+                <li><a href={`${tutorial.mp4}#t=${c.start}`} data-t={c.start}><span class="at">{clock(c.start)}</span>{c.title}</a></li>
+              ))}
+            </ol>
+          </div>
+        </nav>
+      </div>
+      <details class="transcript">
+        <summary>{t.videoTranscript}</summary>
+        {tutorial.chapters.map((c) => <><h3>{clock(c.start)} · {c.title}</h3><p>{c.text}</p></>)}
+      </details>
+    </section>
+
+    <section class="watch intro" id="intro" aria-labelledby="intro-h">
+      <h2 id="intro-h">{intro.title}</h2>
+      <p class="muted">{intro.description}</p>
+      <VideoPlayer video={intro} lang={lang} />
+      <details class="transcript">
+        <summary>{t.videoTranscript}</summary>
+        <p>{intro.chapters.map((c) => c.text).join(' ')}</p>
+      </details>
+    </section>
+
+    <aside class="cta">
+      <h2>{t.guideCtaHeading}</h2>
+      <p>{t.guideCtaBody}</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href={`${home}#download`}>{t.ctaFree}</a>
+        <a class="btn btn-ghost" href={pathFor(lang, 'guides')}>{t.guidesNav}</a>
+      </div>
+    </aside>
+  </div>
+
+  <script is:inline>
+    (() => {
+      // Chapters seek the tutorial; ?t=<seconds> (the Clip URLs in the JSON-LD) opens it at that second.
+      const v = document.querySelector('[data-video="tutorial"]');
+      const links = [...document.querySelectorAll('[data-t]')];
+      const seek = (t, play) => {
+        if (play) v.play().catch(() => {});
+        if (v.readyState > 0) v.currentTime = t;
+        else v.addEventListener('loadedmetadata', () => { v.currentTime = t; }, { once: true });
+      };
+      for (const a of links) {
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          seek(Number(a.dataset.t), true);
+          v.scrollIntoView({ block: 'nearest' });
+        });
+      }
+      v.addEventListener('timeupdate', () => {
+        const on = links.findLastIndex((a) => v.currentTime >= Number(a.dataset.t));
+        links.forEach((a, i) => (i === on ? a.setAttribute('aria-current', 'true') : a.removeAttribute('aria-current')));
+      });
+      const t = Number(new URLSearchParams(location.search).get('t'));
+      if (t > 0) {
+        v.preload = 'metadata';
+        seek(t, false);
+        v.load();
+        v.scrollIntoView({ block: 'center' });
+      }
+    })();
+  </script>
+</Base>
+
+<style>
+  .vp { max-width: 72rem; padding-top: 2.5rem; }
+  .crumbs { font-size: 0.9rem; margin-bottom: 1.25rem; }
+  .crumbs a { color: var(--muted); text-decoration: none; }
+  .crumbs a:hover { color: var(--fg); }
+  .vp h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); }
+  .vp header .muted { font-size: 1.1rem; margin: 0 0 2.5rem; max-width: 44rem; }
+  .watch { margin-bottom: 4rem; }
+  .watch h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+  .len { color: var(--muted); font-weight: 500; }
+  .watch-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(15rem, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
+  /* The chapter list is as tall as the video and scrolls inside it. */
+  .chapters { position: relative; border-radius: 18px; background: var(--card); border: 1px solid var(--border); }
+  .chapters-in { position: absolute; inset: 0; overflow-y: auto; padding: 0.85rem 0.6rem 0.5rem; }
+  .chapters h3 { font-size: 1rem; margin: 0 0.6rem 0.35rem; color: var(--muted); }
+  .chapters ol { list-style: none; margin: 0; padding: 0; }
+  .chapters a {
+    display: flex; gap: 0.75rem; padding: 0.32rem 0.6rem; border-radius: 10px; color: var(--fg);
+    text-decoration: none; font-size: 0.93rem; line-height: 1.4;
+  }
+  .chapters a:hover { background: var(--card-2); }
+  .chapters a[aria-current] { background: rgba(167, 139, 250, 0.16); color: #fff; }
+  .at { flex: none; min-width: 2.6rem; font-family: var(--mono); font-size: 0.85rem; color: var(--purple-l); padding-top: 0.1rem; }
+  .intro { max-width: 52rem; }
+  .intro .muted { margin: 0 0 1.25rem; }
+  .transcript { margin-top: 1.25rem; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+  .transcript summary { cursor: pointer; padding: 0.9rem 1.25rem; font-weight: 600; }
+  .transcript h3 { font-size: 1rem; margin: 1rem 1.25rem 0.3rem; color: var(--purple-l); }
+  .transcript p { margin: 0 1.25rem 1rem; color: var(--muted); }
+  .cta { padding: 2rem; border-radius: 22px; border: 1px solid var(--border); text-align: center;
+         background: linear-gradient(180deg, rgba(124, 58, 237, 0.18), rgba(21, 16, 38, 0.6)); }
+  .cta h2 { font-size: 1.6rem; }
+  .cta p { color: var(--muted); margin: 0 0 1.25rem; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
+  @media (max-width: 56rem) {
+    .watch-grid { grid-template-columns: 1fr; }
+    .chapters-in { position: static; }
+  }
+</style>

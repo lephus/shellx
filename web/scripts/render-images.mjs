@@ -17,7 +17,6 @@ if (!chrome) throw new Error('Chrome not found; set CHROME_PATH');
 
 const jobs = [
   { src: 'og-src/og-en.svg', out: 'public/og/og-en.png', w: 1200, h: 630 },
-  { src: 'og-src/og-vi.svg', out: 'public/og/og-vi.png', w: 1200, h: 630 },
   { src: 'og-src/icon.svg', out: 'public/apple-touch-icon.png', w: 180, h: 180 },
   { src: 'og-src/icon.svg', out: 'public/icon-512.png', w: 512, h: 512 },
 ];

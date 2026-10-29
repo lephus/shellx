@@ -132,15 +132,35 @@ test('the relay URL handed to viewers (RELAY_V2_URL default and relay.env) is al
   }
 });
 
-// --- /media/: the website's videos, posters and subtitles (web/public/media/) ---
+// --- /media/: the website's videos and posters (web/public/media/) ---
 
-test('/media/ serves subtitles as text/vtt and keeps the video, image and caching headers', () => {
+test('/media/ serves mp4 and webp with their types and caching headers', () => {
   const loc = locationBlock('/media/');
   // `types` inside a location replaces nginx's mime.types there, so every served extension is listed.
   const types = loc.match(/types \{([^}]*)\}/)?.[1] ?? '';
-  for (const [type, ext] of [['video/mp4', 'mp4'], ['image/webp', 'webp'], ['text/vtt', 'vtt']]) {
+  for (const [type, ext] of [['video/mp4', 'mp4'], ['image/webp', 'webp']]) {
     assert.match(types, new RegExp(`\\b${type.replace('/', '\\/')}\\s+${ext};`), `${ext} → ${type}`);
   }
   assert.ok(loc.includes('add_header Cache-Control "public, max-age=604800" always;'), 'Cache-Control');
   assert.ok(loc.includes('add_header X-Content-Type-Options "nosniff" always;'), 'nosniff');
 });
+
+// --- /en/: the English pages moved to / on 2026-10-29 ---
+
+test('/en and /en/… answer 301 to the same page without the prefix', () => {
+  assert.match(locationBlock('= /en'), /^location = \/en \{\s*return 301 \/;\s*\}$/);
+  const loc = locationBlock('^~ /en/');
+  const rule = loc.match(/rewrite (\S+) (\S+) permanent;/);
+  assert.ok(rule, 'the /en/ location rewrites permanently');
+  const [, pattern, target] = rule;
+  const moved = (path) => path.replace(new RegExp(pattern), target.replace(/\$(\d)/g, '$$$1'));
+  for (const [from, to] of [['/en/', '/'], ['/en/videos/', '/videos/'], ['/en/guides/ssh-from-phone/', '/guides/ssh-from-phone/'],
+    ['/en/privacy/', '/privacy/']]) {
+    assert.equal(moved(from), to, `${from} → ${to}`);
+  }
+  assert.ok(!absoluteRedirect(), 'absolute_redirect stays off, so the Location is relative and keeps https');
+});
+
+function absoluteRedirect() {
+  return /^\s*absolute_redirect on;/m.test(shellxServer());
+}

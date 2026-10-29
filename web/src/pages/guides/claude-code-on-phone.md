@@ -1,65 +1,65 @@
 ---
 layout: ../../layouts/Guide.astro
-lang: vi
+lang: en
 slug: claude-code-on-phone
 order: 1
-title: "Cách dùng Claude Code và Codex từ điện thoại"
-metaTitle: "Claude Code và Codex trên điện thoại — Hướng dẫn ShellX"
-description: "Chạy Claude Code, Codex hay AI coding agent dạng CLI trên máy tính và theo dõi từ điện thoại: trả lời câu hỏi, duyệt thay đổi, nhận thông báo khi agent cần bạn."
+title: "How to use Claude Code and Codex from your phone"
+metaTitle: "Claude Code and Codex from your phone — ShellX guide"
+description: "Run Claude Code, Codex or any CLI coding agent on your computer and follow it from your phone: answer prompts, review changes, get a push when it needs you."
 published: "2026-10-07"
 updated: "2026-10-07"
-keywords: ["Claude Code trên điện thoại", "Claude Code mobile", "Codex CLI từ điện thoại", "điều khiển AI agent từ xa", "Claude Code iPhone", "Claude Code Android"]
+keywords: ["Claude Code on phone", "Claude Code mobile", "Codex CLI from phone", "AI coding agent remote", "control Claude Code from iPhone", "Claude Code Android"]
 ---
 
-Các AI coding agent như **Claude Code** và **Codex** làm việc tốt nhất trong terminal trên chính máy tính của bạn: chúng thấy repo, chạy test và dùng công cụ của bạn. Vấn đề là chúng thường chạy vài phút rồi dừng lại để hỏi hoặc chờ bạn duyệt. Nếu bạn đã rời bàn làm việc, agent nằm chờ tới khi bạn quay lại.
+AI coding agents such as **Claude Code** and **Codex** work best in a terminal on your own computer: they see your repository, run your tests and use your tools. The catch is that they often run for minutes, then stop to ask a question or wait for approval. If you have stepped away from your desk, the agent sits idle until you come back.
 
-ShellX giải quyết đúng chỗ đó. Agent vẫn chạy trên máy Mac hoặc PC, còn bạn mở **đúng phiên terminal đó** trên điện thoại để xem nó đang làm gì, trả lời, và cho nó chạy tiếp.
+ShellX fixes that. The agent keeps running on your Mac or PC, and you open **that same terminal session** on your phone to read what it is doing, answer it, and let it continue.
 
-## Cần chuẩn bị
+## What you need
 
-- ShellX trên máy tính (macOS 12 trở lên, Windows 10 bản 1809 trở lên).
-- App ShellX trên điện thoại (iOS 15 trở lên, Android 8.0 trở lên), đăng nhập cùng tài khoản và đã ghép nối bằng mã QR.
-- Claude Code, Codex hoặc agent dòng lệnh khác đã cài trên máy tính như bình thường.
+- ShellX on your computer (macOS 12 or later, Windows 10 version 1809 or later).
+- The ShellX app on your phone (iOS 15 or later, Android 8.0 or later), signed in with the same account and paired with a QR code.
+- Claude Code, Codex or another command-line agent installed on the computer, as usual.
 
-Cách cài và đăng nhập agent không thay đổi gì. ShellX không đi qua lưu lượng API của agent; nó chỉ truyền terminal, được mã hóa đầu cuối giữa hai thiết bị của bạn.
+Nothing changes in how you install or log in to the agent. ShellX does not proxy the agent's API traffic; it only carries the terminal, end-to-end encrypted between your two devices.
 
-## Từng bước
+## Step by step
 
-1. **Chạy agent trong terminal ShellX.** Mở một tab trong app ShellX trên máy tính, `cd` vào dự án và chạy `claude` (hoặc `codex`). Giao việc cho nó như mọi khi.
-2. **Mở phiên trên điện thoại.** Trong app ShellX trên điện thoại, chọn máy tính rồi chọn phiên. Bạn thấy đúng màn hình đó, cập nhật trực tiếp, và gõ được vào. Cuộn lên được, nên bạn đọc lại được những gì đã diễn ra lúc vắng mặt.
-3. **Trả lời và duyệt ở bất kỳ đâu.** Khi agent hỏi "Do you want to make this edit?" hay cần làm rõ yêu cầu, gõ câu trả lời trên điện thoại. Agent chạy tiếp ngay trên máy tính.
-4. **Nhận thông báo thay vì phải canh.** ShellX biến thông báo terminal thành thông báo đẩy trên điện thoại. Mọi chương trình gửi thông báo dạng **OSC 9**, **OSC 777** hoặc **OSC 99** đều được hỗ trợ. Claude Code cho chọn kênh thông báo terminal trong phần cài đặt (`/config`); hãy chọn kênh dùng các chuỗi này. Từ bất kỳ script hay hook nào bạn cũng gửi được:
-
-```sh
-shellx notify "Claude Code đang chờ bạn"
-```
-
-Trong một pane ShellX, thông báo hiện trên tab và được đẩy về điện thoại đã ghép nối.
-
-## Cho agent dùng ShellX luôn
-
-ShellX có sẵn công cụ dòng lệnh `shellx` để agent gọi: mở pane bên cạnh chạy dev server, chờ một dòng trong log, đọc output của pane, gửi thông báo. Cài skill có sẵn để Claude Code biết cách dùng:
+1. **Start the agent in a ShellX terminal.** Open a tab in the ShellX app on your computer, `cd` into your project and run `claude` (or `codex`). Give it a task as you normally would.
+2. **Open the session on your phone.** In the ShellX app on your phone, pick your computer, then the session. You see the same screen, live, and can type into it. Scrolling back works too, so you can read what happened while you were away.
+3. **Answer and approve from anywhere.** When the agent asks "Do you want to make this edit?" or needs a clarification, type the answer on your phone. The agent continues on your computer immediately.
+4. **Get notified instead of checking.** ShellX turns terminal notifications into push notifications on your phone. Any program that sends **OSC 9**, **OSC 777** or **OSC 99** notifications is covered. Claude Code lets you choose a terminal notification channel in its settings (`/config`); pick one that uses these sequences. From any script or hook you can also run:
 
 ```sh
-shellx skills install --claude   # hoặc --codex
+shellx notify "Claude Code is waiting for you"
 ```
 
-Sau đó agent có thể, chẳng hạn, chạy `npm run dev` ở pane bên cạnh bằng `shellx split --right --cmd "npm run dev"` rồi chờ bằng `shellx wait`, mà không cướp focus của bạn.
+Inside a ShellX pane this shows up on the tab and as a push on your paired phone.
 
-## Sao không SSH thẳng vào máy tính?
+## Let the agent use ShellX too
 
-Bạn có thể bật SSH trên Mac, mở cổng hoặc cài VPN, rồi gắn vào phiên `tmux` từ một app SSH trên điện thoại. Cách đó chạy được, nhưng nhiều khâu, và bạn nhận một shell **mới**, không phải cửa sổ agent đang chạy, trừ khi đã chuẩn bị tmux từ trước. ShellX không cần mở cổng hay VPN, hiện đúng phiên đang chạy, và có thêm thông báo đẩy. Xem [ShellX so với Termius](/guides/shellx-vs-termius/) và [ShellX so với Tailscale](/guides/shellx-vs-tailscale/) để so sánh.
+ShellX ships a command-line tool, `shellx`, that agents can call: open a split for a dev server, wait for a line in its log, read a pane's output, send a notification. Install the ready-made skill so Claude Code knows how to use it:
 
-## Về bảo mật
+```sh
+shellx skills install --claude   # or --codex
+```
 
-- Nội dung terminal được mã hóa đầu cuối bằng giao thức Noise. Máy chủ chuyển tiếp ở giữa chỉ chuyển gói đã mã hóa, không đọc được code, câu lệnh hay output.
-- Ghép nối bằng mã QR hiện trên máy tính; khóa bí mật không bao giờ rời thiết bị.
-- Nếu điện thoại mất mạng, máy tính giữ 256 KiB output gần nhất của mỗi phiên và phát lại khi điện thoại kết nối lại.
+After that the agent can, for example, start `npm run dev` in a side pane with `shellx split --right --cmd "npm run dev"` and wait for it with `shellx wait`, without stealing your focus.
 
-## Câu hỏi thường gặp
+## Why not just SSH into the computer?
 
-**Agent có chạy trên điện thoại không?** Không. Nó chạy trên máy tính, với file, thông tin đăng nhập và công cụ của bạn. Điện thoại chỉ là màn hình và bàn phím.
+You could enable SSH on your Mac, open a port or install a VPN, and attach to a `tmux` session from a mobile SSH client. That works, but it is several moving parts, and it gives you a **new** shell, not the window the agent is already running in unless you planned ahead with tmux. ShellX needs no open port and no VPN, shows the exact session that is already running, and adds push notifications. See [ShellX vs Termius](/guides/shellx-vs-termius/) and [ShellX vs Tailscale](/guides/shellx-vs-tailscale/) for the trade-offs.
 
-**Có dùng được với agent khác không?** Được. Mọi thứ chạy trong terminal đều dùng như nhau: Codex, Aider, Gemini CLI, hay một lệnh `npm test` dài.
+## Security notes
 
-**Có mất phí không?** ShellX hiện miễn phí.
+- Terminal content is end-to-end encrypted with the Noise protocol. The relay in the middle only forwards encrypted frames and cannot read your code, prompts or output.
+- Pairing uses a QR code shown on your computer; private keys never leave the device.
+- If the phone loses its connection, the computer keeps the latest 256 KiB of each session's output and replays it when the phone reconnects.
+
+## FAQ
+
+**Does the agent run on my phone?** No. It runs on your computer, with your files, credentials and tools. The phone is only the screen and keyboard.
+
+**Does this work with other agents?** Yes. Anything that runs in a terminal works the same way: Codex, Aider, Gemini CLI, or a long `npm test`.
+
+**Does it cost anything?** ShellX is currently free.
