@@ -21,7 +21,8 @@ final class ShellXPhonePushForwarder {
     private let allows: @MainActor () -> Bool
     private let hidesWorkspace: @MainActor () -> Bool
     private let send: @Sendable (PhoneNotification) async -> Void
-    /// The requests the phones were told about and not yet told are handled.
+    /// The requests the phones were told about and not yet told are handled. Kept across ``stop()`` and
+    /// ``start()``: a request alerted before a host restart and handled after it still gets its `resolved`.
     private var told: Set<String> = []
     private var following: Task<Void, Never>?
 
@@ -71,7 +72,6 @@ final class ShellXPhonePushForwarder {
     func stop() {
         following?.cancel()
         following = nil
-        told.removeAll()
     }
 
     /// One Feed change: tell the phones about each new request (when allowed), and take away the alert of

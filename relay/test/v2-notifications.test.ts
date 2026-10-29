@@ -205,4 +205,27 @@ describe("POST /v2/notifications", () => {
     expect((await notify(app, m.session.token, NEEDS_YOU)).status).toBe(429);
     expect(limiter.calls).toEqual([m.session.deviceId, m.session.deviceId]);
   });
+
+  it("does not count a resolved against the limit, so alert removals survive a busy Mac", async () => {
+    const limiter = new CountingLimiter(1);
+    const apns = new FakeApns();
+    const app = makeApp({ apns, limiters: { ...unlimited, notifyAgent: limiter } });
+    const account = await registerAccount(app);
+    const m = await mac(app, account);
+    await grantedPhone(app, account, m, tokenOf(1));
+    expect((await notify(app, m.session.token, NEEDS_YOU)).status).toBe(202);
+    expect((await notify(app, m.session.token, { kind: "resolved", request_id: "req-1" })).status).toBe(202);
+    expect((await notify(app, m.session.token, { kind: "resolved", request_id: "req-1" })).status).toBe(202);
+    expect(limiter.calls).toEqual([m.session.deviceId]);
+  });
+
+  it("counts a needs_you only once its body is valid", async () => {
+    const limiter = new CountingLimiter(10);
+    const app = makeApp({ apns: new FakeApns(), limiters: { ...unlimited, notifyAgent: limiter } });
+    const account = await registerAccount(app);
+    const m = await mac(app, account);
+    expect((await notify(app, m.session.token, { ...NEEDS_YOU, agent: "" })).status).toBe(400);
+    expect((await notify(app, m.session.token, { ...NEEDS_YOU, kind: "done" })).status).toBe(400);
+    expect(limiter.calls).toEqual([]);
+  });
 });

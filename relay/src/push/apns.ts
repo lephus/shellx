@@ -55,6 +55,9 @@ export const APNS_TIMEOUT_MS = 10_000;
 /** Answers that mean the token is gone or not this app's: the relay deletes it. */
 const INVALID_TOKEN_REASONS = new Set(["BadDeviceToken", "DeviceTokenNotForTopic", "Unregistered"]);
 
+/** 403 answers that mean the provider token, not the request, is the problem. */
+const REFUSED_PROVIDER_TOKEN_REASONS = new Set(["ExpiredProviderToken", "InvalidProviderToken"]);
+
 /**
  * APNs provider API client: an ES256 provider token signed with the `.p8` key (node:crypto), reused for
  * 50 minutes, over one HTTP/2 connection per host. Never logs tokens or payloads.
@@ -72,6 +75,23 @@ export class ApnsClient implements ApnsGateway {
   }
 
   async send(message: ApnsMessage): Promise<PushResult> {
+    let answer = await this.attempt(message);
+    // An expired or refused provider token: sign a new one and retry this message once.
+    if (answer !== null && answer.status === 403 && REFUSED_PROVIDER_TOKEN_REASONS.has(reasonOf(answer.body))) {
+      this.cached = null;
+      answer = await this.attempt(message);
+    }
+    if (answer === null) return "error";
+    if (answer.status === 200) return "ok";
+    const reason = reasonOf(answer.body);
+    if (answer.status === 403) this.cached = null;
+    if (answer.status === 410 || (answer.status === 400 && INVALID_TOKEN_REASONS.has(reason))) return "invalid_token";
+    logMeta("apns_send_failed", { status: answer.status, error: reason || "unknown" });
+    return "error";
+  }
+
+  /** One request to APNs; null when the connection failed. */
+  private async attempt(message: ApnsMessage): Promise<{ status: number; body: string } | null> {
     const headers: Record<string, string> = {
       authorization: `bearer ${this.providerToken()}`,
       "apns-topic": message.topic,
@@ -81,22 +101,15 @@ export class ApnsClient implements ApnsGateway {
     };
     if (message.collapseId !== undefined) headers["apns-collapse-id"] = message.collapseId;
     if (message.expiresAtSec !== undefined) headers["apns-expiration"] = String(message.expiresAtSec);
-    let answer: { status: number; body: string };
     try {
-      answer = await this.transport({
+      return await this.transport({
         origin: APNS_ORIGINS[message.environment], path: `/3/device/${message.token}`, headers,
         body: JSON.stringify(message.payload),
       });
     } catch (err) {
       logMeta("apns_send_failed", { error: errorKind(err) });
-      return "error";
+      return null;
     }
-    if (answer.status === 200) return "ok";
-    const reason = reasonOf(answer.body);
-    if (answer.status === 403) this.cached = null; // an expired or refused provider token: sign a new one next time
-    if (answer.status === 410 || (answer.status === 400 && INVALID_TOKEN_REASONS.has(reason))) return "invalid_token";
-    logMeta("apns_send_failed", { status: answer.status, error: reason || "unknown" });
-    return "error";
   }
 
   private providerToken(): string {
@@ -111,7 +124,7 @@ export class ApnsClient implements ApnsGateway {
 }
 
 /** HTTP/2 to APNs: one session per origin, opened on first use and again after it closes or fails. */
-export function http2Transport(): ApnsTransport & { close(): void } {
+export function http2Transport(options: { timeoutMs?: number } = {}): ApnsTransport & { close(): void } {
   const sessions = new Map<string, ClientHttp2Session>();
   const sessionFor = (origin: string): ClientHttp2Session => {
     const open = sessions.get(origin);
@@ -131,14 +144,26 @@ export function http2Transport(): ApnsTransport & { close(): void } {
         [constants.HTTP2_HEADER_PATH]: request.path,
         ...request.headers,
       });
-      stream.setTimeout(APNS_TIMEOUT_MS, () => stream.close(constants.NGHTTP2_CANCEL));
+      let settled = false;
+      const settle = (done: () => void) => {
+        if (settled) return;
+        settled = true;
+        done();
+      };
+      let timedOut = false;
+      stream.setTimeout(options.timeoutMs ?? APNS_TIMEOUT_MS, () => {
+        timedOut = true;
+        stream.close(constants.NGHTTP2_CANCEL);
+      });
       let status = 0;
       let body = "";
       stream.setEncoding("utf8");
       stream.on("response", (headers) => (status = Number(headers[constants.HTTP2_HEADER_STATUS])));
       stream.on("data", (chunk: string) => (body += chunk));
-      stream.on("end", () => (status === 0 ? reject(new Error("apns_no_response")) : resolve({ status, body })));
-      stream.on("error", reject);
+      stream.on("end", () => settle(() => (status === 0 ? reject(new Error(timedOut ? "apns_timeout" : "apns_no_response")) : resolve({ status, body }))));
+      stream.on("error", (err) => settle(() => reject(err)));
+      // A stream closed locally (the timeout) emits only `close`: nothing settled yet means it timed out.
+      stream.on("close", () => settle(() => reject(new Error("apns_timeout"))));
       stream.end(request.body);
     });
   return Object.assign(transport, {

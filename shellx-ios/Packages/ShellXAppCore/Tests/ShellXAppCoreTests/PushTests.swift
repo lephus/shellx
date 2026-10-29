@@ -69,6 +69,26 @@ final class PushRegistrationTests: XCTestCase {
         XCTAssertEqual(calls.count, 2)
     }
 
+    func testComingBackToTheFrontSendsTheKnownTokenAgainInCaseTheRelayDroppedIt() async throws {
+        let (push, relay, _) = try await make()
+        await push.tokenArrived(Self.token)
+
+        await push.appBecameActive()
+
+        let calls = await Self.sets(relay)
+        XCTAssertEqual(calls.count, 2)
+        XCTAssertEqual(calls.last, .setPushToken(hexToken: "00ff10ab", topic: "com.shellx.dev", environment: .sandbox, token: "tok-1"))
+    }
+
+    func testComingBackToTheFrontWithoutATokenSendsNothing() async throws {
+        let (push, relay, _) = try await make()
+
+        await push.appBecameActive()
+
+        let calls = await Self.sets(relay)
+        XCTAssertEqual(calls, [])
+    }
+
     func testAnotherSignInSendsTheTokenAgain() async throws {
         let (push, relay, vault) = try await make()
         await push.tokenArrived(Self.token)

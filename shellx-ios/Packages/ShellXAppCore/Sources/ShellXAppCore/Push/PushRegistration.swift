@@ -4,7 +4,7 @@ import ShellXLinkAccount
 /// Keeps the relay holding this phone's APNs token while it is signed in, so a paired Mac can reach it
 /// while the app is closed (`POST /v2/notifications`). The app hands over every token iOS gives it
 /// (`tokenArrived`) and calls `signedIn()` once a session exists; a token is sent once per sign-in, and
-/// again after a failure.
+/// again after a failure or whenever the app comes to the front (`appBecameActive()`).
 @MainActor
 public final class PushRegistration {
     private let relay: any RelayAccountCalling
@@ -31,6 +31,13 @@ public final class PushRegistration {
 
     /// A session exists now (launch, sign-in, or coming back to the front).
     public func signedIn() async {
+        await sendIfNeeded()
+    }
+
+    /// The app came to the front. The relay deletes a token APNs calls gone (410, `BadDeviceToken`) while
+    /// this phone still remembers sending it, so forget that and send the known token again.
+    public func appBecameActive() async {
+        sent = nil
         await sendIfNeeded()
     }
 
