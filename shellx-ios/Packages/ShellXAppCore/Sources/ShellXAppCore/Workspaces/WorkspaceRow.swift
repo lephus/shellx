@@ -103,7 +103,7 @@ public struct WorkspaceRow: Identifiable, Equatable, Sendable {
     }
 
     /// The first non-blank line of `text`, trimmed, cut to `questionLength` characters (with "…").
-    private static func firstLine(_ text: String) -> String? {
+    static func firstLine(_ text: String) -> String? {
         let line = text.split(whereSeparator: \.isNewline)
             .lazy.map { $0.trimmingCharacters(in: .whitespaces) }
             .first { !$0.isEmpty }
