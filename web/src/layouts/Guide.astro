@@ -1,5 +1,5 @@
 ---
-// Layout of src/pages/guides/*.md and src/pages/en/guides/*.md: breadcrumb, article, download CTA,
+// Layout of src/pages/guides/*.md: breadcrumb, article, download CTA,
 // related guides, TechArticle + BreadcrumbList JSON-LD.
 import Base from './Base.astro';
 import { pathFor, ui } from '../i18n/ui';
@@ -11,9 +11,8 @@ const t = ui[f.lang];
 const path = guidePath(f.lang, f.slug);
 const home = pathFor(f.lang, 'home');
 const index = pathFor(f.lang, 'guides');
-const locale = f.lang === 'vi' ? 'vi-VN' : 'en-US';
 const fmt = (d: string) =>
-  new Date(`${d}T00:00:00Z`).toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+  new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 const related = guides(f.lang).filter((g) => g.slug !== f.slug);
 const ld = [
   {
@@ -33,7 +32,7 @@ const ld = [
   ]),
 ];
 ---
-<Base lang={f.lang} page={null} paths={{ vi: guidePath('vi', f.slug), en: guidePath('en', f.slug) }}
+<Base lang={f.lang} page={null} path={path}
       title={f.metaTitle} description={f.description} ogType="article">
   <Fragment slot="head">
     <meta property="article:published_time" content={f.published} />

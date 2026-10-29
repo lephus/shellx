@@ -1,141 +1,141 @@
 ---
 layout: ../layouts/Legal.astro
-lang: vi
+lang: en
 page: privacy
-title: Chính sách quyền riêng tư
-description: "ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu, mã hóa đầu cuối bảo vệ nội dung terminal ra sao, và cách xóa tài khoản của bạn."
+title: Privacy Policy
+description: "What data ShellX collects, why, how long it is kept, how end-to-end encryption protects your terminal content, and how to delete your account."
 updated: "2026-10-15"
 ---
 
-ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
+ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
 
-## Tóm tắt
+## Summary
 
-- Nội dung terminal (lệnh bạn gõ và kết quả hiển thị) được **mã hóa đầu cuối** giữa điện thoại và máy tính của bạn. Máy chủ chuyển tiếp chỉ chuyển dữ liệu đã mã hóa và **không thể đọc** nội dung đó, ngoại trừ nội dung thông báo đẩy (mục 3).
-- Chúng tôi chỉ lưu những gì cần để vận hành tài khoản: email, mật khẩu ở dạng băm, thông tin thiết bị và bản ghi ghép nối.
-- Thông báo đẩy (push notification): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định) hoặc khi một chương trình gửi thông báo, agent gửi nội dung thông báo qua máy chủ của chúng tôi, Google Firebase Cloud Messaging và Apple Push Notification service, ở dạng không mã hóa đầu cuối, tới điện thoại đã ghép nối và cho phép thông báo (mục 3).
-- Nhập lệnh bằng giọng nói: khi bạn chạm nút mic, lời nói được chuyển thành chữ bằng nhận dạng giọng nói của Apple (iPhone) hoặc Google (Android, khi điện thoại không tự nhận dạng được), có thể xử lý âm thanh trên máy chủ của họ. ShellX không lưu và không nhận âm thanh (mục 2).
-- Không quảng cáo, không công cụ phân tích hay theo dõi, không bán dữ liệu.
+- Terminal content (the commands you type and the output you see) is **end-to-end encrypted** between your phone and your computer. The relay only forwards encrypted data and **cannot read** it, except for the content of push notifications (section 3).
+- We store only what is needed to run your account: your email, a hash of your password, device information and pairing records.
+- Push notifications: while the computer's "Notify when long commands finish" setting is on (the default), or when a program sends a notification, the agent sends the notification text through our server, Google Firebase Cloud Messaging and Apple Push Notification service, without end-to-end encryption, to paired phones that allowed notifications (section 3).
+- Voice input: when you tap the mic, what you say is turned into text by Apple's (iPhone) or Google's (Android, when the phone cannot do it itself) speech recognition, which may process the audio on their servers. ShellX does not store or receive the audio (section 2).
+- No ads, no analytics or tracking tools, and we never sell data.
 
-## 1. Dữ liệu lưu trên máy chủ của chúng tôi
+## 1. Data stored on our servers
 
-**Tài khoản**
+**Account**
 
-- **Email** — dùng làm tên đăng nhập, lưu ở dạng chữ thường. Chúng tôi không gửi email xác thực hay email quảng cáo.
-- **Mật khẩu** — không bao giờ được lưu ở dạng gốc. Máy chủ chỉ lưu kết quả băm bằng thuật toán **argon2id**; từ kết quả băm không thể khôi phục mật khẩu.
-- Thời điểm tạo tài khoản và thời điểm đổi mật khẩu gần nhất.
+- **Email** — your sign-in name, stored in lowercase. We do not send verification or marketing emails.
+- **Password** — never stored as entered. The server stores only an **argon2id** hash, from which the password cannot be recovered.
+- When the account was created and when the password was last changed.
 
-**Thiết bị** — mỗi khi bạn đăng ký hoặc đăng nhập trên một thiết bị, chúng tôi lưu:
+**Devices** — each time you register or sign in on a device, we store:
 
-- **tên thiết bị**: tên máy (hostname) với máy tính, tên model với điện thoại;
-- **loại thiết bị** (agent trên máy tính hoặc ứng dụng di động) và **nền tảng** (macOS, Windows, iOS hoặc Android);
-- **phiên bản ứng dụng** đang chạy trên thiết bị (ví dụ `1.2.0`), dùng để biết khi nào có thể yêu cầu cập nhật bắt buộc mà không chặn nhầm ai;
-- **khóa công khai** của thiết bị (X25519). Khóa bí mật tương ứng không bao giờ rời khỏi thiết bị;
-- thời điểm thêm thiết bị và **thời điểm online gần nhất**, dùng để hiển thị "Lần cuối online" trong ứng dụng.
+- the **device name**: the hostname for a computer, the model name for a phone;
+- the **device kind** (desktop agent or mobile app) and **platform** (macOS, Windows, iOS or Android);
+- the **app version** running on the device (for example `1.2.0`), used to know when an update can be made mandatory without blocking anyone by mistake;
+- the device's **public key** (X25519). The matching private key never leaves the device;
+- when the device was added and when it was **last online**, used to show "Last online" in the app.
 
-**Mã truy cập (token)** — mỗi thiết bị đăng nhập nhận một mã truy cập ngẫu nhiên. Máy chủ chỉ lưu giá trị băm SHA-256 của mã, thời điểm tạo và thời điểm dùng gần nhất.
+**Access tokens** — each signed-in device receives a random access token. The server stores only its SHA-256 hash, when it was created and when it was last used.
 
-**Mã thông báo đẩy** — nếu bạn cho phép thông báo trên ứng dụng di động, máy chủ lưu mã thông báo đẩy (FCM token) của điện thoại đó, nền tảng (iOS hoặc Android) và thời điểm cập nhật (mục 3).
+**Push token** — if you allow notifications in the mobile app, the server stores that phone's push token (FCM token), its platform (iOS or Android) and when it was last updated (section 3).
 
-**Bản ghi ghép nối** — khi bạn ghép nối một điện thoại với một máy tính bằng mã QR, máy chủ lưu cặp (máy tính, điện thoại) và thời điểm ghép nối, chỉ để hiển thị trong ứng dụng. Việc tin cậy một điện thoại được quyết định và lưu trên chính máy tính của bạn, không phải trên máy chủ.
+**Pairing records** — when you pair a phone with a computer by scanning a QR code, the server stores the (computer, phone) pair and when it was paired, for display in the apps only. Whether a phone is trusted is decided and stored on your computer, not on the server.
 
-**Địa chỉ IP** — địa chỉ IP của bạn được dùng tạm thời để giới hạn số lần đăng nhập và đăng ký trong mỗi khoảng 60 giây (chống dò mật khẩu và lạm dụng). Chúng tôi không lưu địa chỉ IP vào cơ sở dữ liệu tài khoản. Các yêu cầu `https://` tới Dịch vụ không bị ghi nhật ký truy cập; riêng nếu bạn truy cập bằng liên kết `http://` không bảo mật, máy chủ web dùng chung có thể ghi yêu cầu đó (kèm địa chỉ IP) vào nhật ký kỹ thuật trước khi chuyển hướng bạn sang `https://`.
+**IP addresses** — your IP address is used transiently to limit sign-in and registration attempts per 60-second window (to stop password guessing and abuse). We do not store IP addresses in the account database. `https://` requests to the Service are not access-logged; however, if you visit over a plain `http://` link, the shared web server may record that request (including your IP address) in its technical log before redirecting you to `https://`.
 
-**Nhật ký vận hành** — máy chủ ghi nhật ký kỹ thuật tối thiểu để vận hành và xử lý sự cố: thời điểm, mã thiết bị, mã lỗi và kích thước gói dữ liệu. Nhật ký **không bao giờ** chứa nội dung terminal, mật khẩu hay mã truy cập.
+**Operational logs** — the server keeps minimal technical logs to run the Service and fix problems: timestamps, device IDs, error codes and frame sizes. Logs **never** contain terminal content, passwords or access tokens.
 
-## 2. Nội dung terminal được mã hóa đầu cuối
+## 2. Terminal content is end-to-end encrypted
 
-Điện thoại và máy tính thiết lập một kênh mã hóa bằng giao thức Noise, với khóa mà chỉ hai thiết bị đó nắm giữ. Máy chủ chuyển tiếp chỉ thấy các gói dữ liệu đã mã hóa, mã thiết bị gửi và nhận, kích thước và thời điểm của gói; nó không đọc được lệnh bạn gõ, kết quả hiển thị, và cũng không biết bạn đang mở bao nhiêu phiên terminal — ngoại trừ nội dung thông báo đẩy (mục 3). Chúng tôi không lưu nội dung terminal.
+Your phone and your computer set up an encrypted channel using the Noise protocol, with keys that only those two devices hold. The relay sees only encrypted frames, the sending and receiving device IDs, and the size and timing of frames; it cannot read what you type or what is displayed, and it does not even know how many terminal sessions you have open — except for the content of push notifications (section 3). We do not store terminal content.
 
-Để bù phần output phát sinh khi điện thoại tạm mất kết nối, agent giữ tối đa 256 KiB output gần nhất của mỗi phiên **trong bộ nhớ của máy tính của bạn**. Dữ liệu này không được gửi cho chúng tôi và mất đi khi phiên kết thúc hoặc agent thoát. Riêng việc ứng dụng máy tính lưu nội dung terminal gần nhất trên máy để khôi phục sau khi mở lại được mô tả ở mục 4.
+To replay output produced while your phone is briefly disconnected, the agent keeps up to 256 KiB of the most recent output of each session **in your computer's memory**. It is never sent to us and is gone when the session ends or the agent quits. Separately, the desktop app can save recent terminal contents on your computer to restore them when it reopens; see section 4.
 
-### Nhập lệnh bằng giọng nói
+### Voice input
 
-- Ứng dụng di động chỉ dùng micro khi bạn chạm nút mic trên màn terminal; không ghi âm nền.
-- Lời nói được chuyển thành chữ bằng tính năng nhận dạng giọng nói của điện thoại, **trước khi** mã hóa đầu cuối. Trên iPhone, ứng dụng dùng nhận dạng giọng nói của Apple: Apple có thể xử lý âm thanh ngay trên điện thoại hoặc trên máy chủ của Apple. Trên Android, lời nói được nhận dạng ngay trên điện thoại khi máy làm được; nếu không, âm thanh được gửi tới dịch vụ nhận dạng giọng nói của Google. Apple và Google xử lý theo chính sách riêng của họ.
-- ShellX không lưu âm thanh và không gửi âm thanh tới máy chủ của ShellX. Chữ bạn gửi đi vào terminal như phím gõ, được mã hóa đầu cuối như trên; máy chủ chuyển tiếp không đọc được.
-- Lựa chọn ngôn ngữ nhận dạng (tiếng Việt/tiếng Anh) được lưu trên điện thoại.
+- The mobile app uses the microphone only when you tap the mic on the terminal screen; it never records in the background.
+- Speech is turned into text by the phone's speech recognition, **before** end-to-end encryption. On iPhone, Apple's speech recognition is used: Apple may process the audio on the phone or on its servers. On Android, speech is recognized on the phone when it can be; otherwise the audio goes to Google's speech recognition service. Apple and Google handle it under their own policies.
+- ShellX does not store audio and does not send audio to ShellX servers. The text you send goes to the terminal like typed keys, end-to-end encrypted as above; the relay cannot read it.
+- Your recognition language choice (Vietnamese/English) is stored on the phone.
 
-## 3. Thông báo đẩy
+## 3. Push notifications
 
-Agent trên máy tính có thể báo cho điện thoại đã ghép nối khi một lệnh chạy lâu kết thúc, hoặc khi một chương trình gửi thông báo — kể cả khi ứng dụng di động đã đóng.
+The agent on your computer can tell your paired phones when a long-running command finishes, or when a program sends a notification — even when the mobile app is closed.
 
-- **Agent gửi gì, khi nào.** Trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định: 30 giây) — và bất cứ khi nào một chương trình trong terminal phát chuỗi thông báo (ví dụ `shellx notify`, OSC 9, OSC 777) — agent gửi **nội dung thông báo** tới máy chủ chuyển tiếp ShellX: tên máy tính, tên phiên hoặc cửa sổ terminal, dòng lệnh, mã thoát và thời gian chạy, hoặc chữ do chương trình gửi. Nội dung này **không được mã hóa đầu cuối**.
-- **Máy chủ làm gì với nó.** Máy chủ chỉ chuyển tiếp nội dung đó qua **Google Firebase Cloud Messaging** và, với iPhone, **Apple Push Notification service**, và chỉ tới những điện thoại đã ghép nối với chính máy tính đó và đã cho phép thông báo. Máy chủ không lưu nội dung này và không ghi nó vào nhật ký; Google và Apple xử lý nó theo chính sách riêng của họ.
-- **Khi không điện thoại nào nhận được** (chưa điện thoại nào cho phép thông báo, hoặc đều đã đăng xuất), agent ngừng gửi tối đa 15 phút — sớm hơn nếu trong lúc đó có điện thoại kết nối tới máy tính.
-- **Mã thông báo đẩy.** Ứng dụng di động nhận một mã thông báo đẩy (FCM token) từ Google Firebase Cloud Messaging và gửi lên máy chủ khi bạn cho phép thông báo. Máy chủ lưu mã này tới khi bạn đăng xuất trên điện thoại đó, xóa tài khoản, tắt thông báo của ShellX trong cài đặt điện thoại (ở lần mở ứng dụng tiếp theo), hoặc Firebase báo mã không còn hiệu lực.
-- Đây là ngoại lệ duy nhất đối với mục 2: chỉ nội dung thông báo, không phải phần còn lại của terminal.
-- **Cách tắt:** chọn "Tắt" ở "Thông báo khi lệnh chạy lâu xong" trong menu ShellX trên máy tính (thông báo khi lệnh kết thúc), hoặc tắt thông báo của ShellX trong cài đặt điện thoại, hoặc đăng xuất trên điện thoại.
+- **What the agent sends, and when.** While the computer's "Notify when long commands finish" setting is on (default: 30 seconds) — and whenever a program in the terminal emits a notification sequence (for example `shellx notify`, OSC 9, OSC 777) — the agent sends the **notification text** to the ShellX relay: the computer's name, the session or terminal window name, the command line, its exit code and running time, or the text the program sent. This text is **not end-to-end encrypted**.
+- **What the relay does with it.** The relay only forwards it through **Google Firebase Cloud Messaging** and, for iPhones, **Apple Push Notification service**, and only to phones that are paired with that computer and have allowed notifications. The relay does not store it or write it to its logs; Google and Apple process it under their own policies.
+- **When no phone can receive it** (no phone has allowed notifications, or all are signed out), the agent stops sending for up to 15 minutes — less if a phone connects to the computer in the meantime.
+- **Push tokens.** When you allow notifications, the mobile app receives a push token (FCM token) from Google Firebase Cloud Messaging and sends it to our server. The server keeps it until you sign out on that phone, delete your account, turn off ShellX notifications in the phone's settings (the next time the app opens), or Firebase reports the token is no longer valid.
+- This is the only exception to section 2: only the content of notifications, not the rest of your terminal.
+- **How to turn it off:** choose "Off" under "Notify when long commands finish" in the ShellX menu on the computer (notifications when commands finish), turn off ShellX notifications in your phone's settings, or sign out on the phone.
 
-## 4. Dữ liệu chỉ nằm trên thiết bị của bạn
+## 4. Data that stays on your devices
 
-Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại được tin cậy (trên máy tính), danh sách máy đã ghép nối (trên điện thoại) và các cài đặt được lưu trong kho bảo mật của hệ điều hành (Keychain trên macOS/iOS, Windows Credential Manager cùng tệp mã hóa AES trên Windows, Android Keystore) hoặc vùng cài đặt của ứng dụng. Những dữ liệu này không được gửi lên máy chủ, trừ mã truy cập được gửi kèm mỗi yêu cầu để xác thực.
+The device private key, access token, the list of trusted phones (on the computer), the list of paired computers (on the phone) and your settings are stored in the operating system's secure storage (Keychain on macOS/iOS, Windows Credential Manager with AES-encrypted files on Windows, Android Keystore) or in the app's settings storage. They are not sent to our servers, except for the access token, which accompanies each request to authenticate it.
 
-- **Camera:** ứng dụng di động chỉ dùng camera để quét mã QR ghép nối. Hình ảnh không được lưu hay gửi đi.
-- **Sinh trắc học:** khóa ứng dụng bằng Face ID, vân tay hoặc mã máy do hệ điều hành xử lý. Ứng dụng chỉ nhận kết quả thành công hoặc thất bại, không bao giờ nhận dữ liệu sinh trắc học.
-- **Full Disk Access (macOS):** quyền này không bắt buộc và chỉ để các lệnh bạn chạy trong terminal truy cập được thư mục của bạn. Agent không tự đọc hay tải lên tệp nào của bạn.
-- **Khôi phục phiên (máy tính):** để mở lại đúng chỗ làm việc sau khi bạn thoát ứng dụng hoặc khởi động lại máy, ShellX lưu bố cục tab/pane, thư mục làm việc của từng terminal và — nếu "Lưu nội dung terminal khi thoát" đang bật (mặc định bật) — tối đa 2.000 dòng nội dung cuối của mỗi terminal (không quá 256 KiB mỗi terminal). Các tệp này chỉ nằm trên máy tính của bạn, trong thư mục dữ liệu của ứng dụng thuộc tài khoản của bạn: trên macOS là `~/Library/Application Support/pro.shellx.desktop/restore`, chỉ tài khoản của bạn đọc được và không đưa vào bản sao lưu Time Machine; trên Windows là `%LOCALAPPDATA%\ShellX\restore`, được xóa khi gỡ cài đặt. Nội dung này có thể chứa bất cứ thứ gì đã hiện trên terminal; nó không bao giờ được gửi lên máy chủ, tới điện thoại hay đồng bộ đi đâu. Bạn có thể tắt việc lưu nội dung hoặc xóa nội dung đã lưu bất cứ lúc nào trong menu ShellX trên máy tính → Terminal. Ảnh bạn dán vào terminal được lưu tạm trên máy tính, trong thư mục riêng của ứng dụng, và bị xoá sau 24 giờ, hoặc khi ShellX thoát và đóng các shell của bạn; ShellX không gửi ảnh đi đâu.
-- **Tab vừa đóng (máy tính):** Danh sách các tab bạn vừa đóng chỉ nằm trong bộ nhớ của máy tính và mất khi bạn thoát ứng dụng.
-- **SSH (máy tính):** khi bạn kết nối tới máy chủ, ShellX chạy lệnh `ssh` của máy bạn với khoá và cấu hình của bạn; ShellX không hỏi, không lưu mật khẩu. Nếu bật hook, ShellX ghi vài tệp script nhỏ vào `~/.cache/shellx/` trên máy chủ để biết thư mục, nhánh git và cổng đang mở — không gửi gì khác đi đâu. Danh sách máy gần đây chỉ lưu trên máy tính này. Tên máy chủ và thư mục bạn đang ở trên đó có thể hiện trong danh sách phiên trên điện thoại đã ghép nối của bạn, như một thư mục cục bộ.
-- **Agent lập trình (máy tính):** khi bạn yêu cầu (`shellx integrations install`), ShellX thêm hook vào tệp cấu hình của chính agent để biết agent đang chạy hay đang chờ bạn; ShellX không gửi thông tin đó đi đâu. Khi agent hỏi quyền hoặc gửi thông báo lúc bạn vắng mặt, nội dung thông báo được xử lý như mọi thông báo của chương trình khác (mục 3) và có thể được đẩy tới điện thoại đã ghép nối. Để đề nghị "tiếp tục phiên" sau khi khởi động lại, ShellX lưu id phiên của agent trong bố cục đã lưu (`layout.json`, chỉ bạn đọc được) trên máy tính. Nếu bật trạng thái pull request, trạng thái được lấy bằng GitHub CLI (`gh`) đã đăng nhập sẵn trên máy bạn; ShellX không đọc hay lưu token của nó.
+- **Camera:** the mobile app uses the camera only to scan pairing QR codes. Images are neither stored nor sent anywhere.
+- **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
+- **Full Disk Access (macOS):** this optional permission only lets the commands you run in the terminal reach your folders. The agent itself never reads or uploads your files.
+- **Session restore (computer):** to reopen your workspace after you quit the app or restart the computer, ShellX saves the tab/pane layout, each terminal's working folder and — if "Save terminal contents on quit" is on (the default) — up to the last 2,000 lines of each terminal (at most 256 KiB per terminal). These files stay on your computer, in the app's data folder for your account: on macOS `~/Library/Application Support/pro.shellx.desktop/restore`, readable only by your account and excluded from Time Machine backups; on Windows `%LOCALAPPDATA%\ShellX\restore`, deleted when you uninstall. These contents can include anything that was shown in the terminal; they are never sent to our servers, to your phone, or synced anywhere. You can turn off saving the contents, or clear what was saved, at any time from the ShellX menu on the computer → Terminal. An image you paste into the terminal stays on your computer, in the app's private folder, and is deleted after 24 hours, or when ShellX quits and closes your shells; ShellX does not send it anywhere.
+- **Recently closed tabs (computer):** The list of tabs you recently closed is kept only in your computer's memory and is gone when you quit the app.
+- **SSH (desktop):** when you connect to a server, ShellX runs your computer's `ssh` with your keys and configuration; it never asks for or stores passwords. With the hook on, ShellX writes a few small script files to `~/.cache/shellx/` on the server to know its folder, git branch and listening ports — nothing else is sent anywhere. The recent-servers list stays on this computer. The server's name and the folder you are in there can appear in the session list on your paired phone, as a local folder does.
+- **Coding agents (computer):** when you ask for it (`shellx integrations install`), ShellX adds hooks to the agent's own configuration file so it can tell ShellX whether the agent is running or waiting for you; ShellX does not send that information anywhere. If an agent asks for permission or sends a notification while you are away, its notification text is treated like any other program notification (section 3) and may be pushed to your paired phone. To offer "resume" after a restart, ShellX stores the agent's session id in the saved layout (`layout.json`, readable only by you) on your computer. If you turn on pull request status, it is fetched with the GitHub CLI (`gh`) that is already signed in on your computer; ShellX never reads or stores its token.
 
 
-## 5. Những gì chúng tôi không làm
+## 5. What we do not do
 
-- Không dùng công cụ phân tích, quảng cáo, pixel theo dõi hay SDK bên thứ ba để theo dõi hành vi. Ứng dụng di động chỉ dùng Firebase Cloud Messaging để nhận thông báo đẩy, không dùng các dịch vụ phân tích của Firebase.
-- Không gửi thông báo quảng cáo: thông báo đẩy chỉ đến từ máy tính của chính bạn.
-- Không bán, cho thuê hay chia sẻ dữ liệu cá nhân cho mục đích quảng cáo.
-- Trang web `shellx.pro` không dùng cookie và không nhúng script của bên thứ ba.
+- No analytics, advertising, tracking pixels or third-party tracking SDKs. The mobile app uses Firebase Cloud Messaging only to receive push notifications, and none of Firebase's analytics services.
+- No promotional notifications: push notifications only come from your own computers.
+- We do not sell, rent or share personal data for advertising.
+- The `shellx.pro` website sets no cookies and embeds no third-party scripts.
 
-## 6. Mục đích sử dụng dữ liệu
+## 6. How we use data
 
-Chúng tôi chỉ dùng dữ liệu nêu ở mục 1 để: tạo và xác thực tài khoản; hiển thị danh sách thiết bị, trạng thái online và ghép nối; chuyển tiếp dữ liệu đã mã hóa giữa các thiết bị trong cùng một tài khoản; gửi thông báo đẩy bạn đã bật tới điện thoại của bạn; và bảo vệ Dịch vụ khỏi lạm dụng.
+We use the data listed in section 1 only to: create and authenticate your account; show your devices, their online status and pairings; relay encrypted data between devices of the same account; deliver the push notifications you turned on to your phone; and protect the Service from abuse.
 
-## 7. Bên cung cấp hạ tầng và nơi xử lý dữ liệu
+## 7. Infrastructure provider and where data is processed
 
-Dịch vụ chạy trên máy chủ riêng do ShellX thuê tại **Việt Nam**: máy chủ chuyển tiếp, cơ sở dữ liệu tài khoản cùng các bản sao lưu, trang web và bản cài đặt. Dữ liệu được lưu và xử lý tại **Việt Nam**. Chúng tôi không dùng mạng phân phối nội dung (CDN) hay dịch vụ phân tích của bên thứ ba.
+The Service runs on a private server rented by ShellX in **Vietnam**: the relay server, the account database and its backups, the website and the installers. Data is stored and processed in **Vietnam**. We use no content delivery network (CDN) and no third-party analytics.
 
-Khi bạn tải ứng dụng từ App Store hoặc Google Play, Apple và Google xử lý dữ liệu theo chính sách riêng của họ. Khi bạn bật thông báo đẩy, nội dung thông báo và mã thông báo đẩy được chuyển cho Google (Firebase Cloud Messaging) và, với iPhone, Apple (Apple Push Notification service) để gửi tới điện thoại (mục 3); các dịch vụ này có thể xử lý dữ liệu ngoài Việt Nam. Khi bạn nhập lệnh bằng giọng nói, âm thanh được xử lý bởi nhận dạng giọng nói của Apple (iPhone) hoặc, khi điện thoại không tự nhận dạng được, của Google (Android); các dịch vụ này cũng có thể xử lý dữ liệu ngoài Việt Nam (mục 2).
+When you download the mobile app from the App Store or Google Play, Apple and Google process data under their own policies. When you turn on push notifications, their content and the push token are passed to Google (Firebase Cloud Messaging) and, for iPhones, Apple (Apple Push Notification service) to reach your phone (section 3); these services may process data outside Vietnam. When you use voice input, the audio is processed by Apple's speech recognition (iPhone) or, when the phone cannot recognize it itself, Google's speech recognition (Android), which may also process it outside Vietnam (section 2).
 
-Chúng tôi chỉ cung cấp dữ liệu cho cơ quan nhà nước khi pháp luật bắt buộc. Vì nội dung terminal được mã hóa đầu cuối, chúng tôi không có nội dung đó để cung cấp.
+We disclose data to authorities only when the law requires it. Because terminal content is end-to-end encrypted, we do not have it to disclose.
 
-## 8. Thời gian lưu trữ
+## 8. Retention
 
-- **Tài khoản và thiết bị:** cho tới khi tài khoản bị xóa.
-- **Mã truy cập:** bị xóa khi bạn đăng xuất trên thiết bị đó hoặc khi bị thu hồi (đổi mật khẩu thu hồi mã của mọi thiết bị khác); mã hết hiệu lực sau 90 ngày không dùng.
-- **Mã thông báo đẩy:** bị xóa khi bạn đăng xuất trên điện thoại đó, khi xóa tài khoản, khi bạn tắt thông báo của ShellX trong cài đặt điện thoại (ở lần mở ứng dụng tiếp theo), hoặc khi Firebase báo mã không còn hiệu lực.
-- **Bản ghi ghép nối:** bị xóa khi bạn thu hồi hoặc bỏ ghép nối, hoặc khi bạn đăng xuất khỏi agent trên máy tính đó.
-- **Nhật ký vận hành:** không quá 30 ngày.
-- **Bản sao lưu cơ sở dữ liệu:** mỗi ngày một bản, giữ 14 bản gần nhất.
+- **Account and devices:** until the account is deleted.
+- **Access tokens:** deleted when you sign out on that device or when revoked (changing your password revokes the tokens of all other devices); a token expires after 90 days without use.
+- **Push tokens:** deleted when you sign out on that phone, when the account is deleted, when you turn off ShellX notifications in the phone's settings (the next time the app opens), or when Firebase reports the token is no longer valid.
+- **Pairing records:** deleted when you revoke or unpair, or when you sign out of the agent on that computer.
+- **Operational logs:** no longer than 30 days.
+- **Database backups:** one per day; the 14 most recent are kept.
 
-<h2 id="delete-account">9. Xóa tài khoản</h2>
+<h2 id="delete-account">9. Deleting your account</h2>
 
-Bạn có thể tự xóa tài khoản ngay trong ứng dụng di động: mở **Cài đặt → Xóa tài khoản** và nhập lại mật khẩu để xác nhận. Việc xóa có hiệu lực ngay và không thể hoàn tác: máy chủ xóa vĩnh viễn tài khoản cùng toàn bộ thiết bị, mã truy cập, mã thông báo đẩy và bản ghi ghép nối; mọi thiết bị đang kết nối bị đăng xuất. Agent trên máy tính không phân biệt được việc này với đổi mật khẩu, nên luôn xóa mã truy cập của nó, đóng mọi phiên terminal rồi hiện lại màn hình đăng nhập — nó **giữ nguyên** khóa thiết bị và danh sách điện thoại được tin cậy. Danh sách đó chỉ bị xóa khi bạn đăng nhập lại bằng một tài khoản khác, khi bạn đăng xuất khỏi agent từ tray, hoặc khi bạn gỡ cài đặt agent.
+You can delete your account yourself in the mobile app: open **Settings → Delete account** and enter your password again to confirm. Deletion takes effect immediately and cannot be undone: the server permanently deletes the account with all of its devices, access tokens, push tokens and pairing records; every connected device is signed out. The desktop agent cannot tell this apart from a password change, so it always deletes its access token, closes all terminal sessions and shows the sign-in screen again — it **keeps** its device key and its list of trusted phones. That list is cleared only when you sign in again with a different account, when you sign out of the agent from the tray, or when you uninstall the agent.
 
-Nếu bạn không còn dùng được ứng dụng di động, hãy gửi email tới [phule9225@gmail.com](mailto:phule9225@gmail.com) **từ chính địa chỉ email của tài khoản**, tiêu đề "Xóa tài khoản ShellX". Chúng tôi có thể hỏi thêm thông tin để xác minh bạn là chủ tài khoản, xóa tài khoản trong vòng 30 ngày kể từ khi xác minh, rồi gửi email xác nhận.
+If you can no longer use the mobile app, email [phule9225@gmail.com](mailto:phule9225@gmail.com) **from the email address of the account** with the subject "Delete my ShellX account". We may ask for more information to confirm that you own the account, delete it within 30 days of verification, and confirm by email.
 
-Nhật ký vận hành (không chứa nội dung terminal, mật khẩu hay mã truy cập) tự hết hạn trong vòng 30 ngày. Dữ liệu đã xóa cũng có thể còn trong các bản sao lưu hằng ngày của cơ sở dữ liệu tối đa 14 ngày, rồi bị xóa cùng bản sao lưu đó.
+Operational logs (which never contain terminal content, passwords or access tokens) expire within 30 days. Deleted data may also remain in the daily database backups for up to 14 days, and is removed together with those backups.
 
-Dữ liệu nằm trên thiết bị của bạn (mục 4): trên Windows, gỡ cài đặt agent sẽ xóa dữ liệu này; trên Android, gỡ cài đặt ứng dụng cũng xóa dữ liệu. Trên macOS và iOS, các mục trong Keychain có thể vẫn còn sau khi bạn gỡ ứng dụng — trên iOS, ShellX tự xóa các mục đó ở lần cài đặt tiếp theo; trên macOS, chúng có thể được dùng lại nếu bạn cài lại ShellX — và bạn có thể xóa sớm hơn bằng công cụ quản lý Keychain của hệ điều hành.
+Data stored on your devices (section 4): on Windows, uninstalling the agent removes it; on Android, uninstalling the app removes it. On macOS and iOS, Keychain entries may remain after you remove the app — on iOS, ShellX clears them the next time you install the app; on macOS, they may be reused if you reinstall ShellX — and you can remove them sooner with the operating system's keychain management tools.
 
-## 10. Quyền của bạn
+## 10. Your rights
 
-Bạn có quyền yêu cầu truy cập, chỉnh sửa hoặc xóa dữ liệu cá nhân của mình, rút lại sự đồng ý và phản đối việc xử lý dữ liệu, theo pháp luật về bảo vệ dữ liệu cá nhân nơi bạn sinh sống. Gửi yêu cầu tới [phule9225@gmail.com](mailto:phule9225@gmail.com); chúng tôi phản hồi trong vòng 30 ngày.
+You have the right to request access to, correction of, or deletion of your personal data, to withdraw consent and to object to processing, under the data protection laws where you live. Send requests to [phule9225@gmail.com](mailto:phule9225@gmail.com); we reply within 30 days.
 
-Ngay trong ứng dụng, bạn có thể xem danh sách thiết bị, thu hồi hoặc bỏ ghép nối, đăng xuất, đổi mật khẩu (từ máy tính đang đăng nhập) và xóa tài khoản (từ ứng dụng di động).
+In the apps you can view your devices, revoke or remove pairings, sign out, change your password (from a signed-in computer) and delete your account (from the mobile app).
 
-## 11. Bảo mật
+## 11. Security
 
-Mọi kết nối tới máy chủ dùng TLS; nội dung terminal được mã hóa đầu cuối (trừ nội dung thông báo đẩy, mục 3); mật khẩu được băm bằng argon2id; mã truy cập chỉ được lưu ở dạng băm SHA-256; khóa bí mật nằm trong kho bảo mật của hệ điều hành; ứng dụng di động mặc định khóa bằng sinh trắc học. Không hệ thống nào an toàn tuyệt đối; nếu xảy ra sự cố ảnh hưởng tới dữ liệu của bạn, chúng tôi sẽ thông báo theo quy định của pháp luật.
+All connections to our servers use TLS; terminal content is end-to-end encrypted (except the content of push notifications, section 3); passwords are hashed with argon2id; access tokens are stored only as SHA-256 hashes; private keys live in the operating system's secure storage; and the mobile app is locked with biometrics by default. No system is perfectly secure; if an incident affects your data, we will notify you as required by law.
 
-## 12. Trẻ em
+## 12. Children
 
-Dịch vụ không dành cho người dưới 16 tuổi và chúng tôi không cố ý thu thập dữ liệu của họ. Nếu bạn biết một người dưới 16 tuổi đã tạo tài khoản, hãy liên hệ để chúng tôi xóa tài khoản đó.
+The Service is not intended for anyone under 16, and we do not knowingly collect their data. If you know that someone under 16 has created an account, contact us and we will delete it.
 
-## 13. Thay đổi chính sách
+## 13. Changes to this policy
 
-Khi chính sách thay đổi, chúng tôi cập nhật trang này và ngày "Cập nhật lần cuối" ở đầu trang. Với thay đổi quan trọng, chúng tôi đăng thông báo trên `shellx.pro` trước khi thay đổi có hiệu lực.
+When this policy changes, we update this page and the "Last updated" date at the top. For significant changes, we post a notice on `shellx.pro` before the change takes effect.
 
-## 14. Liên hệ
+## 14. Contact
 
-Mọi câu hỏi về quyền riêng tư: [phule9225@gmail.com](mailto:phule9225@gmail.com).
+Privacy questions: [phule9225@gmail.com](mailto:phule9225@gmail.com).

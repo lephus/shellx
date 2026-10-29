@@ -23,11 +23,6 @@ export const organization = {
 export const appId = `${siteUrl}/#app`;
 
 export const keywords: Record<Lang, string[]> = {
-  vi: [
-    'terminal trên điện thoại', 'SSH từ điện thoại', 'điều khiển terminal từ xa', 'remote terminal',
-    'terminal Mac từ xa', 'không cần VPN', 'không cần mở port', 'Claude Code trên điện thoại',
-    'tmux trên điện thoại', 'app terminal cho Mac và Windows', 'mã hóa đầu cuối',
-  ],
   en: [
     'remote terminal app', 'SSH from phone', 'terminal on phone', 'control Mac terminal from iPhone',
     'remote terminal without VPN', 'no port forwarding', 'Claude Code on phone', 'tmux on phone',
@@ -36,15 +31,6 @@ export const keywords: Record<Lang, string[]> = {
 };
 
 export const featureList: Record<Lang, string[]> = {
-  vi: [
-    'Mở và điều khiển các phiên terminal của máy Mac hoặc PC từ điện thoại',
-    'Mã hóa đầu cuối bằng giao thức Noise; máy chủ chuyển tiếp không đọc được nội dung',
-    'Không cần mở port, IP tĩnh hay VPN; hoạt động sau NAT và CGNAT',
-    'Thông báo đẩy khi lệnh chạy xong hoặc chương trình cần bạn (OSC 9, 777, 99)',
-    'Workspace, chia pane, khôi phục phiên, bảng lệnh và phím tắt tùy chỉnh',
-    'Workspace SSH và gắn phiên tmux, tự kết nối lại khi mất mạng',
-    'Ghép nối điện thoại bằng mã QR',
-  ],
   en: [
     'Open and control the terminal sessions of a Mac or PC from a phone',
     'End-to-end encrypted with the Noise protocol; the relay cannot read the content',
@@ -69,7 +55,7 @@ export interface GuideFrontmatter {
 }
 
 // Read as raw text, not as modules: the guide pages import Guide.astro, which imports this file.
-const raw = import.meta.glob<string>(['../pages/guides/*.md', '../pages/en/guides/*.md'],
+const raw = import.meta.glob<string>(['../pages/guides/*.md'],
   { eager: true, query: '?raw', import: 'default' });
 
 /** Guide front matter is flat `key: value` lines; values are JSON (strings, arrays) or numbers. */

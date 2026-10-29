@@ -1,14 +1,19 @@
 # shellx.pro website
 
 Static [Astro](https://astro.build) site for `https://shellx.pro` (spec §11): a landing page with
-download links, the privacy policy and the terms of use, in Vietnamese (default, at `/`) and English
-(under `/en/`). Design: `docs/superpowers/specs/2026-10-07-web-redesign-design.md`.
+download links, the product videos, guides, the privacy policy and the terms of use, in English.
+Until 2026-10-29 it was Vietnamese at `/` and English under `/en/`; nginx now answers `/en/…` with
+`301` to the same page without the prefix. Design: `docs/superpowers/specs/2026-10-07-web-redesign-design.md`,
+videos and the switch to English: `docs/superpowers/specs/2026-10-29-web-videos-english-design.md`.
 
 | Path | Page |
 |---|---|
-| `/` · `/en/` | Landing page: hero demo, how it works, features, security, steps, FAQ, downloads |
-| `/privacy/` · `/en/privacy/` | Privacy policy (`#delete-account` explains account deletion) |
-| `/terms/` · `/en/terms/` | Terms of use |
+| `/` | Landing page: hero demo, the 1-minute intro video (`#video`), how it works, features, security, steps, FAQ, downloads |
+| `/videos/` | The 3-minute tutorial with chapters and transcript, then the intro (`?t=<seconds>` opens the tutorial there) |
+| `/guides/` | Guides |
+| `/privacy/` | Privacy policy (`#delete-account` explains account deletion) |
+| `/terms/` | Terms of use |
+| `/s/<id>#<key>` | Share viewer (follows the browser language: Vietnamese or English) |
 | any other path | `404.html` |
 
 ## Commands (Node 22.12 or later)
@@ -20,14 +25,13 @@ download links, the privacy policy and the terms of use, in Vietnamese (default,
 | `npm run build` | Refuse the `[quốc gia]` placeholder, `astro build` into `dist/`, then check pages and links (`tests/`) |
 | `npm test` | Re-run the checks against an existing `dist/` |
 | `CHECK_DOWNLOADS=1 npm test` | Also sends HEAD requests to the installer URLs (needs network) |
-| `npm run lighthouse` | Serve `dist/` locally and run Lighthouse (mobile) on the 6 pages; fails if SEO < 100 or Performance / Accessibility / Best Practices < 95. Needs Chrome and network (npx). `LH_PRESET=desktop` for desktop |
+| `npm run lighthouse` | Serve `dist/` locally and run Lighthouse (mobile) on every page of the sitemap; fails if SEO < 100 or Performance / Accessibility / Best Practices < 95. Needs Chrome and network (npx). `LH_PRESET=desktop` for desktop |
 | `npm run indexnow` | After a deploy: tell IndexNow (Bing, which also feeds ChatGPT search and DuckDuckGo) that every URL in the live sitemap changed. Checks first that `https://shellx.pro/<key>.txt` serves the key in `public/` |
 | `npm run images` | Render `og-src/*.svg` into `public/og/*.png`, `public/apple-touch-icon.png` and `public/icon-512.png` with headless Chrome; commit the PNGs |
 
 ## SEO and AI search
 
-- **Guides** live in `src/pages/guides/<slug>.md` (vi) and `src/pages/en/guides/<slug>.md` (en), same
-  slug in both languages, layout `src/layouts/Guide.astro`. Front matter is flat `key: value` lines
+- **Guides** live in `src/pages/guides/<slug>.md`, layout `src/layouts/Guide.astro`. Front matter is flat `key: value` lines
   with JSON values (`src/lib/seo.ts` parses it): `lang`, `slug`, `order`, `title`, `metaTitle`
   (≤ 65 chars), `description` (70–165 chars), `published`, `updated`, `keywords`. A new guide shows up
   on `/guides/`, in "related guides", the sitemap and `llms.txt` without other changes; add its slug
@@ -63,8 +67,8 @@ subsets) for headings, JetBrains Mono for terminal text.
   from the menu on screens 48rem and wider). The legal pages write the address into their text;
   change them too if it changes.
 
-Legal text lives in `src/pages/privacy.md`, `src/pages/terms.md` and the English versions in
-`src/pages/en/`. Change both languages together and update `updated:` in the front matter. The
+Legal text lives in `src/pages/privacy.md` and `src/pages/terms.md`. Update `updated:` in the front
+matter when they change. The
 privacy policy promises no analytics, cookies or third-party scripts; the build checks fail if a
 page loads an external script, stylesheet or iframe.
 
@@ -76,9 +80,10 @@ on every push to `main` that changes `web/`, `relay/` or `deploy/`. See `deploy/
 
 - `npm run build` first runs `scripts/check-placeholders.mjs`, which refuses to build while any page
   still contains `[quốc gia]`: the privacy policy and terms must name the country where the VPS is
-  hosted before the site is public (VPS spec §9). Replace every occurrence (vi and en), update
+  hosted before the site is public (VPS spec §9). Replace every occurrence, update
   `updated:` in their front matter, and commit.
-- nginx answers `/privacy` with `301 /privacy/`, unknown paths with `dist/404.html` and status 404,
+- nginx answers `/privacy` with `301 /privacy/`, `/en/…` with `301` to the page without `/en`,
+  unknown paths with `dist/404.html` and status 404,
   `www.shellx.pro` with `301 https://shellx.pro…`, and serves `download.shellx.pro` from the VPS
   folder `downloads/` (files only, always as downloads). It writes no access log.
 - Build the image locally from the repository root: `docker build -f web/Dockerfile -t shellx-web .`
@@ -88,8 +93,8 @@ on every push to `main` that changes `web/`, `relay/` or `deploy/`. See `deploy/
 ```bash
 curl -sIL https://shellx.pro/privacy | grep -iE '^(HTTP|location)'
 # Expected: a redirect to /privacy/, then a final "HTTP/2 200"
-curl -s -o /dev/null -w '%{http_code}\n' https://shellx.pro/en/terms/
-# Expected: 200
+curl -sI https://shellx.pro/en/terms/ | grep -iE '^(HTTP|location)'
+# Expected: 301 and location: /terms/
 curl -s -o /dev/null -w '%{http_code}\n' https://shellx.pro/no-such-page
 # Expected: 404 (dist/404.html)
 curl -sI https://www.shellx.pro/terms/ | grep -i '^location'
@@ -99,5 +104,6 @@ curl -sI https://www.shellx.pro/terms/ | grep -i '^location'
 ## URLs for the store listings
 
 - Privacy policy URL (App Store Connect, Google Play Console): `https://shellx.pro/privacy`
-  (spec §14; redirects to `/privacy/`). English: `https://shellx.pro/en/privacy/`.
-- Google Play "Delete account" URL: `https://shellx.pro/en/privacy/#delete-account`.
+  (spec §14; redirects to `/privacy/`).
+- Google Play "Delete account" URL: `https://shellx.pro/privacy/#delete-account` (the old
+  `/en/privacy/#delete-account` redirects there).

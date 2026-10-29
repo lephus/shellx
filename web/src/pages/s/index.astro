@@ -4,17 +4,15 @@
 // script reads it and strips it from the address bar before any other script or request runs; the
 // bundled viewer (src/share/viewer.mjs + xterm.js, served from /_astro/) gets it from there.
 import Base from '../../layouts/Base.astro';
-import { ui } from '../../i18n/ui';
+import { shareUi } from '../../i18n/ui';
 import { shareApiBase } from '../../lib/site';
 
-const vi = ui.vi;
-const pick = (t: typeof vi) =>
-  Object.fromEntries(Object.entries(t).filter(([k]) => k.startsWith('share'))) as Record<string, string>;
+const en = shareUi.en;
 // JSON inside <script>: escape "<" so no string can close the element.
-const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</g, '\\u003c');
+const strings = JSON.stringify(shareUi).replace(/</g, '\\u003c');
 ---
 
-<Base lang="vi" page={null} minimalHeader title={`${vi.shareTitle} — ShellX`} description={vi.shareDescription}>
+<Base lang="en" page={null} minimalHeader title={`${en.shareTitle} — ShellX`} description={en.shareDescription}>
   <Fragment slot="head">
     <meta name="referrer" content="no-referrer" />
     <script is:inline data-share-boot>
@@ -29,16 +27,16 @@ const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</
   </Fragment>
   <section class="share" data-share data-api-base={shareApiBase} data-state="loading">
     <div class="share-head">
-      <h1 data-t="shareTitle">{vi.shareTitle}</h1>
+      <h1 data-t="shareTitle">{en.shareTitle}</h1>
       <span class="badge" data-perm hidden></span>
       <span class="expiry" data-expiry hidden></span>
     </div>
-    <nav class="panebar" data-panes data-t-label="sharePanes" aria-label={vi.sharePanes} hidden></nav>
+    <nav class="panebar" data-panes data-t-label="sharePanes" aria-label={en.sharePanes} hidden></nav>
     <div class="status" data-status role="status" aria-live="polite">
-      <p class="status-title" data-status-title>{vi.shareLoading}</p>
+      <p class="status-title" data-status-title>{en.shareLoading}</p>
       <p class="status-body" data-status-body></p>
-      <button type="button" class="retry" data-retry data-t="shareRetry" hidden>{vi.shareRetry}</button>
-      <noscript><p class="status-body">{vi.shareNoScript}</p><p class="status-body" lang="en">{ui.en.shareNoScript}</p></noscript>
+      <button type="button" class="retry" data-retry data-t="shareRetry" hidden>{en.shareRetry}</button>
+      <noscript><p class="status-body">{en.shareNoScript}</p><p class="status-body" lang="vi">{shareUi.vi.shareNoScript}</p></noscript>
     </div>
     <div class="stage" data-stage hidden>
       <div class="term-scroll" data-term-scroll>
@@ -47,7 +45,7 @@ const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</
       <textarea
         class="typing"
         data-input
-        aria-label={vi.shareTapToType}
+        aria-label={en.shareTapToType}
         data-t-label="shareTapToType"
         autocapitalize="off"
         autocomplete="off"
@@ -57,7 +55,7 @@ const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</
         tabindex="-1"></textarea>
       <p class="placeholder" data-placeholder hidden></p>
     </div>
-    <div class="keyrow" data-keys data-t-label="shareKeys" role="toolbar" aria-label={vi.shareKeys} hidden>
+    <div class="keyrow" data-keys data-t-label="shareKeys" role="toolbar" aria-label={en.shareKeys} hidden>
       <button type="button" data-key="Escape">Esc</button>
       <button type="button" data-key="Tab">Tab</button>
       <button type="button" data-key="Ctrl" aria-pressed="false">Ctrl</button>
@@ -66,7 +64,7 @@ const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</
       <button type="button" data-key="ArrowDown" aria-label="↓">↓</button>
       <button type="button" data-key="ArrowRight" aria-label="→">→</button>
     </div>
-    <p class="e2e" data-t="shareE2E">{vi.shareE2E}</p>
+    <p class="e2e" data-t="shareE2E">{en.shareE2E}</p>
   </section>
   <script type="application/json" id="share-strings" set:html={strings} />
   <script>

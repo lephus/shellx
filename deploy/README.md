@@ -215,9 +215,8 @@ account key; without one it runs normally and push is simply off (`docker compos
    key in the console.
 
 The website only builds once the country hosting the VPS replaces `[quốc gia]` in
-`web/src/pages/privacy.md`, `web/src/pages/en/privacy.md`, `web/src/pages/terms.md` and
-`web/src/pages/en/terms.md` (update their `updated:` dates too). Until then every deploy stops at the
-web image build, so fill it in before the first deploy.
+`web/src/pages/privacy.md` and `web/src/pages/terms.md` (update their `updated:` dates too). Until
+then every deploy stops at the web image build, so fill it in before the first deploy.
 
 ## Admin (admin.shellx.pro)
 

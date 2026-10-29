@@ -1,60 +1,60 @@
 ---
 layout: ../../layouts/Guide.astro
-lang: vi
+lang: en
 slug: remote-terminal-without-vpn
 order: 3
-title: "Điều khiển terminal Mac hoặc PC từ xa không cần VPN"
-metaTitle: "Terminal Mac, PC từ xa không cần VPN — Hướng dẫn ShellX"
-description: "Vào terminal của máy tính ở nhà hoặc công ty từ điện thoại khi máy nằm sau NAT hay CGNAT: không VPN, không mở port, không IP tĩnh, mã hóa đầu cuối."
+title: "Control your Mac or PC terminal remotely without a VPN"
+metaTitle: "Remote Mac or PC terminal without a VPN — ShellX guide"
+description: "Reach the terminal of your home or office computer from your phone behind NAT or CGNAT: no VPN, no port forwarding, no static IP, end-to-end encrypted."
 published: "2026-10-07"
 updated: "2026-10-07"
-keywords: ["terminal từ xa không cần VPN", "truy cập terminal Mac từ xa", "remote terminal sau NAT", "không cần mở port", "truy cập từ xa CGNAT", "điều khiển terminal PC từ điện thoại"]
+keywords: ["remote terminal without VPN", "access Mac terminal remotely", "remote terminal behind NAT", "no port forwarding", "CGNAT remote access", "control PC terminal from phone"]
 ---
 
-Bạn vừa chạy một bản build, một đợt import dữ liệu hay một AI agent trên máy tính, rồi phải ra ngoài. Bạn muốn xem terminal đó từ điện thoại. Câu trả lời thường gặp là VPN hoặc mở port. Cả hai đều chạy được, nhưng tốn công cài đặt hơn mức cần thiết, và có mạng làm không được.
+You started a build, a data import or an AI agent on your computer, and now you are out. You want to look at that terminal from your phone. The usual answers are a VPN or port forwarding. Both work; both are more setup than the job deserves, and some networks make them impossible.
 
-## Vì sao truy cập từ xa thường khó
+## Why remote access is usually hard
 
-Máy tính ở nhà và ở công ty gần như không bao giờ có địa chỉ công khai:
+Home and office computers almost never have a public address:
 
-- **Router che máy đi (NAT).** Muốn vào máy từ bên ngoài, bạn phải mở port trên router trỏ tới máy đó. Việc này cần quyền vào router, và phơi một dịch vụ ra cả Internet.
-- **Nhiều nhà mạng và mạng di động dùng CGNAT.** Chính router của bạn cũng không có IP công khai, nên mở port là không thể.
-- **Mạng công ty** hiếm khi cho bạn mở port.
-- **VPN** (WireGuard, OpenVPN hay VPN dạng mesh như Tailscale) giải quyết việc kết nối tới máy, nhưng bạn vẫn cần SSH server trên máy tính và cách quay lại đúng các cửa sổ terminal đang mở.
+- **The router hides them (NAT).** To reach a computer from outside, you forward a port on the router to it. That needs access to the router, and it exposes a service to the whole Internet.
+- **Many ISPs and mobile networks use CGNAT.** Your router itself has no public IP, so port forwarding is not possible at all.
+- **Office networks** rarely let you forward anything.
+- **A VPN** (WireGuard, OpenVPN or a mesh VPN like Tailscale) solves reachability, but you still need an SSH server on the computer and a way to get back to the terminal windows you already have open.
 
-## ShellX tránh được tất cả thế nào
+## How ShellX avoids all of it
 
-ShellX đảo chiều kết nối. App ShellX trên máy tính và app trên điện thoại đều **chủ động gọi ra** máy chủ chuyển tiếp của ShellX qua Internet, giống như trình duyệt mở một trang web. Kết nối đi ra chạy được sau NAT, CGNAT và hầu hết mạng công ty, nên:
+ShellX turns the connection around. The ShellX app on your computer and the app on your phone each **dial out** to the ShellX relay over the Internet, the same way a browser opens a website. Outgoing connections work behind NAT, CGNAT and most office networks, so:
 
-- **Không mở port**, và không có gì trên máy tính lắng nghe kết nối từ ngoài vào.
-- **Không cần IP tĩnh** hay tên miền động.
-- **Không cần app VPN** trên điện thoại hay máy tính.
+- **No port forwarding** and nothing listening for incoming connections on your computer.
+- **No static IP** or dynamic DNS.
+- **No VPN client** on the phone or the computer.
 
-Máy chủ chuyển tiếp chỉ ghép hai thiết bị của bạn và chuyển dữ liệu giữa chúng. Nó không đọc được dữ liệu đó: nội dung terminal được **mã hóa đầu cuối** bằng giao thức Noise, với khóa được thống nhất khi bạn ghép nối điện thoại bằng mã QR.
+The relay only matches your two devices and forwards their traffic. It cannot read it: terminal content is **end-to-end encrypted** with the Noise protocol, with keys agreed when you pair the phone by QR code.
 
-## Cài đặt trong ba bước
+## Set it up in three steps
 
-1. **Cài ShellX trên máy tính** (macOS 14+ hoặc Windows 10 bản 1809+) và đăng ký tài khoản.
-2. **Cài app trên điện thoại** (iOS 15+ hoặc Android 8.0+) và đăng nhập cùng tài khoản.
-3. **Ghép nối.** Mở menu khay trên máy tính, chọn ghép nối điện thoại, và quét mã QR.
+1. **Install ShellX on the computer** (macOS 14+ or Windows 10 1809+) and create an account.
+2. **Install the phone app** (iOS 15+ or Android 8.0+) and sign in with the same account.
+3. **Pair them.** Open the tray menu on the computer, choose to pair a phone, and scan the QR code.
 
-Từ đó, mọi phiên terminal trong ShellX trên máy tính đều mở được từ điện thoại, ở bất kỳ đâu có Internet.
+From now on, every terminal session in ShellX on your computer can be opened from your phone, from anywhere with an Internet connection.
 
-## Dùng hằng ngày
+## Day-to-day use
 
-- **Nhiều phiên cùng lúc.** Chuyển qua lại giữa các tab và pane trên điện thoại như đang ngồi trước máy.
-- **Mạng di động chập chờn cũng không sao.** Máy tính giữ 256 KiB output gần nhất của mỗi phiên; khi điện thoại kết nối lại, phần đã diễn ra được phát lại.
-- **Thông báo.** Nhận thông báo đẩy khi lệnh dài chạy xong, hoặc khi chương trình hay script cần bạn (`shellx notify "xong"`, hoặc chuỗi OSC 9 / 777 / 99).
-- **Cả server nữa.** Workspace SSH và phiên `tmux` bạn mở trong app ShellX trên máy tính hiện trên điện thoại như mọi phiên khác.
+- **Many sessions at once.** Switch between tabs and panes on the phone as if you were at the machine.
+- **Spotty mobile data is fine.** The computer keeps the latest 256 KiB of each session's output; when the phone reconnects, what happened in between is replayed.
+- **Notifications.** Get a push when a long command finishes, or when a program or script asks for you (`shellx notify "done"`, or OSC 9 / 777 / 99 sequences).
+- **Servers too.** SSH workspaces and `tmux` sessions you open in the ShellX app on the computer show up on the phone like any other session.
 
-## Khi nào VPN vẫn là công cụ đúng
+## When a VPN is still the right tool
 
-ShellX dành cho **terminal**. Nếu bạn cần thư mục chia sẻ, remote desktop, cơ sở dữ liệu hay mọi cổng của một máy, VPN cho bạn cả mạng. Hai thứ dùng chung rất hợp: giữ VPN để vào mạng, dùng ShellX để theo dõi phiên terminal từ điện thoại kèm thông báo. Xem [ShellX so với Tailscale](/guides/shellx-vs-tailscale/).
+ShellX is about **terminals**. If you need file shares, remote desktop, databases or every port of a machine, a VPN gives you the whole network. The two combine well: keep your VPN for network access and use ShellX to follow terminal sessions from your phone with notifications. See [ShellX vs Tailscale](/guides/shellx-vs-tailscale/).
 
-## Câu hỏi thường gặp
+## FAQ
 
-**Máy tính có phải luôn bật không?** Có. Các phiên chạy trên máy tính, nên máy phải bật và có mạng. Máy ngủ thì điện thoại kết nối lại khi máy thức dậy.
+**Does my computer have to stay awake?** Yes. The sessions run on it, so it must be on and connected. If it sleeps, the phone reconnects when it wakes up.
 
-**ShellX có lưu gì trên máy chủ không?** Chỉ tài khoản, thông tin thiết bị và ghép nối, và mã thông báo đẩy của điện thoại đã cho phép thông báo. Nội dung terminal được mã hóa đầu cuối nên không đọc hay lưu được. Chi tiết trong [Chính sách quyền riêng tư](/privacy/).
+**Is anything stored on ShellX servers?** Only your account, device and pairing records, and the push token of phones that allowed notifications. Terminal content is end-to-end encrypted and cannot be read or stored. Details are in the [privacy policy](/privacy/).
 
-**Có mất phí không?** ShellX hiện miễn phí.
+**Does it cost anything?** ShellX is currently free.
