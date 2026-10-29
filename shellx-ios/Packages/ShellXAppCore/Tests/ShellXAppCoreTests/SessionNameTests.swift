@@ -30,6 +30,19 @@ final class SessionNameTests: XCTestCase {
         XCTAssertNil(SessionName.cleaned("<command-name>/clear</command-name>"))
     }
 
+    func testCleanedKeepsAPathThatStartsWithASlash() {
+        XCTAssertEqual(SessionName.cleaned("/Users/x/app crashes"), "/Users/x/app crashes")
+    }
+
+    func testCleanedDropsATagTheMacCutInTheMiddle() {
+        XCTAssertEqual(SessionName.cleaned("fix the login <command-mess"), "fix the login")
+        XCTAssertNil(SessionName.cleaned("<command-mess"))
+    }
+
+    func testCleanedTriesTheNextLineWhenTheFirstIsOnlyTags() {
+        XCTAssertEqual(SessionName.cleaned("<command-name>/clear</command-name>\n  \nfix the login"), "fix the login")
+    }
+
     func testCleanedIsNilForNothing() {
         XCTAssertNil(SessionName.cleaned(nil))
         XCTAssertNil(SessionName.cleaned("   \n "))

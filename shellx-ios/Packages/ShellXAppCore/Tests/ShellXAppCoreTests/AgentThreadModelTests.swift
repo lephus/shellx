@@ -71,6 +71,28 @@ final class AgentThreadModelTests: XCTestCase {
         XCTAssertTrue(seen, "opening an agent clears it from Just finished, and only it")
     }
 
+    func testATurnThatFinishesWhileWatchingDoesNotComeBackAsJustFinished() async throws {
+        let mac = await mac(history: entries(1...3))
+        let s1 = ref(mac)
+        let rig = try await HubRig.make([mac], in: self)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let id = mac.machine.machineID
+        let (model, _) = model(s1, rig)
+        let task = Task { await model.run() }
+        let following = await eventually { model.isObserving }
+        XCTAssertTrue(following)
+
+        await mac.upsertSession(agentSession("s1", state: .working, lastActivityMs: 2, stateSinceMs: 2))
+        await mac.upsertSession(agentSession("s1", state: .idle, lastActivityMs: 3, stateSinceMs: 3))
+        let finished = await eventually { rig.hub.finishedSessionIds(machineID: id) == ["s1"] }
+        XCTAssertTrue(finished)
+        task.cancel()
+        await task.value
+
+        XCTAssertEqual(rig.hub.finishedSessionIds(machineID: id), [], "the user watched it finish")
+    }
+
     // MARK: - History
 
     func testOpenShowsCacheThenLatest() async throws {

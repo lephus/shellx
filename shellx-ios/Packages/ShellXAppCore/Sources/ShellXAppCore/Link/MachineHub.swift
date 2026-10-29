@@ -181,7 +181,8 @@ public final class MachineHub {
     }
 
     /// The Mac's sessions that finished a turn (went from working or waiting to idle) and have not
-    /// started again since, until `markSeen(_:)` clears their workspace. `WorkspaceRow` shows them as
+    /// started again since, until `markSeen(_: WorkspaceRef)` clears their workspace or `markSeen(_: SessionRef)`
+    /// clears the one session. `WorkspaceRow` shows them as
     /// `.done`. Only what this launch saw; nothing is saved.
     public func finishedSessionIds(machineID: String) -> Set<String> {
         Set((finishTimes[machineID] ?? [:]).keys)

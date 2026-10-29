@@ -3,19 +3,23 @@ import ShellXLinkCore
 
 /// The name a session row shows: the session's own title, so rows of one workspace tell apart.
 public enum SessionName {
-    /// The first non-blank line of `title` with every `<…>` tag removed, a leading `/command` word dropped,
+    /// The first non-blank line of `title` that has text left, with every `<…>` tag removed (and a tag
+    /// the Mac cut in the middle), a leading `/command` word dropped (not a path such as `/Users/x`),
     /// and runs of whitespace collapsed to one space; nil when nothing is left.
     public static func cleaned(_ title: String?) -> String? {
-        guard let title,
-            let line = title.split(whereSeparator: \.isNewline).first(where: {
-                !$0.trimmingCharacters(in: .whitespaces).isEmpty
-            })
-        else { return nil }
-        let untagged = String(line).replacingOccurrences(of: "<[^>]*>", with: " ", options: .regularExpression)
-        var words = untagged.split(whereSeparator: \.isWhitespace)
-        if let first = words.first, first.hasPrefix("/") { words.removeFirst() }
-        let text = words.joined(separator: " ")
-        return text.isEmpty ? nil : text
+        guard let title else { return nil }
+        for line in title.split(whereSeparator: \.isNewline) {
+            let untagged = String(line)
+                .replacingOccurrences(of: "<[^>]*>", with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "<[^>]*$", with: " ", options: .regularExpression)
+            var words = untagged.split(whereSeparator: \.isWhitespace)
+            if let first = words.first, first.hasPrefix("/"), !first.dropFirst().contains("/") {
+                words.removeFirst()
+            }
+            let text = words.joined(separator: " ")
+            if !text.isEmpty { return text }
+        }
+        return nil
     }
 
     /// `cleaned(title)`, else "<AgentLabel> · HH:mm" from `lastActivityMs` (then `stateSinceMs`), else the label.

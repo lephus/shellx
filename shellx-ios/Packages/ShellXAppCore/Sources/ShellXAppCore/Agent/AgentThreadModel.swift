@@ -229,6 +229,8 @@ public final class AgentThreadModel {
         closed = false
         // Every way of opening an agent runs this: it no longer counts as just finished.
         hub.markSeen(ref)
+        // A turn that finished while the user watched is not news when the screen goes away.
+        defer { hub.markSeen(ref) }
         // Subscribing and reading the hub's reset count happen in one main-actor step: every reset
         // is either counted here or delivered to `chat`.
         let chat = hub.chatUpdates()

@@ -522,6 +522,22 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertEqual(hub.reachableSessions.map(\.online), [true, true])
     }
 
+    func testReachableSessionsKeepAReconnectingMacsSessionsAsNotOnline() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.upsertSession(agentSession("s1", state: .working, lastActivityMs: 1, stateSinceMs: 1))
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(mac, sleep: sleeper.sleep)
+        let up = await eventually { isOnline(hub) && hub.reachableSessions.count == 1 }
+        XCTAssertTrue(up)
+
+        await mac.dropLiveSessions()
+        let down = await eventually { hub.machines.first?.state == .reconnecting && sleeper.waiting.count == 1 }
+
+        XCTAssertTrue(down, "\(String(describing: hub.machines.first?.state))")
+        XCTAssertEqual(hub.reachableSessions.map(\.session.sessionId), ["s1"])
+        XCTAssertEqual(hub.reachableSessions.map(\.online), [false])
+    }
+
     func testReachableSessionsLeaveOutAnOfflineMac() async throws {
         let a = FakeMac(name: "MacBook Pro")
         let b = FakeMac(name: "Mac mini")
