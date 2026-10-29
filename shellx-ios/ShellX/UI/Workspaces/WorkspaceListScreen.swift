@@ -46,21 +46,27 @@ struct WorkspaceGroup: Identifiable, Equatable {
         return .rows
     }
 
-    /// The last row, "Other agent sessions · N".
+    /// The last row, "Agents outside workspaces · N".
     var showsOtherSessions: Bool { showsRows && otherSessionCount > 0 }
 }
 
-/// The app's home: the workspaces of every paired Mac, grouped by Mac, from plain values so render
-/// tests can show any state; `WorkspaceListView` feeds it from the hub.
+/// The app's home, "ShellX" (mockup A): the agents of every reachable Mac by what needs doing, then the
+/// workspaces of every paired Mac, from plain values so render tests can show any state;
+/// `WorkspaceListView` feeds it from the hub.
 ///
-/// - Top, pinned: the "Needs you · N" bar while something waits.
-/// - Toolbar: the bell with the same count (the requests page), ＋ (make a workspace; a menu of the
-///   online Macs when there are several) and Settings.
-/// - One section per Mac, the default Mac first: its header (opens "Your Macs"), then a card per
-///   workspace in the Mac's order, then "Other agent sessions · N" when some sessions have no card.
-///   A Mac that cannot list workspaces says so in a card; an offline one shows only its header.
-/// - A card opens its workspace; swipe it to the left for Rename and Close (Macs that take them).
-///   Pulling the list down asks the Macs for their workspaces again.
+/// - Toolbar: the bell with how many requests wait (the requests page), ＋ (make a workspace; a menu
+///   of the online Macs when there are several) and Settings.
+/// - "Needs you · N", "Running · N" and "Just finished · N": a `FocusRowView` card per session, each
+///   group only while it has some; "No agent is running" when all three are empty. A card opens its
+///   session.
+/// - "Workspaces": one group per Mac, the default Mac first: its header (opens "Your Macs"), then a
+///   one-line card per workspace in the Mac's order, then "Agents outside workspaces · N" when some
+///   live sessions have no card. A Mac that cannot list workspaces says so in a card; an offline one
+///   shows only its header. A card opens its workspace; swipe it to the left for Rename and Close
+///   (Macs that take them).
+/// - Last, "Ended · N" while some sessions ended in the last hours: it opens their page.
+///
+/// Pulling the list down asks the Macs for their workspaces again.
 struct WorkspaceListScreen: View {
     struct Actions {
         var openWorkspace: (WorkspaceRef) -> Void = { _ in }
@@ -74,17 +80,25 @@ struct WorkspaceListScreen: View {
         var openSettings: () -> Void = {}
         var openMachines: () -> Void = {}
         var openOtherSessions: (String) -> Void = { _ in }
+        /// The "Ended · N" fold.
+        var openEnded: () -> Void = {}
         /// Pull to refresh: runs until the Macs answered.
         var refresh: () async -> Void = {}
     }
 
     let groups: [WorkspaceGroup]
-    /// What waits for the user, on every Mac.
+    /// The sessions of the reachable Macs, by what needs doing (`HomeFocus.make`).
+    let focus: HomeFocus
+    /// What waits for the user, on every Mac: the bell's count.
     let pending: [MachinePendingItem]
     /// A workspace is being made: ＋ waits for the Mac's answer.
     var creating = false
     /// A short line over the bottom edge: a workspace screen that closed itself says why.
     var notice: AgentScreen.Notice?
+    /// The clock the cards count from ("8 minutes", "12 minutes ago").
+    var now = Date()
+    /// Two or more Macs are paired: the agent cards name their Mac.
+    var showsMachineNames = false
     var actions = Actions()
     /// Why the last command did not work; the screen shows it until it is dismissed.
     @Binding var alert: WorkspaceAlert?
@@ -93,25 +107,35 @@ struct WorkspaceListScreen: View {
     @State private var closing: WorkspaceRow?
 
     var body: some View {
+        // Titles and Mac headers are rows, not section headers: a plain list's headers stick and keep a
+        // tall gap over them, where mockup A has a short one.
         List {
-            ForEach(groups) { group in
-                Section {
-                    content(of: group)
-                } header: {
+            Section { agents }
+            Section {
+                sectionTitle(Text(LocalizedStringResource("home.workspaces")))
+                ForEach(groups) { group in
                     MachineGroupHeader(group: group, showsDefault: groups.count > 1, open: actions.openMachines)
-                        .background(Color.appBackground)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    content(of: group)
                 }
+            }
+            if !focus.ended.isEmpty {
+                Section { endedFold }
             }
         }
         .listStyle(.plain)
+        // The title rows are shorter than a list's 44-point rows; every row that is tapped keeps 44.
+        .environment(\.defaultMinListRowHeight, 0)
         .themedList()
         .refreshable { await actions.refresh() }
-        .safeAreaInset(edge: .top, spacing: 0) { needsYou }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let notice { NoticeCapsule(text: notice.text) }
         }
         .animation(.easeInOut(duration: 0.2), value: notice)
-        .navigationTitle(String(localized: "workspaces.title"))
+        // The product's name, never translated.
+        .navigationTitle(Text(verbatim: "ShellX"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -144,19 +168,7 @@ struct WorkspaceListScreen: View {
         .workspaceAlert($alert)
     }
 
-    // MARK: - Top
-
-    @ViewBuilder private var needsYou: some View {
-        if !pending.isEmpty {
-            NeedsYouBar(items: pending, showsMachineName: groups.count > 1, open: actions.openPending)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity)
-                .background(Color.appBackground)
-                .overlay(alignment: .bottom) { Divider() }
-                .transition(.move(edge: .top).combined(with: .opacity))
-        }
-    }
+    // MARK: - Toolbar
 
     /// The bell: opens the requests page, with how many wait on it beside it.
     private var bell: some View {
@@ -206,6 +218,90 @@ struct WorkspaceListScreen: View {
             .disabled(targets.isEmpty || creating)
             .accessibilityIdentifier("workspaces.create")
         }
+    }
+
+    // MARK: - Agents
+
+    /// The three groups of agent cards, each only while it has some; one muted line when all are empty.
+    @ViewBuilder private var agents: some View {
+        if focus.isQuiet {
+            Text(LocalizedStringResource("home.quiet"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 0, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .accessibilityIdentifier("home.quiet")
+        } else {
+            agentGroup(
+                focus.needsYou, kind: .needsYou, title: LocalizedStringResource("home.needsYou \(focus.needsYou.count)"))
+            agentGroup(
+                focus.running, kind: .running, title: LocalizedStringResource("home.running \(focus.running.count)"))
+            agentGroup(
+                focus.justDone, kind: .justDone, title: LocalizedStringResource("home.justDone \(focus.justDone.count)"))
+        }
+    }
+
+    @ViewBuilder private func agentGroup(
+        _ items: [FocusItem], kind: FocusRowView.Kind, title: LocalizedStringResource
+    ) -> some View {
+        if !items.isEmpty {
+            sectionTitle(Text(title))
+            ForEach(items) { item in
+                // Pushes the session's `AgentView` (`WorkspaceListView` registers `SessionRef`).
+                NavigationLink(value: item.id) {
+                    FocusRowView(item: item, kind: kind, now: now, showsMachineName: showsMachineNames)
+                }
+                .navigationLinkIndicatorVisibility(.hidden)
+                .accessibilityHint(Text(LocalizedStringResource("agent.open.hint")))
+                .listRowInsets(Self.cardInsets)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+        }
+    }
+
+    /// "NEEDS YOU · 1", "WORKSPACES": a group's title over its cards, as a row.
+    private func sectionTitle(_ text: Text) -> some View {
+        text
+            .font(.footnote.weight(.semibold))
+            .tracking(0.6)
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 4, trailing: 16))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// "Ended · N", the list's last row: the sessions that ended in the last hours, on their own page.
+    private var endedFold: some View {
+        Button(action: actions.openEnded) {
+            HStack(spacing: 8) {
+                Text(LocalizedStringResource("home.ended \(focus.ended.count)"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .padding(.horizontal, 12)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .accessibilityIdentifier("home.ended")
     }
 
     // MARK: - A Mac's group

@@ -107,6 +107,15 @@ final class WorkspaceListActionsTests: XCTestCase {
             [.workspace(target), .pending, .settings, .machines, .otherSessions(machineID: mac.machine.machineID)])
     }
 
+    func testEndedFoldPushesTheEndedPage() async throws {
+        let mac = await macWithWorkspaces(["shellx"])
+        let rig = try await makeRig([mac])
+
+        rig.actions.openEnded()
+
+        XCTAssertEqual(rig.screen.routes, [.ended])
+    }
+
     func testOpeningAWorkspaceMarksItSeen() async throws {
         let mac = await macWithWorkspaces(["shellx"])
         let session = AgentSession(

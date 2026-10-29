@@ -3,9 +3,10 @@ import SwiftUI
 import XCTest
 @testable import ShellX
 
-/// The workspace list, the app's home: two Macs (one offline) with a workspace in every state, a Mac
-/// whose ShellX is too old for workspaces, the row of other agent sessions, each in light and dark
-/// (`dev.sh screenshots` writes them out in en and vi), and the words and decisions behind the rows.
+/// The app's home: the agents by what needs doing (mockup A), a quiet home, two Macs (one offline)
+/// with their workspaces, a Mac whose ShellX is too old for workspaces, the row of agents outside
+/// workspaces, each in light and dark (`dev.sh screenshots` writes them out in en and vi), and the
+/// words and decisions behind the rows.
 @MainActor
 final class WorkspaceListRenderTests: XCTestCase {
     private func assertRenders(_ view: some View, name: String) throws {
@@ -61,15 +62,130 @@ final class WorkspaceListRenderTests: XCTestCase {
             actionable: true),
     ]
 
+    // The agents of mockup A, as `HomeFocus` sorts them.
+
+    private static let now = Date(timeIntervalSince1970: 1_700_000_000)
+
+    /// Unix milliseconds `minutes` before `now`.
+    private static func ms(minutesAgo minutes: Double) -> Int64 {
+        Int64((now.timeIntervalSince1970 - minutes * 60) * 1000)
+    }
+
+    private static func session(
+        _ id: String, _ title: String, state: AgentState, minutesAgo: Double, workspace: String = "shellx",
+        agent: String = "claude", machine: String = "m1", machineName: String = "MacBook Pro", online: Bool = true
+    ) -> MachineSession {
+        MachineSession(
+            machineID: machine, machineName: machineName, online: online,
+            session: AgentSession(
+                sessionId: id, agent: agent, workspaceId: "ws-\(workspace)", workspaceTitle: workspace, title: title,
+                state: state, stateSinceMs: ms(minutesAgo: minutesAgo), lastActivityMs: ms(minutesAgo: minutesAgo)))
+    }
+
+    private static func item(_ session: MachineSession, question: String? = nil, finishedAt: Date? = nil) -> FocusItem {
+        FocusItem(session: session, name: session.session.title ?? "", question: question, finishedAt: finishedAt)
+    }
+
+    private static let mockup: HomeFocus = {
+        var focus = HomeFocus.empty
+        focus.needsYou = [
+            item(session("s1", "Sửa nút ＋ trên iOS", state: .needsInput, minutesAgo: 2), question: "Cho phép chạy xcodebuild?"),
+        ]
+        focus.running = [
+            item(session("s2", "Viết test SessionSet", state: .working, minutesAgo: 8)),
+            item(session("s3", "Dọn README", state: .working, minutesAgo: 1, workspace: "toknix", agent: "codex")),
+        ]
+        focus.justDone = [
+            item(session("s4", "Build bản 1.5.1", state: .idle, minutesAgo: 12), finishedAt: now.addingTimeInterval(-12 * 60)),
+        ]
+        focus.ended = [
+            item(session("s5", "Đổi tên nhánh", state: .ended, minutesAgo: 30)),
+            item(session("s6", "Sửa lỗi relay", state: .ended, minutesAgo: 95, workspace: "relay")),
+            item(session("s7", "Viết spec", state: .ended, minutesAgo: 240, agent: "codex")),
+        ]
+        return focus
+    }()
+
     private func list(
-        _ groups: [WorkspaceGroup], pending: [MachinePendingItem] = [], alert: WorkspaceAlert? = nil
+        _ groups: [WorkspaceGroup], focus: HomeFocus = .empty, pending: [MachinePendingItem] = [],
+        showsMachineNames: Bool = false, alert: WorkspaceAlert? = nil
     ) -> some View {
         NavigationStack {
-            WorkspaceListScreen(groups: groups, pending: pending, alert: .constant(alert))
+            WorkspaceListScreen(
+                groups: groups, focus: focus, pending: pending, now: Self.now, showsMachineNames: showsMachineNames,
+                alert: .constant(alert))
         }
     }
 
     // MARK: - Screens
+
+    func testRendersTheMockupHome() throws {
+        try assertRenders(list([Self.macbook], focus: Self.mockup), name: "home-focus")
+        try assertRenders(
+            list([Self.macbook], focus: Self.mockup).environment(\.dynamicTypeSize, .accessibility3),
+            name: "home-focus-ax3")
+
+        // What the cards say.
+        let now = Self.now
+        XCTAssertEqual(
+            Self.mockup.needsYou.map { FocusRowView.tag(for: $0, kind: .needsYou, now: now) },
+            [String(localized: "agent.state.needsYou")])
+        XCTAssertEqual(
+            Self.mockup.running.map { FocusRowView.tag(for: $0, kind: .running, now: now) },
+            [AgentStateStyle.elapsedText(.seconds(8 * 60)), AgentStateStyle.elapsedText(.seconds(60))])
+        XCTAssertEqual(
+            Self.mockup.justDone.map { FocusRowView.tag(for: $0, kind: .justDone, now: now) },
+            [String(localized: "agent.state.done")])
+        XCTAssertEqual(Self.mockup.ended.map { FocusRowView.tag(for: $0, kind: .ended, now: now) }, [nil, nil, nil])
+
+        XCTAssertEqual(
+            FocusRowView.subLine(for: Self.mockup.running[1], kind: .running, now: now, showsMachineName: false),
+            "toknix · Codex")
+        XCTAssertEqual(
+            FocusRowView.subLine(for: Self.mockup.justDone[0], kind: .justDone, now: now, showsMachineName: true),
+            "shellx · Claude Code · MacBook Pro · "
+                + String(localized: "home.ago \(AgentStateStyle.elapsedText(.seconds(12 * 60)))"))
+        XCTAssertEqual(
+            FocusRowView.quotedQuestion(for: Self.mockup.needsYou[0], kind: .needsYou),
+            "\u{201C}Cho phép chạy xcodebuild?\u{201D}")
+        XCTAssertNil(FocusRowView.quotedQuestion(for: Self.mockup.running[0], kind: .running))
+    }
+
+    func testRendersAQuietHome() throws {
+        XCTAssertTrue(HomeFocus.empty.isQuiet)
+        try assertRenders(list([Self.macbook], focus: .empty), name: "home-quiet")
+    }
+
+    func testRendersAnOldMacHome() throws {
+        // ShellX 1.5.1 on the Mac: no workspaces and no `workspace_control`, but its agents still sort.
+        let old = WorkspaceGroup(
+            id: "m1", name: "MacBook Pro", state: .online, isDefault: true, rows: [], allowsControl: false,
+            listsWorkspaces: false, otherSessionCount: 3)
+        var focus = HomeFocus.empty
+        focus.running = [
+            Self.item(Self.session("s1", "Viết test SessionSet", state: .working, minutesAgo: 8)),
+            Self.item(Self.session("s2", "Dọn README", state: .working, minutesAgo: 1, agent: "codex")),
+        ]
+        try assertRenders(list([old], focus: focus), name: "home-old-mac")
+        XCTAssertEqual(old.listing, .updateMac)
+        XCTAssertTrue(old.showsOtherSessions, "every live session stays reachable")
+    }
+
+    func testRendersTwoMacNames() throws {
+        // The Mac mini is coming back: its card is its last known one, faded.
+        var mini = Self.mini
+        mini.state = .reconnecting
+        var focus = Self.mockup
+        focus.running.append(
+            Self.item(
+                Self.session(
+                    "s9", "Chạy benchmark", state: .working, minutesAgo: 30, workspace: "bench", machine: "m2",
+                    machineName: "Mac mini", online: false)))
+        try assertRenders(list([Self.macbook, mini], focus: focus, showsMachineNames: true), name: "home-two-macs")
+        XCTAssertEqual(
+            FocusRowView.subLine(for: focus.running[2], kind: .running, now: Self.now, showsMachineName: true),
+            "bench · Claude Code · Mac mini")
+    }
 
     func testRendersGroupsAndStates() throws {
         try assertRenders(list([Self.macbook, Self.mini], pending: Self.pending), name: "workspaces")
@@ -79,11 +195,6 @@ final class WorkspaceListRenderTests: XCTestCase {
         XCTAssertEqual(Self.macbook.listing, .rows)
         XCTAssertEqual(Self.mini.listing, .hidden, "an offline Mac shows no rows")
         XCTAssertEqual(Self.macbook.rows.map(\.title), ["shellx-ios", "relay", "web", "notes"])
-        let labels = Self.macbook.rows.map { AgentStateStyle($0.state).text }
-        XCTAssertEqual(labels.map { $0 != nil }, [true, true, true, false], "all but the idle one have a label")
-        XCTAssertEqual(
-            Self.macbook.rows.map(WorkspaceRowView.quotedQuestion(for:)),
-            ["\u{201C}Cho phép chạy xcodebuild test?\u{201D}", nil, nil, nil])
         XCTAssertFalse(Self.macbook.showsOtherSessions)
     }
 
@@ -164,15 +275,6 @@ final class WorkspaceListRenderTests: XCTestCase {
     }
 
     // MARK: - Words
-
-    func testMetaLineJoinsBranchDirectoryAndPorts() {
-        XCTAssertEqual(
-            WorkspaceRowView.metaLine(for: Self.shellx), "feat/workspaces · ~/shellx/shellx-ios")
-        XCTAssertEqual(WorkspaceRowView.metaLine(for: Self.relay), "main · ~/shellx/relay · :8787")
-        XCTAssertEqual(WorkspaceRowView.metaLine(for: Self.notes), "~")
-        XCTAssertEqual(WorkspaceRowView.metaLine(for: Self.broken), "feature/a-long-branch-name · ~/code/a/deeply/nested/directory · :3000 :3001 :5173")
-        XCTAssertNil(WorkspaceRowView.metaLine(for: WorkspaceRow(id: Self.ref("x"), title: "x")))
-    }
 
     func testEveryStateHasWordsExceptIdle() {
         let styles = [WorkspaceState.needsYou, .running, .done, .error].map { AgentStateStyle($0) }

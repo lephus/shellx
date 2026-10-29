@@ -883,6 +883,78 @@
         }
       }
     },
+    "home.ago %@": {
+      "comment": "End of an agent card's second line on the home: how long ago the agent finished its turn; the argument is a duration such as \"12 minutes\".",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ago"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ trước"
+          }
+        }
+      }
+    },
+    "home.ended %lld": {
+      "comment": "Last row of the home: agent sessions that ended in the last hours, on every Mac; the argument is how many. Opens their list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã kết thúc · %lld"
+          }
+        }
+      }
+    },
+    "home.justDone %lld": {
+      "comment": "Title of the home's group of agents that finished a turn in the last hour; the argument is how many.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Just finished · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vừa xong · %lld"
+          }
+        }
+      }
+    },
+    "home.needsYou %lld": {
+      "comment": "Title of the home's group of agents waiting for the user; the argument is how many agents (not requests).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs you · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn · %lld"
+          }
+        }
+      }
+    },
     "home.needsYou.hint": {
       "comment": "VoiceOver hint of the \"Needs you · N\" bar over a conversation: activating it opens the page with the pending requests.",
       "extractionState": "manual",
@@ -973,6 +1045,42 @@
         }
       }
     },
+    "home.quiet": {
+      "comment": "Shown on the home in place of the agent groups when no agent needs the user, runs or just finished.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No agent is running"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có agent nào đang chạy"
+          }
+        }
+      }
+    },
+    "home.running %lld": {
+      "comment": "Title of the home's group of agents at work; the argument is how many.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy · %lld"
+          }
+        }
+      }
+    },
     "home.sender.you": {
       "comment": "VoiceOver: who said a message in the home conversation.",
       "extractionState": "manual",
@@ -987,6 +1095,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bạn"
+          }
+        }
+      }
+    },
+    "home.workspaces": {
+      "comment": "Title over the workspaces of the paired Macs on the home, under the agent groups.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspaces"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace"
           }
         }
       }
@@ -3993,19 +4119,19 @@
       }
     },
     "workspaces.other %lld": {
-      "comment": "Last row of a Mac's group in the workspace list: agent sessions that belong to no workspace row; the argument is how many. Opens their list.",
+      "comment": "Last row of a Mac's group on the home: live agent sessions that belong to no workspace row; the argument is how many. Opens their list.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Other agent sessions · %lld"
+            "value": "Agents outside workspaces · %lld"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Phiên agent khác · %lld"
+            "value": "Agent ngoài workspace · %lld"
           }
         }
       }
@@ -4029,19 +4155,19 @@
       }
     },
     "workspaces.other.title": {
-      "comment": "Title of the list of a Mac's agent sessions that belong to no workspace row.",
+      "comment": "Title of the list of a Mac's live agent sessions that belong to no workspace row.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Other Agent Sessions"
+            "value": "Agents Outside Workspaces"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Phiên agent khác"
+            "value": "Agent ngoài workspace"
           }
         }
       }

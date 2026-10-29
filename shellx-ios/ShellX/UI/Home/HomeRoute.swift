@@ -13,4 +13,6 @@ enum HomeRoute: Hashable {
     case workspace(WorkspaceRef)
     /// The sessions of a Mac that no workspace row accounts for.
     case otherSessions(machineID: String)
+    /// The sessions that ended in the last hours, on every Mac, from the home's "Ended · N" fold.
+    case ended
 }

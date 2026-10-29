@@ -58,6 +58,9 @@ struct SignedInView: View {
                     WorkspaceView(scope: scope, ref: ref, open: { path.append($0) })
                 case let .otherSessions(machineID):
                     OtherSessionsView(hub: hub, machineID: machineID)
+                case .ended:
+                    // `EndedSessionsView` lands with the ended page.
+                    EmptyView()
                 }
             }
         }

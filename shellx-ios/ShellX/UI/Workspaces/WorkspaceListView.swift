@@ -1,12 +1,13 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The app's home, "Workspace": `WorkspaceListScreen` fed by the signed-in scope. The hub gives each
-/// Mac's workspaces (rows with their state), the decision center what waits for the user; the actions
-/// push screens through `open` and run the workspace commands (`WorkspaceListActions`).
+/// The app's home, "ShellX": `WorkspaceListScreen` fed by the signed-in scope. The hub gives each
+/// Mac's workspaces and the sessions of the reachable Macs (sorted by `HomeFocus` every 30 seconds, so
+/// "just finished" and "ended" age out with the screen open), the decision center what waits for the
+/// user; the actions push screens through `open` and run the workspace commands (`WorkspaceListActions`).
 ///
-/// It also registers where a session opens (`SessionRef`): the "Other agent sessions" list pushes
-/// them, and so did the screens before.
+/// It also registers where a session opens (`SessionRef`): the home's agent cards push them, and so
+/// do the session lists over it.
 struct WorkspaceListView: View {
     let scope: SignedInScope
     /// Pushes a screen over the list.
@@ -17,16 +18,23 @@ struct WorkspaceListView: View {
 
     var body: some View {
         let hub = scope.hub
-        WorkspaceListScreen(
-            groups: Self.groups(hub),
-            pending: scope.decisions.visibleItems(hub.pendingItems),
-            creating: creating,
-            notice: scope.listNotice.current,
-            actions: WorkspaceListActions.make(
-                scope: scope, open: open, alert: { alert = $0 },
-                creating: Binding(get: { creating }, set: { creating = $0 })),
-            alert: $alert
-        )
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let pending = scope.decisions.visibleItems(hub.pendingItems)
+            WorkspaceListScreen(
+                groups: Self.groups(hub),
+                focus: HomeFocus.make(
+                    sessions: hub.reachableSessions, pending: pending, finished: hub.finishTimes, now: context.date),
+                pending: pending,
+                creating: creating,
+                notice: scope.listNotice.current,
+                now: context.date,
+                showsMachineNames: hub.machines.count > 1,
+                actions: WorkspaceListActions.make(
+                    scope: scope, open: open, alert: { alert = $0 },
+                    creating: Binding(get: { creating }, set: { creating = $0 })),
+                alert: $alert
+            )
+        }
         .navigationDestination(for: SessionRef.self) { ref in
             AgentView(scope: scope, ref: ref, open: open)
         }
@@ -58,8 +66,8 @@ struct WorkspaceListView: View {
 
 /// What the list's controls do, wired to the signed-in scope. Built outside the view body, so a test
 /// can run each action and see the hub call it makes and what the list does with the answer:
-/// - the toolbar, the "Needs you" bar, a Mac's header and the last row push `HomeRoute`s through `open`;
-/// - a card opens its workspace and marks it seen (its "done" label goes);
+/// - the toolbar, a Mac's header, a Mac's last row and the "Ended" fold push `HomeRoute`s through `open`;
+/// - a workspace card opens its workspace and marks it seen (its agents leave "Just finished");
 /// - ＋, rename and close run the hub's workspace commands, once each, and `WorkspaceFeedback` says
 ///   what follows: a new workspace opens, a gone one refreshes the list, anything else is an alert.
 @MainActor
@@ -109,6 +117,7 @@ enum WorkspaceListActions {
             openSettings: { open(.settings) },
             openMachines: { open(.machines) },
             openOtherSessions: { open(.otherSessions(machineID: $0)) },
+            openEnded: { open(.ended) },
             refresh: { await hub.refreshWorkspaces() })
     }
 }
