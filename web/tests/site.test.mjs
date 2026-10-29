@@ -223,6 +223,17 @@ test('self-hosted font files exist and are preloaded', () => {
   assert.match(html, /rel="preload" as="font"[^>]*JetBrainsMono-Regular\.woff2/);
 });
 
+test('gradient buttons paint their border box, so no sliver of the gradient repeats at the ends', () => {
+  // .btn has a 1px transparent border. With the default background-origin (padding-box) the gradient
+  // tile repeats under that border: a pink line at the left end and a purple one at the right.
+  const css = readdirSync(join(dist, '_astro')).filter((f) => f.endsWith('.css'))
+    .map((f) => readFileSync(join(dist, '_astro', f), 'utf8')).join('\n');
+  const rule = css.match(/\.btn-primary\{([^}]*)\}/)?.[1];
+  assert.ok(rule, 'no .btn-primary rule in dist/_astro/*.css');
+  assert.match(rule, /linear-gradient/);
+  assert.match(rule, /background-origin:border-box/, `.btn-primary: ${rule}`);
+});
+
 test('home has the landing sections: hero, how it works, features, security, steps, FAQ, download', () => {
   for (const p of ['/']) {
     const html = readPage(p);
