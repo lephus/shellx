@@ -132,6 +132,7 @@ const en = {
   googlePlayRequirement: 'Android 8.0 or later',
   comingSoon: 'Coming soon',
   footerTagline: `Your computer's terminal, right on your phone.`,
+  footerCredit: 'Built on and extended from the open-source cmux:',
   privacy: 'Privacy Policy',
   terms: 'Terms of Use',
   download: 'Download',

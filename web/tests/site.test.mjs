@@ -234,6 +234,15 @@ test('gradient buttons paint their border box, so no sliver of the gradient repe
   assert.match(rule, /background-origin:border-box/, `.btn-primary: ${rule}`);
 });
 
+test('every page credits cmux, the open-source project ShellX is built on, at the bottom', () => {
+  for (const p of everyPage) {
+    const footer = readPage(p).match(/<footer class="bottom"[\s\S]*?<\/footer>/)?.[0];
+    assert.ok(footer, `${p}: no footer`);
+    assert.ok(hrefs(footer).includes('https://github.com/manaflow-ai/cmux'), `${p}: footer lacks the cmux link`);
+    assert.ok(footer.indexOf('manaflow-ai/cmux') > footer.indexOf('©'), `${p}: the credit is not the last line`);
+  }
+});
+
 test('home has the landing sections: hero, how it works, features, security, steps, FAQ, download', () => {
   for (const p of ['/']) {
     const html = readPage(p);

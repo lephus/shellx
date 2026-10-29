@@ -103,7 +103,10 @@ const home = pathFor(lang, 'home');
           <a href={`mailto:${supportEmail}`}>{t.contact}: {supportEmail}</a>
         </nav>
       </div>
-      <p class="wrap copy">© {year} ShellX</p>
+      <div class="wrap copy">
+        <p>© {year} ShellX</p>
+        <p>{t.footerCredit} <a href="https://github.com/manaflow-ai/cmux">github.com/manaflow-ai/cmux</a></p>
+      </div>
     </footer>
   </body>
 </html>
@@ -210,7 +213,9 @@ const home = pathFor(lang, 'home');
   .bottom nav a { color: var(--muted); text-decoration: none; padding: 0.25rem 0; }
   .bottom nav a:hover { color: var(--fg); }
   .bottom .dl { color: var(--purple-l); font-weight: 600; }
-  .copy { padding-top: 1.5rem; padding-bottom: 2.5rem; margin: 0; font-size: 0.85rem; }
+  .copy { padding-top: 1.5rem; padding-bottom: 2.5rem; font-size: 0.85rem; }
+  .copy p { margin: 0; }
+  .copy p + p { margin-top: 0.35rem; overflow-wrap: anywhere; }
 
   /* Scroll-in reveal: [data-reveal] fades up when it enters the viewport (see Home.astro script). */
   .motion [data-reveal] {
