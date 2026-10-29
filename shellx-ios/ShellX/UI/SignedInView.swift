@@ -81,6 +81,8 @@ struct SignedInView: View {
         .onChange(of: hub.pendingItems) { _, items in scope.decisions.sync(items) }
         .task { await scope.chatCopies.run() }
         .onChange(of: pushTaps.hasTap, initial: true) { takePushTap() }
+        // A tap that launched the app waits here until the Macs are loaded.
+        .onChange(of: hub.machines.isEmpty) { takePushTap() }
         // Alerts are worth asking for once a Mac can send them; iOS asks the user only the first time.
         .task(id: hub.machines.isEmpty) {
             guard push != nil, !hub.machines.isEmpty else { return }
@@ -96,7 +98,7 @@ struct SignedInView: View {
 
     /// The waiting requests, over the home, for a tapped alert.
     private func takePushTap() {
-        guard pushTaps.take(), !hub.machines.isEmpty else { return }
+        guard !hub.machines.isEmpty, pushTaps.take() else { return }
         path = NavigationPath([HomeRoute.pending])
     }
 

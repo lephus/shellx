@@ -48,6 +48,8 @@ struct ShellXApp: App {
                         if let prompt = graph.updatePrompt { Task { await prompt.check() } }
                         // The user is in the app, which shows what waits: the alerts on the lock screen go.
                         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                        // The relay may have dropped this phone's token meanwhile; send the known one again.
+                        if let push = graph.push { Task { await push.appBecameActive() } }
                         if let hub = coordinator.hub {
                             hub.appDidBecomeActive()
                             Task { await hub.refreshGrants() }
