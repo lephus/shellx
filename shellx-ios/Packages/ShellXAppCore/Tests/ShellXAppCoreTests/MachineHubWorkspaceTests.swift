@@ -10,17 +10,25 @@ import XCTest
 @MainActor
 final class MachineHubWorkspaceTests: XCTestCase {
     private func makeHub(
-        _ mac: FakeMac, sleep: @escaping @Sendable (Duration) async throws -> Void = instantSleep
+        _ mac: FakeMac, sleep: @escaping @Sendable (Duration) async throws -> Void = instantSleep,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) async throws -> MachineHub {
+        try await makeHub(macs: [mac], sleep: sleep, now: now)
+    }
+
+    private func makeHub(
+        macs: [FakeMac], sleep: @escaping @Sendable (Duration) async throws -> Void = instantSleep,
+        now: @escaping @Sendable () -> Date = { Date() }
     ) async throws -> MachineHub {
         let vault = AccountVault(store: InMemorySecretStore())
         try await vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "tok-1", email: "a@b.c"))
-        try await vault.setMachines([mac.machine], owner: "u1")
+        try await vault.setMachines(macs.map(\.machine), owner: "u1")
         let suite = "MachineHubWorkspaceTests-\(UUID().uuidString)"
         addTeardownBlock { UserDefaults().removePersistentDomain(forName: suite) }
         let hub = MachineHub(
             vault: vault, relay: FakeRelayAccount(),
-            connector: FakeMacFleet([mac], phoneKey: { try await vault.phoneKey() }), latency: LatencyLog(),
-            defaults: UserDefaults(suiteName: suite)!, sleep: sleep, onUnauthorized: {})
+            connector: FakeMacFleet(macs, phoneKey: { try await vault.phoneKey() }), latency: LatencyLog(),
+            defaults: UserDefaults(suiteName: suite)!, sleep: sleep, onUnauthorized: {}, now: now)
         addTeardownBlock { await hub.stopAll() }
         await hub.start()
         return hub
@@ -407,7 +415,7 @@ final class MachineHubWorkspaceTests: XCTestCase {
         // In a listed workspace, but in no terminal.
         await mac.upsertSession(agentSession("s2", lastActivityMs: 400))
         await mac.upsertSession(agentSession("s3", state: .idle, lastActivityMs: 300, workspace: "web"))
-        // Ended, and its workspace is not on the list any more.
+        // Ended, and its workspace is not on the list any more: left out of the others.
         await mac.upsertSession(
             AgentSession(
                 sessionId: "s4", agent: "claude", workspaceId: "ws-closed", workspaceTitle: "closed", state: .ended,
@@ -420,20 +428,124 @@ final class MachineHubWorkspaceTests: XCTestCase {
         let hub = try await makeHub(mac)
         let id = mac.machine.machineID
 
-        let ready = await eventually { hub.workspaceRows(machineID: id).count == 2 && hub.otherSessions(machineID: id).count == 3 }
+        let ready = await eventually { hub.workspaceRows(machineID: id).count == 2 && hub.otherSessions(machineID: id).count == 2
+                && hub.machines.first?.sessions.sessions.count == 5 }
 
         XCTAssertTrue(ready, "\(hub.otherSessions(machineID: id).map(\.session.sessionId))")
         let others = hub.otherSessions(machineID: id)
-        XCTAssertEqual(others.map(\.session.sessionId), ["s2", "s4", "s5"])
-        XCTAssertEqual(others.map(\.machineID), [id, id, id])
-        XCTAssertEqual(others.map(\.machineName), ["MacBook Pro", "MacBook Pro", "MacBook Pro"])
-        XCTAssertEqual(others.map(\.online), [true, true, true])
+        XCTAssertEqual(others.map(\.session.sessionId), ["s2", "s5"])
+        XCTAssertEqual(others.map(\.machineID), [id, id])
+        XCTAssertEqual(others.map(\.machineName), ["MacBook Pro", "MacBook Pro"])
+        XCTAssertEqual(others.map(\.online), [true, true])
         XCTAssertEqual(hub.otherSessions(machineID: "mac-nobody"), [])
+    }
+
+
+    // MARK: - Finish times
+
+    /// A clock the test moves by hand, read from the hub's `now:`.
+    private final class DateBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var date: Date
+        init(_ date: Date) { self.date = date }
+        var value: Date {
+            get { lock.withLock { date } }
+            set { lock.withLock { date = newValue } }
+        }
+    }
+
+    private let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func testAFinishIsTimedWhenThePhoneSawIt() async throws {
+        let box = DateBox(start)
+        let (mac, hub, id) = try await finishedRig(now: { box.value })
+
+        await mac.upsertSession(agentSession("s1", state: .idle, lastActivityMs: 2, stateSinceMs: 2))
+
+        let done = await eventually { hub.finishedSessionIds(machineID: id) == ["s1"] }
+        XCTAssertTrue(done)
+        XCTAssertEqual(hub.finishTimes[id]?["s1"], start)
+    }
+
+    func testAFinishKeepsItsFirstTime() async throws {
+        let box = DateBox(start)
+        let (mac, hub, id) = try await finishedRig(now: { box.value })
+        await mac.upsertSession(agentSession("s1", state: .idle, lastActivityMs: 2, stateSinceMs: 2))
+        let first = await eventually { hub.finishedSessionIds(machineID: id) == ["s1"] }
+        XCTAssertTrue(first)
+
+        box.value = start.addingTimeInterval(600)
+        await mac.upsertSession(agentSession("s2", state: .idle, lastActivityMs: 3, stateSinceMs: 3, workspace: "web"))
+
+        let second = await eventually { hub.finishedSessionIds(machineID: id) == ["s1", "s2"] }
+        XCTAssertTrue(second)
+        XCTAssertEqual(hub.finishTimes[id], ["s1": start, "s2": start.addingTimeInterval(600)])
+    }
+
+    func testMarkSeenOfASessionClearsOnlyIt() async throws {
+        let (mac, hub, id) = try await finishedRig()
+        await mac.upsertSession(agentSession("s1", state: .idle, lastActivityMs: 2, stateSinceMs: 2))
+        await mac.upsertSession(agentSession("s2", state: .idle, lastActivityMs: 2, stateSinceMs: 2, workspace: "web"))
+        let both = await eventually { hub.finishedSessionIds(machineID: id) == ["s1", "s2"] }
+        XCTAssertTrue(both)
+
+        hub.markSeen(SessionRef(machineID: id, sessionId: "s1", agent: "claude", workspaceTitle: "shellx"))
+
+        XCTAssertEqual(hub.finishedSessionIds(machineID: id), ["s2"])
+        XCTAssertEqual(hub.finishTimes[id]?.keys.sorted(), ["s2"])
+    }
+
+    func testOtherSessionsLeaveOutEndedOnes() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        await mac.upsertSession(agentSession("s1", state: .ended))
+        let hub = try await makeHub(mac)
+        let id = mac.machine.machineID
+
+        let listed = await eventually { isOnline(hub) && hub.machines.first?.sessions.sessions.count == 1 }
+
+        XCTAssertTrue(listed)
+        XCTAssertEqual(hub.otherSessions(machineID: id), [])
+    }
+
+    func testReachableSessionsHoldEveryStateOfAReachableMac() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        await mac.upsertSession(agentSession("s1", state: .working, lastActivityMs: 2, stateSinceMs: 1))
+        await mac.upsertSession(agentSession("s2", state: .ended, lastActivityMs: 1, stateSinceMs: 1))
+        let hub = try await makeHub(mac)
+
+        let listed = await eventually { isOnline(hub) && hub.reachableSessions.count == 2 }
+
+        XCTAssertTrue(listed, "\(hub.reachableSessions.map(\.session.sessionId))")
+        XCTAssertEqual(hub.reachableSessions.map(\.session.sessionId), ["s1", "s2"])
+        XCTAssertEqual(hub.reachableSessions.map(\.online), [true, true])
+    }
+
+    func testReachableSessionsLeaveOutAnOfflineMac() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        let b = FakeMac(name: "Mac mini")
+        await a.upsertSession(agentSession("a1", state: .working, lastActivityMs: 1, stateSinceMs: 1))
+        await b.upsertSession(agentSession("b1", state: .working, lastActivityMs: 2, stateSinceMs: 1))
+        await b.failNextConnects(URLError(.notConnectedToInternet), count: 1)
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(macs: [a, b], sleep: sleeper.sleep)
+
+        let settled = await eventually {
+            guard case .offline = hub.machines.first(where: { $0.id == b.machine.machineID })?.state else { return false }
+            return hub.machines.first(where: { $0.id == a.machine.machineID })?.state == .online
+                && hub.reachableSessions.count == 1
+        }
+
+        XCTAssertTrue(settled, "\(hub.machines.map(\.state))")
+        XCTAssertEqual(hub.reachableSessions.map(\.session.sessionId), ["a1"])
     }
 
     // MARK: - Done
 
-    private func finishedRig() async throws -> (mac: FakeMac, hub: MachineHub, id: String) {
+    private func finishedRig(
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) async throws -> (mac: FakeMac, hub: MachineHub, id: String) {
         let mac = FakeMac(name: "MacBook Pro")
         await mac.setWorkspaces([
             linkWorkspace("shellx", terminals: [linkTerminal("t1", sessionId: "s1")]),
@@ -441,7 +553,7 @@ final class MachineHubWorkspaceTests: XCTestCase {
         ])
         await mac.upsertSession(agentSession("s1", state: .working, lastActivityMs: 1, stateSinceMs: 1))
         await mac.upsertSession(agentSession("s2", state: .working, lastActivityMs: 1, stateSinceMs: 1, workspace: "web"))
-        let hub = try await makeHub(mac)
+        let hub = try await makeHub(mac, now: now)
         let id = mac.machine.machineID
         let running = await eventually { hub.workspaceRows(machineID: id).map(\.state) == [.running, .running] }
         XCTAssertTrue(running, "\(hub.workspaceRows(machineID: id).map(\.state))")

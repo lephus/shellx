@@ -25,9 +25,10 @@ public final class MachineHub {
     /// Items that left a Mac's list while the Mac was live and synced, newest last
     /// (`leftWhileSynced(_:)`).
     private var handledKeys: [PendingKey] = []
-    /// Per Mac, the sessions that finished a turn and that the user has not looked at since
-    /// (`finishedSessionIds(machineID:)`). In memory only: a launch starts with none.
-    private var finishedIds: [String: Set<String>] = [:]
+    /// Per Mac, the sessions that finished a turn and that the user has not looked at since, each with
+    /// when the phone saw it finish (`finishedSessionIds(machineID:)`). The Mac sends no finish time for
+    /// an idle session, so this is the phone's clock. In memory only: a launch starts with none.
+    public private(set) var finishTimes: [String: [String: Date]] = [:]
 
     @ObservationIgnored private let vault: AccountVault
     @ObservationIgnored private let relay: any RelayAccountCalling
@@ -36,6 +37,7 @@ public final class MachineHub {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
     @ObservationIgnored private let onUnauthorized: @MainActor () async -> Void
+    @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private let log = Logger(subsystem: "com.shellx.app", category: "link")
 
     /// The vault's Mac list as last read or written.
@@ -57,13 +59,13 @@ public final class MachineHub {
     @ObservationIgnored private var unauthorizedReported = false
     /// Transcript resets (`chat.reset`) per session since the hub started (`transcriptResets(of:)`).
     @ObservationIgnored private var resetCounts: [SessionRef: Int] = [:]
-    /// Tells which sessions finished a turn, from every session list a Mac sends (`finishedIds`).
+    /// Tells which sessions finished a turn, from every session list a Mac sends (`finishTimes`).
     @ObservationIgnored private var finishDetector = SessionFinishDetector()
 
     public init(
         vault: AccountVault, relay: any RelayAccountCalling, connector: any MachineLinkConnecting,
         latency: LatencyLog, defaults: UserDefaults, sleep: @escaping @Sendable (Duration) async throws -> Void,
-        onUnauthorized: @escaping @MainActor () async -> Void
+        onUnauthorized: @escaping @MainActor () async -> Void, now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.vault = vault
         self.relay = relay
@@ -72,6 +74,7 @@ public final class MachineHub {
         self.defaults = defaults
         self.sleep = sleep
         self.onUnauthorized = onUnauthorized
+        self.now = now
         storedDefaultMachineID = defaults.string(forKey: Self.defaultMachineKey)
     }
 
@@ -136,6 +139,21 @@ public final class MachineHub {
         }
     }
 
+    /// Every session, in every state, of the Macs that are online, connecting or reconnecting: a Mac
+    /// that is back keeps its sessions, with `online` false until it answers. A Mac that is offline
+    /// contributes none. Most recent activity first, as in `liveSessions`.
+    public var reachableSessions: [MachineSession] {
+        machines.filter { [.online, .connecting, .reconnecting].contains($0.state) }.flatMap { model in
+            model.sessions.sessions.map {
+                MachineSession(machineID: model.id, machineName: model.name, online: model.state == .online, session: $0)
+            }
+        }
+        .sorted { a, b in
+            let (lhs, rhs) = (a.session.lastActivityMs ?? .min, b.session.lastActivityMs ?? .min)
+            return lhs != rhs ? lhs > rhs : (a.machineID, a.session.sessionId) < (b.machineID, b.session.sessionId)
+        }
+    }
+
     // MARK: - Workspaces
 
     /// The Mac's workspaces as rows, in the Mac's order, each with the state worked out from the Mac's
@@ -151,13 +169,13 @@ public final class MachineHub {
             finished: finishedSessionIds(machineID: machineID), machineID: machineID)
     }
 
-    /// The Mac's sessions, live and ended, that no terminal of its workspaces names
+    /// The Mac's sessions that have not ended and that no terminal of its workspaces names
     /// (`LinkTerminal.sessionId`): the ones with no terminal chip, among them sessions whose workspace
     /// is gone or was never named. Most recent activity first.
     public func otherSessions(machineID: String) -> [MachineSession] {
         guard let model = machines.first(where: { $0.id == machineID }) else { return [] }
         let named = Set(model.workspaces.workspaces.flatMap(\.terminals).compactMap(\.sessionId))
-        return model.sessions.sessions.filter { !named.contains($0.sessionId) }.map {
+        return model.sessions.sessions.filter { $0.state != .ended && !named.contains($0.sessionId) }.map {
             MachineSession(machineID: model.id, machineName: model.name, online: model.state == .online, session: $0)
         }
     }
@@ -166,19 +184,25 @@ public final class MachineHub {
     /// started again since, until `markSeen(_:)` clears their workspace. `WorkspaceRow` shows them as
     /// `.done`. Only what this launch saw; nothing is saved.
     public func finishedSessionIds(machineID: String) -> Set<String> {
-        finishedIds[machineID] ?? []
+        Set((finishTimes[machineID] ?? [:]).keys)
     }
 
     /// The user looked at the workspace (its screen opened): its finished sessions stop counting as
     /// `.done`, until one of them finishes again.
     public func markSeen(_ ref: WorkspaceRef) {
-        guard let model = machines.first(where: { $0.id == ref.machineID }), let finished = finishedIds[ref.machineID]
+        guard let model = machines.first(where: { $0.id == ref.machineID }), let finished = finishTimes[ref.machineID]
         else { return }
         let terminals = model.workspaces.workspace(ref.workspaceId)?.terminals ?? []
         let mine = WorkspaceRow.sessionIds(
             workspaceId: ref.workspaceId, terminals: terminals, among: model.sessions.sessions)
-        let rest = finished.subtracting(mine)
-        if rest != finished { finishedIds[ref.machineID] = rest.isEmpty ? nil : rest }
+        let rest = finished.filter { !mine.contains($0.key) }
+        if rest.count != finished.count { finishTimes[ref.machineID] = rest.isEmpty ? nil : rest }
+    }
+
+    /// The user opened one agent: that session stops counting as finished, until it finishes again.
+    public func markSeen(_ ref: SessionRef) {
+        guard var finished = finishTimes[ref.machineID], finished.removeValue(forKey: ref.sessionId) != nil else { return }
+        finishTimes[ref.machineID] = finished.isEmpty ? nil : finished
     }
 
     /// True when the Mac listed the `workspace_control` feature when it was last online: the app offers
@@ -603,19 +627,22 @@ public final class MachineHub {
     }
 
     /// Takes the Mac's session list into the finish detector: the sessions it reports finished are
-    /// `finishedIds` until they work again (or leave the list, or the user marks them seen).
+    /// `finishTimes` until they work again (or leave the list, or the user marks them seen).
     private func noteFinishes(in sessions: [AgentSession], of model: MachineModel) {
         let finished = finishDetector.observe(machineID: model.id, sessions: sessions)
         let idle = Set(sessions.filter { $0.state == .idle }.map(\.sessionId))
-        let before = finishedIds[model.id] ?? []
-        let now = before.intersection(idle).union(finished.map(\.sessionId))
-        if now != before { finishedIds[model.id] = now.isEmpty ? nil : now }
+        let before = finishTimes[model.id] ?? [:]
+        // A session already finished keeps its first time; a new finish gets the phone's clock now.
+        var kept = before.filter { idle.contains($0.key) }
+        let seenAt = now()
+        for session in finished where kept[session.sessionId] == nil { kept[session.sessionId] = seenAt }
+        if kept != before { finishTimes[model.id] = kept.isEmpty ? nil : kept }
     }
 
     /// Forgets what the finish detector knew of the Mac: its link is new, or gone.
     private func forgetFinishes(of machineID: String) {
         finishDetector.retain(machineIDs: Set(machines.map(\.id)).subtracting([machineID]))
-        finishedIds[machineID] = nil
+        finishTimes[machineID] = nil
     }
 
     /// Records the items that leave `old` for `new`, a list backed by a live, synced session.
