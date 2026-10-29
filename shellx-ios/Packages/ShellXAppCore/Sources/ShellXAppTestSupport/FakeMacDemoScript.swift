@@ -47,7 +47,7 @@ public actor FakeMacDemoScript {
             AgentSession(
                 sessionId: "demo-web", agent: "claude", workspaceId: "ws-web", workspaceTitle: "web",
                 title: "Landing page", state: .working, stateSinceMs: ms - 300_000, lastActivityMs: ms - 60_000),
-            // Outside every terminal, with the same title as the first: the lists show "Pairing sheet · #2".
+            // Idle, in the same workspace and with the same title as the first: a list that holds both names the second "Pairing sheet · #2".
             AgentSession(
                 sessionId: "demo-shellx-2", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx",
                 title: "Pairing sheet", state: .idle, stateSinceMs: ms - 600_000, lastActivityMs: ms - 600_000),

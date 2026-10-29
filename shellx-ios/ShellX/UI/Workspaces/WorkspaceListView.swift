@@ -18,17 +18,21 @@ struct WorkspaceListView: View {
 
     var body: some View {
         let hub = scope.hub
+        // Read here, not in the closure: the hub is observed whatever SwiftUI does with the closure.
+        let pending = scope.decisions.visibleItems(hub.pendingItems)
+        let groups = Self.groups(hub)
+        let sessions = hub.reachableSessions
+        let finishTimes = hub.finishTimes
+        let showsMachineNames = hub.machines.count > 1
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            let pending = scope.decisions.visibleItems(hub.pendingItems)
             WorkspaceListScreen(
-                groups: Self.groups(hub),
-                focus: HomeFocus.make(
-                    sessions: hub.reachableSessions, pending: pending, finished: hub.finishTimes, now: context.date),
+                groups: groups,
+                focus: HomeFocus.make(sessions: sessions, pending: pending, finished: finishTimes, now: context.date),
                 pending: pending,
                 creating: creating,
                 notice: scope.listNotice.current,
                 now: context.date,
-                showsMachineNames: hub.machines.count > 1,
+                showsMachineNames: showsMachineNames,
                 actions: WorkspaceListActions.make(
                     scope: scope, open: open, alert: { alert = $0 },
                     creating: Binding(get: { creating }, set: { creating = $0 })),
