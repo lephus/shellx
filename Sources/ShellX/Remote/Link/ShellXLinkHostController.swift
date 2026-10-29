@@ -50,6 +50,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     private let hostVersion: String
     private let machineName: String
     private let isBlockedByPolicy: @MainActor () -> Bool
+    /// Pushes "an agent needs you" to the paired iPhones while the host runs.
+    private let phonePush: ShellXPhonePushForwarder?
     /// The session the service started, until it stops it. Kept while a managed policy holds the host stopped,
     /// so lifting the policy serves the same session again.
     private var assignment: Assignment?
@@ -70,13 +72,16 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     ///   - isBlockedByPolicy: Whether a configuration profile forbids serving phones (`DisableRemoteControl`
     ///     or `DisableIncomingDeviceAccess`).
     ///   - notificationCenter: Where `ManagedDevicePolicy.didChangeNotification` is posted.
+    ///   - phonePush: Tells the paired iPhones about waiting requests while the host runs (the app passes
+    ///     ``ShellXPhonePushForwarder/live(feed:core:)``).
     init(core: ShellXCoreClient, storage: any ShellXLinkSecretStorage, feed: any AgentFeedSource,
          sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
          workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
          hostVersion: String,
          machineName: String, isBlockedByPolicy: @escaping @MainActor () -> Bool = { MobileRemoteControlPolicy.isDisabled },
-         notificationCenter: NotificationCenter = .default) {
+         notificationCenter: NotificationCenter = .default, phonePush: ShellXPhonePushForwarder? = nil) {
         self.core = core
+        self.phonePush = phonePush
         self.storage = storage
         self.feed = feed
         self.sessions = sessions
@@ -135,6 +140,7 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
         }
         running = Running(machineID: assignment.machineID, linkSlot: linkSlot, accountID: assignment.accountID,
                           keys: keys, liveHost: liveHost, task: task)
+        phonePush?.start()
         Self.log.info("link host starting on slot \(linkSlot, privacy: .public)")
     }
 
@@ -142,6 +148,7 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
         guard let running else { return }
         running.task.cancel()
         self.running = nil
+        phonePush?.stop()
         Self.log.info("link host stopped")
     }
 

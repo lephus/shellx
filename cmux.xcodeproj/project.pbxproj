@@ -3384,6 +3384,8 @@
 		067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */; };
 		94FD51A057547AB301A0EEA5 /* ShellXPhonePairingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA3511379E361A4E81E7182 /* ShellXPhonePairingCoordinator.swift */; };
 		7EE7B9BC69774E0B60D4C1B2 /* ShellXPhonePairingCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9548501B25F7BAB51EE66690 /* ShellXPhonePairingCoordinatorTests.swift */; };
+		4B855C4775BBF457DFB2C45B /* ShellXPhonePushForwarder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4820BE847658E473B2D4C806 /* ShellXPhonePushForwarder.swift */; };
+		19458460FD20C266652BC033 /* ShellXPhonePushForwarderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E63B12CC16FAF68578D975CD /* ShellXPhonePushForwarderTests.swift */; };
 		1EA4DF7B949BB6F40EA075E6 /* ShellXQRCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC34B858D6B69D34AAAF485 /* ShellXQRCode.swift */; };
 		5E11A00000000000000000A5 /* ShellXRemoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A4 /* ShellXRemoteCore */; };
 		15974A84E1E2593C56ABB928 /* ShellXRemoteFixtureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2612802F161E87745147239E /* ShellXRemoteFixtureService.swift */; };
@@ -8020,6 +8022,8 @@
 		7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXPhoneHandoffPopover.swift; sourceTree = "<group>"; };
 		3EA3511379E361A4E81E7182 /* ShellXPhonePairingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXPhonePairingCoordinator.swift; sourceTree = "<group>"; };
 		9548501B25F7BAB51EE66690 /* ShellXPhonePairingCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXPhonePairingCoordinatorTests.swift"; sourceTree = "<group>"; };
+		4820BE847658E473B2D4C806 /* ShellXPhonePushForwarder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXPhonePushForwarder.swift; sourceTree = "<group>"; };
+		E63B12CC16FAF68578D975CD /* ShellXPhonePushForwarderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXPhonePushForwarderTests.swift"; sourceTree = "<group>"; };
 		0FC34B858D6B69D34AAAF485 /* ShellXQRCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXQRCode.swift; sourceTree = "<group>"; };
 		2612802F161E87745147239E /* ShellXRemoteFixtureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteFixtureService.swift; sourceTree = "<group>"; };
 		CE1509AB05C54F55B6FBCBA9 /* ShellXRemoteGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/ShellXRemoteGate.swift; sourceTree = "<group>"; };
@@ -12600,6 +12604,7 @@
 				F372A978508A233A39B67E3C /* WorkspaceSetPlan.swift */,
 				4388B332D070BFD818B88E09 /* WorkspaceSetStore.swift */,
 				8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */,
+				4820BE847658E473B2D4C806 /* ShellXPhonePushForwarder.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14206,6 +14211,7 @@
 				F1B507FD57203BB0E2A9E30D /* ShellXRemoteGateTests.swift */,
 				DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */,
 				0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */,
+				E63B12CC16FAF68578D975CD /* ShellXPhonePushForwarderTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16871,6 +16877,7 @@
 				786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */,
 				067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */,
 				94FD51A057547AB301A0EEA5 /* ShellXPhonePairingCoordinator.swift in Sources */,
+				4B855C4775BBF457DFB2C45B /* ShellXPhonePushForwarder.swift in Sources */,
 				1EA4DF7B949BB6F40EA075E6 /* ShellXQRCode.swift in Sources */,
 				15974A84E1E2593C56ABB928 /* ShellXRemoteFixtureService.swift in Sources */,
 				6AADF75FAAE770FAC4225327 /* ShellXRemoteGate.swift in Sources */,
@@ -19244,6 +19251,7 @@
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
 				7EE7B9BC69774E0B60D4C1B2 /* ShellXPhonePairingCoordinatorTests.swift in Sources */,
+				19458460FD20C266652BC033 /* ShellXPhonePushForwarderTests.swift in Sources */,
 				74808E1D069BF7C8BBAF73F8 /* ShellXRemoteGateTests.swift in Sources */,
 				6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */,
 				C85C042A4E1AC2D4ECE542E0 /* ShellXRightSidebarToggleTests.swift in Sources */,

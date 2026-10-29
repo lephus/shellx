@@ -9,6 +9,7 @@ import UserNotifications
 import Bonsplit
 import CmuxSettings
 import CmuxNotifications
+import ShellXBrand
 
 nonisolated private let terminalNotificationLogger = Logger(
     subsystem: "com.cmuxterm.app",
@@ -211,7 +212,9 @@ final class TerminalNotificationStore: ObservableObject {
         )
         // Cold lane: mirror the dismiss through APNs for every registered
         // device, attached or not (no-op unless phone forwarding is on).
-        PhonePushClient.shared.forwardDismissed(ids: ids, badgeCount: unreadCount)
+        if ShellXFeatures.cloud {
+            PhonePushClient.shared.forwardDismissed(ids: ids, badgeCount: unreadCount)
+        }
     }
 
     /// A user-driven dismiss emit that also carries any stale superseded-banner
@@ -1767,7 +1770,10 @@ final class TerminalNotificationStore: ObservableObject {
         // `suppressWhenAppFocused` only withholds the desktop banner: the Mac
         // may be frontmost with nobody at it, so phone forwarding keeps the
         // exact focused-surface gate.
-        let shouldAttemptPhone = !isFocusedSurfaceArrival
+        // ShellX: cmux's phone push goes to cmux.com for the cmux iPhone app; ShellX's own reaches its
+        // iPhones through the relay instead (`ShellXPhonePushForwarder`).
+        let shouldAttemptPhone = ShellXFeatures.cloud
+            && !isFocusedSurfaceArrival
             && Self.shouldAttemptPhoneForward(
                 effects: effects,
                 phoneForwardingEnabled: PhonePushClient.shared
