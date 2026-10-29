@@ -83,6 +83,8 @@ const ld = [
       };
       for (const a of links) {
         a.addEventListener('click', (e) => {
+          // Ctrl/Cmd/Shift-click and middle-click keep their meaning (open the video in a new tab).
+          if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
           e.preventDefault();
           seek(Number(a.dataset.t), true);
           v.scrollIntoView({ block: 'nearest' });
