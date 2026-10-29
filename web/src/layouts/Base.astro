@@ -1,6 +1,6 @@
 ---
 import { pathFor, ui, type Lang, type Page } from '../i18n/ui';
-import { supportEmail } from '../lib/site';
+import { discordUrl } from '../lib/site';
 
 interface Props {
   lang: Lang;
@@ -100,7 +100,7 @@ const home = pathFor(lang, 'home');
           <a href={pathFor(lang, 'guides')}>{t.guidesNav}</a>
           <a href={pathFor(lang, 'privacy')}>{t.privacy}</a>
           <a href={pathFor(lang, 'terms')}>{t.terms}</a>
-          <a href={`mailto:${supportEmail}`}>{t.contact}: {supportEmail}</a>
+          <a href={discordUrl} rel="noopener">{t.contact}: Discord</a>
         </nav>
       </div>
       <div class="wrap copy">

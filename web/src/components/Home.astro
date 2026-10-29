@@ -6,7 +6,7 @@ import SecurityFlow from './SecurityFlow.astro';
 import Downloads from './Downloads.astro';
 import VideoPlayer from './VideoPlayer.astro';
 import { ui, type Lang, pathFor } from '../i18n/ui';
-import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, supportEmail, windowsDownloadUrl } from '../lib/site';
+import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
 import { appId, author, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
 import { video } from '../lib/videos';
 
@@ -67,7 +67,7 @@ const ld = [
       '@type': 'HowToStep', position: i + 1, text, url: `${url}#start`,
     })),
   },
-  { '@context': 'https://schema.org', ...organization, email: supportEmail },
+  { '@context': 'https://schema.org', ...organization, sameAs: [discordUrl] },
   { '@context': 'https://schema.org', ...author },
   {
     '@context': 'https://schema.org', '@type': 'WebSite', '@id': `${site}/#website`,
@@ -221,10 +221,10 @@ const intro = video(lang, 'intro');
     <div class="contact" data-reveal>
       <h2 id="contact-h">{t.contactHeading}</h2>
       <p class="muted">{t.contactLead}</p>
-      <a class="btn btn-ghost" href={`mailto:${supportEmail}`}>
+      <a class="btn btn-ghost" href={discordUrl} rel="noopener">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18v12H3zM3 7l9 6 9-6" /></svg>
-        {supportEmail}
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9 10.5h.01M15 10.5h.01" /></svg>
+        {t.contactCta}
       </a>
     </div>
   </section>

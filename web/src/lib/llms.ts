@@ -2,7 +2,7 @@
 // assistants and AI search can read and cite. Built from the same strings and guides as the pages,
 // so it never drifts from the site.
 import { pathFor, ui, type Lang } from '../i18n/ui';
-import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, supportEmail, windowsDownloadUrl } from './site';
+import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from './site';
 import { author, featureList, guides, siteUrl } from './seo';
 import { clock, video } from './videos';
 
@@ -43,7 +43,7 @@ ShellX is not a general mobile SSH client: to connect from a phone straight to a
 - Reconnect: the computer keeps the latest 256 KiB of output per session and replays it when the phone reconnects.
 - Notifications: shell hooks (command finished, exit code, duration), OSC 9 / OSC 777 / OSC 99 sequences, and \`shellx notify "text"\`.
 - Command-line tool \`shellx\` for scripts and agents (split, send, read, wait, notify, events) and a ready-made skill: \`shellx skills install --claude\` or \`--codex\`.
-- Website: ${siteUrl}/ (English). Support: ${supportEmail}. Made by [${author.name}](${author.url}).
+- Website: ${siteUrl}/ (English). Support: [Discord](${discordUrl}). Made by [${author.name}](${author.url}).
 
 ## Features
 

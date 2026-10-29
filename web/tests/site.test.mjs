@@ -40,6 +40,7 @@ test('site config is valid', () => {
   assert.match(config.desktopVersion, /^\d+\.\d+\.\d+$/);
   assert.equal(config.downloadBaseUrl, 'https://download.shellx.pro/desktop');
   assert.match(config.supportEmail, /^[^@\s]+@[^@\s]+\.[^@\s]+$/);
+  assert.match(config.discordUrl, /^https:\/\/discord\.gg\/[A-Za-z0-9]+$/);
   assert.match(config.shareApiBase, /^https:\/\/[a-z0-9.-]+$/, 'shareApiBase is an https origin without a path');
   assert.ok(config.appStoreUrl === null || config.appStoreUrl.startsWith('https://apps.apple.com/'));
   assert.ok(config.googlePlayUrl === null || config.googlePlayUrl.startsWith('https://play.google.com/'));
@@ -68,19 +69,19 @@ for (const page of homePages) {
     }
   });
 
-  test(`home ${page.path} has a contact section with the support email, linked from the menu`, () => {
+  test(`home ${page.path} has a contact section with the Discord invite, linked from the menu`, () => {
     const html = readPage(page.path);
     const section = html.match(/<section[^>]*id="contact"[\s\S]*?<\/section>/);
     assert.ok(section, 'missing <section id="contact">');
-    assert.ok(hrefs(section[0]).includes(`mailto:${config.supportEmail}`), 'contact section lacks the mailto link');
-    assert.ok(section[0].includes(config.supportEmail), 'contact section does not show the address');
+    assert.ok(hrefs(section[0]).includes(config.discordUrl), 'contact section lacks the Discord invite');
+    assert.ok(!section[0].includes(config.supportEmail), 'contact section still shows the email address');
     const nav = html.match(/<nav class="top-nav"[\s\S]*?<\/nav>/);
     assert.ok(nav && hrefs(nav[0]).includes(`${page.path}#contact`), `menu lacks a link to ${page.path}#contact`);
   });
 
   test(`home ${page.path} links to the legal pages`, () => {
     const links = hrefs(readPage(page.path));
-    for (const target of [page.privacy, page.terms, `mailto:${config.supportEmail}`]) {
+    for (const target of [page.privacy, page.terms, config.discordUrl]) {
       assert.ok(links.includes(target), `missing link to ${target}`);
     }
   });
