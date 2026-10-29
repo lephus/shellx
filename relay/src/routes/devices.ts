@@ -55,11 +55,18 @@ deviceRoutes.get("/", requireAuth, async (c) => {
 /** Longest FCM registration token accepted (real ones are ~160 characters). */
 export const PUSH_TOKEN_MAX_CHARS = 4096;
 const PUSH_PLATFORMS = ["android", "ios"] as const;
+/** The apps whose APNs tokens the relay keeps (the `apns-topic` it sends with), and the APNs hosts. */
+export const APNS_TOPICS = ["com.shellx.prod", "com.shellx.dev"] as const;
+const APNS_ENVIRONMENTS = ["sandbox", "production"] as const;
+/** An APNs device token: hex (32 bytes today; Apple allows it to grow). */
+const APNS_TOKEN = /^[0-9a-f]{64,200}$/;
 
 /**
- * PUT /v1/devices/me/push-token {token, platform} — phones only (push spec §5). Stores the phone's
- * FCM registration token; a token already held by another device (the same phone signed into
- * another account, or a reinstall) moves to the caller. 204. The token is never logged.
+ * PUT /v1/devices/me/push-token {token, platform, apns_topic?, apns_env?} — phones only (push spec §5).
+ * Stores the phone's FCM registration token, or, with `apns_topic` (a ShellX bundle id) and `apns_env`
+ * (`sandbox` | `production`), the native iPhone app's hex APNs token. A token already held by another
+ * device (the same phone signed into another account, or a reinstall) moves to the caller. 204. The
+ * token is never logged.
  */
 deviceRoutes.put("/me/push-token", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
@@ -69,14 +76,22 @@ deviceRoutes.put("/me/push-token", requireAuth, jsonBodyLimit, async (c) => {
   const platform = body.platform;
   if (typeof token !== "string" || token.length === 0 || [...token].length > PUSH_TOKEN_MAX_CHARS) throw Errors.badRequest();
   if (typeof platform !== "string" || !(PUSH_PLATFORMS as readonly string[]).includes(platform)) throw Errors.badRequest();
+  const { apns_topic: topic, apns_env: environment } = body;
+  const apns = topic !== undefined || environment !== undefined;
+  if (apns) {
+    if (platform !== "ios" || !APNS_TOKEN.test(token)) throw Errors.badRequest();
+    if (typeof topic !== "string" || !(APNS_TOPICS as readonly string[]).includes(topic)) throw Errors.badRequest();
+    if (typeof environment !== "string" || !(APNS_ENVIRONMENTS as readonly string[]).includes(environment)) throw Errors.badRequest();
+  }
   const db = c.get("db");
   const now = c.get("now")();
   db.transaction(() => {
     db.run("DELETE FROM push_tokens WHERE token = ? AND device_id != ?", token, auth.deviceId);
     db.run(
-      `INSERT INTO push_tokens (device_id, token, platform, updated_at) VALUES (?, ?, ?, ?)
-       ON CONFLICT (device_id) DO UPDATE SET token = excluded.token, platform = excluded.platform, updated_at = excluded.updated_at`,
-      auth.deviceId, token, platform, now,
+      `INSERT INTO push_tokens (device_id, token, platform, updated_at, apns_topic, apns_env) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (device_id) DO UPDATE SET token = excluded.token, platform = excluded.platform,
+         updated_at = excluded.updated_at, apns_topic = excluded.apns_topic, apns_env = excluded.apns_env`,
+      auth.deviceId, token, platform, now, apns ? (topic as string) : null, apns ? (environment as string) : null,
     );
   });
   logMeta("push_token_set", { device_id: auth.deviceId });

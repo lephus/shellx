@@ -13,6 +13,8 @@ describe("migration 0003_push_tokens", () => {
       ["token", "TEXT", 1, 0],
       ["platform", "TEXT", 1, 0],
       ["updated_at", "INTEGER", 1, 0],
+      ["apns_topic", "TEXT", 0, 0],
+      ["apns_env", "TEXT", 0, 0],
     ]);
     const indexes = db().all<{ name: string; unique: number }>("PRAGMA index_list(push_tokens)");
     expect(indexes.some((i) => i.unique === 1 && i.name === "push_tokens_token")).toBe(true);
@@ -88,6 +90,52 @@ describe("PUT /v1/devices/me/push-token", () => {
     expect(tokenOf(phone.deviceId)).toBeUndefined();
     const longest = await call(app, "PUT", "/v1/devices/me/push-token", { token: phone.token, body: { token: "a".repeat(4096), platform: "ios" } });
     expect(longest.status).toBe(204);
+  });
+});
+
+describe("PUT /v1/devices/me/push-token with an APNs token (native iPhone app)", () => {
+  const APNS = "0123456789abcdef".repeat(4);
+  const apnsOf = (deviceId: string) =>
+    db().get<{ apns_topic: string | null; apns_env: string | null }>(
+      "SELECT apns_topic, apns_env FROM push_tokens WHERE device_id = ?", deviceId);
+
+  it("stores the app's bundle id and APNs host with the token", async () => {
+    const app = makeApp();
+    const phone = await loginDevice(app, await registerAccount(app), "mobile");
+    const res = await call(app, "PUT", "/v1/devices/me/push-token", {
+      token: phone.token, body: { token: APNS, platform: "ios", apns_topic: "com.shellx.dev", apns_env: "sandbox" },
+    });
+    expect(res.status).toBe(204);
+    expect(tokenOf(phone.deviceId)).toEqual({ token: APNS, platform: "ios" });
+    expect(apnsOf(phone.deviceId)).toEqual({ apns_topic: "com.shellx.dev", apns_env: "sandbox" });
+  });
+
+  it("forgets the APNs fields when the phone sends an FCM token again", async () => {
+    const app = makeApp();
+    const phone = await loginDevice(app, await registerAccount(app), "mobile");
+    await call(app, "PUT", "/v1/devices/me/push-token", {
+      token: phone.token, body: { token: APNS, platform: "ios", apns_topic: "com.shellx.prod", apns_env: "production" },
+    });
+    await call(app, "PUT", "/v1/devices/me/push-token", { token: phone.token, body: { token: "fcm-1", platform: "ios" } });
+    expect(apnsOf(phone.deviceId)).toEqual({ apns_topic: null, apns_env: null });
+  });
+
+  it("refuses another app, an unknown host, half the fields, a token that is not hex, or android (400)", async () => {
+    const app = makeApp();
+    const phone = await loginDevice(app, await registerAccount(app), "mobile");
+    for (const extra of [
+      { apns_topic: "com.example.app", apns_env: "production" },
+      { apns_topic: "com.shellx.prod", apns_env: "development" },
+      { apns_topic: "com.shellx.prod" },
+      { apns_env: "production" },
+      { apns_topic: "com.shellx.prod", apns_env: "production", token: "not-hex-token" },
+      { apns_topic: "com.shellx.prod", apns_env: "production", platform: "android" },
+    ]) {
+      const body = { token: APNS, platform: "ios", ...extra };
+      const res = await call(app, "PUT", "/v1/devices/me/push-token", { token: phone.token, body });
+      expect(res.status, JSON.stringify(extra)).toBe(400);
+    }
+    expect(tokenOf(phone.deviceId)).toBeUndefined();
   });
 });
 

@@ -6,6 +6,7 @@ import { Db } from "./db/db.js";
 import { migrate } from "./db/migrate.js";
 import { HubRegistry } from "./hub/registry.js";
 import { errorKind, logMeta } from "./log.js";
+import { loadApns } from "./push/apns.js";
 import { loadPush } from "./push/config.js";
 import { startRelay } from "./relay.js";
 import { createStopHandler } from "./stop.js";
@@ -37,6 +38,11 @@ try {
 const push = loadPush(process.env);
 if (push.gateway === null) logMeta("push_disabled", { reason: push.reason });
 else logMeta("push_enabled", { project: push.projectId });
+// APNs for the native iPhone app is optional as well: without APNS_KEY_PATH, APNS_KEY_ID and
+// APNS_TEAM_ID (and a readable .p8 key) POST /v2/notifications answers 503.
+const apns = loadApns(process.env);
+if (apns.gateway === null) logMeta("apns_disabled", { reason: apns.reason });
+else logMeta("apns_enabled");
 
 // Admin is optional too: without an ADMIN_PASSWORD of at least 16 characters the dashboard on
 // ADMIN_HOST only answers 503 admin_disabled. Neither line says anything about the password itself.
@@ -50,7 +56,7 @@ else logMeta("relay_v2_disabled", { reason: config.relayV2DisabledReason });
 
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
-  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway },
+  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, apns: apns.gateway },
   { host: config.host, port: config.port },
 ).catch((err: unknown) => fail(`cannot listen on ${config.host}:${config.port} (${errorKind(err)})`));
 logMeta("relay_started", { port: relay.port });

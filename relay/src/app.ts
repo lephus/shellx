@@ -14,6 +14,7 @@ import { accountRoutes } from "./routes/account.js";
 import { authRoutes } from "./routes/auth.js";
 import { deviceRoutes } from "./routes/devices.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { notificationRoutesV2 } from "./v2/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
 import { machineRoutes } from "./v2/machines.js";
 import { newSlot } from "./v2/encoding.js";
@@ -21,6 +22,7 @@ import { shareRoutes } from "./v2/shares.js";
 import { relayTicketRoutes } from "./v2/relay-tickets.js";
 import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import { phoneGrantRoutes, phonePairingRoutes } from "./v2/phones.js";
+import type { ApnsGateway } from "./push/apns.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 import { readNativeLatest } from "./native-latest.js";
@@ -38,6 +40,8 @@ export interface AppDeps {
   now?: () => number;
   /** FCM gateway; null or absent when push is not configured (503 `push_unavailable`). */
   push?: PushGateway | null;
+  /** APNs gateway for the native iPhone app; null or absent when not configured (503 `push_unavailable`). */
+  apns?: ApnsGateway | null;
   /** Directory of the admin UI (index.html, admin.css, admin.js); defaults to `relay/admin/`. */
   adminStaticDir?: string;
   /** The 6-digit code of a new /v2 pairing; defaults to `randomInt(0, 1_000_000)` zero-padded. Injectable for tests. */
@@ -54,6 +58,7 @@ export interface AppVariables {
   passwords: PasswordHasher;
   now: () => number;
   push: PushGateway | null;
+  apns: ApnsGateway | null;
   pairingCode: () => string;
   shareSlot: () => string;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
@@ -93,6 +98,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("passwords", deps.passwords ?? defaultPasswords);
     c.set("now", deps.now ?? Date.now);
     c.set("push", deps.push ?? null);
+    c.set("apns", deps.apns ?? null);
     c.set("pairingCode", deps.pairingCode ?? randomPairingCode);
     c.set("shareSlot", deps.shareSlot ?? newSlot);
     await next();
@@ -116,6 +122,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);
   app.route("/v1/notifications", notificationRoutes);
+  app.route("/v2/notifications", notificationRoutesV2);
   app.route("/v2/machines", machineRoutes);
   app.route("/v2/pairings", machinePairingRoutes);
   app.route("/v2/phone-pairings", phonePairingRoutes);

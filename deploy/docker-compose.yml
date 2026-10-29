@@ -36,6 +36,12 @@ services:
       # container, e.g. /secrets/fcm.json, set once by hand in .env (deploy/README.md, "Push
       # notifications"). Empty → push is off and the relay runs as before.
       FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      # Push to the native iPhone app (APNs, no Firebase): the .p8 provider key inside the container,
+      # e.g. /secrets/apns.p8, with its key id and the Apple team id, set once by hand in .env
+      # (deploy/README.md, "iPhone push (APNs)"). Any empty → POST /v2/notifications answers 503.
+      APNS_KEY_PATH: ${APNS_KEY_PATH:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
       # Password of admin.shellx.pro, set once by hand in the VPS's .env (deploy/README.md, "Admin"),
       # never in this repository. Empty or under 16 characters → the dashboard stays disabled.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
@@ -46,8 +52,8 @@ services:
     volumes:
       # SQLite database; the directory must belong to uid 1000 (the image's `node` user).
       - ./data:/data
-      # Secrets kept on the VPS only (never synced by deploy.yml), read-only; fcm.json must be
-      # readable by uid 1000.
+      # Secrets kept on the VPS only (never synced by deploy.yml), read-only; fcm.json and apns.p8
+      # must be readable by uid 1000.
       - ./secrets:/secrets:ro
       # Native desktop latest manifests (latest-macos.json / latest-windows.json), read-only.
       - ./downloads/desktop:/srv/downloads/desktop:ro

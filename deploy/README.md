@@ -214,6 +214,25 @@ account key; without one it runs normally and push is simply off (`docker compos
    so a plain `cp` over it fails), `docker compose up -d --force-recreate relay`, and delete the old
    key in the console.
 
+### iPhone push (APNs)
+
+The native iPhone app gets its alerts straight from APNs: the Mac calls `POST /v2/notifications`,
+and the relay signs with an APNs provider key (Apple Developer → Keys, team `W4RF3W4VTZ`, Apple Push
+Notifications service enabled). Without it the relay runs normally and logs `apns_disabled`.
+
+```bash
+mkdir -m 700 -p ~/apns-upload
+# from your machine: scp AuthKey_<KEYID>.p8 <deploy-user>@<vps>:apns-upload/apns.p8
+sudo install -o 1000 -g 1000 -m 400 ~/apns-upload/apns.p8 ~/phu/shellx/secrets/apns.p8
+rm -rf ~/apns-upload
+printf 'APNS_KEY_PATH=/secrets/apns.p8\nAPNS_KEY_ID=<KEYID>\nAPNS_TEAM_ID=W4RF3W4VTZ\n' >> ~/phu/shellx/.env
+cd ~/phu/shellx && docker compose up -d --force-recreate relay
+docker compose logs relay | grep apns_   # apns_enabled
+```
+
+One key serves both APNs hosts: Debug builds (`com.shellx.dev`) register sandbox tokens, App Store
+builds (`com.shellx.prod`) production ones, and the relay sends each token to its own host.
+
 The website only builds once the country hosting the VPS replaces `[quốc gia]` in
 `web/src/pages/privacy.md`, `web/src/pages/en/privacy.md`, `web/src/pages/terms.md` and
 `web/src/pages/en/terms.md` (update their `updated:` dates too). Until then every deploy stops at the
