@@ -61,6 +61,23 @@ struct ShellXPhonePushForwarderTests {
         ])
     }
 
+    @Test func aRequestAlertedBeforeAHostRestartStillGetsItsResolvedPush() async {
+        let sent = Sent()
+        let forwarder = Self.forwarder(sent: sent)
+
+        forwarder.start()
+        await forwarder.handle((revision: 1, added: [Self.item("r1")], resolved: []))
+        forwarder.stop()
+        forwarder.start()
+        await forwarder.handle((revision: 2, added: [], resolved: ["r1"]))
+        forwarder.stop()
+
+        #expect(sent.all == [
+            .needsYou(requestID: "r1", agent: "Claude Code", workspaceTitle: "shellx"),
+            .resolved(requestID: "r1"),
+        ])
+    }
+
     @Test func forwardingTurnedOffOrTheUserAtTheMacSendsNothing() async {
         let sent = Sent()
         let forwarder = Self.forwarder(allows: false, sent: sent)
