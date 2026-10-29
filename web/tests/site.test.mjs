@@ -19,7 +19,9 @@ const homePages = [
 
 const guideSlugs = ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn', 'shellx-vs-termius', 'shellx-vs-tailscale'];
 const guidePages = ['/guides/', '/en/guides/', ...guideSlugs.flatMap((s) => [`/guides/${s}/`, `/en/guides/${s}/`])];
-const indexablePages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', ...guidePages];
+const videoPages = [{ path: '/videos/', lang: 'vi', home: '/' }, { path: '/en/videos/', lang: 'en', home: '/en/' }];
+const indexablePages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/',
+  ...videoPages.map((v) => v.path), ...guidePages];
 const everyPage = [...indexablePages, '/404.html', '/s/'];
 
 function fileFor(pathname) {
@@ -150,7 +152,7 @@ test('every internal link resolves to a built file', () => {
 test('no external scripts, styles, fonts or media on any page', () => {
   // Patterns for checking external resources
   // Negative lookahead with boundary ensures shellx.pro is only allowed with path/quote boundary, not shellx.pro.evil.com, etc
-  const htmlOriginPattern = /<(?:script|link|img|source|iframe)\b[^>]*\b(?:src|href)="(?:https?:)?\/\/(?!shellx\.pro[/"])/gi;
+  const htmlOriginPattern = /<(?:script|link|img|source|iframe|video|audio|track)\b[^>]*\b(?:src|href|poster)="(?:https?:)?\/\/(?!shellx\.pro[/"])/gi;
   const cssUrlPattern = /url\(\s*["']?(?:https?:)?\/\/(?!shellx\.pro[/"'])/gi;
 
   // Validate that the patterns correctly identify evil domains but allow shellx.pro
@@ -231,7 +233,7 @@ test('self-hosted font files exist and are preloaded', () => {
 test('home has the landing sections: hero, how it works, features, security, steps, FAQ, download', () => {
   for (const p of ['/', '/en/']) {
     const html = readPage(p);
-    for (const id of ['how', 'features', 'security', 'start', 'faq', 'download']) {
+    for (const id of ['video', 'how', 'features', 'security', 'start', 'faq', 'download']) {
       assert.match(html, new RegExp(`<section[^>]*id="${id}"`), `${p}: missing section #${id}`);
     }
     assert.match(html, /data-demo/, `${p}: hero demo missing`);
@@ -429,13 +431,145 @@ test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries 
     assert.ok(txt.includes(`https://shellx.pro/guides/${s}/`), `llms.txt: missing vi guide ${s}`);
   }
   assert.ok(txt.includes(macUrl) && txt.includes(winUrl), 'llms.txt: download links');
+  for (const p of videoPages) assert.ok(txt.includes(`https://shellx.pro${p.path}`), `llms.txt: missing ${p.path}`);
   if (!config.appStoreUrl) assert.match(txt, /App Store: coming soon/);
   const full = readFileSync(join(dist, 'llms-full.txt'), 'utf8');
-  for (const needle of ['Is ShellX an SSH client?', 'ShellX có phải là SSH client không?', 'shellx skills install --claude', 'ShellX vs Termius']) {
+  for (const needle of ['Is ShellX an SSH client?', 'ShellX có phải là SSH client không?', 'shellx skills install --claude', 'ShellX vs Termius',
+    'open Settings, choose Mobile, and click Show QR Code.']) {
     assert.ok(full.includes(needle), `llms-full.txt: missing "${needle}"`);
   }
   assert.ok(!full.includes('layout:'), 'llms-full.txt: front matter leaked');
   assert.match(readPage('/'), /rel="alternate" type="text\/plain"[^>]*href="\/llms\.txt"/);
+});
+
+// Videos (src/lib/videos.ts, files in public/media/). The narration is English and English captions
+// are burned into the picture, so only the Vietnamese pages carry a subtitle track: Vietnamese, with
+// one cue per English caption and the same timings (src/videos/*.srt), drawn at the top of the frame.
+const videoNames = ['shellx-intro', 'shellx-tutorial'];
+
+function ldDocs(html) {
+  return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+}
+
+function videoTags(html) {
+  return html.match(/<video\b[\s\S]*?<\/video>/g) ?? [];
+}
+
+function srtTimings(name, lang) {
+  const srt = readFileSync(join(root, `src/videos/${name}.${lang}.srt`), 'utf8');
+  return [...srt.matchAll(/^(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})$/gm)]
+    .map((m) => `${m[1]} --> ${m[2]}`.replaceAll(',', '.'));
+}
+
+function seconds(timing) {
+  const [h, m, s] = timing.split(':').map(Number);
+  return h * 3600 + m * 60 + s;
+}
+
+for (const page of homePages) {
+  test(`home ${page.path} plays the 1-minute intro first and links to the full tutorial`, () => {
+    const html = readPage(page.path);
+    const section = html.match(/<section[^>]*id="video"[\s\S]*?<\/section>/)?.[0];
+    assert.ok(section, 'missing <section id="video">');
+    assert.ok(html.indexOf('id="video"') < html.indexOf('id="how"'), 'the intro comes after "how it works"');
+    const videos = videoTags(section);
+    assert.equal(videos.length, 1, 'one video on the home page');
+    const [video] = videos;
+    assert.match(video, /<source src="\/media\/shellx-intro\.mp4" type="video\/mp4"/);
+    assert.match(video, /\bpreload="none"/, 'the video loads only when played');
+    assert.match(video, /\bposter="\/media\/shellx-intro\.webp"/);
+    assert.match(video, /\bcontrols\b/);
+    assert.match(video, /\bplaysinline\b/);
+    if (page.lang === 'vi') {
+      assert.match(video, /<track kind="subtitles" src="\/media\/shellx-intro\.vi\.vtt" srclang="vi" label="Tiếng Việt" default/);
+    } else {
+      assert.ok(!video.includes('<track'), 'English captions are in the picture already');
+    }
+    const videosPage = page.lang === 'vi' ? '/videos/' : '/en/videos/';
+    assert.ok(hrefs(section).includes(videosPage), `the video section lacks a link to ${videosPage}`);
+    const hero = html.match(/<section class="hero"[\s\S]*?<\/section>/)[0];
+    assert.ok(hrefs(hero).includes('#video'), 'the hero lacks a link to #video');
+    const start = html.match(/<section[^>]*id="start"[\s\S]*?<\/section>/)[0];
+    assert.ok(hrefs(start).includes(videosPage), `the steps section lacks a link to ${videosPage}`);
+    const nav = html.match(/<nav class="top-nav"[\s\S]*?<\/nav>/)[0];
+    assert.ok(hrefs(nav).includes(videosPage), `menu lacks a link to ${videosPage}`);
+  });
+}
+
+for (const page of videoPages) {
+  test(`${page.path} plays the full tutorial with chapters and a transcript, then the intro`, () => {
+    const html = readPage(page.path);
+    assert.match(html, new RegExp(`<html lang="${page.lang}"`));
+    const videos = videoTags(html);
+    assert.equal(videos.length, 2);
+    assert.match(videos[0], /<source src="\/media\/shellx-tutorial\.mp4" type="video\/mp4"/);
+    assert.match(videos[1], /<source src="\/media\/shellx-intro\.mp4" type="video\/mp4"/);
+    for (const [video, name] of videos.map((v, i) => [v, videoNames[1 - i]])) {
+      assert.match(video, /\bpreload="none"/);
+      assert.ok(video.includes(`poster="/media/${name}.webp"`), `${name}: poster`);
+      assert.equal(video.includes(`src="/media/${name}.vi.vtt"`), page.lang === 'vi', `${name}: subtitle track`);
+    }
+    const chapters = [...html.matchAll(/data-t="(\d+)"/g)].map((m) => Number(m[1]));
+    assert.ok(chapters.length >= 8, `only ${chapters.length} chapters`);
+    assert.equal(chapters[0], 0);
+    assert.ok(chapters.every((t, i) => i === 0 || t > chapters[i - 1]), `chapters out of order: ${chapters}`);
+    assert.ok(chapters.at(-1) < 183, 'a chapter starts after the end of the video');
+    const transcript = page.lang === 'vi' ? 'mở Settings, chọn Mobile' : 'open Settings, choose Mobile, and click Show QR Code.';
+    assert.ok(html.includes(transcript), `${page.path}: transcript lacks "${transcript}"`);
+    assert.ok(hrefs(html).includes(`${page.home}#download`), `${page.path}: no download link`);
+
+    const docs = ldDocs(html);
+    const objects = docs.filter((d) => d['@type'] === 'VideoObject');
+    assert.equal(objects.length, 2, 'one VideoObject per video');
+    for (const v of objects) {
+      assert.ok(v.name && v.description && v.transcript, `${v.name}: name, description and transcript`);
+      assert.match(v.uploadDate, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+      const d = v.duration.match(/^PT(?:(\d+)M)?(\d+)S$/);
+      assert.ok(d, `${v.name}: duration ${v.duration}`);
+      const name = new URL(v.contentUrl).pathname.match(/^\/media\/([a-z-]+)\.mp4$/)?.[1];
+      assert.ok(videoNames.includes(name), `${v.name}: contentUrl ${v.contentUrl}`);
+      const lastCue = srtTimings(name, 'en').at(-1).split(' --> ')[1];
+      assert.ok(Number(d[1] ?? 0) * 60 + Number(d[2]) >= seconds(lastCue), `${v.name}: duration ends before the last caption`);
+      for (const url of [v.contentUrl, ...[v.thumbnailUrl].flat()]) {
+        assert.ok(url.startsWith('https://shellx.pro/media/'), `${v.name}: ${url}`);
+        assert.ok(existsSync(join(dist, new URL(url).pathname.slice(1))), `${url} missing from dist`);
+      }
+    }
+    const tutorial = objects.find((v) => v.contentUrl.endsWith('/shellx-tutorial.mp4'));
+    assert.deepEqual(tutorial.hasPart.map((c) => c.startOffset), chapters, 'Clip offsets differ from the chapter list');
+    for (const c of tutorial.hasPart) {
+      assert.equal(c['@type'], 'Clip');
+      assert.ok(c.name && c.endOffset > c.startOffset, `clip ${c.name}`);
+      assert.equal(c.url, `https://shellx.pro${page.path}?t=${c.startOffset}`);
+    }
+    const crumbs = docs.find((d) => d['@type'] === 'BreadcrumbList');
+    assert.equal(crumbs?.itemListElement.at(-1).item, `https://shellx.pro${page.path}`, `${page.path}: breadcrumb`);
+  });
+}
+
+test('Vietnamese subtitles keep the English timings and sit at the top, clear of the burned-in captions', () => {
+  for (const name of videoNames) {
+    const vtt = readFileSync(join(dist, `media/${name}.vi.vtt`), 'utf8');
+    assert.match(vtt, /^WEBVTT\n\n/);
+    const cues = [...vtt.matchAll(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})(.*)\n(.+)$/gm)];
+    assert.deepEqual(cues.map((m) => m[1]), srtTimings(name, 'en'), `${name}: vi cues differ from the English timings`);
+    assert.deepEqual(cues.map((m) => m[1]), srtTimings(name, 'vi'), `${name}: vi.srt timings differ from the VTT`);
+    for (const m of cues) assert.equal(m[2], ' line:0', `${name}: cue ${m[1]} is not placed at the top`);
+    assert.match(vtt, /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/, `${name}: no Vietnamese text`);
+  }
+});
+
+test('video files are self-hosted, start streaming before the download ends and carry no text track', () => {
+  for (const name of videoNames) {
+    const file = join(dist, `media/${name}.mp4`);
+    assert.ok(existsSync(file), `missing media/${name}.mp4`);
+    const mp4 = readFileSync(file);
+    assert.ok(mp4.length < 12 * 1024 * 1024, `${name}.mp4 is ${mp4.length} bytes`);
+    assert.ok(mp4.indexOf('moov') < mp4.indexOf('mdat'), `${name}.mp4: moov after mdat (no faststart)`);
+    // A tx3g text track would show up in Safari's caption menu next to the burned-in captions.
+    assert.equal(mp4.indexOf('tx3g'), -1, `${name}.mp4 carries a text track`);
+    assert.ok(existsSync(join(dist, `media/${name}.webp`)), `missing media/${name}.webp`);
+  }
 });
 
 test('IndexNow key file is served at /<key>.txt and holds exactly the key', () => {

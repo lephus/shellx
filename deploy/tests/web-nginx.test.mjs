@@ -131,3 +131,16 @@ test('the relay URL handed to viewers (RELAY_V2_URL default and relay.env) is al
     assert.ok(allowedBy(sources, url), `${url} is not in connect-src ${sources.join(' ')}`);
   }
 });
+
+// --- /media/: the website's videos, posters and subtitles (web/public/media/) ---
+
+test('/media/ serves subtitles as text/vtt and keeps the video, image and caching headers', () => {
+  const loc = locationBlock('/media/');
+  // `types` inside a location replaces nginx's mime.types there, so every served extension is listed.
+  const types = loc.match(/types \{([^}]*)\}/)?.[1] ?? '';
+  for (const [type, ext] of [['video/mp4', 'mp4'], ['image/webp', 'webp'], ['text/vtt', 'vtt']]) {
+    assert.match(types, new RegExp(`\\b${type.replace('/', '\\/')}\\s+${ext};`), `${ext} → ${type}`);
+  }
+  assert.ok(loc.includes('add_header Cache-Control "public, max-age=604800" always;'), 'Cache-Control');
+  assert.ok(loc.includes('add_header X-Content-Type-Options "nosniff" always;'), 'nosniff');
+});
