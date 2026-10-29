@@ -49,6 +49,28 @@ final class AgentThreadModelTests: XCTestCase {
         await rig.store.load(.thread(ref), as: ChatThread.self)
     }
 
+    // MARK: - Seen
+
+    func testRunMarksTheSessionSeen() async throws {
+        let mac = await mac(history: entries(1...3))
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        let s1 = ref(mac)
+        let rig = try await HubRig.make([mac], in: self)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let id = mac.machine.machineID
+        await mac.upsertSession(agentSession("s1", state: .idle, lastActivityMs: 2, stateSinceMs: 2))
+        await mac.upsertSession(agentSession("s2", state: .idle, lastActivityMs: 2, stateSinceMs: 2, workspace: "web"))
+        let both = await eventually { rig.hub.finishedSessionIds(machineID: id) == ["s1", "s2"] }
+        XCTAssertTrue(both)
+
+        let (model, _) = model(s1, rig)
+        let task = Task { await model.run() }
+        let seen = await eventually { rig.hub.finishedSessionIds(machineID: id) == ["s2"] }
+        task.cancel()
+        XCTAssertTrue(seen, "opening an agent clears it from Just finished, and only it")
+    }
+
     // MARK: - History
 
     func testOpenShowsCacheThenLatest() async throws {

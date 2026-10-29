@@ -4261,6 +4261,42 @@
           }
         }
       }
+    },
+    "ended.title": {
+      "comment": "Title of the page that lists the agent sessions that ended in the last 12 hours.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã kết thúc"
+          }
+        }
+      }
+    },
+    "ended.empty": {
+      "comment": "Shown on the Ended page when no agent session ended in the last 12 hours.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No agent ended in the last 12 hours"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có agent nào kết thúc trong 12 giờ qua"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

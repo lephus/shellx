@@ -227,6 +227,8 @@ public final class AgentThreadModel {
     /// section 4, ruling P3-R7). Cancelled before that, it asks for nothing.
     public func run() async {
         closed = false
+        // Every way of opening an agent runs this: it no longer counts as just finished.
+        hub.markSeen(ref)
         // Subscribing and reading the hub's reset count happen in one main-actor step: every reset
         // is either counted here or delivered to `chat`.
         let chat = hub.chatUpdates()

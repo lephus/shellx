@@ -59,8 +59,7 @@ struct SignedInView: View {
                 case let .otherSessions(machineID):
                     OtherSessionsView(hub: hub, machineID: machineID)
                 case .ended:
-                    // `EndedSessionsView` lands with the ended page.
-                    EmptyView()
+                    EndedSessionsView(hub: hub)
                 }
             }
         }

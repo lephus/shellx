@@ -245,29 +245,81 @@ final class WorkspaceListRenderTests: XCTestCase {
         try assertRenders(list([Self.mini]), name: "workspaces-offline")
     }
 
+    private static func machineSession(
+        _ id: String, title: String, machine: String = "m1", machineName: String = "MacBook Pro", workspace: String = "",
+        state: AgentState, since: Int64
+    ) -> MachineSession {
+        MachineSession(
+            machineID: machine, machineName: machineName, online: true,
+            session: AgentSession(
+                sessionId: id, agent: "claude", workspaceId: workspace.isEmpty ? "" : "ws-\(workspace)",
+                workspaceTitle: workspace, title: title, state: state, stateSinceMs: since, lastActivityMs: since))
+    }
+
     func testOtherSessionsListRenders() throws {
+        let nowMs: Int64 = 1_700_000_000_000
         let sessions = [
-            MachineSession(
-                machineID: "m1", machineName: "MacBook Pro", online: true,
-                session: AgentSession(
-                    sessionId: "s1", agent: "claude", workspaceId: "ws-gone", workspaceTitle: "old-experiment",
-                    title: "Fix the flaky test", state: .working, stateSinceMs: 1_700_000_000_000 - 240_000,
-                    lastActivityMs: 1_700_000_000_000)),
-            MachineSession(
-                machineID: "m1", machineName: "MacBook Pro", online: true,
-                session: AgentSession(
-                    sessionId: "s2", agent: "claude", workspaceId: "", workspaceTitle: "ssh-box", state: .ended,
-                    lastActivityMs: 1_699_999_000_000)),
+            Self.machineSession("s1", title: "X", workspace: "old-experiment", state: .working, since: nowMs - 240_000),
+            Self.machineSession("s2", title: "X", workspace: "old-experiment", state: .idle, since: nowMs - 60_000),
         ]
+        let names = SessionName.distinct(sessions, timeZone: TimeZone(identifier: "UTC") ?? .current)
+        XCTAssertEqual(sessions.map { names[$0.ref] }, ["X", "X · #2"])
+        let items = sessions.map { FocusItem(session: $0, name: names[$0.ref] ?? "") }
         try assertRenders(
             NavigationStack {
-                OtherSessionsList(
-                    machineName: "MacBook Pro", sessions: sessions, now: Date(timeIntervalSince1970: 1_700_000_000))
+                SessionListScreen(
+                    title: "Agents Outside Workspaces", header: "MacBook Pro", items: items,
+                    kind: { $0.session.session.state == .working ? .running : .ended },
+                    now: Self.now, showsMachineName: false, empty: LocalizedStringResource("workspaces.other.empty"))
             },
             name: "workspaces-other-sessions-list")
         try assertRenders(
-            NavigationStack { OtherSessionsList(machineName: "MacBook Pro", sessions: [], now: .now) },
+            NavigationStack {
+                SessionListScreen(
+                    title: "Agents Outside Workspaces", header: "MacBook Pro", items: [], kind: .running, now: .now,
+                    showsMachineName: false, empty: LocalizedStringResource("workspaces.other.empty"))
+            },
             name: "workspaces-other-sessions-empty")
+    }
+
+    func testEndedListRenders() throws {
+        let nowMs: Int64 = 1_700_000_000_000
+        let sessions = [
+            Self.machineSession("e1", title: "Release 1.5.1", workspace: "web", state: .ended, since: nowMs - 7_200_000),
+            Self.machineSession("e2", title: "Fix the flaky test", workspace: "shellx", state: .ended, since: nowMs - 14_400_000),
+            Self.machineSession(
+                "e3", title: "Benchmark", machine: "m2", machineName: "Mac mini", workspace: "bench", state: .ended,
+                since: nowMs - 30_000_000),
+        ]
+        let focus = HomeFocus.make(sessions: sessions, pending: [], finished: [:], now: Self.now)
+        XCTAssertEqual(focus.ended.map(\.session.session.sessionId), ["e1", "e2", "e3"])
+        try assertRenders(
+            NavigationStack {
+                SessionListScreen(
+                    title: "Ended", header: nil, items: focus.ended, kind: .ended, now: Self.now, showsMachineName: true,
+                    empty: LocalizedStringResource("ended.empty"))
+            },
+            name: "ended-list")
+    }
+
+    func testEndedListEmptyRenders() throws {
+        try assertRenders(
+            NavigationStack {
+                SessionListScreen(
+                    title: "Ended", header: nil, items: [], kind: .ended, now: Self.now, showsMachineName: false,
+                    empty: LocalizedStringResource("ended.empty"))
+            },
+            name: "ended-empty")
+    }
+
+    func testAnOtherSessionIsDrawnByItsState() {
+        func session(_ state: AgentState) -> AgentSession {
+            AgentSession(sessionId: "s", agent: "claude", workspaceId: "", workspaceTitle: "", state: state)
+        }
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.needsInput), finished: []), .needsYou)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.working), finished: []), .running)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finished: ["s"]), .justDone)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finished: []), .ended)
     }
 
     func testRenameSheetRenders() throws {

@@ -4,7 +4,8 @@ import ShellXLinkCore
 /// What the Debug demo's Mac (`SHELLX_DEMO=1`) does over time, so every screen has something to
 /// show before a real Mac serves phones.
 ///
-/// `setUp()` gives the Mac two Claude Code sessions, both working, each with a chat history that
+/// `setUp()` gives the Mac two Claude Code sessions, both working (and two more outside any terminal,
+/// one idle and one ended), each with a chat history that
 /// holds every kind of entry (user, agent and system; prose, thought, tool use, status; one cut
 /// short), and three workspaces (`workspaces`) that hold them. Then every `interval`, `step(_:)`
 /// adds a pending request, in turn a permission, a question and a plan, and switches one session
@@ -46,6 +47,14 @@ public actor FakeMacDemoScript {
             AgentSession(
                 sessionId: "demo-web", agent: "claude", workspaceId: "ws-web", workspaceTitle: "web",
                 title: "Landing page", state: .working, stateSinceMs: ms - 300_000, lastActivityMs: ms - 60_000),
+            // Outside every terminal, with the same title as the first: the lists show "Pairing sheet · #2".
+            AgentSession(
+                sessionId: "demo-shellx-2", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx",
+                title: "Pairing sheet", state: .idle, stateSinceMs: ms - 600_000, lastActivityMs: ms - 600_000),
+            // Ended two hours ago: the Ended page has a row.
+            AgentSession(
+                sessionId: "demo-ended", agent: "claude", workspaceId: "ws-web", workspaceTitle: "web",
+                title: "Release 1.5.1", state: .ended, stateSinceMs: ms - 7_200_000, lastActivityMs: ms - 7_200_000),
         ]
         for session in sessions {
             await mac.setHistory(sessionId: session.sessionId, entries: Self.history(for: session.workspaceTitle, at: ms))
@@ -78,15 +87,15 @@ public actor FakeMacDemoScript {
     public func step(_ index: Int) async {
         let ms = millis()
         let id = "demo-\(index)-\(ms)"
-        let session = sessions.isEmpty ? nil : sessions[index % sessions.count]
+        let session = stepped.isEmpty ? nil : stepped[index % stepped.count]
         let workspace = session?.workspaceTitle ?? "shellx"
         await mac.addPending(Self.request(id: id, kind: index % 3, workspace: workspace, at: ms))
         waiting.append(id)
         while waiting.count > Self.maxPending {
             await mac.resolvePending(waiting.removeFirst())
         }
-        guard !sessions.isEmpty else { return }
-        let slot = index % sessions.count
+        guard let session else { return }
+        let slot = sessions.firstIndex { $0.sessionId == session.sessionId } ?? 0
         sessions[slot].state = sessions[slot].state == .working ? .idle : .working
         sessions[slot].stateSinceMs = ms
         sessions[slot].lastActivityMs = ms
@@ -99,6 +108,9 @@ public actor FakeMacDemoScript {
         await mac.pushChat(sessionId: sessions[slot].sessionId, entries: [entry])
         await mac.upsertSession(sessions[slot])
     }
+
+    /// The sessions the steps flip: the first two, which work in a terminal.
+    private var stepped: [AgentSession] { Array(sessions.prefix(2)) }
 
     private func millis() -> Int64 { Int64(now().timeIntervalSince1970 * 1000) }
 

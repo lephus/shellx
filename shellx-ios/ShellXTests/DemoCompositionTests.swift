@@ -95,8 +95,10 @@ final class DemoCompositionTests: XCTestCase {
         XCTAssertTrue(listed, "\(hub.workspaceRows(machineID: id).map(\.title))")
         XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.title), ["shellx-ios", "relay", "web", "notes"])
         XCTAssertTrue(hub.supportsWorkspaceControl(id))
-        // The script's two sessions are in `shellx-ios` and `web`; nothing is left over.
-        XCTAssertEqual(hub.otherSessions(machineID: id), [])
+        // The script's two working sessions are in `shellx-ios` and `web`; its idle second "Pairing sheet"
+        // is outside every workspace (the ended one is on the Ended page).
+        let others = await eventually { hub.otherSessions(machineID: id).map(\.session.sessionId) == ["demo-shellx-2"] }
+        XCTAssertTrue(others, "\(hub.otherSessions(machineID: id).map(\.session.sessionId))")
     }
 
     func testDemoAgentScreenShowsTheScriptedChatAndStops() async throws {
@@ -107,7 +109,7 @@ final class DemoCompositionTests: XCTestCase {
         let hub = try XCTUnwrap(graph.coordinator.hub)
         addTeardownBlock { @MainActor in await hub.stopAll() }
         let scope = try XCTUnwrap(graph.scopes.scope(for: hub))
-        let listed = await eventually { hub.liveSessions.count == 2 }
+        let listed = await eventually { hub.liveSessions.count == 3 }
         XCTAssertTrue(listed, "\(hub.machines.map(\.state))")
         let session = try XCTUnwrap(hub.liveSessions.first { $0.session.workspaceTitle == "shellx" })
 

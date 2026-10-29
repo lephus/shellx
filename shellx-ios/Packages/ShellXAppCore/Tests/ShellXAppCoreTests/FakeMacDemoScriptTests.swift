@@ -31,9 +31,10 @@ final class FakeMacDemoScriptTests: XCTestCase {
         await script.setUp()
         let hub = try await hub(for: mac)
 
-        let ready = await eventually { hub.liveSessions.count == 2 }
+        let ready = await eventually { hub.liveSessions.count == 3 }
         XCTAssertTrue(ready)
-        XCTAssertEqual(hub.liveSessions.map(\.session.state), [.working, .working])
+        XCTAssertEqual(hub.liveSessions.map(\.session.state), [.working, .working, .idle])
+        XCTAssertEqual(hub.reachableSessions.count, 4, "and one that ended two hours ago")
         XCTAssertEqual(Set(hub.liveSessions.map(\.session.agent)), ["claude"])
 
         var roles: Set<String> = []
@@ -54,13 +55,14 @@ final class FakeMacDemoScriptTests: XCTestCase {
         let hub = try await hub(for: mac)
         let id = mac.machine.machineID
 
-        let ready = await eventually { hub.workspaceRows(machineID: id).count == 3 && hub.liveSessions.count == 2 }
+        let ready = await eventually { hub.workspaceRows(machineID: id).count == 3 && hub.liveSessions.count == 3 }
 
         XCTAssertTrue(ready)
         XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.title), ["shellx", "web", "docs"])
         XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.state), [.running, .running, .idle])
-        // Both sessions sit in a terminal, so none is left for the "other sessions" list.
-        XCTAssertEqual(hub.otherSessions(machineID: id), [])
+        // The two working sessions sit in a terminal; the idle second "Pairing sheet" is left for the
+        // "other sessions" list, and the ended one is on the Ended page.
+        XCTAssertEqual(hub.otherSessions(machineID: id).map(\.session.sessionId), ["demo-shellx-2"])
 
         await script.step(0)
         let asks = await eventually { hub.workspaceRows(machineID: id).map(\.state) == [.needsYou, .running, .idle] }
@@ -72,7 +74,7 @@ final class FakeMacDemoScriptTests: XCTestCase {
         let script = FakeMacDemoScript(mac: mac)
         await script.setUp()
         let hub = try await hub(for: mac)
-        _ = await eventually { hub.liveSessions.count == 2 }
+        _ = await eventually { hub.liveSessions.count == 3 }
 
         for index in 0..<3 { await script.step(index) }
 
@@ -124,7 +126,7 @@ final class FakeMacDemoScriptTests: XCTestCase {
         await script.setUp()
         for index in 0..<3 { await script.step(index) }
         let hub = try await hub(for: mac)
-        _ = await eventually { hub.liveSessions.count == 2 }
+        _ = await eventually { hub.liveSessions.count == 3 }
         let sleeper = ManualSleeper()
         let running = Task { await script.run(sleep: sleeper.sleep, setUp: false, from: 3) }
         defer { running.cancel() }
