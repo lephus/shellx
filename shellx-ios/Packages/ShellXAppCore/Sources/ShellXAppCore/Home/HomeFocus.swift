@@ -46,8 +46,9 @@ public struct HomeFocus: Equatable, Sendable {
     ///   request in `pending` matching it; a request goes to the most recently active matching card;
     /// - running: `.working`;
     /// - just finished: `.idle` and in `finished` (per Mac, by session id) for less than `justDoneFor`;
-    /// - ended: `.ended` for less than `endedFor`, counted from `stateSinceMs`, else `lastActivityMs`;
-    ///   with neither the session is hidden. A negative age (the Mac's clock is ahead) counts as 0.
+    /// - ended: `.ended` for less than `endedFor`, counted from `stateSinceMs`, else `lastActivityMs`
+    ///   (`endedMs(of:)`); with neither the session is hidden. A negative age (the Mac's clock is ahead)
+    ///   counts as 0. A session in `dismissed` (the user took it off the list) is left out too.
     ///
     /// The first three lists are newest activity first, then by (machineID, sessionId). Names are distinct
     /// across those three together; Ended has its own pass.
@@ -86,9 +87,10 @@ public struct HomeFocus: Equatable, Sendable {
                 max(0, now.timeIntervalSince(at)) < justDoneFor
             {
                 done.append(machineSession)
-            } else if session.state == .ended, let endedMs = session.stateSinceMs ?? session.lastActivityMs {
-                let age = max(0, now.timeIntervalSince1970 - Double(endedMs) / 1000)
-                if age < endedFor { ended.append((machineSession, endedMs)) }
+            } else if session.state == .ended, let endedMs = endedMs(of: session) {
+                if endedAge(ms: endedMs, now: now) < endedFor, !dismissed.hides(machineSession) {
+                    ended.append((machineSession, endedMs))
+                }
             }
         }
 
@@ -115,6 +117,17 @@ public struct HomeFocus: Equatable, Sendable {
                     finishedAt: finished[$0.machineID]?[$0.session.sessionId])
             },
             ended: items(endedSessions, endedNames))
+    }
+
+    /// When the session ended, as the Mac's milliseconds: when it entered its state, else its last activity.
+    /// Nil when the Mac gave neither; such a session is never on the Ended list.
+    public static func endedMs(of session: AgentSession) -> Int64? {
+        session.stateSinceMs ?? session.lastActivityMs
+    }
+
+    /// How long ago an end at `ms` was. A negative age (the Mac's clock is ahead) counts as 0.
+    static func endedAge(ms: Int64, now: Date) -> TimeInterval {
+        max(0, now.timeIntervalSince1970 - Double(ms) / 1000)
     }
 
     /// The most recently active of `sessions`; ties go to the lower `sessionId`.
