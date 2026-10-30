@@ -23,11 +23,13 @@ struct WorkspaceListView: View {
         let groups = Self.groups(hub)
         let sessions = hub.reachableSessions
         let finishTimes = hub.finishTimes
+        let dismissed = scope.endedDismissals.dismissals
         let showsMachineNames = hub.machines.count > 1
         TimelineView(.periodic(from: .now, by: 30)) { context in
             WorkspaceListScreen(
                 groups: groups,
-                focus: HomeFocus.make(sessions: sessions, pending: pending, finished: finishTimes, now: context.date),
+                focus: HomeFocus.make(
+                    sessions: sessions, pending: pending, finished: finishTimes, dismissed: dismissed, now: context.date),
                 pending: pending,
                 creating: creating,
                 notice: scope.listNotice.current,

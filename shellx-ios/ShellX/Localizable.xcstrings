@@ -4279,6 +4279,42 @@
           }
         }
       }
+    },
+    "ended.remove": {
+      "comment": "Swipe action on a card of the Ended page: take the session off the list. It only hides it on this phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá"
+          }
+        }
+      }
+    },
+    "ended.remove.named %@": {
+      "comment": "VoiceOver label of the trash button on a card of the Ended page; the argument is the session's name. It only hides the session on this phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@” from Ended"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá “%@” khỏi Đã kết thúc"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -297,7 +297,7 @@ final class WorkspaceListRenderTests: XCTestCase {
             NavigationStack {
                 SessionListScreen(
                     title: "Ended", header: nil, items: focus.ended, kind: .ended, now: Self.now, showsMachineName: true,
-                    empty: LocalizedStringResource("ended.empty"))
+                    empty: LocalizedStringResource("ended.empty"), remove: { _ in })
             },
             name: "ended-list")
     }

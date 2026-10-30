@@ -22,6 +22,9 @@ struct FocusRowView: View {
     let now: Date
     /// Two or more Macs are paired: the sub line names the Mac.
     let showsMachineName: Bool
+    /// Room kept free at the card's right edge, for a button the list draws over it (the Ended page's
+    /// trash); the text never runs under it.
+    var trailingInset: CGFloat = 0
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -121,7 +124,8 @@ struct FocusRowView: View {
                     .padding(.top, 1)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.leading, 12)
+        .padding(.trailing, 12 + trailingInset)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .background(Color.appSurface, in: shape)

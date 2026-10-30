@@ -1,7 +1,8 @@
 import ShellXAppCore
 
 /// What the signed-in account's screens share: its hub, the decision center, the pairing model, the
-/// history store and the sweeper of its stale copies, the voice input and the count of open sheets.
+/// history store and the sweeper of its stale copies, the voice input, the count of open sheets and the
+/// ended sessions taken off the Ended list.
 /// Made with the hub at every sign-in (`AppComposition`) and dropped with it.
 @MainActor
 final class SignedInScope {
@@ -18,11 +19,14 @@ final class SignedInScope {
     let sheets: SheetPresence
     /// What the workspace list says once more: a workspace screen that closed itself leaves a line here.
     let listNotice = ListNotice()
+    /// The ended sessions the user took off the Ended page; the home's "Ended" fold leaves them out too.
+    let endedDismissals: EndedDismissalStore
     private let launch: LaunchMark
 
     init(
         hub: MachineHub, decisions: DecisionCenter, pairing: PairingModel, history: ConversationStore,
-        launch: LaunchMark, voice: VoiceService? = nil, sheets: SheetPresence = SheetPresence()
+        launch: LaunchMark, endedDismissals: EndedDismissalStore, voice: VoiceService? = nil,
+        sheets: SheetPresence = SheetPresence()
     ) {
         self.hub = hub
         self.decisions = decisions
@@ -30,6 +34,7 @@ final class SignedInScope {
         self.history = history
         chatCopies = ChatCopySweeper(hub: hub, store: history)
         self.launch = launch
+        self.endedDismissals = endedDismissals
         self.voice = voice
         self.sheets = sheets
     }

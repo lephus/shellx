@@ -6,7 +6,8 @@ import SwiftUI
 /// `AgentView` (`WorkspaceListView` registers `SessionRef`).
 ///
 /// It is laid out as the home is: a plain list with the same room around a card
-/// (`WorkspaceListScreen.cardInsets`) and no gap over the first one.
+/// (`WorkspaceListScreen.cardInsets`) and no gap over the first one. With `remove` each card has a trash
+/// button at its right edge, and swiping the card to the left does the same.
 struct SessionListScreen: View {
     let title: String
     /// Over the cards, e.g. a Mac's name; none for a list that spans the Macs.
@@ -18,10 +19,12 @@ struct SessionListScreen: View {
     let showsMachineName: Bool
     /// Shown in place of the cards when there are none.
     let empty: LocalizedStringResource
+    /// Takes a card off the list; nil draws no trash.
+    let remove: ((FocusItem) -> Void)?
 
     init(
         title: String, header: String?, items: [FocusItem], kind: @escaping (FocusItem) -> FocusRowView.Kind,
-        now: Date, showsMachineName: Bool, empty: LocalizedStringResource
+        now: Date, showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil
     ) {
         self.title = title
         self.header = header
@@ -30,17 +33,22 @@ struct SessionListScreen: View {
         self.now = now
         self.showsMachineName = showsMachineName
         self.empty = empty
+        self.remove = remove
     }
 
     /// Every card in the same group.
     init(
         title: String, header: String?, items: [FocusItem], kind: FocusRowView.Kind, now: Date,
-        showsMachineName: Bool, empty: LocalizedStringResource
+        showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil
     ) {
         self.init(
             title: title, header: header, items: items, kind: { _ in kind }, now: now,
-            showsMachineName: showsMachineName, empty: empty)
+            showsMachineName: showsMachineName, empty: empty, remove: remove)
     }
+
+    /// The trash button's square: a touch target of 44 points at the card's right edge, which the card's
+    /// text leaves free.
+    private static let removeSize: CGFloat = 44
 
     var body: some View {
         List {
@@ -68,14 +76,30 @@ struct SessionListScreen: View {
                 }
                 ForEach(items) { item in
                     NavigationLink(value: item.id) {
-                        FocusRowView(item: item, kind: kind(item), now: now, showsMachineName: showsMachineName)
+                        FocusRowView(
+                            item: item, kind: kind(item), now: now, showsMachineName: showsMachineName,
+                            trailingInset: remove == nil ? 0 : Self.removeSize)
                     }
                     .navigationLinkIndicatorVisibility(.hidden)
                     .accessibilityHint(Text(LocalizedStringResource("agent.open.hint")))
                     .accessibilityIdentifier("sessionList.row.\(item.session.session.sessionId)")
+                    // Over the link, not in its label: a button in the label would be one element with the card.
+                    .overlay(alignment: .trailing) {
+                        if let remove { removeButton(for: item, remove) }
+                    }
                     .listRowInsets(WorkspaceListScreen.cardInsets)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if let remove {
+                            // `.destructive`: nothing is asked, so the row may go as soon as it is swiped.
+                            Button(role: .destructive) {
+                                remove(item)
+                            } label: {
+                                Label(String(localized: "ended.remove"), systemImage: "trash")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -85,5 +109,22 @@ struct SessionListScreen: View {
         .themedList()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// The trash at the card's right edge. Borderless, so a tap on it is its own and the row's link
+    /// stays for the rest of the card.
+    private func removeButton(for item: FocusItem, _ remove: @escaping (FocusItem) -> Void) -> some View {
+        Button {
+            remove(item)
+        } label: {
+            Image(systemName: "trash")
+                // `Color`, not the hierarchical `.secondary`: that one is the button's accent colour, faded.
+                .foregroundStyle(Color.secondary)
+                .frame(width: Self.removeSize, height: Self.removeSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(Text(LocalizedStringResource("ended.remove.named \(item.name)")))
+        .accessibilityIdentifier("sessionList.remove.\(item.session.session.sessionId)")
     }
 }

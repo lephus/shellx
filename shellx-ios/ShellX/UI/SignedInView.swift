@@ -59,7 +59,7 @@ struct SignedInView: View {
                 case let .otherSessions(machineID):
                     OtherSessionsView(hub: hub, machineID: machineID)
                 case .ended:
-                    EndedSessionsView(hub: hub)
+                    EndedSessionsView(hub: hub, dismissals: scope.endedDismissals)
                 }
             }
         }
