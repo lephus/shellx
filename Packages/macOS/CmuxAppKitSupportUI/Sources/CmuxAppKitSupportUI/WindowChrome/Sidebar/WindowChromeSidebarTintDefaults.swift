@@ -4,9 +4,10 @@ import ShellXBrand
 
 /// Default sidebar tint values. ShellX: the opaque `panel` token
 /// (`ShellXPalette.panel`, #100b1d). The sidebar does not match the terminal
-/// background by default. While the tint stays at this default, the sidebar
-/// takes its color from the terminal theme (``themeTint(forTerminalBackground:)``),
-/// which gives `panel` for the ShellX theme (spec §7.4).
+/// background by default. Until the user picks their own tint, the sidebar
+/// takes its color from the terminal theme (``themeTint(forTerminalBackground:rendered:)``),
+/// which gives `panel` for the ShellX theme (spec §7.4). `ShellXSidebarTintSource`
+/// decides which applies.
 public struct WindowChromeSidebarTintDefaults: Sendable {
     /// Default tint hex value.
     public let hex: String
@@ -22,21 +23,6 @@ public struct WindowChromeSidebarTintDefaults: Sendable {
 
     /// `ShellXPalette.panel` as an uppercase `#RRGGBB` string.
     public static let shellXPanelHex = ShellXPalette.panel.hexString.uppercased()
-
-    /// Whether the sidebar tint settings are still the default, so the
-    /// sidebar follows the terminal theme. A chosen hex, a light or dark
-    /// override, or a lowered opacity is the user's own tint and wins.
-    public static func followsTerminalTheme(
-        tintHex: String,
-        tintHexLight: String?,
-        tintHexDark: String?,
-        tintOpacity: Double
-    ) -> Bool {
-        tintHexLight == nil
-            && tintHexDark == nil
-            && tintOpacity >= 0.999
-            && tintHex.caseInsensitiveCompare(shellXPanelHex) == .orderedSame
-    }
 
     /// The sidebar color for a terminal theme: one small step off what the
     /// terminal draws, so the sidebar takes the theme's color and still reads
