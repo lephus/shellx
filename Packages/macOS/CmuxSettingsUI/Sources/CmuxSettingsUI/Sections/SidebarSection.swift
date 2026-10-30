@@ -11,6 +11,11 @@ public struct SidebarSection: View {
     @State private var fontSaveFailed = false
     @State private var tasks = MainActorTaskStore<String>()
     @State private var matchTerminal: DefaultsValueModel<Bool>
+    @State private var tintSource: DefaultsValueModel<SidebarTintSourceOption>
+    @State private var tintHex: DefaultsValueModel<String>
+    @State private var tintHexLight: DefaultsValueModel<String>
+    @State private var tintHexDark: DefaultsValueModel<String>
+    @State private var tintOpacity: DefaultsValueModel<Double>
     @State var hideAll: DefaultsValueModel<Bool>
     @State private var wrapTitles: DefaultsValueModel<Bool>
     @State private var showDesc: DefaultsValueModel<Bool>
@@ -45,6 +50,11 @@ public struct SidebarSection: View {
         _rightSidebarTabs = State(initialValue: hostActions.rightSidebarTabs())
         _sidebarFont = State(initialValue: hostActions.sidebarFontSize())
         _matchTerminal = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebarAppearance.matchTerminalBackground))
+        _tintSource = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebarAppearance.tintSource))
+        _tintHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebarAppearance.tintColorHex))
+        _tintHexLight = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebarAppearance.lightModeTintColorHex))
+        _tintHexDark = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebarAppearance.darkModeTintColorHex))
+        _tintOpacity = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebarAppearance.tintOpacity))
         _hideAll = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.hideAllDetails))
         _wrapTitles = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.wrapWorkspaceTitles))
         _showDesc = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.sidebar.showWorkspaceDescription))
@@ -92,6 +102,11 @@ public struct SidebarSection: View {
     private func startObservingSettings() {
         let models: [any SettingObservationStarting] = [
             matchTerminal,
+            tintSource,
+            tintHex,
+            tintHexLight,
+            tintHexDark,
+            tintOpacity,
             hideAll,
             wrapTitles,
             showDesc,
@@ -125,6 +140,34 @@ public struct SidebarSection: View {
             if !Task.isCancelled { fontSaveFailed = !saved }
         }
     }
+    private var backgroundChoice: SidebarBackgroundChoice {
+        SidebarBackgroundChoice(
+            matchesTerminal: matchTerminal.current,
+            source: tintSource.current,
+            tintHex: tintHex.current,
+            tintHexLight: tintHexLight.current,
+            tintHexDark: tintHexDark.current,
+            tintOpacity: tintOpacity.current
+        )
+    }
+
+    private func setBackgroundChoice(_ choice: SidebarBackgroundChoice) {
+        if matchTerminal.current != choice.matchesTerminal {
+            matchTerminal.set(choice.matchesTerminal)
+        }
+        if let source = choice.tintSource, tintSource.current != source {
+            tintSource.set(source)
+        }
+    }
+
+    /// Stores the picked color as the one the sidebar draws: a light or dark
+    /// override left from earlier would otherwise draw instead of it.
+    private func setOwnTint(_ hex: String) {
+        tintHex.set(hex)
+        if !tintHexLight.current.isEmpty { tintHexLight.reset() }
+        if !tintHexDark.current.isEmpty { tintHexDark.reset() }
+    }
+
     private var rightMaxWidthOverrideEnabled: Bool {
         rightMaxWidth.current.isFinite && rightMaxWidth.current > 0
     }
@@ -182,15 +225,42 @@ public struct SidebarSection: View {
         SettingsCard {
             SettingsCardRow(
                 configurationReview: .json("sidebarAppearance.matchTerminalBackground"),
-                String(localized: "settings.sidebarAppearance.matchTerminalBackground", defaultValue: "Match Terminal Background"),
-                subtitle: String(localized: "settings.sidebarAppearance.matchTerminalBackground.subtitle", defaultValue: "Use the same background color and transparency as the terminal.")
+                String(localized: "settings.sidebarAppearance.background", defaultValue: "Sidebar Background"),
+                subtitle: String(localized: "settings.sidebarAppearance.background.subtitle", defaultValue: "Follow the terminal theme, use the terminal's own background, or pick a color of your own."),
+                controlWidth: 196
             ) {
-                Toggle("", isOn: Binding(get: { matchTerminal.current }, set: { matchTerminal.set($0) }))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                Picker("", selection: Binding(get: { backgroundChoice }, set: { setBackgroundChoice($0) })) {
+                    Text(String(localized: "settings.sidebarAppearance.background.theme", defaultValue: "Follow Theme")).tag(SidebarBackgroundChoice.theme)
+                    Text(String(localized: "settings.sidebarAppearance.background.terminal", defaultValue: "Match Terminal")).tag(SidebarBackgroundChoice.terminal)
+                    Text(String(localized: "settings.sidebarAppearance.background.custom", defaultValue: "Custom Color")).tag(SidebarBackgroundChoice.custom)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
             }
             SettingsCardDivider()
+
+            if backgroundChoice == .custom {
+                SettingsCardRow(
+                    configurationReview: .json("sidebarAppearance.tintColor"),
+                    String(localized: "settings.sidebarAppearance.tintColor", defaultValue: "Sidebar Color"),
+                    subtitle: String(localized: "settings.sidebarAppearance.tintColor.subtitle", defaultValue: "The sidebar keeps this color whichever theme you pick.")
+                ) {
+                    HStack(spacing: 8) {
+                        HexColorPicker(
+                            storedHex: tintHex.current,
+                            fallback: Color.black,
+                            reconcileRevision: tintHex.revision
+                        ) { hex in
+                            setOwnTint(hex)
+                        }
+                        Text(tintHex.current.uppercased())
+                            .cmuxFont(size: 12, weight: .medium, design: .monospaced)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 76, alignment: .trailing)
+                    }
+                }
+                SettingsCardDivider()
+            }
 
             SettingsCardRow(
                 configurationReview: .settingsOnly,
