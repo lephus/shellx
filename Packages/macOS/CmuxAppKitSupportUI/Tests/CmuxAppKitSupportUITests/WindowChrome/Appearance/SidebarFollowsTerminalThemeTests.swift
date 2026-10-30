@@ -17,6 +17,14 @@ import Testing
         #expect(snapshot.sidebarContentColorScheme == .dark)
     }
 
+    /// The ShellX theme is recognized by its own background, not by the
+    /// color a translucent terminal composites to.
+    @Test func translucentShellXThemeKeepsThePanelColor() throws {
+        let snapshot = snapshot(terminalHex: "#0B0716", terminalOpacity: 0.8)
+
+        #expect(try leftSidebarTintHex(snapshot) == "#100B1DFF")
+    }
+
     @Test func darkThemeDrawsTheSidebarSlightlyLighterThanTheTerminal() throws {
         let terminal = try #require(NSColor(hex: "#282A36"))
         let snapshot = snapshot(terminalHex: "#282A36")
@@ -107,6 +115,7 @@ import Testing
 
     private func snapshot(
         terminalHex: String,
+        terminalOpacity: Double = 1,
         ambientScheme: ColorScheme = .dark,
         unifySurfaceBackdrops: Bool = false,
         tintHex: String = WindowChromeSidebarTintDefaults.shellXPanelHex,
@@ -117,7 +126,7 @@ import Testing
         let resolver = WindowAppearanceResolver(
             terminalAppearance: WindowTerminalAppearanceSnapshot(
                 backgroundColor: NSColor(hex: terminalHex) ?? .black,
-                backgroundOpacity: 1,
+                backgroundOpacity: terminalOpacity,
                 backgroundBlur: .disabled,
                 usesHostLayerBackground: true
             )
