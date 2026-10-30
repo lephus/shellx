@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import CmuxWorkspaces
+import ShellXBrand
 import SwiftUI
 import Testing
 
@@ -88,6 +89,54 @@ import Testing
             .hexString(includeAlpha: true)
 
         #expect(try leftSidebarTintHex(snapshot) == expected)
+    }
+
+    /// Picking the theme wins over a tint left from earlier, and the theme
+    /// decides the whole color: opaque, with no light or dark override.
+    @Test func themeSourceIgnoresAnEarlierTint() throws {
+        let untouched = snapshot(terminalHex: "#282A36")
+        let picked = snapshot(
+            terminalHex: "#282A36",
+            tintHex: "#FF0000",
+            tintHexDark: "#00FF00",
+            tintOpacity: 0.6,
+            tintSource: .theme
+        )
+
+        #expect(try leftSidebarTintHex(picked) == (try leftSidebarTintHex(untouched)))
+        #expect(picked.sidebarContentColorScheme == .dark)
+    }
+
+    /// Picking the user's own color keeps it even when it is the default `panel`.
+    @Test func customSourceKeepsThePanelColorOnAnotherTheme() throws {
+        let snapshot = snapshot(terminalHex: "#282A36", tintSource: .custom)
+
+        #expect(try leftSidebarTintHex(snapshot) == "#100B1DFF")
+    }
+
+    /// An opaque tint of the user's own covers the sidebar material, so the
+    /// sidebar text follows that color, not the dark app appearance.
+    @Test(arguments: [
+        ("#F5F5F5", ColorScheme.light),
+        ("#1E3A5F", ColorScheme.dark),
+    ])
+    func opaqueCustomTintGetsReadableText(hex: String, expected: ColorScheme) throws {
+        let snapshot = snapshot(terminalHex: "#282A36", tintHex: hex, tintSource: .custom)
+
+        #expect(try leftSidebarTintHex(snapshot) == "\(hex)FF")
+        #expect(snapshot.sidebarContentColorScheme == expected)
+        #expect(snapshot.sidebarSettings.colorScheme == expected)
+    }
+
+    /// A translucent tint shows the material, which follows the app appearance.
+    @Test func translucentCustomTintKeepsTheAppAppearance() {
+        let snapshot = snapshot(
+            terminalHex: "#282A36",
+            tintHex: "#F5F5F5",
+            tintOpacity: 0.4,
+            tintSource: .custom
+        )
+
         #expect(snapshot.sidebarContentColorScheme == .dark)
     }
 
@@ -121,7 +170,8 @@ import Testing
         tintHex: String = WindowChromeSidebarTintDefaults.shellXPanelHex,
         tintHexLight: String? = nil,
         tintHexDark: String? = nil,
-        tintOpacity: Double = WindowChromeSidebarTintDefaults().opacity
+        tintOpacity: Double = WindowChromeSidebarTintDefaults().opacity,
+        tintSource: ShellXSidebarTintSource = .automatic
     ) -> WindowAppearanceSnapshot {
         let resolver = WindowAppearanceResolver(
             terminalAppearance: WindowTerminalAppearanceSnapshot(
@@ -141,6 +191,7 @@ import Testing
             sidebarTintHexLight: tintHexLight,
             sidebarTintHexDark: tintHexDark,
             sidebarTintOpacity: tintOpacity,
+            sidebarTintSource: tintSource,
             sidebarCornerRadius: 0,
             sidebarBlurOpacity: 1,
             bgGlassEnabled: false,
