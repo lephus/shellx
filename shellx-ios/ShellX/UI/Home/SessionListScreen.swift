@@ -4,6 +4,9 @@ import SwiftUI
 /// A page of agent sessions as cards: "Agents outside workspaces" and "Ended". Built from plain values
 /// so render tests can show it; the views that read the hub only adapt it. A tap pushes the session's
 /// `AgentView` (`WorkspaceListView` registers `SessionRef`).
+///
+/// It is laid out as the home is: a plain list with the same room around a card
+/// (`WorkspaceListScreen.cardInsets`) and no gap over the first one.
 struct SessionListScreen: View {
     let title: String
     /// Over the cards, e.g. a Mac's name; none for a list that spans the Macs.
@@ -39,8 +42,6 @@ struct SessionListScreen: View {
             showsMachineName: showsMachineName, empty: empty)
     }
 
-    private static let cardInsets = EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16)
-
     var body: some View {
         List {
             if items.isEmpty {
@@ -72,12 +73,15 @@ struct SessionListScreen: View {
                     .navigationLinkIndicatorVisibility(.hidden)
                     .accessibilityHint(Text(LocalizedStringResource("agent.open.hint")))
                     .accessibilityIdentifier("sessionList.row.\(item.session.session.sessionId)")
-                    .listRowInsets(Self.cardInsets)
+                    .listRowInsets(WorkspaceListScreen.cardInsets)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
                 }
             }
         }
+        .listStyle(.plain)
+        // As on the home, a title row is shorter than a list's 44-point rows; the cards keep 44.
+        .environment(\.defaultMinListRowHeight, 0)
         .themedList()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)

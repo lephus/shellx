@@ -397,7 +397,9 @@ struct WorkspaceListScreen: View {
         .accessibilityIdentifier("workspace.otherSessions.\(group.id)")
     }
 
-    private static let cardInsets = EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12)
+    /// The room around a card, here and in the session lists (`SessionListScreen`), so a card sits the same
+    /// distance from the screen's edges on every page.
+    static let cardInsets = EdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12)
 
     /// A plain card in the list, for the notice rows.
     private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
