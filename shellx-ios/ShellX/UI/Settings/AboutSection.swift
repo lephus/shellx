@@ -33,10 +33,12 @@ struct AboutSection: View {
                     }
                     .foregroundStyle(.secondary)
                 } label: {
-                    Text(LocalizedStringResource("settings.about.license")).foregroundStyle(.primary)
+                    Text(LocalizedStringResource("settings.about.license"))
                 }
                 .frame(minHeight: 44)
             }
+            // A link is tinted; the row reads like the others, with only the arrow saying it leaves the app.
+            .tint(.primary)
             .accessibilityIdentifier("settings.about.license")
         } header: {
             Text(LocalizedStringResource("settings.about.title"))
