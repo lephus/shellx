@@ -19,6 +19,14 @@ public struct SidebarAppearanceCatalogSection: SettingCatalogSection {
         userDefaultsKey: "sidebarTintHex"
     )
 
+    /// ShellX: whether the sidebar takes its color from the terminal theme
+    /// or keeps ``tintColorHex``. `automatic` until the user picks one.
+    public let tintSource = DefaultsKey<SidebarTintSourceOption>(
+        id: "sidebarAppearance.tintSource",
+        defaultValue: .automatic,
+        userDefaultsKey: "sidebarTintSource"
+    )
+
     public let lightModeTintColorHex = DefaultsKey<String>(
         id: "sidebarAppearance.lightModeTintColor",
         defaultValue: "",

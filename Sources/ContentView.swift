@@ -2022,6 +2022,7 @@ struct ContentView: View {
     @AppStorage("sidebarTintHex") private var sidebarTintHex = SidebarTintDefaults().hex
     @AppStorage("sidebarTintHexLight") private var sidebarTintHexLight: String?
     @AppStorage("sidebarTintHexDark") private var sidebarTintHexDark: String?
+    @AppStorage("sidebarTintSource") private var sidebarTintSource = SidebarAppearanceCatalogSection().tintSource.defaultValue
     @AppStorage("sidebarMaterial") private var sidebarMaterial = SidebarMaterialOption.sidebar.rawValue
     @AppStorage("sidebarState") private var sidebarStateSetting = SidebarStateOption.followWindow.rawValue
     @AppStorage("sidebarCornerRadius") private var sidebarCornerRadius = 0.0
@@ -2046,6 +2047,7 @@ struct ContentView: View {
                 sidebarTintHexLight: sidebarTintHexLight,
                 sidebarTintHexDark: sidebarTintHexDark,
                 sidebarTintOpacity: sidebarTintOpacity,
+                sidebarTintSource: sidebarTintSource,
                 sidebarCornerRadius: sidebarCornerRadius,
                 sidebarBlurOpacity: sidebarBlurOpacity,
                 bgGlassEnabled: bgGlassEnabled,
