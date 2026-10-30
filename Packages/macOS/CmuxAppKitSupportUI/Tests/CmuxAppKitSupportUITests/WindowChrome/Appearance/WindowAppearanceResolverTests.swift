@@ -107,9 +107,12 @@ import Testing
                 resolvedColorScheme: terminalScheme
             )
         )
+        // A chosen tint keeps the sidebar on the ambient scheme; a default
+        // tint follows the theme (SidebarFollowsTerminalThemeTests).
         let snapshot = resolver.current(settings: makeSettings(
             unifySurfaceBackdrops: false,
             sidebarBlendMode: "withinWindow",
+            sidebarTintHexDark: "#FF0000",
             bgGlassEnabled: false,
             colorScheme: ambientScheme
         ))
@@ -120,10 +123,10 @@ import Testing
         #expect(snapshot.sidebarSettings.colorScheme == ambientScheme)
     }
 
-    /// A separate sidebar draws a material that resolves against the app
-    /// appearance, so its content must follow that appearance even when an
-    /// opaque terminal theme disagrees. A sidebar sharing the terminal
-    /// backdrop keeps following the terminal.
+    /// A separate sidebar with a chosen tint draws a material that resolves
+    /// against the app appearance, so its content must follow that appearance
+    /// even when an opaque terminal theme disagrees. A sidebar sharing the
+    /// terminal backdrop keeps following the terminal.
     @Test(arguments: [
         (false, ColorScheme.dark, ColorScheme.light, ColorScheme.light),
         (false, ColorScheme.light, ColorScheme.dark, ColorScheme.dark),
@@ -148,6 +151,7 @@ import Testing
         let snapshot = resolver.current(settings: makeSettings(
             unifySurfaceBackdrops: unifySurfaceBackdrops,
             sidebarBlendMode: "withinWindow",
+            sidebarTintHexDark: "#FF0000",
             bgGlassEnabled: false,
             colorScheme: ambientScheme
         ))
