@@ -327,6 +327,9 @@ public struct GhosttyConfig {
         if let opacity = sidebarTintOpacity {
             defaults.set(opacity, forKey: "sidebarTintOpacity")
         }
+        // `sidebar-background` is the user's own sidebar color, so it applies
+        // even after Settings › Sidebar was set to follow the theme.
+        defaults.set(ShellXSidebarTintSource.custom.rawValue, forKey: "sidebarTintSource")
     }
 
     /// The top-level config files Ghostty loads on macOS, in load order: the
