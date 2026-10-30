@@ -9,12 +9,15 @@ import ShellXLinkSession
 ///
 /// * The list is every Claude Code agent session (v1 phones answer Claude Code only) that is not ended,
 ///   plus the ``maxEndedSessions`` most recently active ended ones whose transcript is still readable.
+/// * A session whose terminal was closed (its tab or workspace) is not listed, live or ended. A session that
+///   names no terminal (an agent run outside ShellX) is.
 /// * `revision` counts changes of that list: every published difference raises it by exactly 1
 ///   (PROTOCOL.md 4), and ``sessions()`` publishes any difference it finds before answering, so a list at
 ///   revision r includes every change up to r.
-/// * Changes come from the service's frames (`stateChanged`, `descriptorChanged`, `sessionRemoved`). The
-///   frame observer is registered only while someone subscribes to ``sessionChanges()``; it also keeps the
-///   service publishing session frames with no mobile client subscribed.
+/// * Changes come from the service's frames (`stateChanged`, `descriptorChanged`, `sessionRemoved`) and from
+///   the change signal (a terminal closing). Both are watched only while someone subscribes to
+///   ``sessionChanges()``; the frame observer also keeps the service publishing session frames with no mobile
+///   client subscribed.
 ///
 /// All state is main-actor isolated, like the service. `onTermination` only schedules the removal on the
 /// main actor, so it never waits for anything `yield` holds.
@@ -39,6 +42,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     /// Streams that ended before their subscription ran; never subscribed afterwards.
     private var endedEarly: Set<UUID> = []
     private var observation: (service: AgentChatTranscriptService, token: UUID)?
+    private var stopSignal: (@MainActor () -> Void)?
     /// The list as last published, most recently active first.
     private var published: [AgentSession] = []
     private var revision = 0
@@ -93,6 +97,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
         if subscribers.isEmpty {
             refresh()   // catch up while nobody listened, before this subscriber's first change
             startObserving()
+            stopSignal = changeSignal { [weak self] in self?.refresh() }
         }
         subscribers[id] = continuation
     }
@@ -102,9 +107,13 @@ final class ShellXLinkSessionSource: AgentSessionSource {
             endedEarly.insert(id)
             return
         }
-        guard subscribers.isEmpty, let observation else { return }
-        observation.service.removeFrameObserver(observation.token)
-        self.observation = nil
+        guard subscribers.isEmpty else { return }
+        if let observation {
+            observation.service.removeFrameObserver(observation.token)
+            self.observation = nil
+        }
+        stopSignal?()
+        stopSignal = nil
     }
 
     private func startObserving() {
@@ -126,7 +135,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     private func refresh() {
         guard let service = serviceProvider() else { return }
         if !subscribers.isEmpty { startObserving() }
-        let current = Self.listedRecords(service).map(makeSession)
+        let current = Self.listedRecords(service, terminalIsOpen: terminalIsOpen).map(makeSession)
         let known = Dictionary(published.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
         let upserted = current.filter { known[$0.sessionId] != $0 }
         let currentIDs = Set(current.map(\.sessionId))
@@ -142,12 +151,18 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     // MARK: - Mapping
 
     /// The listed records, most recently active first: Claude Code agent sessions that are not ended, and the
-    /// most recent listable ended ones.
-    static func listedRecords(_ service: AgentChatTranscriptService) -> [AgentChatSessionRecord] {
+    /// most recent listable ended ones, leaving out those whose terminal was closed.
+    static func listedRecords(
+        _ service: AgentChatTranscriptService, terminalIsOpen: TerminalIsOpen
+    ) -> [AgentChatSessionRecord] {
         var listed: [AgentChatSessionRecord] = []
         var endedCount = 0
         for record in service.sessionRecords(workspaceID: nil)
         where record.agentKind == .claude && record.descriptor.kind == .agent {
+            // Before the ended count, so a closed tab's sessions do not take the slots of listable ones.
+            if let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)), !terminalIsOpen(terminal) {
+                continue
+            }
             guard record.state == .ended else {
                 listed.append(record)
                 continue
