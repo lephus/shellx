@@ -20,17 +20,45 @@ struct ShellXLinkSessionSourceTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     /// A service over an empty, private hook store (no mobile client subscribed) and a source on it whose
-    /// workspace lookup needs no live window.
+    /// workspace lookup needs no live window. Without `terminals`, every terminal is open.
     @MainActor
-    private static func makeSource(home: URL) -> (AgentChatTranscriptService, ShellXLinkSessionSource) {
+    private static func makeSource(
+        home: URL,
+        terminals: OpenTerminals? = nil,
+        signal: ManualChangeSignal? = nil
+    ) -> (AgentChatTranscriptService, ShellXLinkSessionSource) {
+        let signal = signal ?? ManualChangeSignal()
         let service = AgentChatTranscriptService(
             registry: AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home)),
             resolver: AgentChatTranscriptResolver(homeDirectory: home, environment: [:]),
             hasEventSubscribers: { false },
             emitEventPayload: { _ in }
         )
-        let source = ShellXLinkSessionSource(service: { service }, workspaceLookup: { _ in workspace })
+        let source = ShellXLinkSessionSource(
+            service: { service },
+            workspaceLookup: { _ in workspace },
+            terminalIsOpen: { terminals?.open.contains($0) ?? true },
+            changeSignal: signal.start
+        )
         return (service, source)
+    }
+
+    /// The terminals open on the Mac, as the tests set them.
+    @MainActor
+    final class OpenTerminals {
+        var open: Set<UUID>
+        init(_ open: Set<UUID> = []) { self.open = open }
+    }
+
+    /// A change signal the tests fire by hand, like a tab closing.
+    @MainActor
+    final class ManualChangeSignal {
+        private var onChange: (@MainActor () -> Void)?
+        func start(_ onChange: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
+            self.onChange = onChange
+            return { [weak self] in self?.onChange = nil }
+        }
+        func fire() { onChange?() }
     }
 
     private static func makeHome() throws -> URL {
@@ -103,6 +131,64 @@ struct ShellXLinkSessionSourceTests {
         #expect(list.allSatisfy { $0.agent == "claude" })
         #expect(list.allSatisfy { $0.workspaceId == Self.workspace.id && $0.workspaceTitle == Self.workspace.title })
         #expect(byID[busy]?.lastActivityMs == Self.ms(5))
+    }
+
+    /// A tab or workspace closed on the Mac takes its agent sessions off the phone, live and ended alike. A
+    /// session that names no terminal (an agent run outside ShellX) stays.
+    @Test func testSessionsOfAClosedTabAreNotListed() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let openTab = UUID(), closedTab = UUID()
+        let inOpenTab = UUID().uuidString, inClosedTab = UUID().uuidString
+        let endedInClosedTab = UUID().uuidString, outside = UUID().uuidString
+        let endedPath = try Self.transcript(in: home)
+        let (service, source) = await MainActor.run {
+            Self.makeSource(home: home, terminals: OpenTerminals([openTab]))
+        }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(inOpenTab, .sessionStart, surface: openTab.uuidString))
+            service.noteHookEvent(Self.event(inClosedTab, .sessionStart, surface: closedTab.uuidString))
+            service.noteHookEvent(Self.event(
+                endedInClosedTab, .sessionStart, surface: closedTab.uuidString, transcriptPath: endedPath))
+            service.noteHookEvent(Self.event(
+                endedInClosedTab, .sessionEnd, surface: closedTab.uuidString, transcriptPath: endedPath, at: 2))
+            service.noteHookEvent(Self.event(outside, .sessionStart))
+        }
+
+        let listed = Set(await source.sessions().sessions.map(\.sessionId))
+
+        #expect(listed == [inOpenTab, outside])
+    }
+
+    /// Closing a tab while a phone listens sends the phone the removal of its session.
+    @Test func testClosingATabEmitsRemoved() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let tab = UUID()
+        let session = UUID().uuidString
+        let terminals = await MainActor.run { OpenTerminals([tab]) }
+        let signal = await MainActor.run { ManualChangeSignal() }
+        let (service, source) = await MainActor.run {
+            Self.makeSource(home: home, terminals: terminals, signal: signal)
+        }
+        await MainActor.run { service.noteHookEvent(Self.event(session, .sessionStart, surface: tab.uuidString)) }
+        let changes = SessionChanges()
+        let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; this call orders it before the tab closes.
+        let base = await source.sessions()
+        #expect(base.sessions.map(\.sessionId) == [session])
+
+        await MainActor.run {
+            terminals.open.remove(tab)
+            signal.fire()
+        }
+
+        #expect(await Self.waitUntil { !changes.all.isEmpty })
+        let closed = try #require(changes.all.first)
+        #expect(closed.revision == base.revision + 1)
+        #expect(closed.removed == [session])
+        #expect(closed.upserted.isEmpty)
     }
 
     @Test func testStateChangeEmitsUpsertWithNextRevision() async throws {

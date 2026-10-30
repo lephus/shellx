@@ -22,6 +22,9 @@ import ShellXLinkSession
 final class ShellXLinkSessionSource: AgentSessionSource {
     /// The workspace a session belongs to, or nil when no live workspace owns it.
     typealias WorkspaceLookup = @MainActor (ChatSessionDescriptor) -> (id: String, title: String)?
+    /// Whether the terminal with this surface id is open in a window.
+    typealias TerminalIsOpen = @MainActor (UUID) -> Bool
+    typealias ChangeSignal = ShellXLinkWorkspaceSource.ChangeSignal
     typealias Change = (revision: Int, upserted: [AgentSession], removed: [String])
 
     /// Ended sessions listed at most: the hook store keeps up to 512 sessions for a week, more than an
@@ -30,6 +33,8 @@ final class ShellXLinkSessionSource: AgentSessionSource {
 
     private let serviceProvider: @MainActor () -> AgentChatTranscriptService?
     private let workspaceLookup: WorkspaceLookup
+    private let terminalIsOpen: TerminalIsOpen
+    private let changeSignal: ChangeSignal
     private var subscribers: [UUID: AsyncStream<Change>.Continuation] = [:]
     /// Streams that ended before their subscription ran; never subscribed afterwards.
     private var endedEarly: Set<UUID> = []
@@ -42,12 +47,19 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     ///   - service: The app's transcript service; nil until the app wires it.
     ///   - workspaceLookup: Finds a session's workspace; the default asks the open windows for the workspace
     ///     that owns the session's terminal. Tests pass a fixed answer.
+    ///   - terminalIsOpen: Whether a session's terminal is still open; the default asks the open windows.
+    ///   - changeSignal: Tells the source when to look again for closed terminals; the default watches the
+    ///     windows, their workspaces and panels.
     init(
         service: @escaping @MainActor () -> AgentChatTranscriptService? = { TerminalController.shared.agentChatTranscriptService },
-        workspaceLookup: @escaping WorkspaceLookup = ShellXLinkSessionSource.liveWorkspace
+        workspaceLookup: @escaping WorkspaceLookup = ShellXLinkSessionSource.liveWorkspace,
+        terminalIsOpen: @escaping TerminalIsOpen = ShellXLinkSessionSource.liveTerminalIsOpen,
+        changeSignal: @escaping ChangeSignal = ShellXLinkWorkspaceSource.liveChangeSignal
     ) {
         self.serviceProvider = service
         self.workspaceLookup = workspaceLookup
+        self.terminalIsOpen = terminalIsOpen
+        self.changeSignal = changeSignal
     }
 
     /// Live subscriptions (tests).
@@ -189,5 +201,11 @@ final class ShellXLinkSessionSource: AgentSessionSource {
             return nil
         }
         return (recorded.uuidString, workspace.title)
+    }
+
+    /// Whether a window holds the terminal. True with no app to ask, so nothing is hidden on a guess.
+    static func liveTerminalIsOpen(_ terminal: UUID) -> Bool {
+        guard let app = AppDelegate.shared else { return true }
+        return app.workspaceContainingPanel(panelId: terminal) != nil
     }
 }
