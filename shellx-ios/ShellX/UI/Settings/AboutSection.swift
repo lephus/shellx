@@ -1,7 +1,11 @@
 import SwiftUI
 
-/// The app version and the open-source licence note.
+/// The app version and the "Licenses" row, which opens shellx.pro in the browser.
 struct AboutSection: View {
+    /// Where "Licenses" goes, and the host it shows as its value (a web address is never translated).
+    static let website = URL(string: "https://shellx.pro")!
+    static let websiteHost = "shellx.pro"
+
     private var version: String {
         let info = Bundle.main
         let short = info.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -18,12 +22,22 @@ struct AboutSection: View {
             }
             .accessibilityElement(children: .combine)
 
-            LabeledContent {
-                Text(LocalizedStringResource("settings.about.license.value")).foregroundStyle(.secondary)
-            } label: {
-                Text(LocalizedStringResource("settings.about.license"))
+            // A link, so VoiceOver says so; the arrow only tells the eye that it leaves the app.
+            Link(destination: Self.website) {
+                LabeledContent {
+                    HStack(spacing: 4) {
+                        Text(verbatim: Self.websiteHost)
+                        Image(systemName: "arrow.up.right")
+                            .font(.footnote.weight(.semibold))
+                            .accessibilityHidden(true)
+                    }
+                    .foregroundStyle(.secondary)
+                } label: {
+                    Text(LocalizedStringResource("settings.about.license")).foregroundStyle(.primary)
+                }
+                .frame(minHeight: 44)
             }
-            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("settings.about.license")
         } header: {
             Text(LocalizedStringResource("settings.about.title"))
         }

@@ -2,7 +2,6 @@
 # version numbers). check-strings.py fails on any other key whose vi value copies its en value.
 root.title
 signin.email
-settings.about.license.value
 common.ok
 pending.plan.title
 pending.plan.ultraplan

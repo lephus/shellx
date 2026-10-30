@@ -2841,7 +2841,7 @@
       }
     },
     "settings.about.license": {
-      "comment": "Row label for the open-source licence note.",
+      "comment": "Row label of the link to shellx.pro, where the licences are; its value is the host, shown as it is.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2854,24 +2854,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Giấy phép"
-          }
-        }
-      }
-    },
-    "settings.about.license.value": {
-      "comment": "Which open-source package is MIT licensed; the package name is not translated.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "shellx-link: MIT"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "shellx-link: MIT"
           }
         }
       }

@@ -30,4 +30,9 @@ final class AccountRenderTests: XCTestCase {
         try assertRenders(
             NavigationStack { SettingsView(email: "phu@example.com", signOut: {}) }, name: "settings")
     }
+
+    func testLicensesLinkToTheWebsiteAndShowItsHost() {
+        XCTAssertEqual(AboutSection.website.absoluteString, "https://shellx.pro")
+        XCTAssertEqual(AboutSection.websiteHost, AboutSection.website.host())
+    }
 }
