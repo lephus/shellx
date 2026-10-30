@@ -25,7 +25,7 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
         wantsLayer = true
 
         iconImageView.imageScaling = .scaleProportionallyDown
-        iconImageView.contentTintColor = ShellXPalette.muted.nsColor
+        iconImageView.contentTintColor = ShellXSidebarText.muted
         addSubview(iconImageView)
 
         titleField.lineBreakMode = .byTruncatingTail
@@ -84,7 +84,7 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
             string: header.title,
             attributes: [
                 .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
-                .foregroundColor: ShellXPalette.textHi.nsColor,
+                .foregroundColor: ShellXSidebarText.title,
                 .paragraphStyle: truncating,
             ]
         )
@@ -93,7 +93,7 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
                 string: " \u{00B7} " + header.note,
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 11, weight: .regular),
-                    .foregroundColor: ShellXPalette.muted.nsColor,
+                    .foregroundColor: ShellXSidebarText.muted,
                     .paragraphStyle: truncating,
                 ]
             ))
@@ -152,7 +152,7 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
             string: text,
             attributes: [
                 .font: NSFont.systemFont(ofSize: 10.5, weight: .regular),
-                .foregroundColor: ShellXPalette.muted.nsColor,
+                .foregroundColor: ShellXSidebarText.muted,
                 .paragraphStyle: truncating,
             ]
         )

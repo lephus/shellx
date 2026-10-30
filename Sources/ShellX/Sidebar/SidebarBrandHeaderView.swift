@@ -27,7 +27,7 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
         nameField.stringValue = ShellXBrand.appName
         // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
         nameField.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        nameField.textColor = ShellXPalette.textHi.nsColor
+        nameField.textColor = ShellXSidebarText.title
         nameField.lineBreakMode = .byTruncatingTail
         nameField.maximumNumberOfLines = 1
         nameField.isSelectable = false
@@ -41,7 +41,7 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
                 .uppercased(with: .current),
             attributes: [
                 .font: NSFont.systemFont(ofSize: 10.5, weight: .medium),
-                .foregroundColor: ShellXPalette.muted.nsColor,
+                .foregroundColor: ShellXSidebarText.muted,
                 .kern: 0.8,
                 .paragraphStyle: truncating,
             ]
@@ -55,7 +55,7 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
         let addTitle = String(localized: "sidebar.machines.add.ssh", defaultValue: "Add a machine over SSH…")
         // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
         addButton.glyphImage = ShellXSidebarIcon.image(named: "Add_Plus", pointSize: 12)
-        addButton.contentTintColor = ShellXPalette.muted.nsColor
+        addButton.contentTintColor = ShellXSidebarText.muted
         addButton.toolTip = addTitle
         addButton.setAccessibilityLabel(addTitle)
         addButton.onClick = {
@@ -138,7 +138,7 @@ final class SidebarSignInRowCellView: NSTableCellView, ShellXSidebarHeaderCell {
         wantsLayer = true
 
         iconImageView.imageScaling = .scaleProportionallyDown
-        iconImageView.contentTintColor = ShellXPalette.primaryText.nsColor
+        iconImageView.contentTintColor = ShellXSidebarText.link
         // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
         iconImageView.image = ShellXSidebarIcon.image(
             named: "User_Circle",
@@ -153,7 +153,7 @@ final class SidebarSignInRowCellView: NSTableCellView, ShellXSidebarHeaderCell {
             string: text,
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11.5, weight: .medium),
-                .foregroundColor: ShellXPalette.primaryText.nsColor,
+                .foregroundColor: ShellXSidebarText.link,
                 .paragraphStyle: truncating,
             ]
         )
