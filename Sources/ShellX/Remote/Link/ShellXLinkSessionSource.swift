@@ -9,8 +9,10 @@ import ShellXLinkSession
 ///
 /// * The list is every Claude Code agent session (v1 phones answer Claude Code only) that is not ended,
 ///   plus the ``maxEndedSessions`` most recently active ended ones whose transcript is still readable.
-/// * A session whose terminal was closed (its tab or workspace) is not listed, live or ended. A session that
-///   names no terminal (an agent run outside ShellX) is.
+/// * Closing a terminal (its tab or workspace) ends its agent: Ghostty hangs up, then terminates and kills its
+///   process groups. Once ended, a closed terminal's session is not listed, not even as ended. A session still
+///   running after its terminal closed stays listed, so the phone never loses sight of a live agent. A session
+///   that names no terminal (an agent run outside ShellX) is listed like any other.
 /// * `revision` counts changes of that list: every published difference raises it by exactly 1
 ///   (PROTOCOL.md 4), and ``sessions()`` publishes any difference it finds before answering, so a list at
 ///   revision r includes every change up to r.
@@ -52,8 +54,8 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     ///   - workspaceLookup: Finds a session's workspace; the default asks the open windows for the workspace
     ///     that owns the session's terminal. Tests pass a fixed answer.
     ///   - terminalIsOpen: Whether a session's terminal is still open; the default asks the open windows.
-    ///   - changeSignal: Tells the source when to look again for closed terminals; the default watches the
-    ///     windows, their workspaces and panels.
+    ///   - changeSignal: Tells the source when to look again for closed terminals (an ended session's tab
+    ///     closing); the default watches the windows, their workspaces and panels.
     init(
         service: @escaping @MainActor () -> AgentChatTranscriptService? = { TerminalController.shared.agentChatTranscriptService },
         workspaceLookup: @escaping WorkspaceLookup = ShellXLinkSessionSource.liveWorkspace,
@@ -151,7 +153,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     // MARK: - Mapping
 
     /// The listed records, most recently active first: Claude Code agent sessions that are not ended, and the
-    /// most recent listable ended ones, leaving out those whose terminal was closed.
+    /// most recent listable ended ones, leaving out the ended ones whose terminal was closed.
     static func listedRecords(
         _ service: AgentChatTranscriptService, terminalIsOpen: TerminalIsOpen
     ) -> [AgentChatSessionRecord] {
@@ -160,7 +162,8 @@ final class ShellXLinkSessionSource: AgentSessionSource {
         for record in service.sessionRecords(workspaceID: nil)
         where record.agentKind == .claude && record.descriptor.kind == .agent {
             // Before the ended count, so a closed tab's sessions do not take the slots of listable ones.
-            if let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)), !terminalIsOpen(terminal) {
+            if record.state == .ended,
+               let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)), !terminalIsOpen(terminal) {
                 continue
             }
             guard record.state == .ended else {
