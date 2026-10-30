@@ -38,6 +38,14 @@ import Testing
         #expect(SidebarBackgroundChoice.terminal.tintSource == nil)
     }
 
+    /// Picking Custom Color clears a light or dark override left from
+    /// earlier, so the swatch shows the color the sidebar draws.
+    @Test func onlyCustomColorClearsEarlierOverrides() {
+        #expect(SidebarBackgroundChoice.custom.clearsTintOverrides)
+        #expect(!SidebarBackgroundChoice.theme.clearsTintOverrides)
+        #expect(!SidebarBackgroundChoice.terminal.clearsTintOverrides)
+    }
+
     private func choice(
         matchesTerminal: Bool = false,
         source: SidebarTintSourceOption,
