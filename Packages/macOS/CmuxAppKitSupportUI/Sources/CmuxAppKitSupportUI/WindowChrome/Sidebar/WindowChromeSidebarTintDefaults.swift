@@ -38,20 +38,26 @@ public struct WindowChromeSidebarTintDefaults: Sendable {
             && tintHex.caseInsensitiveCompare(shellXPanelHex) == .orderedSame
     }
 
-    /// The sidebar color for an opaque terminal background: one small step
-    /// off it, so the sidebar takes the theme's color and still reads as its
-    /// own surface. The ShellX theme keeps `panel`. Another dark theme is
-    /// lifted 2% toward white, about ShellX's own `bg` to `panel` step; a
-    /// light theme is pressed 3% toward black.
-    public static func themeTint(forTerminalBackground background: NSColor) -> NSColor {
+    /// The sidebar color for a terminal theme: one small step off what the
+    /// terminal draws, so the sidebar takes the theme's color and still reads
+    /// as its own surface. The ShellX theme keeps `panel`, recognized by its
+    /// own background even when a translucent terminal draws it composited.
+    /// Another dark theme is lifted 2% toward white, about ShellX's own `bg`
+    /// to `panel` step; a light theme is pressed 3% toward black.
+    ///
+    /// - Parameters:
+    ///   - background: The theme's background color.
+    ///   - rendered: The opaque color the terminal draws: `background`
+    ///     composited over the window base.
+    public static func themeTint(forTerminalBackground background: NSColor, rendered: NSColor) -> NSColor {
         if background.hexString().caseInsensitiveCompare(ShellXPalette.bg.hexString) == .orderedSame {
             return ShellXPalette.panel.nsColor
         }
         let resolver = WindowChromeColorResolver()
-        let step = resolver.readableColorScheme(for: background) == .dark
+        let step = resolver.readableColorScheme(for: rendered) == .dark
             ? NSColor.white.withAlphaComponent(0.02)
             : NSColor.black.withAlphaComponent(0.03)
-        return resolver.compositedColor(step, over: background)
+        return resolver.compositedColor(step, over: rendered)
     }
 
     /// Creates sidebar tint defaults.

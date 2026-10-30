@@ -76,7 +76,8 @@ public struct WindowAppearanceSnapshot {
             tintOpacity: sidebarSettings.tintOpacity
         ) {
             let themeTint = WindowChromeSidebarTintDefaults.themeTint(
-                forTerminalBackground: Self.resolvedChromeBackgroundColor(
+                forTerminalBackground: terminalBackgroundColor,
+                rendered: Self.resolvedChromeBackgroundColor(
                     backgroundColor: terminalBackgroundColor,
                     opacity: Double(Self.clampedOpacity(Double(terminalBackgroundOpacity))),
                     colorScheme: resolvedScheme
