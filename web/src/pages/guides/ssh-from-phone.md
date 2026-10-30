@@ -1,65 +1,65 @@
 ---
 layout: ../../layouts/Guide.astro
-lang: vi
+lang: en
 slug: ssh-from-phone
 order: 2
-title: "SSH từ điện thoại mà không cần mở port"
-metaTitle: "SSH từ điện thoại không cần mở port — Hướng dẫn ShellX"
-description: "Các cách SSH từ điện thoại quen thuộc, chúng đòi hỏi gì (mở port, IP tĩnh, VPN), và cách ShellX đưa phiên SSH, tmux của bạn lên điện thoại mà không cần những thứ đó."
+title: "SSH from your phone without opening ports"
+metaTitle: "SSH from your phone without opening ports — ShellX guide"
+description: "The classic ways to SSH from a phone, what they need (open ports, static IP, VPN), and how ShellX puts your SSH and tmux sessions on the phone with none of that."
 published: "2026-10-07"
 updated: "2026-10-07"
-keywords: ["SSH từ điện thoại", "SSH trên iPhone", "SSH trên Android", "SSH không cần mở port", "tmux trên điện thoại", "thay thế SSH client"]
+keywords: ["SSH from phone", "SSH from iPhone", "SSH from Android", "mobile SSH without port forwarding", "tmux on phone", "SSH client alternative"]
 ---
 
-Muốn có shell trên điện thoại thường là một trong hai việc: vào một **server** (VPS, máy dev, Raspberry Pi), hoặc vào **chính máy tính của bạn** để xem một việc đang chạy. Bài này nói cả hai, và ShellX nằm ở đâu trong đó.
+Wanting a shell on your phone usually means one of two things: reaching a **server** (a VPS, a dev box, a Raspberry Pi), or reaching your **own computer** to check on something running there. This guide covers both, and shows where ShellX fits.
 
-## Cách quen thuộc: app SSH trên điện thoại
+## The classic way: a mobile SSH client
 
-App SSH kết nối thẳng tới SSH server. Muốn vậy, server phải nhận được kết nối từ chỗ điện thoại của bạn:
+A mobile SSH client connects straight to an SSH server. For that to work, the server has to accept an incoming connection from wherever your phone is:
 
-- **Server công khai** (VPS trên cloud) đã có IP công khai và cổng 22 mở. Ở đây app SSH là lựa chọn đơn giản nhất.
-- **Máy ở nhà hay ở công ty** nằm sau router, nhiều khi sau CGNAT, không có IP công khai. Bạn cần mở port trên router, tên miền động (DDNS), hoặc VPN như WireGuard hay Tailscale.
-- **Chính máy Mac hoặc PC của bạn** còn phải bật SSH server (Remote Login trên macOS, OpenSSH Server trên Windows), và bạn nhận một shell **mới**, không phải các cửa sổ terminal đang mở, trừ khi mọi thứ chạy trong `tmux`.
+- **A public server** (a cloud VPS) already has a public IP and port 22 open. A mobile SSH client is the simplest choice here.
+- **A machine at home or in the office** sits behind a router, often behind CGNAT, with no public IP. You need port forwarding on the router, a dynamic DNS name, or a VPN such as WireGuard or Tailscale.
+- **Your own Mac or PC** also needs its SSH server turned on (Remote Login on macOS, OpenSSH Server on Windows), and you get a **new** shell, not the terminal windows you already have open, unless everything runs inside `tmux`.
 
-Gõ trên điện thoại trong một phiên SSH trần cũng khổ khi mạng chập chờn: rớt mạng là mất phiên, trừ khi dùng `tmux` hoặc `mosh`.
+Typing on a phone in a raw SSH session is also rough when the connection drops: the session is gone unless you use `tmux` or `mosh`.
 
-## Cách của ShellX: mở các phiên đang chạy trên máy tính
+## The ShellX way: open the sessions already running on your computer
 
-ShellX bắt đầu từ máy tính của bạn thay vì từ server:
+ShellX starts from your computer instead of the server:
 
-1. **Cài ShellX trên Mac hoặc PC** và đăng ký tài khoản.
-2. **Cài app trên điện thoại**, đăng nhập, ghép nối bằng cách quét mã QR từ menu khay trên máy tính.
-3. **SSH như bình thường từ app ShellX trên máy tính.** Chạy `ssh my-server` trong tab bất kỳ, hoặc bấm **⌘⇧K** (Windows **Ctrl+Shift+K**) và chọn máy chủ từ `~/.ssh/config`. ShellX mở một workspace SSH cho máy đó.
-4. **Mở phiên trên điện thoại.** Điện thoại thấy mọi pane, kể cả pane SSH, và hiện thư mục từ xa dạng `host:/đường/dẫn`.
+1. **Install ShellX on your Mac or PC** and create an account.
+2. **Install the phone app**, sign in, and pair it by scanning the QR code from the tray menu on your computer.
+3. **SSH from the ShellX app on the computer as usual.** Run `ssh my-server` in any tab, or press **⌘⇧K** (Windows **Ctrl+Shift+K**) and pick a host from your `~/.ssh/config`. ShellX opens an SSH workspace for it.
+4. **Open the session on your phone.** The phone sees every pane, SSH panes included, and shows the remote folder as `host:/path`.
 
-Vì cả máy tính và điện thoại đều **chủ động gọi ra** máy chủ chuyển tiếp của ShellX, không thiết bị nào trong mạng của bạn phải nhận kết nối vào: không mở port, không IP tĩnh, không VPN.
+Because both the computer and the phone **dial out** to the ShellX relay, nothing on your network accepts incoming connections: no port forwarding, no static IP, no VPN.
 
-### Workspace SSH có gì thêm
+### What the SSH workspace adds
 
-- **Dùng `ssh` và SSH agent của bạn.** ShellX chạy binary `ssh` của hệ điều hành với khóa và `~/.ssh/config` của bạn. ShellX không bao giờ hỏi, giữ hay lưu mật khẩu; lời nhắc mật khẩu hay host key hiện ngay trong terminal như mọi terminal khác.
-- **Tự kết nối lại.** Mất mạng thì pane báo mất kết nối và tự kết nối lại, đúng chỗ cũ trong bố cục.
-- **Gắn tmux.** Liệt kê các phiên `tmux` trên máy tính hoặc trên server và gắn một phiên thành tab. Chương trình trong tmux vẫn chạy khi bạn ngắt kết nối.
-- **Ngữ cảnh từ xa.** Sidebar hiện thư mục hiện tại, nhánh và các cổng đang nghe trên server; bấm vào cổng là mở trong trình duyệt qua cổng được chuyển tiếp.
-- **Không cài gì trên server.** Không có agent hay daemon chạy ở đó; ShellX chỉ đặt một hook shell nhỏ trong thư mục cache của server để hiện thư mục và nhánh.
+- **Your own `ssh` and SSH agent.** ShellX runs the operating system `ssh` binary with your keys and `~/.ssh/config`. It never asks for, keeps or stores passwords; a password or host-key prompt appears inside the terminal, like in any terminal.
+- **Automatic reconnect.** If the network drops, the pane shows that it lost the connection and reconnects by itself, in the same place in your layout.
+- **tmux attach.** List the `tmux` sessions on your computer or on the server and attach one as a tab. Programs inside tmux keep running when you disconnect.
+- **Remote context.** The sidebar shows the server's current folder, branch and listening ports; a click opens a forwarded port in your browser.
+- **Nothing to install on the server.** No agent or daemon runs there; ShellX only places a small shell hook in the server's cache folder for the folder and branch display.
 
-## Nên dùng cái nào?
+## Which one should you use?
 
-| Tình huống | Hợp nhất |
+| Situation | Best fit |
 |---|---|
-| Vào nhanh một VPS công khai từ điện thoại, không qua máy tính | App SSH trên điện thoại |
-| Máy tính ở nhà hoặc công ty, sau NAT, không có VPN | ShellX |
-| Theo dõi việc chạy lâu hay AI agent đang chạy trong terminal | ShellX |
-| Thông báo đẩy khi lệnh chạy xong | ShellX |
-| Nhiều server, đã vào được qua VPN | Cái nào cũng được; ShellX thêm phiên trên điện thoại và thông báo |
+| Quick access to a public VPS from a phone, no computer involved | A mobile SSH client |
+| Your computer at home or work, behind NAT, no VPN | ShellX |
+| Following long jobs or AI agents already running in your terminal | ShellX |
+| Push notification when a command finishes | ShellX |
+| Many servers, already reachable over a VPN | Either; ShellX adds the session-on-phone and notifications |
 
-## Bảo mật
+## Security
 
-Điện thoại và máy tính thống nhất khóa khi ghép nối bằng QR, và mọi nội dung terminal được mã hóa đầu cuối bằng giao thức Noise. Máy chủ chuyển tiếp chỉ chuyển gói đã mã hóa. Khóa SSH của bạn nằm trong SSH agent trên máy tính; chúng không bao giờ đi tới điện thoại hay máy chủ chuyển tiếp.
+The phone and the computer agree on keys during QR pairing, and all terminal content is end-to-end encrypted with the Noise protocol. The relay only forwards encrypted frames. Your SSH keys stay in your SSH agent on the computer; they never go to the phone or the relay.
 
-## Câu hỏi thường gặp
+## FAQ
 
-**ShellX có thay được app SSH của tôi không?** Với việc vào chính máy tính của bạn và các server bạn vẫn làm việc từ máy đó thì có. Nếu bạn muốn kết nối từ điện thoại thẳng tới server mà không qua máy tính nào, app SSH vẫn là đường trực tiếp.
+**Is ShellX a replacement for my SSH client?** For reaching your own computer and the servers you already work on from it, yes. If you want to connect from the phone to a server without any computer in between, a mobile SSH client is still the direct route.
 
-**Có chạy trên Linux không?** App ShellX cho máy tính chạy trên macOS và Windows. Từ đó bạn SSH vào server Linux như thường.
+**Does it work on Linux?** The ShellX desktop app runs on macOS and Windows. From there you can SSH into Linux servers as usual.
 
-**Có mất phí không?** ShellX hiện miễn phí.
+**Does it cost anything?** ShellX is currently free.

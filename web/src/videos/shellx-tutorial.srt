@@ -1,0 +1,139 @@
+1
+00:00:00,600 --> 00:00:05,667
+Here's how to get started with ShellX, from your first workspace to answering your AI agents
+
+2
+00:00:05,667 --> 00:00:06,549
+from your phone.
+
+3
+00:00:07,988 --> 00:00:13,335
+Install ShellX on your Mac or Windows PC. Each project lives in its own workspace,
+
+4
+00:00:13,335 --> 00:00:16,073
+listed in the sidebar under Your Machines.
+
+5
+00:00:16,566 --> 00:00:22,639
+Open a new one with the plus button. The sidebar shows each workspace's git branch,
+
+6
+00:00:22,639 --> 00:00:25,127
+folder and open ports at a glance.
+
+7
+00:00:26,568 --> 00:00:30,218
+Split any workspace into panes, to the right or down.
+
+8
+00:00:30,909 --> 00:00:35,790
+Run your dev server in one pane, and preview the app in the built-in browser right next to it.
+
+9
+00:00:39,102 --> 00:00:42,764
+Every action is in the command palette. Press Command Shift P,
+
+10
+00:00:42,764 --> 00:00:44,122
+and type what you need.
+
+11
+00:00:49,332 --> 00:00:54,150
+Now start Claude Code, Codex, or any command-line AI agent in a pane,
+
+12
+00:00:54,150 --> 00:00:55,966
+just like in any terminal.
+
+13
+00:01:03,370 --> 00:01:07,164
+ShellX follows what the agent is doing. When it needs your permission,
+
+14
+00:01:07,164 --> 00:01:11,664
+the workspace is flagged in the sidebar, and your paired phone gets a notification.
+
+15
+00:01:12,157 --> 00:01:14,820
+Approve it here, and the agent carries on.
+
+16
+00:01:23,461 --> 00:01:27,539
+To take your sessions with you, pair your phone. On your Mac,
+
+17
+00:01:27,539 --> 00:01:31,082
+open Settings, choose Mobile, and click Show QR Code.
+
+18
+00:01:39,119 --> 00:01:43,417
+In ShellX on your phone, open Settings, then Your Macs,
+
+19
+00:01:43,417 --> 00:01:47,715
+and tap plus. Scan the code, or paste the pairing code.
+
+20
+00:01:48,193 --> 00:01:51,918
+Check the Mac's name, tap Pair, and allow the phone on your Mac.
+
+21
+00:01:51,918 --> 00:01:54,653
+Only devices you allow can reach your sessions.
+
+22
+00:01:55,901 --> 00:01:59,558
+Every workspace from every paired Mac shows up on your phone,
+
+23
+00:01:59,558 --> 00:02:01,177
+with its branch and status.
+
+24
+00:02:02,801 --> 00:02:08,332
+Tap one to follow the agent live. Type a message, and it goes straight to the session on your Mac.
+
+25
+00:02:10,901 --> 00:02:14,760
+Then watch it write the code and run the tests, as it happens.
+
+26
+00:02:17,897 --> 00:02:22,139
+Needs You collects every request from your agents in one place.
+
+27
+00:02:22,635 --> 00:02:25,171
+Allow a command with one tap.
+
+28
+00:02:25,649 --> 00:02:29,299
+Answer a question by picking an option, or by voice.
+
+29
+00:02:33,197 --> 00:02:36,897
+And review a plan before any code is written. Approve it,
+
+30
+00:02:36,897 --> 00:02:40,597
+revise it, or deny it, without walking back to your desk.
+
+31
+00:02:42,146 --> 00:02:45,834
+All of this is end-to-end encrypted between your devices.
+
+32
+00:02:45,834 --> 00:02:50,752
+The ShellX relay only forwards encrypted bytes: it can't read your terminal,
+
+33
+00:02:50,752 --> 00:02:52,240
+and it never stores it.
+
+34
+00:02:53,786 --> 00:02:58,719
+That's ShellX. Download it free for Mac and Windows at shellx.pro,
+
+35
+00:02:58,719 --> 00:03:02,382
+and get the app for your iPhone or Android phone.

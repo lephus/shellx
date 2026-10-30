@@ -6,6 +6,8 @@ import config from '../site.config.json';
 //   desktop/<version>/ShellX-Setup-<version>.exe
 export const desktopVersion: string = config.desktopVersion;
 export const supportEmail: string = config.supportEmail;
+/** Public contact channel on the website; the email stays for legal requests (privacy, terms). */
+export const discordUrl: string = config.discordUrl;
 export const appStoreUrl: string | null = config.appStoreUrl;
 export const googlePlayUrl: string | null = config.googlePlayUrl;
 /** Origin of the ShellX API that mints share-viewer tickets (`POST /v2/shares/:id/ticket`). */
