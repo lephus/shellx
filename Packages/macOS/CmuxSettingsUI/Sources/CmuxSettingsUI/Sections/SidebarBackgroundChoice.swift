@@ -47,4 +47,9 @@ enum SidebarBackgroundChoice: Hashable, CaseIterable {
         case .terminal: return nil
         }
     }
+
+    /// Whether picking this choice clears a light or dark tint override left
+    /// from earlier. A custom color draws `tintColor`, which the Sidebar Color
+    /// swatch shows; an override would draw instead of it.
+    var clearsTintOverrides: Bool { self == .custom }
 }

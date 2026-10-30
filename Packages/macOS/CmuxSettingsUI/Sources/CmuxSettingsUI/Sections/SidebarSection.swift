@@ -158,12 +158,18 @@ public struct SidebarSection: View {
         if let source = choice.tintSource, tintSource.current != source {
             tintSource.set(source)
         }
+        if choice.clearsTintOverrides { clearTintOverrides() }
     }
 
-    /// Stores the picked color as the one the sidebar draws: a light or dark
-    /// override left from earlier would otherwise draw instead of it.
+    /// Stores the picked color as the one the sidebar draws.
     private func setOwnTint(_ hex: String) {
         tintHex.set(hex)
+        clearTintOverrides()
+    }
+
+    /// A light or dark override left from earlier would draw instead of the
+    /// color the Sidebar Color swatch shows.
+    private func clearTintOverrides() {
         if !tintHexLight.current.isEmpty { tintHexLight.reset() }
         if !tintHexDark.current.isEmpty { tintHexDark.reset() }
     }
