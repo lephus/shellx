@@ -53,7 +53,7 @@ public struct HomeFocus: Equatable, Sendable {
     /// across those three together; Ended has its own pass.
     public static func make(
         sessions: [MachineSession], pending: [MachinePendingItem], finished: [String: [String: Date]],
-        now: Date, timeZone: TimeZone = .current
+        dismissed: EndedDismissals = .none, now: Date, timeZone: TimeZone = .current
     ) -> HomeFocus {
         var waiting = Set(sessions.filter { $0.session.state == .needsInput }.map(\.ref))
         var questions: [SessionRef: String] = [:]
