@@ -38,7 +38,8 @@ Start menu entry "ShellX". Needs Windows 10 1809 (build 17763) or later.
 ## Run the window on a Mac (development only)
 
 The GPUI window also builds on macOS so the UI can be checked with screenshots without a
-Windows PC. This is not a product: nothing ships from it, and it opens `/bin/sh` instead of
+Windows PC. This is not a product: nothing ships from it, and it opens `/bin/bash` (with the
+same OSC 7 prompt hook, so the workspace cards show the directory and branch) instead of
 PowerShell. From `windows/`:
 
 ```
@@ -122,9 +123,11 @@ with a close box per tab and the New terminal / Split right / Split down buttons
 sidebar footer has the `?` help menu (Settings…, Check for Updates, Docs, GitHub), the
 version and, when a newer version exists, the "Update Available" pill.
 
-While any panel is open (settings, pairing, sign-in, machine picker, forced-update overlay),
-app shortcuts are swallowed and `Esc` closes the topmost panel (not the forced-update overlay);
-the terminal gets the keyboard back when the last panel closes.
+While any panel is open (settings, pairing, sign-in, forced-update overlay), app shortcuts are
+swallowed and `Esc` closes the topmost panel (not the forced-update overlay); the terminal gets
+the keyboard back when the last panel closes. The dropdowns (the "+ ▾" menu, the `?` help menu,
+the machines "+" list) are not panels: they close on a click outside them, when a panel opens
+or a shortcut runs, and on `Esc`, which then does not reach the shell.
 
 Source of truth: `shellx-model/src/keys.rs`. Keys are ignored while an IME is composing
 and while the Windows key is held. `Ctrl+Alt` combinations are treated as AltGr text.
