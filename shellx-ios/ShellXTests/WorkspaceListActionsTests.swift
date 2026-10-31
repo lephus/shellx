@@ -373,6 +373,49 @@ final class WorkspaceListActionsTests: XCTestCase {
         XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [], "no Close while the Mac is away")
     }
 
+    /// Close Agent is offered only for an agent a tab of the Mac's listed workspaces names: `agent.close` finds
+    /// nothing else, so an agent outside workspaces (run over SSH, or in a workspace since closed) has no Close
+    /// anywhere, and neither has an agent that ended in its tab.
+    func testOnlyAnAgentWithAListedTabOffersClose() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            LinkWorkspace(
+                workspaceId: "ws-shellx", title: "shellx", order: 0,
+                terminals: [
+                    LinkTerminal(terminalId: "t1", title: "claude", order: 0, selected: true, sessionId: "s1"),
+                    LinkTerminal(terminalId: "t2", title: "zsh", order: 1, selected: false, sessionId: "s3"),
+                ])
+        ])
+        // `s1` runs in a listed tab; `s2` over SSH, which no listed tab names; `s3` ended in its tab.
+        await mac.upsertSession(
+            AgentSession(
+                sessionId: "s1", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx", state: .working))
+        await mac.upsertSession(
+            AgentSession(sessionId: "s2", agent: "claude", workspaceId: "", workspaceTitle: "", state: .working))
+        await mac.upsertSession(
+            AgentSession(
+                sessionId: "s3", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx", state: .ended))
+        let rig = try await makeRig([mac])
+        let id = mac.machine.machineID
+        let ready = await eventually {
+            rig.hub.machines.first?.state == .online && rig.hub.reachableSessions.count == 3
+                && rig.hub.workspaceRows(machineID: id).count == 1
+        }
+        XCTAssertTrue(ready)
+        let sessions = Dictionary(uniqueKeysWithValues: rig.hub.reachableSessions.map { ($0.session.sessionId, $0) })
+
+        XCTAssertTrue(WorkspaceListActions.canClose(try XCTUnwrap(sessions["s1"]), hub: rig.hub))
+        XCTAssertFalse(
+            WorkspaceListActions.canClose(try XCTUnwrap(sessions["s2"]), hub: rig.hub),
+            "no listed tab names it: the Mac would answer not_found")
+        XCTAssertFalse(
+            WorkspaceListActions.canClose(try XCTUnwrap(sessions["s3"]), hub: rig.hub), "its tab runs the shell now")
+        XCTAssertEqual(rig.hub.otherSessions(machineID: id).map(\.session.sessionId), ["s2"])
+        XCTAssertFalse(
+            rig.hub.otherSessions(machineID: id).contains { WorkspaceListActions.canClose($0, hub: rig.hub) },
+            "no agent outside workspaces offers Close")
+    }
+
     // MARK: - Closing a tab
 
     /// A Mac with the workspace `shellx`: a shell `t1` and the agent `claude` (session `s1`) in `t2`.
