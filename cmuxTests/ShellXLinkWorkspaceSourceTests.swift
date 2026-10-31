@@ -503,7 +503,7 @@ struct ShellXLinkWorkspaceSourceTests {
     }
 
     /// The live control's gate (PROTOCOL.md 10, "Shell fall-through"): only a Claude agent that has not ended, whose
-    /// pid the Mac knows and finds alive, and that is bound to a workspace and a terminal, names a surface to close.
+    /// pid the Mac knows and finds alive, and that is bound to a terminal, names a surface to close.
     /// Once the agent has exited, its tab runs the user's shell, which a phone must never close.
     @Test func liveAgentSurfaceNamesOnlyALiveAgentBoundToATab() throws {
         // A process that has exited (reaped), so its pid names no agent.
@@ -523,17 +523,15 @@ struct ShellXLinkWorkspaceSourceTests {
             return changed
         }
 
-        let live = try #require(ShellXLinkWorkspaceSource.liveAgentSurface(base))
-        #expect(live.workspaceId == workspace)
-        #expect(live.surfaceId == surface)
+        #expect(ShellXLinkWorkspaceSource.liveAgentSurface(base) == surface)
         let working = ShellXLinkWorkspaceSource.liveAgentSurface(record { $0.state = .working(since: Date()) })
-        #expect(working?.surfaceId == surface)
+        #expect(working == surface)
         // The registry may keep ids in lower case; the list names them in upper case.
         let lower = ShellXLinkWorkspaceSource.liveAgentSurface(record {
             $0.workspaceID = workspace.uuidString.lowercased()
             $0.surfaceID = surface.uuidString.lowercased()
         })
-        #expect(lower?.workspaceId == workspace && lower?.surfaceId == surface)
+        #expect(lower == surface)
 
         let codex = AgentChatSessionRecord(
             sessionID: "s2", agentKind: .codex, workspaceID: workspace.uuidString, surfaceID: surface.uuidString,
@@ -558,7 +556,7 @@ struct ShellXLinkWorkspaceSourceTests {
             ("garbled workspace", record { $0.workspaceID = "ws-1" }),
         ]
         for (name, candidate) in anyWorkspace {
-            #expect(ShellXLinkWorkspaceSource.liveAgentSurface(candidate) != nil, "\(name) named no surface")
+            #expect(ShellXLinkWorkspaceSource.liveAgentSurface(candidate) == surface, "\(name) named no surface")
         }
     }
 
@@ -683,7 +681,8 @@ private final class FakeMac {
     var createResult: TerminalController.V2CallResult = .ok(["created_workspace_id": "ws-new"] as [String: Any])
     var renameResult: TerminalController.V2CallResult = .ok([String: Any]())
     var closeResult: TerminalController.V2CallResult = .ok([String: Any]())
-    /// The live agents' surfaces, by session id; a session missing here is not a live agent.
+    /// The live agents' records, by session id: the workspace each names (where its shell started, stale once the
+    /// tab moves) and its surface. A session missing here is not a live agent.
     var agentSurfaces: [String: (workspaceId: UUID, surfaceId: UUID)] = [:]
     var closeSurfaceResult: TerminalController.V2CallResult = .ok([String: Any]())
     private(set) var creates = 0
@@ -711,7 +710,7 @@ private final class FakeMac {
                 closes.append(workspaceId)
                 return closeResult
             },
-            agentSurface: { [self] sessionId in agentSurfaces[sessionId] },
+            agentSurface: { [self] sessionId in agentSurfaces[sessionId]?.surfaceId },
             closeSurface: { [self] workspaceId, surfaceId in
                 surfaceCloses.append((workspaceId, surfaceId))
                 return closeSurfaceResult

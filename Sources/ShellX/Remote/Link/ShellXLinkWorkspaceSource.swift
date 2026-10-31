@@ -22,8 +22,8 @@ import ShellXLinkSession
 ///   forward. They act only on a workspace the list holds, and answer `refused` while a managed policy blocks
 ///   remote control, read on every call.
 /// * `agent.close` closes only the terminal of a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``), and only
-///   while the list shows that terminal in that workspace: never an SSH or remote one, and never the shell a tab
-///   runs once its agent has exited.
+///   while the list shows that terminal, in the workspace the list shows it in (a tab dragged elsewhere closes
+///   there): never an SSH or remote one, and never the shell a tab runs once its agent has exited.
 ///
 /// Titles, tab titles and directories are never logged. All state is main-actor isolated, like the windows it
 /// reads; `onTermination` only schedules the removal on the main actor, so it never waits for anything `yield`
@@ -41,9 +41,9 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
         var create: @MainActor @Sendable () async -> V2CallResult
         var rename: @MainActor @Sendable (_ workspaceId: String, _ title: String) -> V2CallResult
         var close: @MainActor @Sendable (_ workspaceId: String) -> V2CallResult
-        /// The workspace and terminal of a live agent session (``ShellXLinkChatSource/isLiveAgent(_:)``); nil for any
-        /// other session, or a live one the Mac has not bound to both.
-        var agentSurface: @MainActor @Sendable (_ sessionId: String) -> (workspaceId: UUID, surfaceId: UUID)?
+        /// The terminal of a live agent session (``ShellXLinkChatSource/isLiveAgent(_:)``); nil for any other
+        /// session, or a live one the Mac has not bound to a terminal.
+        var agentSurface: @MainActor @Sendable (_ sessionId: String) -> UUID?
         /// Closes that terminal, or its workspace when it is the last one.
         var closeSurface: @MainActor @Sendable (_ workspaceId: UUID, _ surfaceId: UUID) -> V2CallResult
         /// Whether a configuration profile blocks remote control now.
@@ -173,34 +173,35 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
     // MARK: - AgentControl
 
     /// Closes a live agent's terminal tab (PROTOCOL.md 10, "Agents"), or its workspace when it is the last tab and
-    /// the Mac's Close Tab would close it. Only a tab the list shows in that workspace: the Mac is asked nothing for
-    /// any other session.
+    /// the Mac's Close Tab would close it. Only a tab the list shows, in the workspace the list shows it in: the Mac
+    /// is asked nothing for any other session.
     func closeAgent(sessionId: String) async -> WorkspaceControlOutcome {
         guard !control.isBlocked() else { return .refused }
-        guard let target = control.agentSurface(sessionId),
-              isListed(target.workspaceId, terminal: target.surfaceId) else { return .notFound }
-        let outcome = Self.outcome(of: control.closeSurface(target.workspaceId, target.surfaceId), action: "close-agent")
+        guard let surface = control.agentSurface(sessionId),
+              let workspace = listedWorkspace(holding: surface) else { return .notFound }
+        let outcome = Self.outcome(of: control.closeSurface(workspace, surface), action: "close-agent")
         if outcome == .ok { refresh() }
         return outcome
     }
 
-    /// The workspace and terminal `record` names when it is a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``)
-    /// bound to both; nil for no record, any other record, or an id that is not a UUID. Once the agent has exited its
-    /// tab runs the user's shell, so this is what keeps a phone from closing it.
-    static func liveAgentSurface(_ record: AgentChatSessionRecord?) -> (workspaceId: UUID, surfaceId: UUID)? {
-        guard let record, ShellXLinkChatSource.isLiveAgent(record),
-              let workspace = record.workspaceID.flatMap(UUID.init(uuidString:)),
-              let surface = record.surfaceID.flatMap(UUID.init(uuidString:)) else { return nil }
-        return (workspace, surface)
+    /// The terminal `record` names when it is a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``); nil for no
+    /// record, any other record, or a terminal id that is not a UUID. Once the agent has exited its tab runs the
+    /// user's shell, so this is what keeps a phone from closing it. The record's workspace is not used: it is where
+    /// the shell started (`CMUX_WORKSPACE_ID`) and goes stale once the tab is dragged to another workspace.
+    static func liveAgentSurface(_ record: AgentChatSessionRecord?) -> UUID? {
+        guard let record, ShellXLinkChatSource.isLiveAgent(record) else { return nil }
+        return record.surfaceID.flatMap(UUID.init(uuidString:))
     }
 
-    /// Whether the list shows `terminal` in `workspace`.
-    private func isListed(_ workspace: UUID, terminal: UUID) -> Bool {
+    /// The listed workspace whose terminals include `terminal`, wherever the tab has moved since its shell started,
+    /// as `workspace.list` and `agent.sessions` show it; nil when no listed workspace has it (an SSH or other remote
+    /// workspace, or a tab that is gone).
+    private func listedWorkspace(holding terminal: UUID) -> UUID? {
         refresh()
-        let workspaceId = workspace.uuidString, terminalId = terminal.uuidString
-        return published?.contains { listed in
-            listed.workspaceId == workspaceId && listed.terminals.contains { $0.terminalId == terminalId }
-        } ?? false
+        let terminalId = terminal.uuidString
+        return published?
+            .first { listed in listed.terminals.contains { $0.terminalId == terminalId } }
+            .flatMap { UUID(uuidString: $0.workspaceId) }
     }
 
     /// The title a phone asked for, without control characters or line breaks, trimmed, and cut to
