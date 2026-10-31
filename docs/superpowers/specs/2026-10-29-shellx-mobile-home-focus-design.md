@@ -170,9 +170,11 @@ Luật này dùng cho **mọi danh sách phiên** trên điện thoại: ba nhó
 - **Hành vi** **[người dùng]**: tắt hẳn agent trên Mac. Mac đóng tab terminal đang chạy agent, đúng như
   người dùng đóng tab đó trên desktop. Phiên thành `ended` và chuyển vào "Đã kết thúc" trên điện thoại.
 - **Chỗ đặt nút** **[người viết]**:
-  - vuốt trái một dòng agent ở ba nhóm và ở "Agent ngoài workspace": nút "Đóng", giống vuốt dòng workspace;
+  - vuốt trái một dòng agent ở ba nhóm: nút "Đóng", giống vuốt dòng workspace;
   - một mục "Đóng agent" trong màn agent.
   - Trang "Đã kết thúc" không có nút này: phiên đã tắt rồi.
+  - "Agent ngoài workspace" cũng không có nút này (quyết định khi review cuối, 2026-10-31): đó là các phiên
+    không terminal nào trong workspace của Mac ghi tên, nên Mac không bao giờ đóng được chúng (`not_found`).
 - **Hỏi lại** **[người viết, theo spec đợt 1 §6.3]**: luôn có hộp xác nhận ghi tên agent và "Tab terminal
   của agent trên Mac sẽ bị đóng". Đã xác nhận trên điện thoại thì Mac **không** hỏi lại, kể cả khi agent
   đang chạy: Mac đóng tab như `surface.close` với `force=true`.

@@ -91,8 +91,8 @@ extension View {
 extension View {
     /// Asks before an agent is closed: "Close <name>?", what closing does on the Mac, and one red "Close"
     /// (the system adds Cancel). Shown while `item` is set; `name` gives the agent's name, `close` runs once
-    /// the user confirmed. The home's cards, the agents outside workspaces, the agent screen and the
-    /// workspace screen ask the same way (HIG: Action sheets).
+    /// the user confirmed. The home's cards, the agent screen and the workspace screen ask the same way
+    /// (HIG: Action sheets).
     func agentCloseConfirmation<Item>(
         _ item: Binding<Item?>, name: @escaping (Item) -> String, close: @escaping (Item) -> Void
     ) -> some View {

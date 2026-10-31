@@ -7,8 +7,8 @@ import SwiftUI
 ///
 /// It is laid out as the home is: a plain list with the same room around a card
 /// (`WorkspaceListScreen.cardInsets`) and no gap over the first one. With `remove` each card has a trash
-/// button at its right edge, and swiping the card to the left does the same. With `close` each card of a
-/// live session swipes to Close, which asks first; the Ended page has none.
+/// button at its right edge, and swiping the card to the left does the same. No card offers Close: neither
+/// page holds an agent the Mac can close for the phone.
 struct SessionListScreen: View {
     let title: String
     /// Over the cards, e.g. a Mac's name; none for a list that spans the Macs.
@@ -22,15 +22,10 @@ struct SessionListScreen: View {
     let empty: LocalizedStringResource
     /// Takes a card off the list; nil draws no trash.
     let remove: ((FocusItem) -> Void)?
-    /// Confirmed: closes the card's agent on its Mac. Nil, or an ended session, offers no Close.
-    let close: ((FocusItem) -> Void)?
-
-    @State private var closing: FocusItem?
 
     init(
         title: String, header: String?, items: [FocusItem], kind: @escaping (FocusItem) -> FocusRowView.Kind,
-        now: Date, showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil,
-        close: ((FocusItem) -> Void)? = nil
+        now: Date, showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil
     ) {
         self.title = title
         self.header = header
@@ -40,7 +35,6 @@ struct SessionListScreen: View {
         self.showsMachineName = showsMachineName
         self.empty = empty
         self.remove = remove
-        self.close = close
     }
 
     /// Every card in the same group.
@@ -97,8 +91,8 @@ struct SessionListScreen: View {
                     .listRowInsets(WorkspaceListScreen.cardInsets)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    // A full swipe takes a card off at once; Close asks first, so it waits for a tap.
-                    .swipeActions(edge: .trailing, allowsFullSwipe: remove != nil) {
+                    // A full swipe takes a card off at once.
+                    .swipeActions(edge: .trailing) {
                         if let remove {
                             // `.destructive`: nothing is asked, so the row may go as soon as it is swiped.
                             Button(role: .destructive) {
@@ -106,16 +100,6 @@ struct SessionListScreen: View {
                             } label: {
                                 Label(String(localized: "ended.remove"), systemImage: "trash")
                             }
-                        }
-                        if close != nil, item.session.session.state != .ended {
-                            // Not `.destructive`: that role lets iOS animate the row away before the
-                            // confirmation the button only opens.
-                            Button {
-                                closing = item
-                            } label: {
-                                Label(String(localized: "agent.close"), systemImage: "xmark")
-                            }
-                            .tint(Color("StatusError"))
                         }
                     }
                 }
@@ -127,7 +111,6 @@ struct SessionListScreen: View {
         .themedList()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .agentCloseConfirmation($closing, name: \.name) { close?($0) }
     }
 
     /// The trash at the card's right edge. Borderless, so a tap on it is its own and the row's link
