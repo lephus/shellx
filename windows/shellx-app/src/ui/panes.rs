@@ -1,6 +1,7 @@
-//! The active tab's split tree (spec §7.1 "Khu vực chính"): each region
-//! shows its stack's selected pane, that pane's `TermView` absolutely
-//! positioned at the region's `Layout::rects` rect inside the pane area.
+//! The active tab's split tree (spec §7.1 "Khu vực chính"): each region is
+//! absolutely positioned at its `Layout::rects` rect inside the pane area
+//! and holds its tab bar (`tab_bar.rs`) over its stack's selected pane's
+//! `TermView`.
 //! The 1 px gaps between rects show the area's LINE background, which draws
 //! the dividers. No divider dragging in the MVP.
 //! Inactive tabs and unselected stacked panes are not rendered; their views
@@ -13,10 +14,12 @@ use gpui::{
     Bounds, Context, Div, Entity, MouseButton, MouseDownEvent, Pixels, Size, Subscription, Window,
     canvas, div, prelude::*, px,
 };
-use shellx_model::layout::{PaneId, Rect};
-use shellx_model::tabs::Tab;
+use shellx_model::layout::{PaneId, Rect, SlotId};
+use shellx_model::strings::Lang;
+use shellx_model::tabs::{Stack, Tab};
 
 use super::root::RootView;
+use super::tab_bar;
 use super::term_view::TermView;
 use super::theme;
 use crate::workspace::{DIVIDER, PaneHost, estimate_pane_area};
@@ -86,6 +89,8 @@ impl PaneArea {
 }
 
 pub(super) fn render(
+    root: &RootView,
+    lang: Lang,
     tab: &Tab,
     host: &PaneHost<PaneView>,
     area: &PaneArea,
@@ -114,19 +119,49 @@ pub(super) fn render(
         );
     // Each region shows the selected terminal of its stack; the others
     // stay alive in the host, like the panes of inactive tabs.
+    let focused_slot = tab.focused_slot();
     for (slot, r) in tab.layout.rects(bounds, DIVIDER) {
-        let Some(pane) = tab.stacks.get(&slot).map(|stack| stack.selected_pane()) else {
+        let Some(stack) = tab.stacks.get(&slot) else {
             continue;
         };
-        let Some(live) = host.get(pane) else {
+        let Some(live) = host.get(stack.selected_pane()) else {
             continue;
         };
-        container = container.child(pane_slot(pane, r, live.view.clone(), cx));
+        let region = Region {
+            slot,
+            stack,
+            focused: slot == focused_slot,
+            rect: r,
+        };
+        container = container.child(region_view(root, lang, region, live.view.clone(), cx));
     }
     container
 }
 
-fn pane_slot(pane: PaneId, r: Rect, view: Entity<TermView>, cx: &mut Context<RootView>) -> Div {
+/// One split region: where it is, and what its tab bar shows.
+struct Region<'a> {
+    slot: SlotId,
+    stack: &'a Stack,
+    /// The region the keyboard goes to.
+    focused: bool,
+    rect: Rect,
+}
+
+/// A region: its tab bar over the selected terminal.
+fn region_view(
+    root: &RootView,
+    lang: Lang,
+    region: Region<'_>,
+    view: Entity<TermView>,
+    cx: &mut Context<RootView>,
+) -> Div {
+    let Region {
+        slot,
+        stack,
+        focused,
+        rect: r,
+    } = region;
+    let pane: PaneId = stack.selected_pane();
     div()
         .absolute()
         .left(px(r.x))
@@ -134,13 +169,25 @@ fn pane_slot(pane: PaneId, r: Rect, view: Entity<TermView>, cx: &mut Context<Roo
         .w(px(r.w))
         .h(px(r.h))
         .overflow_hidden()
+        .flex()
+        .flex_col()
         .bg(theme::bg())
-        // TermView focuses itself on click; this keeps the model in step.
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                this.focus_pane(pane, window, cx);
-            }),
+        .child(tab_bar::render(root, slot, stack, focused, lang, cx))
+        .child(
+            div()
+                .relative()
+                .flex_1()
+                .min_h_0()
+                .w_full()
+                .overflow_hidden()
+                // TermView focuses itself on click; this keeps the model in
+                // step. (Clicks on the tab bar act on their own.)
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                        this.focus_pane(pane, window, cx);
+                    }),
+                )
+                .child(view),
         )
-        .child(view)
 }

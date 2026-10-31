@@ -70,6 +70,10 @@ pub enum Str {
     ClosePane,
     SplitRight,
     SplitDown,
+    /// Tooltip of the tab bar's terminal button.
+    NewTerminal,
+    /// Tooltip of a tab's close button.
+    CloseTab,
     Copy,
     Paste,
     ToggleSidebar,
@@ -157,6 +161,8 @@ impl Str {
         Str::ClosePane,
         Str::SplitRight,
         Str::SplitDown,
+        Str::NewTerminal,
+        Str::CloseTab,
         Str::Copy,
         Str::Paste,
         Str::ToggleSidebar,
@@ -241,6 +247,8 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ClosePane => "Đóng khung",
             Str::SplitRight => "Chia sang phải",
             Str::SplitDown => "Chia xuống dưới",
+            Str::NewTerminal => "Terminal mới",
+            Str::CloseTab => "Đóng tab",
             Str::Copy => "Sao chép",
             Str::Paste => "Dán",
             Str::ToggleSidebar => "Ẩn/hiện thanh bên",
@@ -320,6 +328,8 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ClosePane => "Close pane",
             Str::SplitRight => "Split right",
             Str::SplitDown => "Split down",
+            Str::NewTerminal => "New Terminal",
+            Str::CloseTab => "Close Tab",
             Str::Copy => "Copy",
             Str::Paste => "Paste",
             Str::ToggleSidebar => "Toggle sidebar",
@@ -463,7 +473,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 77);
+        assert_eq!(Str::ALL.len(), 79);
     }
 
     #[test]
@@ -501,6 +511,14 @@ mod tests {
             "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL."
         );
         assert_eq!(t(Lang::Vi, Str::Retry), "Thử lại");
+    }
+
+    #[test]
+    fn tab_bar_strings_match_the_mac() {
+        assert_eq!(t(Lang::Vi, Str::NewTerminal), "Terminal mới");
+        assert_eq!(t(Lang::En, Str::NewTerminal), "New Terminal");
+        assert_eq!(t(Lang::Vi, Str::CloseTab), "Đóng tab");
+        assert_eq!(t(Lang::En, Str::CloseTab), "Close Tab");
     }
 
     #[test]

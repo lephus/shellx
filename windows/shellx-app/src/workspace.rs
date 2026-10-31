@@ -25,11 +25,13 @@ use crate::term_core::TermCore;
 
 /// Width of the line between split panes (`Layout::rects` divider), in px.
 pub const DIVIDER: f32 = 1.0;
-/// Fixed chrome around the pane area, in px (ui/titlebar.rs, ui/root.rs
-/// session bar, ui/sidebar.rs). Borders are inside these sizes.
+/// Fixed chrome around the pane area, in px (ui/titlebar.rs, ui/sidebar.rs).
+/// Borders are inside these sizes.
 pub const TITLEBAR_H: f32 = 40.0;
-pub const SESSION_BAR_H: f32 = 36.0;
 pub const SIDEBAR_W: f32 = 290.0;
+/// Height of each region's tab bar (ui/tab_bar.rs). It sits inside the
+/// region's rect, so it is not part of the chrome around the pane area.
+pub const TAB_BAR_H: f32 = 30.0;
 
 /// Size of the pane area for a window viewport, before the first layout
 /// measures it (the window prefers the measured size once it has one).
@@ -39,7 +41,7 @@ pub fn estimate_pane_area(viewport_w: f32, viewport_h: f32, sidebar_visible: boo
         x: 0.0,
         y: 0.0,
         w: (viewport_w - side).max(0.0),
-        h: (viewport_h - TITLEBAR_H - SESSION_BAR_H).max(0.0),
+        h: (viewport_h - TITLEBAR_H).max(0.0),
     }
 }
 
@@ -264,19 +266,24 @@ mod tests {
 
     #[test]
     fn pane_area_subtracts_chrome() {
-        let a = estimate_pane_area(1200.0, 760.0, true);
+        assert_eq!(estimate_pane_area(1200.0, 760.0, false).w, 1200.0);
+        let tiny = estimate_pane_area(100.0, 30.0, true);
+        assert_eq!((tiny.w, tiny.h), (0.0, 0.0));
+    }
+
+    #[test]
+    fn pane_area_leaves_room_for_the_title_bar_only() {
+        // Each region draws its own tab bar inside its rect, so nothing but
+        // the title bar is subtracted from the window's height.
         assert_eq!(
-            a,
+            estimate_pane_area(1200.0, 760.0, true),
             Rect {
                 x: 0.0,
                 y: 0.0,
                 w: 910.0,
-                h: 684.0
+                h: 720.0
             }
         );
-        assert_eq!(estimate_pane_area(1200.0, 760.0, false).w, 1200.0);
-        let tiny = estimate_pane_area(100.0, 50.0, true);
-        assert_eq!((tiny.w, tiny.h), (0.0, 0.0));
     }
 
     #[test]

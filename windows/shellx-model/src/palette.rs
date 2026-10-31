@@ -45,6 +45,12 @@ pub const PRIMARY_TEXT: Rgba = Rgba::rgb(0x93c5fd);
 pub const RUNNING: Rgba = Rgba::rgb(0xe8c468);
 pub const DONE: Rgba = Rgba::rgb(0x6fd49a);
 pub const ERROR: Rgba = Rgba::rgb(0xe88a8a);
+/// Title of the selected tab in the focused region.
+pub const SELECTION_TITLE: Rgba = Rgba::rgb(0xf1f5ff);
+/// The bar under the selected tab of a region that is not focused.
+pub const INDICATOR_UNFOCUSED: Rgba = Rgba::rgb(0x5b5478);
+/// The purple of a new workspace's rail.
+pub const RAIL_PURPLE: Rgba = Rgba::rgb(0x6a1b9a);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -143,6 +149,9 @@ mod tests {
             (RUNNING, "#e8c468"),
             (DONE, "#6fd49a"),
             (ERROR, "#e88a8a"),
+            (SELECTION_TITLE, "#f1f5ff"),
+            (INDICATOR_UNFOCUSED, "#5b5478"),
+            (RAIL_PURPLE, "#6a1b9a"),
         ];
         for (c, h) in cases {
             assert_eq!(c.hex(), h);

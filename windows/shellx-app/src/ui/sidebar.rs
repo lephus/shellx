@@ -18,8 +18,8 @@
 //! that machine's tabs are listed under it.
 
 use gpui::{
-    AnyView, App, ClickEvent, Context, Div, FontWeight, ImageSource, IntoElement, MouseDownEvent,
-    Pixels, Render, Resource, SharedString, Stateful, Window, div, img, prelude::*, px, svg,
+    ClickEvent, Context, Div, FontWeight, ImageSource, MouseDownEvent, Pixels, Resource,
+    SharedString, Stateful, div, img, prelude::*, px, svg,
 };
 use shellx_model::palette::{Pill, Status};
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
@@ -30,6 +30,7 @@ use super::assets::Icon;
 use super::button::{Kind, button};
 use super::root::RootView;
 use super::theme;
+use super::tooltip::Tooltip;
 
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
@@ -267,33 +268,6 @@ fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView
         list = list.child(row);
     }
     list
-}
-
-/// Plain tooltip: RAISE box, 1 px BORDER, small TEXT label.
-pub(super) struct Tooltip {
-    text: SharedString,
-}
-
-impl Tooltip {
-    pub(super) fn view(text: SharedString, cx: &mut App) -> AnyView {
-        cx.new(|_| Tooltip { text }).into()
-    }
-}
-
-impl Render for Tooltip {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .px(px(8.0))
-            .py(px(4.0))
-            .bg(theme::raise())
-            .border_1()
-            .border_color(theme::border())
-            .rounded(px(6.0))
-            .font(theme::ui_font())
-            .text_size(theme::SMALL_SIZE)
-            .text_color(theme::text())
-            .child(self.text.clone())
-    }
 }
 
 fn group_header(

@@ -1,5 +1,6 @@
 //! RootView: title bar on top, machine sidebar on the left, and the main
-//! area: the session bar over the active tab's split panes (spec §7.1).
+//! area: the active tab's split regions, each with its own tab bar
+//! (spec §7.1; `tab_bar.rs`).
 //!
 //! RootView owns the one `Tabs` model and a `PaneHost` of `TermView`s. Every
 //! structure change (new tab, split, close, respawn) goes through the model
@@ -19,7 +20,8 @@
 //! `PaneTarget::Remote`; `reconcile` opens it through `RemoteTabs` (one
 //! session per Mac, shared by its panes) and a remote `TermView`. A split or
 //! a new terminal tab (Ctrl+Shift+T) of a remote pane opens a new shell on
-//! the same Mac; of a local pane, a local one. A new workspace
+//! the same Mac; of a local pane, a local one. The tab bar's buttons do the
+//! same for their own region. A new workspace
 //! (Ctrl+Shift+N) is always local. A remote terminal ending closes only its
 //! pane (the normal close path, so the last pane respawns a local tab);
 //! every pane the model drops is closed on its session. The machine list
@@ -44,13 +46,13 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui::{
-    App, Context, Div, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render,
-    Subscription, Window, div, prelude::*, px, relative, svg,
+    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render, Subscription,
+    Window, div, prelude::*, relative,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
 use shellx_model::keys::{AppCommand, KeyCtx, KeyIn, map_key};
-use shellx_model::layout::{Axis, PaneId};
+use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::modal::{Panel, Panels, RootKey};
 use shellx_model::palette::Status;
@@ -61,7 +63,6 @@ use shellx_model::update::{UpdateStatus, download_url};
 
 use super::account::AccountService;
 use super::app::Services;
-use super::assets::Icon;
 use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
@@ -76,7 +77,7 @@ use crate::remote_link::{PaneEvent, PaneSink};
 use crate::remote_session::RemoteSession;
 use crate::remote_tabs::{AccountWatch, RemoteTabs, open_want, split_target, start_app_session};
 use crate::shell_info::{remote_session_title, session_title, sidebar_machines, this_machine_id};
-use crate::workspace::{DIVIDER, PaneHost, SESSION_BAR_H};
+use crate::workspace::{DIVIDER, PaneHost};
 
 pub struct RootView {
     tabs: Tabs,
@@ -369,6 +370,16 @@ impl RootView {
         }
     }
 
+    /// A tab's close button. Like a pane click, it is swallowed while a panel
+    /// is open.
+    pub fn close_terminal(&mut self, pane: PaneId, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.panels(cx).allows_app_commands() {
+            self.focus_terminal(window, cx);
+            return;
+        }
+        self.close_pane(pane, window, cx);
+    }
+
     fn run_command(&mut self, command: AppCommand, window: &mut Window, cx: &mut Context<Self>) {
         // A panel is open (or the forced update shows): terminals keep
         // running, but no command gets through.
@@ -377,7 +388,10 @@ impl RootView {
         }
         match command {
             AppCommand::NewWorkspace => self.new_tab(window, cx),
-            AppCommand::NewTerminal => self.new_terminal(window, cx),
+            AppCommand::NewTerminal => {
+                let slot = self.tabs.active().focused_slot();
+                self.new_terminal(slot, window, cx);
+            }
             AppCommand::ClosePane => {
                 let pane = self.tabs.active().focused;
                 self.close_pane(pane, window, cx);
@@ -390,8 +404,14 @@ impl RootView {
                 self.tabs.prev_tab();
                 self.after_focus_change(window, cx);
             }
-            AppCommand::SplitRight => self.split(Axis::Row, window, cx),
-            AppCommand::SplitDown => self.split(Axis::Column, window, cx),
+            AppCommand::SplitRight => {
+                let slot = self.tabs.active().focused_slot();
+                self.split(slot, Axis::Row, window, cx);
+            }
+            AppCommand::SplitDown => {
+                let slot = self.tabs.active().focused_slot();
+                self.split(slot, Axis::Column, window, cx);
+            }
             AppCommand::FocusPane(dir) => {
                 // The same rect the panes are rendered in.
                 let bounds = self.area.bounds(window, self.sidebar_visible);
@@ -424,27 +444,58 @@ impl RootView {
         self.reconcile(window, cx);
     }
 
-    /// Splits the focused pane: a remote pane gets a new shell on the same
-    /// Mac (spec §8.6 C12), a local pane a new local shell.
-    fn split(&mut self, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
+    /// Makes `slot`'s selected terminal the focused one (a button of a
+    /// region's tab bar acts on that region, not on the focused one).
+    fn focus_slot(&mut self, slot: SlotId) {
+        let pane = self
+            .tabs
+            .active()
+            .stacks
+            .get(&slot)
+            .map(|stack| stack.selected_pane());
+        if let Some(pane) = pane {
+            self.tabs.focus(pane);
+        }
+    }
+
+    /// Adds a terminal to `slot` (`add` makes it in the model). Like every
+    /// new terminal it runs where the region's shown pane runs: a remote pane
+    /// gets a new shell on the same Mac (spec §8.6 C12), a local pane a new
+    /// local shell. Swallowed while a panel is open, like a pane click.
+    fn add_terminal(
+        &mut self,
+        slot: SlotId,
+        add: impl FnOnce(&mut Tabs, PaneTarget) -> PaneId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.panels(cx).allows_app_commands() {
+            self.focus_terminal(window, cx);
+            return;
+        }
+        self.focus_slot(slot);
         let (target, want) = split_target(&self.tabs, self.tabs.active().focused);
-        let pane = self.tabs.split_focused(axis, target);
+        let pane = add(&mut self.tabs, target);
         if let Some(want) = want {
             self.remotes.plan(pane, want);
         }
         self.reconcile(window, cx);
     }
 
-    /// Ctrl+Shift+T: a new terminal tab in the focused region, shown in place
-    /// of the focused one. Like a split, it runs where the focused pane runs:
-    /// a new shell on the same Mac for a remote pane, else a local shell.
-    fn new_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (target, want) = split_target(&self.tabs, self.tabs.active().focused);
-        let pane = self.tabs.new_surface(target);
-        if let Some(want) = want {
-            self.remotes.plan(pane, want);
-        }
-        self.reconcile(window, cx);
+    /// Splits `slot`: a new region next to it holding a new terminal.
+    pub fn split(&mut self, slot: SlotId, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
+        self.add_terminal(
+            slot,
+            |tabs, target| tabs.split_focused(axis, target),
+            window,
+            cx,
+        );
+    }
+
+    /// Ctrl+Shift+T and a region's terminal button: a new terminal tab in
+    /// `slot`, shown in place of the one it showed.
+    pub fn new_terminal(&mut self, slot: SlotId, window: &mut Window, cx: &mut Context<Self>) {
+        self.add_terminal(slot, |tabs, target| tabs.new_surface(target), window, cx);
     }
 
     /// "Mở" on a Mac (sidebar row, or the pairing panel after approval): a
@@ -628,9 +679,9 @@ impl RootView {
             .unwrap_or_else(|| machine_id.to_string())
     }
 
-    /// Sidebar / session bar title of a tab: its focused pane's terminal
+    /// Title of a terminal (a sidebar row, a tab bar tab): its terminal
     /// title, else "PowerShell" (a Mac tab: else the Mac's name).
-    fn tab_title(&self, focused: PaneId, lang: Lang, cx: &App) -> String {
+    pub(super) fn tab_title(&self, focused: PaneId, lang: Lang, cx: &App) -> String {
         let title = self
             .host
             .get(focused)
@@ -641,60 +692,6 @@ impl RootView {
             }
             None => session_title(title.as_deref(), lang),
         }
-    }
-
-    /// 36 px bar over the panes: terminal icon, "<tab title> › <machine>".
-    fn session_bar(&self, lang: Lang, cx: &App) -> Div {
-        let focused = self.tabs.active().focused;
-        let title = self.tab_title(focused, lang, cx);
-        let machine = match self.pane_machine(focused) {
-            Some(remote) => self.machine_name(remote, cx),
-            None => {
-                let machines = self.machines(cx);
-                let local_id = this_machine_id(&machines);
-                machines
-                    .iter()
-                    .find(|m| m.machine_id == local_id)
-                    .map(|m| m.name.clone())
-                    .unwrap_or_default()
-            }
-        };
-        div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(px(8.0))
-            .flex_none()
-            .w_full()
-            .h(px(SESSION_BAR_H))
-            .px(px(14.0))
-            .bg(theme::panel())
-            .border_b_1()
-            .border_color(theme::line())
-            .child(
-                svg()
-                    .path(Icon::Terminal.path())
-                    .flex_none()
-                    .size(px(14.0))
-                    .text_color(theme::muted()),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .min_w_0()
-                    .gap(px(6.0))
-                    .child(
-                        div()
-                            .min_w_0()
-                            .truncate()
-                            .text_color(theme::text_hi())
-                            .child(title),
-                    )
-                    .child(div().flex_none().text_color(theme::muted()).child("›"))
-                    .child(div().flex_none().text_color(theme::muted()).child(machine)),
-            )
     }
 }
 
@@ -754,7 +751,6 @@ impl Render for RootView {
         } else {
             None
         };
-        let session_bar = self.session_bar(lang, cx);
         let account = self.account.read(cx);
         let banner = match account.update_status() {
             status @ UpdateStatus::Available { version, .. } if account.banner_visible() => {
@@ -786,6 +782,8 @@ impl Render for RootView {
             .is_open()
             .then(|| self.pairing.clone());
         let panes = panes::render(
+            self,
+            lang,
             self.tabs.active(),
             &self.host,
             &self.area,
@@ -803,7 +801,6 @@ impl Render for RootView {
             .overflow_hidden()
             .bg(theme::bg())
             .children(banner)
-            .child(session_bar)
             .child(panes)
             // The pairing card, centered over the main area.
             .children(pairing);

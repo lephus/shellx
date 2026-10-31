@@ -1,4 +1,4 @@
-//! Embedded icons: the 20 coolicons v4.1 SVGs (CC BY 4.0, Kryston Schwarze)
+//! Embedded icons: the 23 coolicons v4.1 SVGs (CC BY 4.0, Kryston Schwarze)
 //! plus the ShellX logo. GPUI-free, so the `--smoke-ui-assets` check and the
 //! window's `AssetSource` (ui/assets.rs) share one table.
 //!
@@ -13,7 +13,9 @@ pub enum Icon {
     BellRing,
     ChevronDown,
     CircleCheck,
+    CloseSm,
     Cloud,
+    Columns,
     Command,
     Data,
     Desktop,
@@ -22,6 +24,7 @@ pub enum Icon {
     Mobile,
     MoreHorizontal,
     QrCode,
+    Rows,
     Search,
     Settings,
     Share,
@@ -59,7 +62,9 @@ icon_table! {
     BellRing => "bell_ring.svg",
     ChevronDown => "chevron_down.svg",
     CircleCheck => "circle_check.svg",
+    CloseSm => "close_sm.svg",
     Cloud => "cloud.svg",
+    Columns => "columns.svg",
     Command => "command.svg",
     Data => "data.svg",
     Desktop => "desktop.svg",
@@ -68,6 +73,7 @@ icon_table! {
     Mobile => "mobile.svg",
     MoreHorizontal => "more_horizontal.svg",
     QrCode => "qr_code.svg",
+    Rows => "rows.svg",
     Search => "search.svg",
     Settings => "settings.svg",
     Share => "share.svg",
@@ -128,7 +134,7 @@ mod tests {
 
     #[test]
     fn every_icon_is_an_embedded_svg() {
-        assert_eq!(Icon::ALL.len(), 21);
+        assert_eq!(Icon::ALL.len(), 24);
         for icon in Icon::ALL {
             assert!(looks_like_svg(icon.bytes()), "{icon:?} is not an SVG");
             assert_eq!(by_path(icon.path()), Some(icon.bytes()), "{icon:?}");
