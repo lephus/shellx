@@ -5,6 +5,8 @@
 //! panel and cannot itself be closed; the keyboard goes back to the terminal
 //! only when the last panel has closed.
 
+use crate::keys::{AppCommand, KeyAction};
+
 /// A panel, topmost first in drawing order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Panel {
@@ -18,6 +20,20 @@ pub enum Panel {
     Login,
     /// The machines-header "+" list in the sidebar.
     Picker,
+}
+
+/// What the window root does with a key that reached it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RootKey {
+    /// Leave it alone: it is typed text (or an IME key) and must reach the
+    /// platform's text path.
+    Pass,
+    /// Stop it here.
+    Swallow,
+    /// Esc: close the topmost closable panel.
+    CloseTop,
+    /// Run this window command.
+    Run(AppCommand),
 }
 
 /// Position in the drawing order, 0 = topmost.
@@ -83,11 +99,114 @@ impl Panels {
     pub fn must_close(&self) -> Option<Panel> {
         (self.forced_update && self.settings).then_some(Panel::Settings)
     }
+
+    /// What the root does with `action` (from `map_key`); `plain_escape` is
+    /// Esc without modifiers.
+    pub fn root_key(&self, action: &KeyAction, plain_escape: bool) -> RootKey {
+        if self.top() == Some(Panel::ForcedUpdate) {
+            return RootKey::Swallow;
+        }
+        if self.any_open() {
+            return if plain_escape {
+                RootKey::CloseTop
+            } else {
+                RootKey::Swallow
+            };
+        }
+        match action {
+            KeyAction::App(command) => RootKey::Run(*command),
+            _ => RootKey::Pass,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn composing_and_text_keys_pass_while_a_panel_is_open() {
+        // Typed text and IME keys must reach the sign-in, settings and
+        // pairing fields: a handled key-down never becomes a WM_CHAR on
+        // Windows, so stopping them here leaves the fields dead.
+        for p in [
+            Panels {
+                settings: true,
+                ..Panels::default()
+            },
+            Panels {
+                login: true,
+                ..Panels::default()
+            },
+            Panels {
+                pairing: true,
+                ..Panels::default()
+            },
+        ] {
+            assert_eq!(p.root_key(&KeyAction::Text, false), RootKey::Pass, "{p:?}");
+            assert_eq!(
+                p.root_key(&KeyAction::Ignore, false),
+                RootKey::Pass,
+                "{p:?}"
+            );
+            assert_eq!(
+                p.root_key(&KeyAction::App(AppCommand::NewTab), false),
+                RootKey::Swallow,
+                "{p:?}"
+            );
+            assert_eq!(
+                p.root_key(&KeyAction::Chord("ctrl+x".into()), false),
+                RootKey::Swallow,
+                "{p:?}"
+            );
+            assert_eq!(
+                p.root_key(&KeyAction::Chord("escape".into()), true),
+                RootKey::CloseTop,
+                "{p:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn forced_update_passes_text_and_swallows_everything_else() {
+        let p = Panels {
+            forced_update: true,
+            settings: true,
+            ..Panels::default()
+        };
+        assert_eq!(p.root_key(&KeyAction::Text, false), RootKey::Pass);
+        assert_eq!(p.root_key(&KeyAction::Ignore, false), RootKey::Pass);
+        assert_eq!(
+            p.root_key(&KeyAction::App(AppCommand::OpenSettings), false),
+            RootKey::Swallow
+        );
+        assert_eq!(
+            p.root_key(&KeyAction::Chord("ctrl+x".into()), false),
+            RootKey::Swallow
+        );
+        // nothing closes the overlay
+        assert_eq!(
+            p.root_key(&KeyAction::Chord("escape".into()), true),
+            RootKey::Swallow
+        );
+    }
+
+    #[test]
+    fn nothing_open_runs_app_commands_and_passes_the_rest() {
+        let p = Panels::default();
+        assert_eq!(
+            p.root_key(&KeyAction::App(AppCommand::NewTab), false),
+            RootKey::Run(AppCommand::NewTab)
+        );
+        for action in [
+            KeyAction::Text,
+            KeyAction::Ignore,
+            KeyAction::Chord("ctrl+x".into()),
+            KeyAction::Chord("escape".into()),
+        ] {
+            assert_eq!(p.root_key(&action, true), RootKey::Pass, "{action:?}");
+        }
+    }
 
     #[test]
     fn nothing_open_allows_commands_and_esc_goes_to_the_terminal() {
