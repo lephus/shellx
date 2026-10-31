@@ -147,12 +147,9 @@ pub struct LocalPane {
 }
 
 /// Starts the default shell (PowerShell, or `SHELLX_SHELL`) with
-/// `extra_args` appended, on a `cols` x `rows` pseudoconsole.
+/// `extra_args` added, on a `cols` x `rows` pseudoconsole.
 pub fn spawn_local_pane(cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
-    let (program, args) = default_shell();
-    let mut args: Vec<&str> = args;
-    args.extend_from_slice(extra_args);
-    let (link, reader) = LocalPty::spawn(&program, &args, cols, rows)?;
+    let (link, reader) = default_shell().spawn(extra_args, cols, rows)?;
     let core = TermCore::new(link.clone(), cols, rows)?;
     Ok(LocalPane { core, link, reader })
 }

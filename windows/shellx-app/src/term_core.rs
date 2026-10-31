@@ -182,6 +182,12 @@ impl TermCore {
         self.terminal.title()
     }
 
+    /// The last OSC 7 URL the shell wrote (`file://HOST/PATH`), if any
+    /// (`crate::cwd::cwd_from_osc7` turns it into a path).
+    pub fn pwd(&self) -> Option<String> {
+        self.terminal.pwd()
+    }
+
     pub fn frame(&mut self) -> Result<RenderFrame> {
         self.render
             .update(&mut self.terminal)
@@ -296,6 +302,17 @@ mod tests {
                 0x74, 0x69, 0xe1, 0xba, 0xbf, 0x6e, 0x67, 0x20, 0x56, 0x69, 0xe1, 0xbb, 0x87, 0x74
             ]]
         );
+    }
+
+    #[test]
+    fn pwd_is_the_last_osc7_url() {
+        let (mut t, _) = core();
+        assert_eq!(t.pwd(), None);
+        t.feed(b"\x1b]7;file://PC/C:/Users/Admin\x1b\\");
+        assert_eq!(t.pwd().as_deref(), Some("file://PC/C:/Users/Admin"));
+        // Raw UTF-8 and spaces, as the PowerShell hook writes them.
+        t.feed("\x1b]7;file://PC/C:/Tài liệu\x1b\\".as_bytes());
+        assert_eq!(t.pwd().as_deref(), Some("file://PC/C:/Tài liệu"));
     }
 
     #[test]

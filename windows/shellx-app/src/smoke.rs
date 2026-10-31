@@ -336,10 +336,8 @@ pub fn run() -> Result<()> {
     remote_tabs()?;
     input_paths()?;
     let started = Instant::now();
-    let (program, args) = default_shell();
-    let mut full_args = args.clone();
-    full_args.extend(smoke_shell_args(&program));
-    let (link, reader) = LocalPty::spawn(&program, &full_args, 100, 30)?;
+    let shell = default_shell();
+    let (link, reader) = shell.spawn(&smoke_shell_args(&shell.program), 100, 30)?;
     let mut session = TermCore::new(link.clone(), 100, 30)?;
     let (tx, rx) = mpsc::channel();
     spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
@@ -456,7 +454,7 @@ struct ShellPane {
 
 impl ShellPane {
     fn spawn(_pane: PaneId, _target: &PaneTarget) -> Result<ShellPane> {
-        let (program, _) = default_shell();
+        let program = default_shell().program;
         let started = spawn_local_pane(80, 24, &smoke_shell_args(&program))?;
         let (tx, rx) = mpsc::channel();
         spawn_reader(started.reader, move |bytes| tx.send(bytes).is_ok());

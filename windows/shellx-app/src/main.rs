@@ -10,6 +10,7 @@
 
 mod core_bridge;
 mod core_service;
+mod cwd;
 mod fonts;
 mod icons;
 mod ime;

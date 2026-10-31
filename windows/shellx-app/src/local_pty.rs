@@ -37,6 +37,7 @@ impl LocalPty {
     pub fn spawn(
         program: &str,
         args: &[&str],
+        env: &[(&str, &str)],
         cols: u16,
         rows: u16,
     ) -> Result<(Arc<LocalPty>, Box<dyn Read + Send>)> {
@@ -51,6 +52,9 @@ impl LocalPty {
         command.args(args.iter().copied());
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
+        for (key, value) in env {
+            command.env(*key, *value);
+        }
         if let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) {
             command.cwd(std::path::PathBuf::from(home));
         }
@@ -151,16 +155,172 @@ pub fn spawn_reader(
         .expect("failed to spawn the PTY reader thread");
 }
 
-/// PowerShell on Windows (override with SHELLX_SHELL), sh elsewhere.
-pub fn default_shell() -> (String, Vec<&'static str>) {
-    if let Ok(shell) = std::env::var("SHELLX_SHELL")
+/// What to run in a new local pane.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShellCmd {
+    pub program: String,
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+}
+
+impl ShellCmd {
+    /// `args` with `extra` added. PowerShell's `-Command` takes everything
+    /// after it as the script, so `extra` goes before that flag.
+    fn args_with(&self, extra: &[&str]) -> Vec<String> {
+        let at = self
+            .args
+            .iter()
+            .position(|a| a == "-Command")
+            .unwrap_or(self.args.len());
+        let mut args = self.args.clone();
+        args.splice(at..at, extra.iter().map(|a| a.to_string()));
+        args
+    }
+
+    /// Starts this shell with `extra_args` on a `cols` x `rows` pseudoconsole.
+    pub fn spawn(
+        &self,
+        extra_args: &[&str],
+        cols: u16,
+        rows: u16,
+    ) -> Result<(Arc<LocalPty>, Box<dyn Read + Send>)> {
+        let args = self.args_with(extra_args);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        let env: Vec<(&str, &str)> = self
+            .env
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
+        LocalPty::spawn(&self.program, &args, &env, cols, rows)
+    }
+}
+
+/// PowerShell: keep the profile's `prompt` and write the working directory
+/// (OSC 7) before it at every prompt. The profile still loads (`-Command`
+/// runs after it); without a `prompt` function the stock look is used.
+const POWERSHELL_HOOK: &str = r#"$__shellxPrompt = $function:prompt; function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; if ($__shellxPrompt) { & $__shellxPrompt } else { "PS $($l.Path)> " } }"#;
+
+/// bash (the macOS dev harness): the same OSC 7 before every prompt.
+const BASH_PROMPT_COMMAND: &str = r#"printf '\033]7;file://%s%s\033\\' "$HOSTNAME" "$PWD""#;
+
+/// `override_shell` is `SHELLX_SHELL`: that program, no args, no env.
+fn shell_cmd(override_shell: Option<&str>) -> ShellCmd {
+    if let Some(shell) = override_shell
         && !shell.trim().is_empty()
     {
-        return (shell, Vec::new());
+        return ShellCmd {
+            program: shell.to_string(),
+            args: Vec::new(),
+            env: Vec::new(),
+        };
     }
     if cfg!(windows) {
-        ("powershell.exe".to_string(), vec!["-NoLogo"])
+        ShellCmd {
+            program: "powershell.exe".to_string(),
+            args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_HOOK]
+                .map(String::from)
+                .to_vec(),
+            env: Vec::new(),
+        }
     } else {
-        ("/bin/sh".to_string(), Vec::new())
+        ShellCmd {
+            program: "/bin/bash".to_string(),
+            args: ["--noprofile", "--norc", "-i"].map(String::from).to_vec(),
+            env: vec![(
+                "PROMPT_COMMAND".to_string(),
+                BASH_PROMPT_COMMAND.to_string(),
+            )],
+        }
+    }
+}
+
+/// PowerShell on Windows (override with SHELLX_SHELL), bash elsewhere; both
+/// report the working directory with OSC 7 (`TermCore::pwd`).
+pub fn default_shell() -> ShellCmd {
+    shell_cmd(std::env::var("SHELLX_SHELL").ok().as_deref())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_shell_has_the_osc7_hook() {
+        let shell = shell_cmd(None);
+        if cfg!(windows) {
+            assert_eq!(shell.program, "powershell.exe");
+            assert!(shell.args.iter().any(|a| a == "-NoExit"));
+            assert!(shell.args.iter().any(|a| a == POWERSHELL_HOOK));
+            assert!(POWERSHELL_HOOK.contains("]7;file://"));
+            assert!(shell.env.is_empty());
+        } else {
+            assert_eq!(shell.program, "/bin/bash");
+            let prompt_command = shell
+                .env
+                .iter()
+                .find(|(key, _)| key == "PROMPT_COMMAND")
+                .map(|(_, value)| value.as_str())
+                .expect("PROMPT_COMMAND is set");
+            assert!(prompt_command.contains("]7;file://"));
+        }
+    }
+
+    /// The dev-harness bash end to end: `cd` makes the prompt hook write an
+    /// OSC 7 URL that the terminal keeps and `cwd_from_osc7` reads back.
+    #[cfg(unix)]
+    #[test]
+    fn bash_reports_the_directory_after_cd() {
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        use crate::cwd::cwd_from_osc7;
+        use crate::term_core::TermCore;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = std::fs::canonicalize(tmp.path()).unwrap();
+        let (link, reader) = shell_cmd(None).spawn(&[], 80, 24).unwrap();
+        let (tx, rx) = mpsc::channel();
+        spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
+        let mut core = TermCore::new(link.clone(), 80, 24).unwrap();
+
+        link.write(format!("cd '{}'\n", dir.display()).as_bytes());
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let want = Some(dir.display().to_string());
+        while core.pwd().as_deref().and_then(cwd_from_osc7) != want {
+            assert!(
+                Instant::now() < deadline,
+                "no OSC 7 for {dir:?}: {:?}",
+                core.pwd()
+            );
+            if let Ok(bytes) = rx.recv_timeout(Duration::from_millis(100)) {
+                core.feed(&bytes);
+            }
+        }
+    }
+
+    #[test]
+    fn shellx_shell_overrides_without_args_or_env() {
+        let shell = shell_cmd(Some("C:\\tools\\nu.exe"));
+        assert_eq!(shell.program, "C:\\tools\\nu.exe");
+        assert!(shell.args.is_empty() && shell.env.is_empty());
+        // A blank override is no override.
+        assert_ne!(shell_cmd(Some("  ")).program, "  ");
+    }
+
+    #[test]
+    fn extra_args_go_before_the_command_script() {
+        let shell = ShellCmd {
+            program: "powershell.exe".into(),
+            args: ["-NoLogo", "-NoExit", "-Command", "script"]
+                .map(String::from)
+                .to_vec(),
+            env: Vec::new(),
+        };
+        assert_eq!(
+            shell.args_with(&["-NoProfile"]),
+            ["-NoLogo", "-NoExit", "-NoProfile", "-Command", "script"]
+        );
+        let bash = shell_cmd(Some("/bin/zsh"));
+        assert_eq!(bash.args_with(&["-x"]), ["-x"]);
     }
 }
