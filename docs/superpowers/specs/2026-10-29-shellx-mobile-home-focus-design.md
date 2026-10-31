@@ -228,6 +228,25 @@ Luật này dùng cho **mọi danh sách phiên** trên điện thoại: ba nhó
   chữ. Bật "Giảm chuyển động" thì viền đứng yên (vẫn nhiều màu).
 - Ngoại lệ có chủ đích với ghi nhớ "không gradient": người dùng chọn rõ viền nhiều màu cho trạng thái cần chú ý.
 
+### 6.8 Gỡ một phiên đã mất khỏi điện thoại (phần 5, thêm 2026-10-31)
+
+- **Vì sao** **[người dùng, 2026-10-31: "tại sao tôi không xoá được tab này", rồi "làm luôn đi"]**: một Mac (ví dụ
+  ShellX cũ bị lỗi Esc) vẫn liệt kê một phiên là đang chạy, nhưng khi điện thoại hỏi lịch sử thì Mac trả
+  `not_found` ("Phiên này không còn trên Mac"). Phiên đó không đóng được (không còn gì để đóng) và không xoá được
+  (chỉ phiên `ended` có thùng rác), nên nằm mãi trong "Đang chạy".
+- **Hành vi**: chỉ với phiên mà Mac đã trả `not_found` (phiên đã mất), điện thoại cho "Gỡ khỏi điện thoại". Gỡ chỉ
+  ẩn phiên trên điện thoại này, như thùng rác của "Đã kết thúc"; không gửi gì cho Mac. Phiên còn sống (Mac chưa trả
+  `not_found`) **không bao giờ** có mục này: đóng là đóng hẳn, không ẩn một tác vụ còn chạy (ghi nhớ người dùng).
+- **Hiện lại**: phiên đã gỡ hiện lại khi Mac báo nó đổi (trạng thái, lúc vào trạng thái, hay hoạt động cuối khác lúc
+  gỡ). Dữ liệu gỡ lưu qua lần mở lại app và tự dọn sau 30 ngày.
+- **Chỗ đặt**:
+  - màn agent (không nhúng trong màn workspace): nút "Gỡ khỏi điện thoại" cạnh dòng "Phiên này không còn trên Mac", và
+    một mục cùng tên trong `•••`. Bấm thì gỡ và quay về màn trước;
+  - vuốt một thẻ ở màn chính (Cần bạn / Đang chạy / Vừa xong) và ở danh sách agent ngoài workspace: chỉ cho phiên điện
+    thoại đã biết là đã mất trong lần chạy app này (đã mở và nhận `not_found`).
+- **Không hỏi lại**: không có gì trên Mac bị dừng, và phiên tự hiện lại nếu Mac báo nó đổi.
+- Phiên đã gỡ biến khỏi mọi danh sách phiên trên điện thoại và mọi con số đếm (ví dụ "Đang chạy · N").
+
 ## 7. Kiểm thử và dogfood
 
 - **ShellXAppCore**: test cho phần chia nhóm (đầu vào: phiên, yêu cầu đang chờ, `finishedSessionIds`,
