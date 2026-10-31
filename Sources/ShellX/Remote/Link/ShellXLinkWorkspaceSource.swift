@@ -62,11 +62,9 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
                 TerminalController.shared.v2MobileWorkspaceClose(params: ["workspace_id": workspaceId, "force": true])
             },
             agentSurface: { sessionId in
-                guard let record = TerminalController.shared.agentChatTranscriptService?.sessionRecord(sessionID: sessionId),
-                      ShellXLinkChatSource.isLiveAgent(record),
-                      let workspace = record.workspaceID.flatMap(UUID.init(uuidString:)),
-                      let surface = record.surfaceID.flatMap(UUID.init(uuidString:)) else { return nil }
-                return (workspace, surface)
+                ShellXLinkWorkspaceSource.liveAgentSurface(
+                    TerminalController.shared.agentChatTranscriptService?.sessionRecord(sessionID: sessionId)
+                )
             },
             // Without asking: the phone confirmed already.
             closeSurface: { workspaceId, surfaceId in
@@ -184,6 +182,16 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
         let outcome = Self.outcome(of: control.closeSurface(target.workspaceId, target.surfaceId), action: "close-agent")
         if outcome == .ok { refresh() }
         return outcome
+    }
+
+    /// The workspace and terminal `record` names when it is a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``)
+    /// bound to both; nil for no record, any other record, or an id that is not a UUID. Once the agent has exited its
+    /// tab runs the user's shell, so this is what keeps a phone from closing it.
+    static func liveAgentSurface(_ record: AgentChatSessionRecord?) -> (workspaceId: UUID, surfaceId: UUID)? {
+        guard let record, ShellXLinkChatSource.isLiveAgent(record),
+              let workspace = record.workspaceID.flatMap(UUID.init(uuidString:)),
+              let surface = record.surfaceID.flatMap(UUID.init(uuidString:)) else { return nil }
+        return (workspace, surface)
     }
 
     /// Whether the list shows `terminal` in `workspace`.
