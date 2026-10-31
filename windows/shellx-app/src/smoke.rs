@@ -2,7 +2,9 @@
 //! interactive PowerShell on ConPTY, types a command through the same input
 //! path as the window (committed text + libghostty-vt-encoded Enter), waits
 //! for the computed result in the libghostty-vt grid, resizes, and exits.
-//! Exit code 0 = pass. No window is opened.
+//! On Windows the shell is the window's command line (the OSC 7 prompt hook,
+//! plus -NoProfile), and the working directory it reports through ConPTY
+//! must parse. Exit code 0 = pass. No window is opened.
 //!
 //! Then the pane checks: a `Tabs` model with two splits and a second tab,
 //! one real shell per pane through `workspace::PaneHost` (the window's code
@@ -21,6 +23,7 @@ use anyhow::{Context as _, Result, bail, ensure};
 use shellx_model::layout::{Axis, PaneId};
 use shellx_model::tabs::{CloseOutcome, PaneTarget, Tabs};
 
+use crate::cwd::cwd_from_osc7;
 use crate::fonts;
 use crate::icons::{self, Icon};
 use crate::local_pty::{ExitProbe, LocalPty, default_shell, spawn_reader};
@@ -58,20 +61,25 @@ impl Pump {
                 dump(&lines);
                 bail!("timed out waiting for {what}");
             }
-            if self.closed {
-                std::thread::sleep(Duration::from_millis(100));
-                continue;
-            }
-            match self.rx.recv_timeout(Duration::from_millis(100)) {
-                Ok(bytes) => {
-                    session.feed(&bytes);
-                    while let Ok(more) = self.rx.try_recv() {
-                        session.feed(&more);
-                    }
+            self.feed(session);
+        }
+    }
+
+    /// Feeds what the shell wrote within the next 100 ms.
+    fn feed(&mut self, session: &mut TermCore) {
+        if self.closed {
+            std::thread::sleep(Duration::from_millis(100));
+            return;
+        }
+        match self.rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(bytes) => {
+                session.feed(&bytes);
+                while let Ok(more) = self.rx.try_recv() {
+                    session.feed(&more);
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => self.closed = true,
             }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => self.closed = true,
         }
     }
 }
@@ -383,6 +391,15 @@ pub fn run() -> Result<()> {
     })?;
     println!("smoke: prompt after {:?}", started.elapsed());
 
+    // 2b. Windows: the PowerShell hook (the window's command line, with
+    //     -NoProfile) reported the working directory with OSC 7 through
+    //     ConPTY; the workspace cards read it. Elsewhere the smoke is
+    //     unchanged.
+    if cfg!(windows) && std::env::var_os("SHELLX_SHELL").is_none() {
+        let cwd = osc7_cwd(&mut pump, &mut session)?;
+        println!("smoke: OSC 7 working directory {cwd:?}");
+    }
+
     // 3. Type a command the way the window does and read the result back.
     //    The marker is computed by the shell, so finding it proves the
     //    command ran (the typed text alone never contains it).
@@ -440,6 +457,29 @@ pub fn run() -> Result<()> {
     panes()?;
     println!("smoke: PASS in {:?}", started.elapsed());
     Ok(())
+}
+
+/// The working directory the shell reported with OSC 7 (`TermCore::pwd`),
+/// read the way the window reads it (`cwd_from_osc7`). The hook writes
+/// OSC 7 before the prompt text, so it is normally there already; this
+/// waits up to 5 s more.
+fn osc7_cwd(pump: &mut Pump, session: &mut TermCore) -> Result<String> {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(url) = session.pwd() {
+            return cwd_from_osc7(&url).with_context(|| {
+                format!("OSC 7 URL from the PowerShell hook does not parse: {url:?}")
+            });
+        }
+        if Instant::now() > deadline {
+            dump(&session.text_lines()?);
+            bail!(
+                "no working directory (OSC 7) from PowerShell: the prompt hook did not \
+                 run or ConPTY did not pass its OSC 7 through"
+            );
+        }
+        pump.feed(session);
+    }
 }
 
 /// One pane's shell in the smoke: what `TermView` holds in the window.
