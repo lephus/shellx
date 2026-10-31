@@ -48,6 +48,7 @@ final class WaitingBorderView: NSView {
         didSet {
             guard isActive != oldValue else { return }
             isHidden = !isActive
+            sizeDidChange()
             updateRotation()
         }
     }
@@ -174,7 +175,9 @@ final class WaitingBorderView: NSView {
 
     // MARK: - Ring
 
+    /// Fits the ring and the gradient to the bounds; an inactive border skips it until it shows.
     private func sizeDidChange() {
+        guard isActive else { return }
         let side = ceil(hypot(bounds.width, bounds.height))
         let square = CGRect(x: 0, y: 0, width: side, height: side)
         let center = CGPoint(x: bounds.midX, y: bounds.midY)

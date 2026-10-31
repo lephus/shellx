@@ -254,6 +254,8 @@ extension Workspace {
     /// Re-checks the pane after the grace, then settles it at the time the
     /// agent's activity ended. Any hook report after that edge wins: a late
     /// Stop already settled the turn, and a new prompt started another one.
+    /// A Running row settles, and so does a Needs input row whose prompt the
+    /// edge cancelled; an error row does not.
     func settleAgentTurnFromProgramStatus(key: String, panelId: UUID, edge: Date) {
         guard panels[panelId] != nil else { return }
         let store = programStatusStoresByPanelId[panelId] ?? ProgramStatusRecordStore()
@@ -268,12 +270,22 @@ extension Workspace {
             agentKind: ChatAgentKind(source: source),
             at: edge
         )
-        // Only a foreground Running row is stale. A Waiting or subagent row
-        // means the turn ended with background work still live.
-        guard agentLifecycleStatesByPanelId[panelId]?[key] == .running,
-              let reported = agentStatusEntriesByPanelId[panelId]?[key],
-              reported.workState == .running,
+        guard let reported = agentStatusEntriesByPanelId[panelId]?[key],
               reported.timestamp <= edge else { return }
+        switch agentLifecycleStatesByPanelId[panelId]?[key] {
+        case .running?:
+            // Only a foreground Running row is stale. A Waiting or subagent
+            // row means the turn ended with background work still live.
+            guard reported.workState == .running else { return }
+        case .needsInput?:
+            // Claude keeps its record blocked while a permission prompt or a
+            // question waits, so the edge means the person cancelled it (Esc)
+            // and no hook will say so. A failed turn also shows needs input
+            // (the journal's error phase); its error row stays.
+            guard !SidebarCompactStatusGlyph.reportsError(reported) else { return }
+        default:
+            return
+        }
 #if DEBUG
         cmuxDebugLog("agentTurn.settleFromProgramStatus panel=\(panelId.uuidString.prefix(8)) key=\(key)")
 #endif
