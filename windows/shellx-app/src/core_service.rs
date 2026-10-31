@@ -307,8 +307,8 @@ mod tests {
     }
 
     /// The whole session through the real shellx-core against L5's fake API:
-    /// start (no session) -> login card; login -> register once -> listed;
-    /// heartbeat on the tick; logout -> login card.
+    /// start (no session) -> signed out; login -> register once -> listed;
+    /// heartbeat on the tick; logout -> signed out.
     #[test]
     fn account_session_against_fake_api() {
         let api = FakeApi::start(FakeOptions::default());

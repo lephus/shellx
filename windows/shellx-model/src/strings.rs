@@ -99,6 +99,14 @@ pub enum Str {
     ShellExitsAtStart,
     /// Under `ShellExitsAtStart`.
     PressAnyKeyToRetry,
+    /// Title of the sign-in dialog.
+    SignInTitle,
+    /// Label over the dialog's email field.
+    EmailAddress,
+    /// Settings -> Account button that opens the dialog.
+    SignInEllipsis,
+    /// Under "not signed in" in Settings -> Account.
+    SignInSubtitle,
 }
 
 impl Str {
@@ -176,6 +184,10 @@ impl Str {
         Str::RemoteAttachFailed,
         Str::ShellExitsAtStart,
         Str::PressAnyKeyToRetry,
+        Str::SignInTitle,
+        Str::EmailAddress,
+        Str::SignInEllipsis,
+        Str::SignInSubtitle,
     ];
 }
 
@@ -206,7 +218,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Denied => "Máy kia đã từ chối",
             Str::Expired => "Yêu cầu đã hết hạn",
             Str::Open => "Mở",
-            Str::Cancel => "Huỷ",
+            Str::Cancel => "Hủy",
             Str::Retry => "Thử lại",
             Str::UpdateAvailable => "Có bản cập nhật",
             Str::UpdateRequired => "Cần cập nhật",
@@ -256,6 +268,10 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::RemoteAttachFailed => "Không mở được phiên trên máy kia, đang thử lại…",
             Str::ShellExitsAtStart => "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL.",
             Str::PressAnyKeyToRetry => "Nhấn phím bất kỳ hoặc Thử lại.",
+            Str::SignInTitle => "Đăng nhập ShellX",
+            Str::EmailAddress => "Địa chỉ email",
+            Str::SignInEllipsis => "Đăng nhập…",
+            Str::SignInSubtitle => "Đăng nhập bằng tài khoản ShellX của bạn.",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -331,6 +347,10 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::RemoteAttachFailed => "Could not open the session on the other machine, retrying…",
             Str::ShellExitsAtStart => "The shell exits as soon as it starts. Check SHELLX_SHELL.",
             Str::PressAnyKeyToRetry => "Press any key or Retry.",
+            Str::SignInTitle => "Sign in to ShellX",
+            Str::EmailAddress => "Email",
+            Str::SignInEllipsis => "Sign In…",
+            Str::SignInSubtitle => "Sign in with your ShellX account.",
         },
     }
 }
@@ -435,7 +455,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 73);
+        assert_eq!(Str::ALL.len(), 77);
     }
 
     #[test]
@@ -458,6 +478,26 @@ mod tests {
             "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL."
         );
         assert_eq!(t(Lang::Vi, Str::Retry), "Thử lại");
+    }
+
+    #[test]
+    fn sign_in_strings_match_the_mac() {
+        assert_eq!(t(Lang::Vi, Str::SignInTitle), "Đăng nhập ShellX");
+        assert_eq!(t(Lang::En, Str::SignInTitle), "Sign in to ShellX");
+        assert_eq!(t(Lang::Vi, Str::EmailAddress), "Địa chỉ email");
+        assert_eq!(t(Lang::En, Str::EmailAddress), "Email");
+        assert_eq!(t(Lang::Vi, Str::SignInEllipsis), "Đăng nhập…");
+        assert_eq!(t(Lang::En, Str::SignInEllipsis), "Sign In…");
+        assert_eq!(
+            t(Lang::Vi, Str::SignInSubtitle),
+            "Đăng nhập bằng tài khoản ShellX của bạn."
+        );
+        assert_eq!(
+            t(Lang::En, Str::SignInSubtitle),
+            "Sign in with your ShellX account."
+        );
+        assert_eq!(t(Lang::Vi, Str::Cancel), "Hủy");
+        assert_eq!(t(Lang::En, Str::Cancel), "Cancel");
     }
 
     #[test]

@@ -152,7 +152,7 @@ impl TextEdit {
         }
     }
 
-    /// Clears everything (after a submit, and when the sign-in panel
+    /// Clears everything (after a submit, and when the sign-in dialog
     /// closes, the password field is emptied). The content is zeroed in
     /// place first.
     pub fn clear(&mut self) {

@@ -1,6 +1,7 @@
 //! Settings / About panel (spec §7.1): a 360 px right panel over the main
 //! area, opened by the title bar gear or Ctrl+, and closed by Esc or its
-//! close button. Sections: Tài khoản, Cập nhật, Ngôn ngữ (read-only) and
+//! close button. Sections: Tài khoản (where sign-in lives: "Đăng nhập…" asks
+//! RootView for the sign-in dialog), Cập nhật, Ngôn ngữ (read-only) and
 //! Giới thiệu (with the CC BY 4.0 icon credit).
 
 use gpui::{
@@ -25,6 +26,8 @@ pub const SOURCE_URL: &str = "https://github.com/lephus/shellx";
 pub enum SettingsEvent {
     /// Esc / close button: RootView gives the keyboard back to the terminal.
     Closed,
+    /// "Đăng nhập…" (signed out): RootView opens the sign-in dialog.
+    SignInRequested,
 }
 
 pub struct SettingsPanel {
@@ -111,15 +114,49 @@ impl SettingsPanel {
         } else {
             t(lang, Str::NotLoggedIn).to_string()
         };
-        let notice = account.notice().map(|e| e.message.clone());
+        // A failed logout, else why the account is not working (offline at
+        // start, a state-folder problem): the sidebar no longer shows these.
+        let notice =
+            account
+                .notice()
+                .map(|e| e.message.clone())
+                .or_else(|| match account.state() {
+                    AccountState::Error(e) if e.message.trim().is_empty() => {
+                        Some(t(lang, Str::Error).to_string())
+                    }
+                    AccountState::Error(e) => {
+                        Some(format!("{} · {}", t(lang, Str::Error), e.message))
+                    }
+                    _ => None,
+                });
         Self::section(t(lang, Str::Account))
             .child(div().text_color(theme::text_hi()).truncate().child(who))
+            .when(!signed_in, |s| {
+                s.child(Self::muted(t(lang, Str::SignInSubtitle)))
+            })
             .children(notice.filter(|m| !m.is_empty()).map(|m| {
                 div()
                     .text_size(theme::SMALL_SIZE)
                     .text_color(theme::hsla(palette::ERROR))
                     .child(m)
             }))
+            .when(!signed_in, |s| {
+                s.child(
+                    div().flex().child(
+                        button(
+                            "settings-sign-in",
+                            t(lang, Str::SignInEllipsis),
+                            Kind::Primary,
+                            false,
+                        )
+                        .on_click(cx.listener(
+                            |_, _: &ClickEvent, _, cx| {
+                                cx.emit(SettingsEvent::SignInRequested);
+                            },
+                        )),
+                    ),
+                )
+            })
             .when(signed_in, |s| {
                 s.child(
                     div().flex().child(

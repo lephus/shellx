@@ -1,24 +1,27 @@
-//! Sign-in card in the sidebar's machines area (spec §7.1).
+//! The "Sign in to ShellX" dialog (the Mac's sign-in sheet): Settings ->
+//! Account opens it (and the machines "+" while signed out); the window never
+//! asks for a password by itself.
 //!
-//! Signed out: a card with "Chưa đăng nhập" and the primary "Đăng nhập"
-//! button. The button opens the panel: Email, Mật khẩu (masked), the primary
-//! "Đăng nhập" button and, after a failed attempt, an ERROR line
-//! "Đăng nhập không thành công: <core message>". Enter submits, Tab moves
-//! between the fields, Esc closes. While the call runs the fields are
-//! disabled and the button reads "Đang đăng nhập…".
+//! A centred card over a backdrop that swallows clicks: the title, Email and
+//! Password (masked) fields, after a failed attempt an ERROR line
+//! "Đăng nhập không thành công: <core message>", and a right-aligned
+//! "Hủy" / "Đăng nhập" pair. "Đăng nhập" stays disabled until both fields
+//! have text. Enter submits, Tab moves between the fields, Esc closes. While
+//! the call runs the fields are disabled and the button reads
+//! "Đang đăng nhập…". It closes itself when the account becomes signed in.
 //!
 //! Other account errors (offline at start, a state-folder problem, a
-//! register failure) show as one muted line; local terminals keep working and
-//! the account service retries by itself.
+//! register failure) are not shown here: Settings -> Account shows them;
+//! local terminals keep working and the account service retries by itself.
 //!
 //! The password field is cleared (its buffer zeroed) as soon as a login is
-//! accepted, and when the panel closes: the password then lives only in the
+//! accepted, and when the dialog closes: the password then lives only in the
 //! login call. A submit the account flow would ignore (this machine is being
 //! registered) keeps the typed password and starts nothing.
 
 use gpui::{
-    App, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
-    Render, Subscription, Window, div, prelude::*, px,
+    App, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, FontWeight,
+    IntoElement, Render, Subscription, Window, div, prelude::*, px,
 };
 use shellx_model::account::AccountState;
 use shellx_model::palette;
@@ -30,26 +33,29 @@ use super::button::{Kind, button};
 use super::text_field::{TextField, TextFieldEvent};
 use super::theme;
 
+/// Card width (the Mac's sheet).
+const CARD_W: f32 = 340.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LoginPanelEvent {
-    /// Esc / Cancel: RootView gives the keyboard back to the terminal.
+pub enum SignInEvent {
+    /// Esc / Cancel / signed in: RootView gives the keyboard to the panel
+    /// below, else back to the terminal.
     Closed,
-    /// "Đăng nhập" on the card: RootView keeps the panel open and focuses
-    /// its field only if no higher panel is open (modal rule), else closes it.
+    /// `open` ran: RootView redraws (the dialog now holds the keyboard).
     Opened,
 }
 
-pub struct LoginPanel {
+pub struct SignInDialog {
     account: Entity<AccountService>,
     email: Entity<TextField>,
     password: Entity<TextField>,
     open: bool,
-    /// A login was submitted from this panel, so its error is shown here.
+    /// A login was submitted from this dialog, so its error is shown here.
     submitted: bool,
     _subscriptions: Vec<Subscription>,
 }
 
-impl LoginPanel {
+impl SignInDialog {
     pub fn new(
         account: Entity<AccountService>,
         window: &mut Window,
@@ -58,6 +64,9 @@ impl LoginPanel {
         let email = cx.new(|cx| TextField::new(false, "", cx));
         let password = cx.new(|cx| TextField::new(true, "", cx));
         let subscriptions = vec![
+            // Typing enables or disables the "Đăng nhập" button.
+            cx.observe(&email, |_, _, cx| cx.notify()),
+            cx.observe(&password, |_, _, cx| cx.notify()),
             cx.subscribe_in(
                 &email,
                 window,
@@ -80,20 +89,20 @@ impl LoginPanel {
                         account.login_in_flight(),
                     )
                 };
-                if logged_in && (this.open || this.submitted) {
-                    // Signed in: the panel goes away and the keyboard goes
-                    // back to the terminal.
+                if logged_in && this.open {
+                    // Signed in: the dialog goes away and the keyboard goes
+                    // back to the panel below, else the terminal.
                     this.password.update(cx, |f, cx| f.clear(cx));
                     this.open = false;
                     this.submitted = false;
-                    cx.emit(LoginPanelEvent::Closed);
+                    cx.emit(SignInEvent::Closed);
                 }
                 this.email.update(cx, |f, cx| f.set_disabled(busy, cx));
                 this.password.update(cx, |f, cx| f.set_disabled(busy, cx));
                 cx.notify();
             }),
         ];
-        LoginPanel {
+        SignInDialog {
             account,
             email,
             password,
@@ -124,19 +133,24 @@ impl LoginPanel {
         }
     }
 
-    /// Shows the fields; RootView decides about the keyboard (`Opened`).
-    fn open(&mut self, cx: &mut Context<Self>) {
+    /// Shows the dialog (fresh: no password, no old error) and gives its
+    /// field the keyboard. RootView only calls it when nothing above the
+    /// dialog is open (`Panels::may_open`).
+    pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.password.update(cx, |f, cx| f.clear(cx));
         self.open = true;
-        cx.emit(LoginPanelEvent::Opened);
+        self.submitted = false;
+        window.focus(&self.focus_target(cx));
+        cx.emit(SignInEvent::Opened);
         cx.notify();
     }
 
-    /// The panel (Email, Mật khẩu) is shown; a field holds the keyboard.
+    /// The dialog is shown; a field holds the keyboard.
     pub fn is_open(&self) -> bool {
         self.open
     }
 
-    /// The field the keyboard belongs to while the panel is open: Email
+    /// The field the keyboard belongs to while the dialog is open: Email
     /// while it is empty, else Mật khẩu.
     pub fn focus_target(&self, cx: &App) -> FocusHandle {
         let target = if self.email.read(cx).text().trim().is_empty() {
@@ -147,12 +161,13 @@ impl LoginPanel {
         target.read(cx).focus_handle(cx)
     }
 
-    /// Esc / Cancel, and the sidebar hiding: the typed password is wiped.
+    /// Esc / Cancel: the typed password is wiped.
     pub fn close(&mut self, cx: &mut Context<Self>) {
         self.password.update(cx, |f, cx| f.clear(cx));
         if self.open {
             self.open = false;
-            cx.emit(LoginPanelEvent::Closed);
+            self.submitted = false;
+            cx.emit(SignInEvent::Closed);
         }
         cx.notify();
     }
@@ -196,118 +211,99 @@ impl LoginPanel {
             .child(text)
     }
 
-    fn card() -> Div {
+    /// A label over its field.
+    fn field(label: &'static str, field: &Entity<TextField>) -> Div {
         div()
             .flex()
             .flex_col()
-            .gap(px(8.0))
-            .mx(px(8.0))
-            .my(px(6.0))
-            .p(px(12.0))
-            .rounded(px(8.0))
-            .bg(theme::raise())
-            .border_1()
-            .border_color(theme::border())
+            .gap(px(4.0))
+            .child(Self::label(label))
+            .child(field.clone())
     }
+}
 
-    fn render_panel(
-        &self,
-        lang: Lang,
-        busy: bool,
-        error: Option<String>,
-        cx: &mut Context<Self>,
-    ) -> Div {
+impl EventEmitter<SignInEvent> for SignInDialog {}
+
+impl Render for SignInDialog {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let lang: Lang = cx.global::<Services>().lang;
+        let account = self.account.read(cx);
+        let busy = account.login_in_flight();
+        // Only a failure of this dialog's own attempt; other account errors
+        // are Settings -> Account's.
+        let error = match account.state() {
+            AccountState::Error(e) if self.submitted => Some(login_failed(lang, &e.message)),
+            _ => None,
+        };
+        let filled = !self.email.read(cx).text().trim().is_empty()
+            && !self.password.read(cx).text().is_empty();
+        let can_submit = filled && !busy;
         let submit_label = if busy {
             t(lang, Str::SigningIn)
         } else {
             t(lang, Str::Login)
         };
-        Self::card()
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(4.0))
-                    .child(Self::label(t(lang, Str::Email)))
-                    .child(self.email.clone()),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(4.0))
-                    .child(Self::label(t(lang, Str::Password)))
-                    .child(self.password.clone()),
-            )
-            .children(error.map(Self::error_line))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(8.0))
-                    .child(
-                        button("login-submit", submit_label, Kind::Primary, busy).when(
-                            !busy,
-                            |b| {
-                                b.on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                                    this.submit(window, cx);
-                                }))
-                            },
-                        ),
-                    )
-                    .child(
-                        button("login-cancel", t(lang, Str::Cancel), Kind::Secondary, false)
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close(cx))),
-                    ),
-            )
-    }
-}
 
-impl EventEmitter<LoginPanelEvent> for LoginPanel {}
-
-impl Render for LoginPanel {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let lang = cx.global::<Services>().lang;
-        let account = self.account.read(cx);
-        let state = account.state().clone();
-        let busy = account.login_in_flight();
-        let error = match &state {
-            AccountState::Error(e) => Some(e.clone()),
-            _ => None,
-        };
-        let login_error = error
-            .as_ref()
-            .filter(|_| self.submitted)
-            .map(|e| login_failed(lang, &e.message));
-
-        if self.open {
-            return self.render_panel(lang, busy, login_error, cx);
-        }
-        let signed_out = matches!(state, AccountState::LoggedOut);
-        if signed_out || login_error.is_some() || (busy && self.submitted) {
-            return Self::card()
+        let card =
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.0))
+                .w(px(CARD_W))
+                .p(px(20.0))
+                .rounded(px(10.0))
+                .border_1()
+                .border_color(theme::border())
+                .bg(theme::raise())
                 .child(
                     div()
-                        .text_color(theme::text())
-                        .child(t(lang, Str::NotLoggedIn)),
+                        .text_size(px(15.0))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(theme::text_hi())
+                        .child(t(lang, Str::SignInTitle)),
                 )
-                .children(login_error.map(Self::error_line))
+                .child(Self::field(t(lang, Str::EmailAddress), &self.email))
+                .child(Self::field(t(lang, Str::Password), &self.password))
+                .children(error.map(Self::error_line))
                 .child(
-                    div().flex().child(
-                        button("login-open", t(lang, Str::Login), Kind::Primary, false)
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open(cx))),
-                    ),
+                    div()
+                        .flex()
+                        .flex_row()
+                        .justify_end()
+                        .gap(px(8.0))
+                        .child(
+                            button(
+                                "sign-in-cancel",
+                                t(lang, Str::Cancel),
+                                Kind::Secondary,
+                                false,
+                            )
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close(cx))),
+                        )
+                        .child(
+                            button("sign-in-submit", submit_label, Kind::Primary, !can_submit)
+                                .when(can_submit, |b| {
+                                    b.on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                        this.submit(window, cx);
+                                    }))
+                                }),
+                        ),
                 );
-        }
-        // Not from this panel: offline at start, state folder, register.
-        match error {
-            Some(e) => div()
-                .px(px(14.0))
-                .py(px(6.0))
-                .text_size(theme::SMALL_SIZE)
-                .text_color(theme::muted())
-                .child(format!("{} · {}", t(lang, Str::Error), e.message)),
-            None => div(),
-        }
+
+        // Covers the window below the title bar: the backdrop blocks the
+        // mouse for everything under it, and the keyboard is in a field.
+        div()
+            .id("sign-in-dialog")
+            .occlude()
+            .absolute()
+            .top(px(crate::workspace::TITLEBAR_H))
+            .left_0()
+            .right_0()
+            .bottom_0()
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(theme::bg().opacity(0.6))
+            .child(card)
     }
 }

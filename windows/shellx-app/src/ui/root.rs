@@ -8,9 +8,11 @@
 //! active tab gets keyboard focus.
 //!
 //! The sidebar's machines come from the `AccountService` (signed in: the
-//! account's machines; signed out: this PC and the sign-in card). Access to
-//! the other machines (links, the code being waited on) comes from the
-//! `PairingPanel`, which is drawn over the main area while it is open.
+//! account's machines; signed out: this PC only). Sign-in is never asked at
+//! launch: Settings -> Account (or the machines "+" while signed out) opens
+//! the `SignInDialog`, drawn over the whole window. Access to the other
+//! machines (links, the code being waited on) comes from the `PairingPanel`,
+//! which is drawn over the main area while it is open.
 //!
 //! Remote panes (Task 13b): "Mở" on a Mac (sidebar row, or the pairing
 //! panel after approval) opens a new tab whose pane is
@@ -24,7 +26,7 @@
 //! every remote pane.
 //!
 //! One modal rule (`shellx_model::modal`): while a panel is open (forced
-//! update overlay, settings, pairing, sign-in fields) the topmost one holds
+//! update overlay, sign-in dialog, settings, pairing) the topmost one holds
 //! the keyboard, app commands and pane clicks are swallowed, Esc closes the
 //! topmost closable one, and the terminal gets the keyboard back when the
 //! last one closes. The overlay closes settings. Typed text is never
@@ -44,6 +46,7 @@ use gpui::{
     App, Context, Div, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render,
     Subscription, Window, div, prelude::*, px, relative, svg,
 };
+use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
 use shellx_model::keys::{AppCommand, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId};
@@ -58,7 +61,7 @@ use shellx_model::update::{UpdateStatus, download_url};
 use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
-use super::login::{LoginPanel, LoginPanelEvent};
+use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
 use super::settings::{SettingsEvent, SettingsPanel};
@@ -82,7 +85,7 @@ pub struct RootView {
     /// `%COMPUTERNAME%`: this PC's name while it has no server entry.
     computer_name: Option<String>,
     account: Entity<AccountService>,
-    login: Entity<LoginPanel>,
+    sign_in: Entity<SignInDialog>,
     settings: Entity<SettingsPanel>,
     pairing: Entity<PairingPanel>,
     /// The remote panes' sessions (one per Mac) and pane ids.
@@ -104,7 +107,7 @@ impl RootView {
         let core = cx.global::<Services>().core.clone();
         let pairing = cx.new(|cx| PairingPanel::new(core.clone(), cx));
         let account = cx.new(|cx| AccountService::new(core, MachineFacts::this_pc(), cx));
-        let login = cx.new(|cx| LoginPanel::new(account.clone(), window, cx));
+        let sign_in = cx.new(|cx| SignInDialog::new(account.clone(), window, cx));
         let settings = cx.new(|cx| SettingsPanel::new(account.clone(), cx));
         let subscriptions = vec![
             // A forced update takes the keyboard from the terminals and
@@ -134,24 +137,15 @@ impl RootView {
             cx.subscribe_in(
                 &settings,
                 window,
-                |this, _, _: &SettingsEvent, window, cx| this.after_focus_change(window, cx),
-            ),
-            cx.subscribe_in(
-                &login,
-                window,
-                |this, _, event: &LoginPanelEvent, window, cx| match event {
-                    LoginPanelEvent::Closed => this.after_focus_change(window, cx),
-                    // Only when nothing above the sign-in fields is open;
-                    // else they close again and the keyboard stays put.
-                    LoginPanelEvent::Opened => {
-                        if this.panels(cx).may_open(Panel::Login) {
-                            this.after_focus_change(window, cx);
-                        } else {
-                            this.login.update(cx, |p, cx| p.close(cx));
-                        }
-                    }
+                |this, _, event: &SettingsEvent, window, cx| match event {
+                    SettingsEvent::Closed => this.after_focus_change(window, cx),
+                    SettingsEvent::SignInRequested => this.open_sign_in(window, cx),
                 },
             ),
+            // `open_sign_in` checked the modal rule before the dialog opened.
+            cx.subscribe_in(&sign_in, window, |this, _, _: &SignInEvent, window, cx| {
+                this.after_focus_change(window, cx)
+            }),
         ];
         let mut root = RootView {
             tabs,
@@ -160,7 +154,7 @@ impl RootView {
             sidebar_visible: true,
             computer_name,
             account,
-            login,
+            sign_in,
             settings,
             pairing,
             remotes: RemoteTabs::new(),
@@ -197,9 +191,9 @@ impl RootView {
         let pairing = self.pairing.read(cx);
         Panels {
             forced_update: self.required(cx).is_some(),
+            sign_in: self.sign_in.read(cx).is_open(),
             settings: self.settings.read(cx).is_open(),
             pairing: pairing.is_open(),
-            login: self.sidebar_visible && self.login.read(cx).is_open(),
         }
     }
 
@@ -208,9 +202,9 @@ impl RootView {
     pub fn focus_terminal(&self, window: &mut Window, cx: &App) {
         let handle = match self.panels(cx).top() {
             Some(Panel::ForcedUpdate) => self.overlay_focus.clone(),
+            Some(Panel::SignIn) => self.sign_in.read(cx).focus_target(cx),
             Some(Panel::Settings) => self.settings.read(cx).focus_handle(cx),
             Some(Panel::Pairing) => self.pairing.read(cx).focus_handle(cx),
-            Some(Panel::Login) => self.login.read(cx).focus_target(cx),
             None => match self.host.get(self.tabs.active().focused) {
                 Some(live) => live.view.read(cx).focus_handle(cx),
                 None => return,
@@ -223,9 +217,9 @@ impl RootView {
     /// forced-update overlay). `false` when there is none.
     fn close_top_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         match self.panels(cx).esc_target() {
+            Some(Panel::SignIn) => self.sign_in.update(cx, |p, cx| p.close(cx)),
             Some(Panel::Settings) => self.settings.update(cx, |p, cx| p.close(cx)),
             Some(Panel::Pairing) => self.pairing.update(cx, |p, cx| p.close(cx)),
-            Some(Panel::Login) => self.login.update(cx, |p, cx| p.close(cx)),
             Some(Panel::ForcedUpdate) | None => return false,
         }
         self.after_focus_change(window, cx);
@@ -497,10 +491,26 @@ impl RootView {
     }
 
     /// The machines-header "+": the list of machines to request access to.
-    /// It is not a panel: the keyboard stays where it was.
+    /// It is not a panel: the keyboard stays where it was. While signed out
+    /// there is no list to show, so it opens the sign-in dialog instead.
     pub fn toggle_machine_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !matches!(self.account.read(cx).state(), AccountState::LoggedIn { .. }) {
+            self.open_sign_in(window, cx);
+            return;
+        }
         self.pairing.update(cx, |panel, cx| panel.toggle_picker(cx));
         self.after_focus_change(window, cx);
+    }
+
+    /// Settings -> Account "Đăng nhập…" and the machines "+" while signed
+    /// out: the "Sign in to ShellX" dialog, over Settings if that is open.
+    /// Refused while the forced-update overlay is up (`Panels::may_open`).
+    pub fn open_sign_in(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.panels(cx).may_open(Panel::SignIn) {
+            return;
+        }
+        self.sign_in
+            .update(cx, |dialog, cx| dialog.open(window, cx));
     }
 
     /// A click outside the "+" list closes it (the click itself still runs).
@@ -510,22 +520,21 @@ impl RootView {
     }
 
     /// Title bar button and `AppCommand::ToggleSidebar` (Ctrl+Shift+B, only
-    /// while no panel is open). Hiding the sidebar closes the sign-in fields
-    /// (wiping a typed password) and the machine picker that live in it, so
-    /// the keyboard never stays on a field that is no longer drawn.
+    /// while no panel is open). Hiding the sidebar closes the machine picker
+    /// that lives in it.
     pub fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar_visible = !self.sidebar_visible;
         if !self.sidebar_visible {
-            self.login.update(cx, |p, cx| p.close(cx));
             self.pairing.update(cx, |p, cx| p.close_picker(cx));
         }
         self.after_focus_change(window, cx);
     }
 
     /// Title bar Settings button and `AppCommand::OpenSettings` (Ctrl+,).
-    /// Toggles the settings panel (blocked while a forced update shows).
+    /// Toggles the settings panel (blocked while a forced update or the
+    /// sign-in dialog shows, both drawn above it).
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.required(cx).is_some() {
+        if !self.panels(cx).may_open(Panel::Settings) {
             return;
         }
         if self.settings.read(cx).is_open() {
@@ -719,12 +728,10 @@ impl Render for RootView {
                     status: Status::Idle,
                 })
                 .collect();
-            let login = self.login.clone();
             Some(sidebar::render(
                 &groups,
                 &rows,
                 &local_id,
-                &login,
                 picker.as_deref(),
                 lang,
                 cx,
@@ -753,6 +760,11 @@ impl Render for RootView {
             .read(cx)
             .is_open()
             .then(|| self.settings.clone());
+        let sign_in = self
+            .sign_in
+            .read(cx)
+            .is_open()
+            .then(|| self.sign_in.clone());
         let pairing = self
             .pairing
             .read(cx)
@@ -804,6 +816,7 @@ impl Render for RootView {
                     .child(main),
             )
             .children(settings)
+            .children(sign_in)
             .children(overlay)
     }
 }

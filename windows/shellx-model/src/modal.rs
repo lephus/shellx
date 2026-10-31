@@ -3,7 +3,8 @@
 //! splits, Alt+arrows, tab and pane focus, terminal clicks) are swallowed; Esc
 //! closes the topmost closable panel; the forced-update overlay closes the
 //! settings panel and cannot itself be closed; the keyboard goes back to the
-//! terminal only when the last panel has closed. The machines "+" list is not
+//! terminal only when the last panel has closed. The sign-in dialog (opened
+//! from Settings -> Account) draws over Settings. The machines "+" list is not
 //! a panel: it never holds the keyboard.
 //!
 //! Typed text is never swallowed (`Panels::root_key`): on Windows a key-down
@@ -17,12 +18,13 @@ use crate::keys::{AppCommand, KeyAction};
 pub enum Panel {
     /// Covers the whole window; never closed by the user.
     ForcedUpdate,
-    /// Drawn over everything but the overlay.
+    /// The "Sign in to ShellX" dialog, centered over the window and drawn
+    /// over Settings (it opens from Settings -> Account).
+    SignIn,
+    /// Drawn over everything but the dialog and the overlay.
     Settings,
     /// Centered over the main area.
     Pairing,
-    /// The sign-in fields in the sidebar.
-    Login,
 }
 
 /// What the window root does with a key that reached it.
@@ -43,9 +45,9 @@ pub enum RootKey {
 fn rank(panel: Panel) -> u8 {
     match panel {
         Panel::ForcedUpdate => 0,
-        Panel::Settings => 1,
-        Panel::Pairing => 2,
-        Panel::Login => 3,
+        Panel::SignIn => 1,
+        Panel::Settings => 2,
+        Panel::Pairing => 3,
     }
 }
 
@@ -53,9 +55,9 @@ fn rank(panel: Panel) -> u8 {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Panels {
     pub forced_update: bool,
+    pub sign_in: bool,
     pub settings: bool,
     pub pairing: bool,
-    pub login: bool,
 }
 
 impl Panels {
@@ -63,9 +65,9 @@ impl Panels {
     pub fn top(&self) -> Option<Panel> {
         [
             (self.forced_update, Panel::ForcedUpdate),
+            (self.sign_in, Panel::SignIn),
             (self.settings, Panel::Settings),
             (self.pairing, Panel::Pairing),
-            (self.login, Panel::Login),
         ]
         .into_iter()
         .find_map(|(open, panel)| open.then_some(panel))
@@ -88,8 +90,9 @@ impl Panels {
     }
 
     /// Whether `panel` may open (and take the keyboard) now: nothing above
-    /// it in the drawing order is open. Opening the sign-in fields while the
-    /// pairing or settings panel (or the overlay) is up is refused.
+    /// it in the drawing order is open. Opening Settings under the sign-in
+    /// dialog, or the dialog under the overlay, is refused; the dialog opens
+    /// over Settings and over pairing.
     pub fn may_open(&self, panel: Panel) -> bool {
         self.top().is_none_or(|top| rank(top) >= rank(panel))
     }
@@ -136,7 +139,7 @@ mod tests {
                 ..Panels::default()
             },
             Panels {
-                login: true,
+                sign_in: true,
                 ..Panels::default()
             },
             Panels {
@@ -237,10 +240,10 @@ mod tests {
             ),
             (
                 Panels {
-                    login: true,
+                    sign_in: true,
                     ..Panels::default()
                 },
-                Panel::Login,
+                Panel::SignIn,
             ),
         ];
         for (p, panel) in each {
@@ -255,7 +258,7 @@ mod tests {
         let mut p = Panels {
             settings: true,
             pairing: true,
-            login: true,
+            sign_in: true,
             ..Panels::default()
         };
         let mut closed = Vec::new();
@@ -264,49 +267,82 @@ mod tests {
             match top {
                 Panel::Settings => p.settings = false,
                 Panel::Pairing => p.pairing = false,
-                Panel::Login => p.login = false,
+                Panel::SignIn => p.sign_in = false,
                 Panel::ForcedUpdate => unreachable!(),
             }
             // commands stay swallowed until the last one closed
             assert_eq!(p.allows_app_commands(), p.top().is_none());
         }
-        assert_eq!(closed, [Panel::Settings, Panel::Pairing, Panel::Login]);
+        assert_eq!(closed, [Panel::SignIn, Panel::Settings, Panel::Pairing]);
         assert!(p.allows_app_commands());
     }
 
     #[test]
     fn a_panel_opens_only_when_nothing_above_it_is_open() {
+        // Drawing order, topmost first.
+        let order = [
+            Panel::ForcedUpdate,
+            Panel::SignIn,
+            Panel::Settings,
+            Panel::Pairing,
+        ];
+        let only = |panel: Panel| Panels {
+            forced_update: panel == Panel::ForcedUpdate,
+            sign_in: panel == Panel::SignIn,
+            settings: panel == Panel::Settings,
+            pairing: panel == Panel::Pairing,
+        };
         let none = Panels::default();
-        assert!(none.may_open(Panel::Login));
-        let login = Panels {
-            login: true,
+        for (open_at, open) in order.into_iter().enumerate() {
+            assert!(none.may_open(open), "{open:?} with nothing open");
+            let panels = only(open);
+            for (candidate_at, candidate) in order.into_iter().enumerate() {
+                // A panel may open when the one up now is the same or lower.
+                assert_eq!(
+                    panels.may_open(candidate),
+                    open_at >= candidate_at,
+                    "{candidate:?} while {open:?} is open"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sign_in_draws_above_settings_and_opens_while_settings_is_open() {
+        // The sign-in dialog is opened from Settings -> Account, so it must
+        // draw over Settings, open while Settings is up and close first.
+        let both = Panels {
+            settings: true,
+            sign_in: true,
             ..Panels::default()
         };
-        assert!(login.may_open(Panel::Login));
-        for above in [
-            Panels {
-                pairing: true,
-                ..Panels::default()
-            },
+        assert_eq!(both.top(), Some(Panel::SignIn));
+        assert!(
             Panels {
                 settings: true,
                 ..Panels::default()
-            },
-            Panels {
-                forced_update: true,
-                ..Panels::default()
-            },
-        ] {
-            assert!(!above.may_open(Panel::Login), "{above:?}");
-            assert!(above.may_open(above.top().unwrap()));
-        }
+            }
+            .may_open(Panel::SignIn)
+        );
+        // ... but Settings does not open over the dialog, nor the dialog
+        // over the forced-update overlay.
+        assert!(!both.may_open(Panel::Settings));
         assert!(
             !Panels {
                 forced_update: true,
                 ..Panels::default()
             }
-            .may_open(Panel::Settings)
+            .may_open(Panel::SignIn)
         );
+        // Esc closes the dialog first, then Settings.
+        let mut p = both;
+        assert_eq!(p.esc_target(), Some(Panel::SignIn));
+        p.sign_in = false;
+        assert_eq!(p.esc_target(), Some(Panel::Settings));
+        assert!(!p.allows_app_commands());
+        p.settings = false;
+        assert_eq!(p.esc_target(), None);
+        assert!(p.allows_app_commands());
     }
 
     #[test]

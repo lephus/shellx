@@ -6,19 +6,20 @@
 //! and a "+" on the group header that opens a new local tab.
 //! Signed in, the groups are the account's machines (this PC first, the
 //! others below, offline ones dimmed with "ngoại tuyến · lần cuối HH:MM");
-//! signed out, the sign-in card (`login.rs`) sits under this PC.
+//! signed out, this PC is the only group and the sidebar never asks for a
+//! password: sign-in lives in Settings -> Account (`login.rs`).
 //! Another online machine without access shows "Xin quyền truy cập", which
 //! opens the pairing panel (`pairing.rs`); while waiting, the row shows the
 //! code instead. The "+" in the machines header opens a small list of the
 //! account's other machines without a link (same action); it never holds the
-//! keyboard and closes on a click outside it and the "+". An online machine
+//! keyboard and closes on a click outside it and the "+". While signed out
+//! that "+" opens the sign-in dialog instead. An online machine
 //! with access shows "Mở", which opens a tab with its terminal (Task 13b);
 //! that machine's tabs are listed under it.
 
 use gpui::{
-    AnyView, App, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement,
-    MouseDownEvent, Pixels, Render, Resource, SharedString, Stateful, Window, div, img, prelude::*,
-    px, svg,
+    AnyView, App, ClickEvent, Context, Div, FontWeight, ImageSource, IntoElement, MouseDownEvent,
+    Pixels, Render, Resource, SharedString, Stateful, Window, div, img, prelude::*, px, svg,
 };
 use shellx_model::palette::{Pill, Status};
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
@@ -27,7 +28,6 @@ use shellx_model::tabs::TabId;
 
 use super::assets::Icon;
 use super::button::{Kind, button};
-use super::login::LoginPanel;
 use super::root::RootView;
 use super::theme;
 
@@ -54,13 +54,11 @@ pub struct PickerEntry {
 
 /// `local_id`: this PC's group (its server id when signed in).
 /// `sessions`: every tab, each listed under its `machine_id` group.
-/// `login`: the sign-in card, drawn under this PC's sessions.
 /// `picker`: the "+" list, when open.
 pub fn render(
     groups: &[MachineGroup],
     sessions: &[SessionRow],
     local_id: &str,
-    login: &Entity<LoginPanel>,
     picker: Option<&[PickerEntry]>,
     lang: Lang,
     cx: &mut Context<RootView>,
@@ -78,9 +76,6 @@ pub fn render(
             if row.machine_id == group.machine_id {
                 list = list.child(session_row(ix, row, lang, cx));
             }
-        }
-        if local {
-            list = list.child(login.clone());
         }
     }
 
@@ -159,7 +154,8 @@ fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
         .text_color(theme::muted())
         .child(t(lang, Str::MachinesHeader))
         .child(
-            // Request access to another machine: toggles the "+" list.
+            // Request access to another machine: toggles the "+" list (signed
+            // out: opens the sign-in dialog).
             div()
                 .id("sidebar-add-machine")
                 .group("sidebar-add-machine")

@@ -2,9 +2,10 @@
 //! off the UI thread on one background worker (in order, so results arrive
 //! in call order as the flow expects), delivers every `ScheduleTick` as a
 //! `Tick` through a GPUI timer, and applies results with `entity.update`.
-//! The sidebar (machines + sign-in card) observes it.
+//! The sidebar (machines), Settings -> Account and the sign-in dialog
+//! observe it.
 //!
-//! The password goes from the sign-in panel straight into
+//! The password goes from the sign-in dialog straight into
 //! `AccountEvent::LoginSubmitted` -> `CallLogin` -> the worker, and is
 //! dropped after the call. The account token stays inside shellx-core.
 
@@ -142,7 +143,7 @@ impl AccountService {
         self.utc_offset_secs
     }
 
-    /// Sign-in panel submit. The password is moved into the event.
+    /// Sign-in dialog submit. The password is moved into the event.
     pub fn login(&mut self, email: String, password: String, cx: &mut Context<Self>) {
         self.email = Some(email.clone());
         self.apply(AccountEvent::LoginSubmitted { email, password }, cx);
