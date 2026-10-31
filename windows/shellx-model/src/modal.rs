@@ -4,8 +4,10 @@
 //! closes the topmost closable panel; the forced-update overlay closes the
 //! settings panel and cannot itself be closed; the keyboard goes back to the
 //! terminal only when the last panel has closed. The sign-in dialog (opened
-//! from Settings -> Account) draws over Settings. The machines "+" list is not
-//! a panel: it never holds the keyboard.
+//! from Settings -> Account) draws over Settings. The dropdowns (the title
+//! bar "+ ▾" menu, the "?" help menu, the machines "+" list) are not panels:
+//! they never hold the keyboard, but a plain Esc while one is open closes
+//! them and goes nowhere else (`Panels::esc_closes_dropdowns`).
 //!
 //! Typed text is never swallowed (`Panels::root_key`): on Windows a key-down
 //! that was handled is not translated, so no WM_CHAR follows and the field
@@ -103,6 +105,26 @@ impl Panels {
         (self.forced_update && self.settings).then_some(Panel::Settings)
     }
 
+    /// Whether this key closes the open dropdowns (the title bar "+ ▾"
+    /// menu, the sidebar "?" help menu, the machines "+" list) instead of
+    /// going anywhere else. The root asks in the CAPTURE phase, before the
+    /// focused terminal (which would send Esc to the shell) or panel (which
+    /// would close itself) sees the key. Only a plain Esc, and only while a
+    /// dropdown is open; never while an IME composes (`action` is
+    /// `Ignore`: the Esc cancels the composition) and never under the
+    /// forced-update overlay (nothing reacts to keys there).
+    pub fn esc_closes_dropdowns(
+        &self,
+        action: &KeyAction,
+        plain_escape: bool,
+        dropdown_open: bool,
+    ) -> bool {
+        plain_escape
+            && dropdown_open
+            && !matches!(action, KeyAction::Ignore)
+            && self.top() != Some(Panel::ForcedUpdate)
+    }
+
     /// What the root does with `action` (from `map_key`); `plain_escape` is
     /// Esc without modifiers. Typed text and IME keys (`Text`, `Ignore`)
     /// always pass: the open panel's field (or the terminal) takes them from
@@ -169,6 +191,41 @@ mod tests {
                 "{p:?}"
             );
         }
+    }
+
+    #[test]
+    fn esc_closes_an_open_dropdown_before_the_shell_or_a_panel_sees_it() {
+        let esc = KeyAction::Chord("escape".into());
+        let pairing = Panels {
+            pairing: true,
+            ..Panels::default()
+        };
+        // A dropdown is open: a plain Esc closes it, with or without a panel
+        // (the sidebar and title bar stay clickable beside the pairing card).
+        for p in [Panels::default(), pairing] {
+            assert!(p.esc_closes_dropdowns(&esc, true, true), "{p:?}");
+            // Only a plain Esc, and only while a dropdown is open.
+            assert!(!p.esc_closes_dropdowns(&esc, false, true), "{p:?}");
+            assert!(!p.esc_closes_dropdowns(&esc, true, false), "{p:?}");
+            for other in [
+                KeyAction::Text,
+                KeyAction::Chord("enter".into()),
+                KeyAction::App(AppCommand::NewWorkspace),
+            ] {
+                assert!(!p.esc_closes_dropdowns(&other, false, true), "{other:?}");
+            }
+        }
+        // No dropdown: Esc goes on as before (to the shell, or CloseTop).
+        assert_eq!(Panels::default().root_key(&esc, true), RootKey::Pass);
+        assert_eq!(pairing.root_key(&esc, true), RootKey::CloseTop);
+        // An IME composition gets its Esc (it cancels the composition).
+        assert!(!Panels::default().esc_closes_dropdowns(&KeyAction::Ignore, true, true));
+        // Nothing reacts under the forced-update overlay.
+        let overlay = Panels {
+            forced_update: true,
+            ..Panels::default()
+        };
+        assert!(!overlay.esc_closes_dropdowns(&esc, true, true));
     }
 
     #[test]

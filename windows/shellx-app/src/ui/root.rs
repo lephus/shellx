@@ -33,9 +33,12 @@
 //! the keyboard, app commands and pane clicks are swallowed, Esc closes the
 //! topmost closable one, and the terminal gets the keyboard back when the
 //! last one closes. The overlay closes settings. Typed text is never
-//! swallowed (a handled key-down yields no WM_CHAR on Windows). The machines
-//! "+" list is not a panel: it closes on a click outside it and never holds
-//! the keyboard.
+//! swallowed (a handled key-down yields no WM_CHAR on Windows). The
+//! dropdowns (the title bar "+ ▾" menu, the help menu, the machines "+"
+//! list) are not panels: they never hold the keyboard, and they close on a
+//! click outside them, when a panel opens, a command runs or the sidebar
+//! toggles, and on a plain Esc, which then reaches neither the shell nor a
+//! panel (`close_menus`, R14).
 //!
 //! A shell that exits as it starts would respawn the last pane forever:
 //! `RespawnGuard` holds the pane after 5 respawns in 10 s (a message and
@@ -56,7 +59,7 @@ use gpui::{
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
 use shellx_model::history::FocusHistory;
-use shellx_model::keys::{AppCommand, KeyCtx, KeyIn, map_key};
+use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::modal::{Panel, Panels, RootKey};
@@ -137,12 +140,13 @@ impl RootView {
         let settings = cx.new(|cx| SettingsPanel::new(account.clone(), cx));
         let subscriptions = vec![
             // A forced update takes the keyboard from the terminals and
-            // closes the settings panel.
+            // closes the settings panel and the dropdowns.
             cx.observe_in(&account, window, |this, _, window, cx| {
                 if this.panels(cx).must_close() == Some(Panel::Settings) {
                     this.settings.update(cx, |panel, cx| panel.close(cx));
                 }
                 if this.required(cx).is_some() {
+                    this.close_menus(cx);
                     this.focus_terminal(window, cx);
                 }
                 this.account_changed(window, cx);
@@ -413,6 +417,8 @@ impl RootView {
     }
 
     fn run_command(&mut self, command: AppCommand, window: &mut Window, cx: &mut Context<Self>) {
+        // A shortcut never leaves a dropdown drawn over what it changed.
+        self.close_menus(cx);
         // A panel is open (or the forced update shows): terminals keep
         // running, but no command gets through.
         if !self.panels(cx).allows_app_commands() {
@@ -583,6 +589,21 @@ impl RootView {
         }
     }
 
+    /// Whether a dropdown is showing: the title bar "+ ▾" menu, the help
+    /// menu or the machines "+" list.
+    fn dropdown_open(&self, cx: &App) -> bool {
+        self.new_menu_open || self.help_open || self.pairing.read(cx).picker_open()
+    }
+
+    /// Closes every dropdown (the "+ ▾" menu, the help menu, the machines
+    /// "+" list): a panel opens, a command or shortcut runs, the sidebar
+    /// toggles, the forced update shows, or a plain Esc (R14).
+    fn close_menus(&mut self, cx: &mut Context<Self>) {
+        self.close_new_menu(cx);
+        self.close_help_menu(cx);
+        self.pairing.update(cx, |panel, cx| panel.close_picker(cx));
+    }
+
     /// Makes `slot`'s selected terminal the focused one (a button of a
     /// region's tab bar acts on that region, not on the focused one).
     fn focus_slot(&mut self, slot: SlotId) {
@@ -711,6 +732,7 @@ impl RootView {
     /// out: the "Sign in to ShellX" dialog, over Settings if that is open.
     /// Refused while the forced-update overlay is up (`Panels::may_open`).
     pub fn open_sign_in(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_menus(cx);
         if !self.panels(cx).may_open(Panel::SignIn) {
             return;
         }
@@ -725,21 +747,19 @@ impl RootView {
     }
 
     /// Title bar button and `AppCommand::ToggleSidebar` (Ctrl+Shift+B, only
-    /// while no panel is open). Hiding the sidebar closes the machine picker
-    /// and the help menu that live in it.
+    /// while no panel is open). Closes the dropdowns, among them the machine
+    /// picker and the help menu that live in the sidebar.
     pub fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar_visible = !self.sidebar_visible;
-        if !self.sidebar_visible {
-            self.pairing.update(cx, |p, cx| p.close_picker(cx));
-            self.help_open = false;
-        }
+        self.close_menus(cx);
         self.after_focus_change(window, cx);
     }
 
     /// Title bar Settings button and `AppCommand::OpenSettings` (Ctrl+,).
     /// Toggles the settings panel (blocked while a forced update or the
-    /// sign-in dialog shows, both drawn above it).
+    /// sign-in dialog shows, both drawn above it). Closes the dropdowns.
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_menus(cx);
         if !self.panels(cx).may_open(Panel::Settings) {
             return;
         }
@@ -757,6 +777,47 @@ impl RootView {
     /// are never stopped: a handled key-down yields no WM_CHAR on Windows,
     /// so the field would never see the letter (`Panels::root_key`).
     fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let (action, plain_escape) = self.key_action(event, cx);
+        match self.panels(cx).root_key(&action, plain_escape) {
+            RootKey::Pass => {}
+            RootKey::Swallow => cx.stop_propagation(),
+            RootKey::CloseTop => {
+                self.close_top_panel(window, cx);
+                cx.stop_propagation();
+            }
+            RootKey::Run(command) => {
+                cx.stop_propagation();
+                self.run_command(command, window, cx);
+            }
+        }
+    }
+
+    /// Capture phase, before the focused terminal (which sends Esc to the
+    /// shell) or panel (which closes itself on Esc) sees the key: a plain
+    /// Esc while a dropdown is open closes the dropdowns and goes no further
+    /// (R14). Every other key, typed text included, passes untouched.
+    fn on_key_down_capture(
+        &mut self,
+        event: &KeyDownEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.dropdown_open(cx) {
+            return;
+        }
+        let (action, plain_escape) = self.key_action(event, cx);
+        if self
+            .panels(cx)
+            .esc_closes_dropdowns(&action, plain_escape, true)
+        {
+            self.close_menus(cx);
+            cx.stop_propagation();
+        }
+    }
+
+    /// The key as `map_key` sees it (with the focused terminal's selection
+    /// and IME state), and whether it is Esc without modifiers.
+    fn key_action(&self, event: &KeyDownEvent, cx: &App) -> (KeyAction, bool) {
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;
         let key = KeyIn {
@@ -773,18 +834,7 @@ impl RootView {
             has_selection: focused.is_some_and(TermView::has_selection),
             composing: focused.is_some_and(TermView::composing),
         };
-        match self.panels(cx).root_key(&map_key(&key, &ctx), plain_escape) {
-            RootKey::Pass => {}
-            RootKey::Swallow => cx.stop_propagation(),
-            RootKey::CloseTop => {
-                self.close_top_panel(window, cx);
-                cx.stop_propagation();
-            }
-            RootKey::Run(command) => {
-                cx.stop_propagation();
-                self.run_command(command, window, cx);
-            }
-        }
+        (map_key(&key, &ctx), plain_escape)
     }
 
     fn focused_view<'a>(&self, cx: &'a App) -> Option<&'a TermView> {
@@ -978,6 +1028,7 @@ impl Render for RootView {
             .font(theme::ui_font())
             .text_size(theme::UI_SIZE)
             .line_height(relative(1.4))
+            .capture_key_down(cx.listener(Self::on_key_down_capture))
             .on_key_down(cx.listener(Self::on_key_down))
             .child(titlebar)
             .child(
