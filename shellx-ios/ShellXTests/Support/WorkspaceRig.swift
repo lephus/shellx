@@ -40,11 +40,14 @@ struct WorkspaceRig {
 
     /// `ws-shellx` has the agent `claude` (session `s1`, working) and a shell `zsh` (the Mac's selection);
     /// `ws-web` has one shell. `name` is the workspace the model looks at: `new` is one the Mac does not list.
-    /// With `acceptsAgentClose` false the Mac is one from before `agent_close`.
+    /// With `acceptsAgentClose` false the Mac is one from before `agent_close`; with `acceptsTerminalClose`
+    /// false, one from before `terminal_close`.
     static func make(
-        opening name: String = "shellx", acceptsAgentClose: Bool = true, in test: XCTestCase
+        opening name: String = "shellx", acceptsAgentClose: Bool = true, acceptsTerminalClose: Bool = true,
+        in test: XCTestCase
     ) async throws -> WorkspaceRig {
-        let mac = FakeMac(name: "MacBook Pro", acceptsAgentClose: acceptsAgentClose)
+        let mac = FakeMac(
+            name: "MacBook Pro", acceptsAgentClose: acceptsAgentClose, acceptsTerminalClose: acceptsTerminalClose)
         await mac.setWorkspaces([
             LinkWorkspace(
                 workspaceId: "ws-shellx", title: "shellx-ios", order: 0, directory: "~/shellx/shellx-ios",

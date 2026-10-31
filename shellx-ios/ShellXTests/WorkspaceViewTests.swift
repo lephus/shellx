@@ -1,5 +1,6 @@
 import ShellXAppCore
 import ShellXAppTestSupport
+import ShellXLinkCore
 import SwiftUI
 import XCTest
 @testable import ShellX
@@ -83,72 +84,117 @@ final class WorkspaceViewTests: XCTestCase {
         XCTAssertTrue(rig.screen.alerts.isEmpty)
     }
 
-    // MARK: - Closing an agent
+    // MARK: - Closing a tab
 
-    private func agentRef(_ rig: WorkspaceRig) -> SessionRef {
-        SessionRef(machineID: rig.mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx-ios")
+    private func terminalCloses(_ rig: WorkspaceRig) async -> [String] {
+        await rig.mac.terminalCloses.map { "\($0.workspaceId)/\($0.terminalId)" }
     }
 
-    func testTheMenuListsCloseAgentOnlyWhenItCan() {
-        XCTAssertEqual(WorkspaceMenuItem.items(canCloseAgent: true), [.rename, .closeAgent, .closeWorkspace])
-        XCTAssertEqual(WorkspaceMenuItem.items(canCloseAgent: false), [.rename, .closeWorkspace])
+    /// Follows the hub as the screen does while it is shown.
+    private func follow(_ rig: WorkspaceRig) {
+        let run = Task { await rig.model.run() }
+        addTeardownBlock { run.cancel() }
     }
 
-    func testCloseAgentIsOfferedForTheLiveAgentShownAndReachesTheMac() async throws {
+    func testTheMenuListsCloseTabOnlyWhenItCan() {
+        XCTAssertEqual(WorkspaceMenuItem.items(canCloseTab: true), [.rename, .closeTab, .closeWorkspace])
+        XCTAssertEqual(WorkspaceMenuItem.items(canCloseTab: false), [.rename, .closeWorkspace])
+    }
+
+    func testCloseTabClosesTheShellShownAndTheNextChipShowsWithoutAWord() async throws {
         let rig = try await makeRig()
-        XCTAssertNil(WorkspaceView.closableAgent(rig.model, hub: rig.hub), "the shell shown runs no agent")
+        follow(rig)
+        XCTAssertTrue(WorkspaceListActions.canCloseTab(machineID: rig.model.ref.machineID, hub: rig.hub))
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-zsh", "a shell: any tab closes, not only an agent's")
 
+        rig.actions.closeTab("t-zsh")
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .nothing, "the tab leaves by the Mac's push")
+        let calls = await terminalCloses(rig)
+        XCTAssertEqual(calls, ["ws-shellx/t-zsh"])
+        let moved = await eventually { rig.model.panes.map(\.id) == ["t-claude"] }
+        XCTAssertTrue(moved)
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-claude", "the chip left, the only one there")
+        XCTAssertEqual(rig.model.shownPaneClosed, 0, "closed from this iPhone: no 'closed on the Mac'")
+        XCTAssertEqual(rig.model.phase, .showing)
+        XCTAssertTrue(rig.screen.alerts.isEmpty)
+        XCTAssertEqual(rig.screen.closings, 0, "closing a tab is not closing the workspace")
+    }
+
+    func testClosingTheLastTabLeavesWithoutSayingTheMacClosedIt() async throws {
+        let rig = try await makeRig()
+        follow(rig)
         rig.actions.select("t-claude")
-        let pane = try XCTUnwrap(WorkspaceView.closableAgent(rig.model, hub: rig.hub))
-        XCTAssertEqual(pane.id, "t-claude")
-        let session = try XCTUnwrap(pane.session)
-        XCTAssertTrue(WorkspaceListActions.canClose(session, hub: rig.hub), "its own screen offers it too")
 
-        rig.actions.closeAgent(session.ref)
+        // A long-press on the shell's chip, which is not the one shown: the agent stays on screen.
+        rig.actions.closeTab("t-zsh")
+        _ = await rig.lastFeedback()
+        let shellGone = await eventually { rig.model.panes.map(\.id) == ["t-claude"] }
+        XCTAssertTrue(shellGone)
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-claude")
+
+        // The agent's tab, now the workspace's last: the Mac closes the workspace with it.
+        rig.actions.closeTab("t-claude")
         let feedback = await rig.lastFeedback()
 
         XCTAssertEqual(feedback, .nothing)
-        let calls = await rig.mac.agentCloses
-        XCTAssertEqual(calls, ["s1"])
+        let calls = await terminalCloses(rig)
+        XCTAssertEqual(calls, ["ws-shellx/t-zsh", "ws-shellx/t-claude"])
+        let agentCloses = await rig.mac.agentCloses
+        XCTAssertEqual(agentCloses, [], "an agent's tab closes as a tab: the Mac checks for no live agent")
+        let gone = await eventually { rig.model.phase == .dismissed }
+        XCTAssertTrue(gone, "\(rig.model.phase)")
+        XCTAssertTrue(rig.model.lastTabClosedHere, "the screen leaves without 'Workspace closed on the Mac'")
+        XCTAssertEqual(rig.model.shownPaneClosed, 0)
         XCTAssertTrue(rig.screen.alerts.isEmpty)
-        XCTAssertEqual(rig.screen.closings, 0, "closing an agent is not closing the workspace")
-        // Ended: the terminal now runs the user's shell, which Close never offers to shut.
-        let ended = await eventually { WorkspaceView.closableAgent(rig.model, hub: rig.hub) == nil }
-        XCTAssertTrue(ended)
-        let endedSession = try XCTUnwrap(rig.model.panes.first { $0.id == "t-claude" }?.session)
-        XCTAssertFalse(WorkspaceListActions.canClose(endedSession, hub: rig.hub))
     }
 
-    func testAMacWithoutAgentCloseOffersNoClose() async throws {
-        let rig = try await WorkspaceRig.make(acceptsAgentClose: false, in: self)
-
-        rig.actions.select("t-claude")
-
-        XCTAssertNil(WorkspaceView.closableAgent(rig.model, hub: rig.hub))
-        let session = try XCTUnwrap(rig.model.panes.first { $0.id == "t-claude" }?.session)
-        XCTAssertFalse(WorkspaceListActions.canClose(session, hub: rig.hub), "nor does the agent's own screen")
-    }
-
-    func testCloseAgentFromTheMenuWhileTheListsCloseWaitsSendsNothing() async throws {
+    func testARefusedCloseTabIsAnAlertAndTheTabStays() async throws {
         let rig = try await makeRig()
-        // The home's swipe on the same agent, through the same signed-in scope.
-        let listScreen = WorkspaceRig.Screen()
-        let list = WorkspaceListActions.make(
-            scope: rig.scope, open: { _ in }, alert: { listScreen.alerts.append($0) }, creating: .constant(false),
-            done: { listScreen.tasks.append($0) })
+        follow(rig)
+        await rig.mac.setNextTerminalCloseOutcome(.refused)
+
+        rig.actions.closeTab("t-zsh")
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .alert(.refusedCloseTab))
+        XCTAssertEqual(rig.screen.alerts, [.refusedCloseTab])
+        XCTAssertEqual(rig.model.panes.map(\.id), ["t-claude", "t-zsh"])
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-zsh")
+
+        // Closed later on the Mac itself: that one the screen does explain.
+        await rig.mac.upsertWorkspace(
+            LinkWorkspace(
+                workspaceId: "ws-shellx", title: "shellx-ios", order: 0, directory: "~/shellx/shellx-ios",
+                branch: "feat/workspaces",
+                terminals: [LinkTerminal(terminalId: "t-claude", title: "claude", order: 0, selected: true, sessionId: "s1")]))
+        let moved = await eventually { rig.model.selectedTerminalId == "t-claude" }
+        XCTAssertTrue(moved)
+        XCTAssertEqual(rig.model.shownPaneClosed, 1)
+    }
+
+    func testCloseTabWhileTheSameTabsCloseWaitsSendsNothing() async throws {
+        let rig = try await makeRig()
         await rig.mac.holdWorkspaceControl()
 
-        list.closeAgent(agentRef(rig))
-        rig.actions.closeAgent(agentRef(rig))
+        // The menu's Close Tab… and a long-press on the same chip, both confirmed.
+        rig.actions.closeTab("t-zsh")
+        rig.actions.closeTab("t-zsh")
 
-        XCTAssertEqual(listScreen.tasks.count, 1)
-        XCTAssertTrue(rig.screen.tasks.isEmpty, "the menu's close waits for the swipe's")
-        let held = await eventually { await rig.mac.agentCloses == ["s1"] }
+        XCTAssertEqual(rig.screen.tasks.count, 1, "the second close waits for the first")
+        let held = await eventually { await self.terminalCloses(rig) == ["ws-shellx/t-zsh"] }
         XCTAssertTrue(held)
         await rig.mac.releaseWorkspaceControl()
-        _ = await listScreen.tasks.last?.value
-        let calls = await rig.mac.agentCloses
-        XCTAssertEqual(calls, ["s1"])
+        _ = await rig.lastFeedback()
+        let calls = await terminalCloses(rig)
+        XCTAssertEqual(calls, ["ws-shellx/t-zsh"])
+    }
+
+    func testAMacWithoutTerminalCloseOffersNoCloseTab() async throws {
+        let rig = try await WorkspaceRig.make(acceptsTerminalClose: false, in: self)
+
+        XCTAssertFalse(WorkspaceListActions.canCloseTab(machineID: rig.model.ref.machineID, hub: rig.hub))
     }
 
     func testCommandsToAMacThatIsAwayAreAnAlert() async throws {

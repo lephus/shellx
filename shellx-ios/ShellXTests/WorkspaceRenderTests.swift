@@ -180,19 +180,21 @@ final class WorkspaceRenderTests: XCTestCase {
 
     // MARK: - Words
 
-    func testTheMenuOffersRenameCloseAgentAndCloseWorkspace() {
+    func testTheMenuOffersRenameCloseTabAndCloseWorkspace() {
         XCTAssertEqual(
-            WorkspaceMenuItem.items(canCloseAgent: false), [.rename, .closeWorkspace],
-            "no 'close pane' for a shell before the terminal version")
+            WorkspaceMenuItem.items(canCloseTab: false), [.rename, .closeWorkspace], "a Mac from before terminal_close")
+        XCTAssertEqual(
+            WorkspaceMenuItem.items(canCloseTab: true), [.rename, .closeTab, .closeWorkspace],
+            "any tab, agent or shell: it replaces Close Agent… here")
         let titles = WorkspaceMenuItem.allCases.map(\.title)
         XCTAssertEqual(
             titles,
             [
-                String(localized: "workspace.menu.rename"), String(localized: "agent.close.menu"),
+                String(localized: "workspace.menu.rename"), String(localized: "terminal.close.menu"),
                 String(localized: "workspace.menu.close"),
             ])
         XCTAssertEqual(Set(titles).count, 3)
-        XCTAssertEqual(WorkspaceMenuItem.allCases.filter(\.isDestructive), [.closeAgent, .closeWorkspace])
+        XCTAssertEqual(WorkspaceMenuItem.allCases.filter(\.isDestructive), [.closeTab, .closeWorkspace])
     }
 
     func testAChipSaysItsTabsNameOrWhatItRuns() {

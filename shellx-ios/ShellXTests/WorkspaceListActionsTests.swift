@@ -1,5 +1,6 @@
 import ShellXAppCore
 import ShellXAppTestSupport
+import ShellXLinkCore
 import SwiftUI
 import XCTest
 @testable import ShellX
@@ -370,6 +371,135 @@ final class WorkspaceListActionsTests: XCTestCase {
         XCTAssertTrue(away)
         XCTAssertTrue(rig.hub.supportsAgentClose(id), "it took agent.close when it was last online")
         XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [], "no Close while the Mac is away")
+    }
+
+    // MARK: - Closing a tab
+
+    /// A Mac with the workspace `shellx`: a shell `t1` and the agent `claude` (session `s1`) in `t2`.
+    private func macWithTabs(name: String = "MacBook Pro", acceptsTerminalClose: Bool = true) async -> FakeMac {
+        let mac = FakeMac(name: name, acceptsTerminalClose: acceptsTerminalClose)
+        await mac.setWorkspaces([
+            LinkWorkspace(
+                workspaceId: "ws-shellx", title: "shellx", order: 0,
+                terminals: [
+                    LinkTerminal(terminalId: "t1", title: "zsh", order: 0, selected: true),
+                    LinkTerminal(terminalId: "t2", title: "claude", order: 1, selected: false, sessionId: "s1"),
+                ])
+        ])
+        await mac.upsertSession(
+            AgentSession(
+                sessionId: "s1", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx", state: .working))
+        return mac
+    }
+
+    private func tabs(_ rig: Rig, _ mac: FakeMac) -> [String] {
+        rig.hub.machines.first { $0.id == mac.machine.machineID }?.workspaces.workspace("ws-shellx")?.terminals
+            .map(\.terminalId) ?? []
+    }
+
+    private func terminalCloses(_ mac: FakeMac) async -> [String] {
+        await mac.terminalCloses.map { "\($0.workspaceId)/\($0.terminalId)" }
+    }
+
+    private func closeTab(_ rig: Rig, _ mac: FakeMac, _ terminalId: String) {
+        WorkspaceListActions.closeTab(
+            machineID: mac.machine.machineID, workspaceId: "ws-shellx", terminalId: terminalId, hub: rig.hub,
+            alert: { rig.screen.alerts.append($0) }, done: { rig.screen.tasks.append($0) })
+    }
+
+    func testCloseTabAsksTheMacOnce() async throws {
+        let mac = await macWithTabs()
+        let rig = try await makeRig([mac])
+        let listed = await eventually { rig.hub.machines.first?.state == .online && self.tabs(rig, mac) == ["t1", "t2"] }
+        XCTAssertTrue(listed)
+        await mac.holdWorkspaceControl()
+
+        // A long-press's Close Tab… and the menu's, on the same tab, both confirmed.
+        closeTab(rig, mac, "t1")
+        closeTab(rig, mac, "t1")
+        XCTAssertEqual(rig.screen.tasks.count, 1, "the second close started nothing")
+        let held = await eventually { await self.terminalCloses(mac) == ["ws-shellx/t1"] }
+        XCTAssertTrue(held)
+        // Another tab is another close.
+        closeTab(rig, mac, "t2")
+        XCTAssertEqual(rig.screen.tasks.count, 2)
+        await mac.releaseWorkspaceControl()
+        for task in rig.screen.tasks { _ = await task.value }
+
+        let calls = await terminalCloses(mac)
+        XCTAssertEqual(Set(calls), ["ws-shellx/t1", "ws-shellx/t2"])
+        XCTAssertEqual(calls.filter { $0 == "ws-shellx/t1" }.count, 1, "exactly one terminal.close for t1")
+        XCTAssertEqual(rig.screen.alerts, [])
+
+        // Answered: Close Tab goes out again (and the Mac says the tab is no longer there).
+        let before = rig.screen.tasks.count
+        closeTab(rig, mac, "t1")
+        XCTAssertEqual(rig.screen.tasks.count, before + 1)
+        let again = await rig.lastFeedback()
+        XCTAssertEqual(again, .alert(.tabNotClosable))
+    }
+
+    func testCloseTabTheMacCannotCloseIsAnAlert() async throws {
+        let mac = await macWithTabs()
+        let rig = try await makeRig([mac])
+        let listed = await eventually { rig.hub.machines.first?.state == .online && self.tabs(rig, mac) == ["t1", "t2"] }
+        XCTAssertTrue(listed)
+        let lists = await mac.workspaceListCount
+        await mac.setNextTerminalCloseOutcome(.notFound)
+
+        closeTab(rig, mac, "t1")
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .alert(.tabNotClosable))
+        XCTAssertEqual(rig.screen.alerts, [.tabNotClosable])
+        let listsAfter = await mac.workspaceListCount
+        XCTAssertEqual(listsAfter, lists, "said, not refreshed quietly")
+        XCTAssertEqual(tabs(rig, mac), ["t1", "t2"])
+    }
+
+    func testCloseTabTheMacRefusesSaysWhy() async throws {
+        let mac = await macWithTabs()
+        let rig = try await makeRig([mac])
+        let listed = await eventually { rig.hub.machines.first?.state == .online && self.tabs(rig, mac) == ["t1", "t2"] }
+        XCTAssertTrue(listed)
+        // Remote control blocked, or the last tab of a pinned or kept-open workspace.
+        await mac.setNextTerminalCloseOutcome(.refused)
+
+        closeTab(rig, mac, "t1")
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .alert(.refusedCloseTab))
+        XCTAssertEqual(rig.screen.alerts, [.refusedCloseTab])
+        XCTAssertEqual(tabs(rig, mac), ["t1", "t2"], "the tab stays")
+    }
+
+    func testAMacWithoutTerminalCloseOffersNoCloseTab() async throws {
+        let modern = await macWithTabs(name: "MacBook Pro")
+        let old = await macWithTabs(name: "iMac", acceptsTerminalClose: false)
+        let rig = try await makeRig([modern, old])
+        let ready = await eventually {
+            rig.hub.machines.count == 2 && rig.hub.machines.allSatisfy { $0.state == .online }
+                && self.tabs(rig, old) == ["t1", "t2"]
+        }
+        XCTAssertTrue(ready)
+
+        XCTAssertTrue(WorkspaceListActions.canCloseTab(machineID: modern.machine.machineID, hub: rig.hub))
+        XCTAssertFalse(WorkspaceListActions.canCloseTab(machineID: old.machine.machineID, hub: rig.hub))
+        XCTAssertEqual(
+            WorkspaceMenuItem.items(
+                canCloseTab: WorkspaceListActions.canCloseTab(machineID: old.machine.machineID, hub: rig.hub)),
+            [.rename, .closeWorkspace])
+
+        // Nothing reaches such a Mac even if a close were started: only the frames the phone sent can show it.
+        let before = old.phoneFrameCount
+        WorkspaceListActions.closeTab(
+            machineID: old.machine.machineID, workspaceId: "ws-shellx", terminalId: "t1", hub: rig.hub,
+            alert: { rig.screen.alerts.append($0) }, done: { rig.screen.tasks.append($0) })
+        _ = await rig.lastFeedback()
+        XCTAssertEqual(old.phoneFrameCount, before, "no frame is sent to a Mac from before terminal_close")
+        let calls = await old.terminalCloses
+        XCTAssertTrue(calls.isEmpty)
+        XCTAssertEqual(tabs(rig, old), ["t1", "t2"])
     }
 
     func testPullToRefreshAsksTheOnlineMacsAgain() async throws {

@@ -300,6 +300,69 @@ final class WorkspaceScreenModelTests: XCTestCase {
         XCTAssertTrue(back, "a chip came: it shows")
     }
 
+    func testATabClosedFromThisIPhoneGoesWithoutAWord() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2", "t3"))])
+        let (model, _, _) = try await makeModel(mac)
+        model.select("t2")
+
+        model.closesHere("t2")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1", "t3")))
+        let next = await eventually { model.selectedTerminalId == "t3" }
+        XCTAssertTrue(next, "the next chip shows: \(String(describing: model.selectedTerminalId))")
+        XCTAssertEqual(model.shownPaneClosed, 0, "the user closed it here: nothing to explain")
+
+        // A close the Mac did not carry out: when the tab goes later, the Mac closed it.
+        model.closesHere("t3")
+        model.keeps("t3")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1")))
+        let moved = await eventually { model.selectedTerminalId == "t1" }
+        XCTAssertTrue(moved)
+        XCTAssertEqual(model.shownPaneClosed, 1, "closed on the Mac: the screen says so")
+        XCTAssertEqual(model.phase, .showing)
+        XCTAssertFalse(model.lastTabClosedHere)
+    }
+
+    func testTheWorkspaceGoingWithTheLastTabClosedHereIsNotClosedOnTheMac() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("t1", "t2")), linkWorkspace("web", order: 1, terminals: terminals("w1")),
+        ])
+        let (model, _, _) = try await makeModel(mac)
+
+        model.closesHere("t1")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t2")))
+        let one = await eventually { model.panes.map(\.id) == ["t2"] }
+        XCTAssertTrue(one)
+        model.closesHere("t2")
+        // The Mac may list the workspace with no tab for a moment before it goes.
+        await mac.upsertWorkspace(linkWorkspace(terminals: []))
+        let empty = await eventually { model.panes.isEmpty }
+        XCTAssertTrue(empty)
+        await mac.removeWorkspace("ws-shellx")
+        let dismissed = await eventually { model.phase == .dismissed }
+
+        XCTAssertTrue(dismissed, "\(model.phase)")
+        XCTAssertTrue(model.lastTabClosedHere, "the screen leaves without 'Workspace closed on the Mac'")
+        XCTAssertEqual(model.shownPaneClosed, 0)
+    }
+
+    func testTheWorkspaceGoingWithATabNotClosedHereIsClosedOnTheMac() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("t1", "t2")), linkWorkspace("web", order: 1, terminals: terminals("w1")),
+        ])
+        let (model, _, _) = try await makeModel(mac)
+
+        // Only one of its two tabs was closed here when the Mac closed the whole workspace.
+        model.closesHere("t1")
+        await mac.removeWorkspace("ws-shellx")
+        let dismissed = await eventually { model.phase == .dismissed }
+
+        XCTAssertTrue(dismissed, "\(model.phase)")
+        XCTAssertFalse(model.lastTabClosedHere)
+    }
+
     // MARK: - The workspace leaves, or has not come
 
     func testClosedWorkspaceDismisses() async throws {
@@ -317,6 +380,7 @@ final class WorkspaceScreenModelTests: XCTestCase {
         await mac.removeWorkspace("ws-shellx")
         let dismissed = await eventually { model.phase == .dismissed }
         XCTAssertTrue(dismissed, "\(model.phase)")
+        XCTAssertFalse(model.lastTabClosedHere, "closed on the Mac: the list says so")
     }
 
     func testDismissedStaysDismissedWhenTheWorkspaceListsAgain() async throws {

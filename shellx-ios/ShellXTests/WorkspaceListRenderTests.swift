@@ -427,6 +427,14 @@ final class WorkspaceListRenderTests: XCTestCase {
         XCTAssertEqual(WorkspaceFeedback.of(.offline, for: .closeAgent, machineID: m), .alert(.offline))
         XCTAssertEqual(WorkspaceFeedback.of(.failed, for: .closeAgent, machineID: m), .alert(.failed))
         XCTAssertEqual(WorkspaceFeedback.of(.unknown, for: .closeAgent, machineID: m), .alert(.unknown))
+        // Closing a tab: the tab (or its workspace) leaves by push; a tab the Mac no longer has says so rather
+        // than refreshing quietly, and a refusal names every rule that can cause it.
+        XCTAssertEqual(WorkspaceFeedback.of(.ok(workspaceId: nil), for: .closeTab, machineID: m), .nothing)
+        XCTAssertEqual(WorkspaceFeedback.of(.notFound, for: .closeTab, machineID: m), .alert(.tabNotClosable))
+        XCTAssertEqual(WorkspaceFeedback.of(.refused, for: .closeTab, machineID: m), .alert(.refusedCloseTab))
+        XCTAssertEqual(WorkspaceFeedback.of(.offline, for: .closeTab, machineID: m), .alert(.offline))
+        XCTAssertEqual(WorkspaceFeedback.of(.failed, for: .closeTab, machineID: m), .alert(.failed))
+        XCTAssertEqual(WorkspaceFeedback.of(.unknown, for: .closeTab, machineID: m), .alert(.unknown))
     }
 
     func testEveryAlertSaysSomethingDifferent() {
