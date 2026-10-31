@@ -66,13 +66,14 @@ public actor FakeMac {
     /// False: the host lists workspaces but takes no control of them (no `workspace_control` feature).
     public nonisolated let acceptsWorkspaceControl: Bool
     /// False: the host takes no `agent.close` (no `agent_close` feature in `welcome`), like a ShellX from
-    /// before it.
+    /// before it. A host that serves no sessions (`servesSessionsAndChat` false) never advertises it either.
     public nonisolated let acceptsAgentClose: Bool
     /// How many times a phone tried to connect, failed attempts included.
     public private(set) var connectCount = 0
 
     private var hostKey: NoiseStaticKey
     private let trusted = TrustedPhones()
+    private let phoneFrames = FrameCounter()
     private let feed = FakeMacFeed()
     private let sessionSource: FakeMacSessions
     private let workspaceSource: FakeMacWorkspaces
@@ -144,6 +145,12 @@ public actor FakeMac {
     /// How many sessions are being served right now.
     public var liveSessionCount: Int { live.count }
 
+    /// How many frames phones have sent to this Mac, handshake and every call included, over all circuits.
+    /// Frames are encrypted, so this does not say what they hold: a test reads it before and after an
+    /// action to show that nothing at all was sent, which `agentCloses` cannot, because a Mac that does
+    /// not advertise `agent_close` has no agent control to count a call.
+    public nonisolated var phoneFrameCount: Int { phoneFrames.count }
+
     /// Opens the Mac's end of a new circuit and serves it; returns the phone's end.
     fileprivate func open(phoneKey: Data) throws -> any RelayCircuit {
         connectCount += 1
@@ -166,7 +173,7 @@ public actor FakeMac {
             await host.serve(macEnd)
             self.ended(id)
         })
-        return phoneEnd
+        return CountingCircuit(phoneEnd, counter: phoneFrames)
     }
 
     private func ended(_ id: UUID) {
@@ -253,6 +260,37 @@ public actor FakeMac {
     /// `releaseChat()`, as when the Mac is slow.
     public func holdChat() { chat.hold() }
     public func releaseChat() { chat.release() }
+}
+
+/// Counts the frames a phone sends; read from any thread.
+private final class FrameCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var frames = 0
+
+    var count: Int { lock.withLock { frames } }
+
+    func add() {
+        lock.withLock { frames += 1 }
+    }
+}
+
+/// The phone's end of a circuit, counting what the phone sends.
+private struct CountingCircuit: RelayCircuit {
+    let inner: any RelayCircuit
+    let counter: FrameCounter
+
+    init(_ inner: any RelayCircuit, counter: FrameCounter) {
+        self.inner = inner
+        self.counter = counter
+    }
+
+    func send(_ data: Data) async throws {
+        counter.add()
+        try await inner.send(data)
+    }
+
+    func receive() async throws -> Data { try await inner.receive() }
+    func close() async { await inner.close() }
 }
 
 /// The phone keys a `FakeMac` trusts; read by `LinkHost` on every handshake, from any thread.

@@ -483,12 +483,23 @@ final class MachineHubWorkspaceTests: XCTestCase {
         let up = await eventually { isOnline(hub) && sessionState(hub, "s1") == .working }
         XCTAssertTrue(up)
 
+        // Such a Mac has no agent control to count a call, and it would answer an `agent.close` with an
+        // `unsupported` error, which the hub also maps to `.failed`: only the frames the phone sent show
+        // that nothing went out.
+        let before = mac.phoneFrameCount
         let closed = await hub.closeAgent(sessionRef(mac))
+        let after = mac.phoneFrameCount
 
-        XCTAssertEqual(closed, .failed, "nothing is sent to a Mac that takes no agent control")
+        XCTAssertEqual(closed, .failed)
+        XCTAssertEqual(after, before, "no frame is sent to a Mac that takes no agent control")
         let calls = await mac.agentCloses
         XCTAssertEqual(calls, [])
         XCTAssertEqual(sessionState(hub, "s1"), .working)
+
+        // The count does see a call that is sent: the Mac does take workspace control.
+        let created = await hub.createWorkspace(machineID: mac.machine.machineID)
+        guard case .ok = created else { return XCTFail("\(created)") }
+        XCTAssertGreaterThan(mac.phoneFrameCount, after)
     }
 
     func testCloseAgentOfflineMacIsOffline() async throws {
