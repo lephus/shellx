@@ -64,6 +64,7 @@ extension ShellXRemoteEnvironment {
             chat: ShellXLinkChatSource(),
             workspaces: workspaces,
             workspaceControl: workspaces,
+            agentControl: workspaces,
             hostVersion: device.appVersion,
             machineName: device.machineName,
             phonePush: .live(feed: feed, core: core))

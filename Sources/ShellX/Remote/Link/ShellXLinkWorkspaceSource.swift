@@ -7,8 +7,9 @@ import os
 import ShellXLinkCore
 import ShellXLinkSession
 
-/// ShellX: ShellX Link's list of this Mac's workspaces (`workspace.list`) and the phone's control of them
-/// (`workspace.create`, `workspace.rename`, `workspace.close`), PROTOCOL.md sections 4 ("Workspace") and 10.
+/// ShellX: ShellX Link's list of this Mac's workspaces (`workspace.list`), the phone's control of them
+/// (`workspace.create`, `workspace.rename`, `workspace.close`), and closing an agent's tab in them (`agent.close`),
+/// PROTOCOL.md sections 4 ("Workspace") and 10.
 ///
 /// * The list is every local workspace of every main window, in sidebar order: window order, then the order
 ///   within the window, numbered from 0 without a gap. SSH, remote tmux and cloud workspaces are not listed
@@ -20,12 +21,15 @@ import ShellXLinkSession
 /// * Control calls go through cmux's mobile paths, which never select the new workspace or bring a window
 ///   forward. They act only on a workspace the list holds, and answer `refused` while a managed policy blocks
 ///   remote control, read on every call.
+/// * `agent.close` closes only the terminal of a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``), and only
+///   while the list shows that terminal in that workspace: never an SSH or remote one, and never the shell a tab
+///   runs once its agent has exited.
 ///
 /// Titles, tab titles and directories are never logged. All state is main-actor isolated, like the windows it
 /// reads; `onTermination` only schedules the removal on the main actor, so it never waits for anything `yield`
 /// holds.
 @MainActor
-final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
+final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentControl {
     typealias Snapshot = @MainActor () -> [LinkWorkspace]
     /// Starts watching what the list shows and calls `onChange` after a change; returns the function that stops.
     typealias ChangeSignal = @MainActor (_ onChange: @escaping @MainActor () -> Void) -> @MainActor () -> Void
@@ -37,6 +41,11 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
         var create: @MainActor @Sendable () async -> V2CallResult
         var rename: @MainActor @Sendable (_ workspaceId: String, _ title: String) -> V2CallResult
         var close: @MainActor @Sendable (_ workspaceId: String) -> V2CallResult
+        /// The workspace and terminal of a live agent session (``ShellXLinkChatSource/isLiveAgent(_:)``); nil for any
+        /// other session, or a live one the Mac has not bound to both.
+        var agentSurface: @MainActor @Sendable (_ sessionId: String) -> (workspaceId: UUID, surfaceId: UUID)?
+        /// Closes that terminal, or its workspace when it is the last one.
+        var closeSurface: @MainActor @Sendable (_ workspaceId: UUID, _ surfaceId: UUID) -> V2CallResult
         /// Whether a configuration profile blocks remote control now.
         var isBlocked: @MainActor @Sendable () -> Bool
 
@@ -51,6 +60,17 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
             // `force`: the phone confirmed already. The Mac still refuses its last or a protected workspace.
             close: { workspaceId in
                 TerminalController.shared.v2MobileWorkspaceClose(params: ["workspace_id": workspaceId, "force": true])
+            },
+            agentSurface: { sessionId in
+                guard let record = TerminalController.shared.agentChatTranscriptService?.sessionRecord(sessionID: sessionId),
+                      ShellXLinkChatSource.isLiveAgent(record),
+                      let workspace = record.workspaceID.flatMap(UUID.init(uuidString:)),
+                      let surface = record.surfaceID.flatMap(UUID.init(uuidString:)) else { return nil }
+                return (workspace, surface)
+            },
+            // Without asking: the phone confirmed already.
+            closeSurface: { workspaceId, surfaceId in
+                TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: workspaceId, surfaceID: surfaceId)
             },
             isBlocked: { MobileRemoteControlPolicy.isDisabled }
         )
@@ -152,6 +172,29 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
         return published?.contains { $0.workspaceId == workspaceId } ?? false
     }
 
+    // MARK: - AgentControl
+
+    /// Closes a live agent's terminal tab (PROTOCOL.md 10, "Agents"), or its workspace when it is the last tab and
+    /// the Mac's Close Tab would close it. Only a tab the list shows in that workspace: the Mac is asked nothing for
+    /// any other session.
+    func closeAgent(sessionId: String) async -> WorkspaceControlOutcome {
+        guard !control.isBlocked() else { return .refused }
+        guard let target = control.agentSurface(sessionId),
+              isListed(target.workspaceId, terminal: target.surfaceId) else { return .notFound }
+        let outcome = Self.outcome(of: control.closeSurface(target.workspaceId, target.surfaceId), action: "close-agent")
+        if outcome == .ok { refresh() }
+        return outcome
+    }
+
+    /// Whether the list shows `terminal` in `workspace`.
+    private func isListed(_ workspace: UUID, terminal: UUID) -> Bool {
+        refresh()
+        let workspaceId = workspace.uuidString, terminalId = terminal.uuidString
+        return published?.contains { listed in
+            listed.workspaceId == workspaceId && listed.terminals.contains { $0.terminalId == terminalId }
+        } ?? false
+    }
+
     /// The title a phone asked for, without control characters or line breaks, trimmed, and cut to
     /// ``maxTitleCharacters`` characters. Format characters such as the joiners of an emoji stay.
     static func sanitizedTitle(_ raw: String) -> String {
@@ -164,13 +207,13 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
     }
 
     /// The protocol's outcome for a cmux mobile call: `not_found` is not found; the Mac's own refusals
-    /// (`protected`, `confirmation_required`) are refused; anything else failed.
+    /// (`protected`, `confirmation_required`, `invalid_state`, `denied`) are refused; anything else failed.
     static func outcome(of result: V2CallResult, action: String) -> WorkspaceControlOutcome {
         guard case let .err(code, _, _) = result else { return .ok }
         switch code {
         case "not_found":
             return .notFound
-        case "protected", "confirmation_required":
+        case "protected", "confirmation_required", "invalid_state", "denied":
             return .refused
         default:
             // The code only: never the message, which may quote a title or a path.

@@ -49,6 +49,59 @@ extension TerminalController {
         ])
     }
 
+    /// ShellX: closes the terminal tab a live agent runs in, for a phone's `agent.close` (ShellX Link). The caller
+    /// has checked that the agent is live and that this workspace lists that terminal. It never asks: the phone
+    /// has asked its user. On the workspace's last tab it closes the workspace when the Mac's Close Tab would
+    /// (``TabManager/closeWorkspaceOnLastSurfacePreferenceEnabled()``), through ``v2MobileWorkspaceClose(params:)``
+    /// and its rules (never a pinned workspace or a window's last one), and is `protected` when that preference
+    /// keeps the workspace open. Like the other mobile paths it neither selects a workspace nor brings a window
+    /// forward.
+    func v2MobileAgentSurfaceClose(workspaceID: UUID, surfaceID: UUID) -> V2CallResult {
+        let routing = ControlRoutingSelectors(
+            hasWindowIDParam: false, windowID: nil, groupID: nil,
+            workspaceID: workspaceID, surfaceID: surfaceID, paneID: nil
+        )
+        let notFound: V2CallResult = .err(
+            code: "not_found",
+            message: String(localized: "devices.host.surfaceNotFound", defaultValue: "Terminal surface not found"),
+            data: nil
+        )
+        let lastSurface: V2CallResult = .err(
+            code: "protected",
+            message: String(localized: "devices.host.lastSurface", defaultValue: "Cannot close the last surface"),
+            data: nil
+        )
+        guard let tabManager = resolveTabManager(routing: routing),
+              let workspace = tabManager.tabs.first(where: { $0.id == workspaceID }) else {
+            return notFound
+        }
+        if workspace.panels[surfaceID] != nil, workspace.panels.count <= 1 {
+            guard tabManager.closeWorkspaceOnLastSurfacePreferenceEnabled() else { return lastSurface }
+            return v2MobileWorkspaceClose(params: ["workspace_id": workspaceID.uuidString, "force": true])
+        }
+        switch controlSurfaceClose(routing: routing, surfaceID: surfaceID, hasSurfaceIDParam: true, force: true) {
+        case .closed:
+            return .ok([
+                "workspace_id": workspaceID.uuidString,
+                "surface_id": surfaceID.uuidString,
+                "closed": true,
+            ])
+        case .surfaceNotFound, .workspaceNotFound, .invalidSurfaceID:
+            return notFound
+        case .lastSurface:
+            // The check above handles the last tab; never close a workspace on this path.
+            return lastSurface
+        case .denied(_, let message):
+            return .err(code: "protected", message: message, data: nil)
+        default:
+            return .err(
+                code: "internal_error",
+                message: String(localized: "devices.host.closeFailed", defaultValue: "Failed to close surface"),
+                data: nil
+            )
+        }
+    }
+
     /// `mobile.terminal.rename {workspace_id?, surface_id, title}`: set the
     /// terminal's custom title; an empty title clears it so the shell's own
     /// title shows again.

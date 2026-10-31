@@ -299,10 +299,11 @@ A `workspace_id` the host does not have is `not_found`, not an `error`. A comman
 blocks remote control. A client does not resend a control call after losing the connection: the host may already
 have acted, so it reads the list again.
 
-`agent.close` closes the terminal tab of a live agent session the host lists in a local workspace, without asking; on
-its workspace's last tab the Mac does what its Close Tab does (by default closes the workspace). `not_found` for an
-unknown, ended or tab-less session. Like a control call it answers with an `outcome`, and a client does not resend it
-after losing the connection: the host may already have acted, so it reads the session list again.
+`agent.close` closes the terminal tab of a live agent session the host lists in a local workspace, without asking. On
+its workspace's last tab the Mac closes the workspace, as its Close Tab does by default; with its "Keep Workspace Open"
+preference on it answers `refused` and closes nothing. `not_found` for an unknown, ended or tab-less session. Like a
+control call it answers with an `outcome`, and a client does not resend it after losing the connection: the host may
+already have acted, so it reads the session list again.
 
 ### ChatEntry
 
@@ -361,7 +362,8 @@ it opens the session again.
 - `kind` (`attach.begin`): `image`, `file`.
 - `outcome` of `workspace.create.result`, `workspace.rename.result`, `workspace.close.result` and
   `agent.close.result`: `ok`, `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as
-  closing a pinned workspace or the last workspace of a window), `failed`.
+  closing a pinned workspace, the last workspace of a window, or an agent's last tab while "Keep Workspace Open" is
+  on), `failed`.
 
 ## 5. Rules
 
@@ -699,7 +701,7 @@ session is bound to (Agents below).
 | `workspace.create` | Makes a workspace on the Mac, in a directory the Mac chooses as when the user adds a workspace there. Its terminal starts the user's default shell when it is first shown (the Mac creates it lazily). Does not change the Mac's selection or bring its window to the front | None named: the call carries only `call_id`, no path, command, program, URL or environment |
 | `workspace.rename` | Sets the workspace's title (at most 512 UTF-8 bytes) | One local workspace in the host's list, by `workspace_id` |
 | `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rules: it refuses to close a pinned workspace or the last workspace of a window, and refuses every control call while device management blocks remote control | One local workspace in the host's list, by `workspace_id` |
-| `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. On the workspace's last tab the Mac does what its Close Tab does (by default closes the workspace). The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
+| `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. On the workspace's last tab it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open" preference on it is `refused` and nothing closes. The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
 | `ping` | None | |
 
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
@@ -795,10 +797,10 @@ three questions a remote command channel must answer, one by one.
   longer alive when the call arrives is answered `not_found` before any terminal is touched, so once the agent
   has exited its terminal, which now runs the user's shell, cannot be closed by a phone. The host closes only
   the terminal that session is bound to, and only while that terminal still exists and still hosts the agent.
-  When that terminal is the last one of its workspace, the Mac does what its Close Tab does: by default it
-  closes the workspace, and with its "Keep Workspace Open" preference on it answers `refused` and closes
-  nothing. The Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a
-  window): the answer is `refused`.
+  When that terminal is the last one of its workspace, the Mac closes the workspace, as its Close Tab does by
+  default; with its "Keep Workspace Open" preference on it answers `refused` and closes nothing. The Mac's
+  rules for closing a workspace still hold (a pinned workspace, the last workspace of a window): the answer is
+  `refused`.
 - Does it read state the phone has no business seeing? No. The answer is an `outcome` and nothing else.
 
 More rules: a Mac whose device management (MDM) blocks remote control does not run a Link host at all, and a

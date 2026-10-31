@@ -222,15 +222,22 @@ final class ShellXLinkChatSource: AgentChatSource {
         return (service, record)
     }
 
-    /// Whether a phone's text or interrupt may go to `sessionId` (PROTOCOL.md section 10): a Claude Code session
-    /// that has not ended and whose agent process the Mac knows by pid and finds alive. The send path then types
-    /// into the terminal the agent ran in; once the agent is gone that terminal runs the user's shell (or whatever
-    /// started next), so text must never reach it. Stricter than the mobile path, which trusts a binding without
-    /// a pid: a session whose pid the Mac has not learned yet is `not_found` here until a hook names it.
+    /// Whether a phone's text or interrupt may go to `sessionId` (PROTOCOL.md section 10): ``isLiveAgent(_:)``.
     private func hasLiveAgent(_ sessionId: String) -> Bool {
-        guard let record = linkRecord(sessionId)?.record, let pid = record.pid else { return false }
+        guard let record = linkRecord(sessionId)?.record else { return false }
+        return Self.isLiveAgent(record)
+    }
+
+    /// Whether a phone may act on `record`'s terminal (PROTOCOL.md section 10, "Shell fall-through"): a Claude
+    /// Code agent session that has not ended and whose agent process the Mac knows by pid and finds alive. Sending,
+    /// interrupting and closing act on the terminal the agent ran in; once the agent is gone that terminal runs the
+    /// user's shell (or whatever started next), so a phone must never reach it. Stricter than the mobile path, which
+    /// trusts a binding without a pid: a session whose pid the Mac has not learned yet is not live here until a hook
+    /// names it. Shared with ``ShellXLinkWorkspaceSource``'s `agent.close`.
+    static func isLiveAgent(_ record: AgentChatSessionRecord) -> Bool {
+        guard record.agentKind == .claude, record.descriptor.kind == .agent, let pid = record.pid else { return false }
         if case .ended = record.state { return false }
-        return Self.processIsAlive(pid)
+        return processIsAlive(pid)
     }
 
     /// `kill(pid, 0)`: the process exists (EPERM: it exists under another user).
