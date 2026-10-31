@@ -213,6 +213,18 @@ Luật này dùng cho **mọi danh sách phiên** trên điện thoại: ba nhó
   `workspace.list`; không bao giờ là workspace SSH/từ xa. Cập nhật PROTOCOL.md §10 như 6.5.
 - Mac chưa có `terminal_close`: không hiện "Đóng tab…" ở đâu cả.
 
+### 6.7 Viền nhiều màu khi agent chờ bạn trả lời (thêm 2026-10-31)
+
+- **Khi nào** **[người dùng]**: chỉ khi agent đang chờ người dùng trả lời (phiên `needsInput`: hỏi quyền, hỏi
+  câu hỏi). Không áp cho đang chạy, xong hay nhàn rỗi.
+- **Ở đâu** **[người dùng: "cả Mac và iPhone"]**:
+  - Mac: dòng tab của agent trong sidebar dọc (cùng chỗ có hiệu ứng tên khi agent chạy);
+  - iPhone: thẻ trong nhóm "Cần bạn" ở màn chính, và chip tab của agent đó trong màn workspace.
+- **Kiểu** **[người dùng chọn "viền mảnh chạy vòng quanh"]**: viền ~2 pt nhiều màu (xanh `#60a5fa` → tím
+  `#a78bfa` → hồng `#f472b6` → hổ phách `#fbbf24` → xanh) chạy vòng quanh tab/thẻ, mỗi vòng ~3 giây, không che
+  chữ. Bật "Giảm chuyển động" thì viền đứng yên (vẫn nhiều màu).
+- Ngoại lệ có chủ đích với ghi nhớ "không gradient": người dùng chọn rõ viền nhiều màu cho trạng thái cần chú ý.
+
 ## 7. Kiểm thử và dogfood
 
 - **ShellXAppCore**: test cho phần chia nhóm (đầu vào: phiên, yêu cầu đang chờ, `finishedSessionIds`,
