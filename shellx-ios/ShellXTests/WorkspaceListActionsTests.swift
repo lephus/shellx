@@ -346,7 +346,13 @@ final class WorkspaceListActionsTests: XCTestCase {
 
         XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [modern.machine.machineID])
 
-        await rig.hub.stopAll()
+        // The modern Mac goes away and does not come back.
+        let id = modern.machine.machineID
+        await modern.failNextConnects(URLError(.notConnectedToInternet), count: 1000)
+        await modern.dropLiveSessions()
+        let away = await eventually { rig.hub.machines.first { $0.id == id }?.state != .online }
+        XCTAssertTrue(away)
+        XCTAssertTrue(rig.hub.supportsAgentClose(id), "it took agent.close when it was last online")
         XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [], "no Close while the Mac is away")
     }
 

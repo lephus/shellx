@@ -19,6 +19,78 @@
         }
       }
     },
+    "agent.close": {
+      "comment": "Swipe action on an agent's card, and the confirm button: close the agent's terminal tab on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng"
+          }
+        }
+      }
+    },
+    "agent.close.confirm": {
+      "comment": "Message of the confirmation before closing an agent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its terminal tab on the Mac will be closed. If it is the workspace's last tab, the workspace closes too."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab terminal của agent trên Mac sẽ bị đóng. Nếu đó là tab cuối của workspace, workspace cũng đóng theo."
+          }
+        }
+      }
+    },
+    "agent.close.menu": {
+      "comment": "Item of the ••• menu on an agent screen and on a workspace screen (shown red): close the agent's terminal tab on the Mac; it asks to confirm first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close Agent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng agent"
+          }
+        }
+      }
+    },
+    "agent.close.title %@": {
+      "comment": "Title of the confirmation before closing an agent; the argument is the agent's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close %@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng agent %@?"
+          }
+        }
+      }
+    },
     "agent.cut": {
       "comment": "Under a chat entry the Mac cut short.",
       "extractionState": "manual",
@@ -177,6 +249,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Phiên này không còn trên Mac"
+          }
+        }
+      }
+    },
+    "agent.menu": {
+      "comment": "The ••• button on an agent screen: spoken label (VoiceOver); it opens Close Agent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent actions"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tác vụ agent"
           }
         }
       }
@@ -3790,6 +3880,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Xem và gõ terminal có ở bản sau"
+          }
+        }
+      }
+    },
+    "workspaces.alert.agentNotClosable": {
+      "comment": "Alert: the Mac could not close an agent because it has no terminal tab on the Mac, or it has stopped already.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac can't close this agent: it has no terminal tab there, or it has already stopped."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không đóng được agent này: nó không có tab terminal trên Mac, hoặc đã dừng."
           }
         }
       }

@@ -41,6 +41,7 @@ struct WorkspaceView: View {
                 WorkspaceScreen(
                     title: model.workspace?.title ?? "", branch: model.workspace?.branch, panes: model.panes,
                     selected: model.selectedTerminalId, canControl: model.canControl,
+                    closableAgent: Self.closableAgent(model, hub: scope.hub),
                     pagingLocked: voiceService?.isListening ?? false, notice: notice,
                     actions: WorkspaceScreenActions.make(
                         scope: scope, model: model,
@@ -94,6 +95,17 @@ struct WorkspaceView: View {
         dismiss()
     }
 
+    /// The chip shown, when it runs an agent the phone may close (`WorkspaceListActions.canClose`): one
+    /// whose session has not ended, on a Mac that lists `agent_close`. Nil for a shell.
+    static func closableAgent(_ model: WorkspaceScreenModel, hub: MachineHub) -> WorkspacePane? {
+        let panes = model.panes
+        let shown = model.selectedTerminalId ?? panes.first?.id
+        guard let pane = panes.first(where: { $0.id == shown }), let session = pane.session,
+            WorkspaceListActions.canClose(session, hub: hub)
+        else { return nil }
+        return pane
+    }
+
     /// What the screen says when the pane shown was closed on the Mac and the next chip shows.
     static var paneClosedNotice: String { String(localized: "workspace.paneClosedOnMac") }
 
@@ -138,6 +150,11 @@ extension WorkspaceScreenActions {
             close: {
                 closing()
                 run(.close) { await hub.closeWorkspace(ref) }
+            },
+            closeAgent: { session in
+                // Not `closing`: the workspace stays unless the agent's tab was its last, and then the list
+                // says it closed on the Mac.
+                WorkspaceListActions.closeAgent(session, hub: hub, alert: alert, done: done)
             })
     }
 }

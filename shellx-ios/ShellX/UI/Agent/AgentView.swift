@@ -7,6 +7,10 @@ import SwiftUI
 /// bar of the session's workspace). The model follows the hub while the screen is shown and writes
 /// its chat copy when the screen goes or the app leaves the foreground.
 ///
+/// Standalone, its `•••` offers "Close Agent" while the session has not ended and its Mac takes
+/// `agent.close`; the close goes through `WorkspaceListActions.closeAgent`, and an alert says why one did
+/// not work.
+///
 /// The composer offers attachments when the session's Mac takes them, or while some wait in it. A
 /// message with attachments stays in the composer, locked, until the Mac answers; what went is
 /// cleared unless the result keeps it (`ComposerDraft`, `AgentSendResult.keepsDraft`).
@@ -20,6 +24,8 @@ struct AgentView: View {
     @State private var model: AgentThreadModel
     @State private var composer = ComposerDraft()
     @State private var notice: AgentScreen.Notice?
+    /// Why the last Close Agent did not work.
+    @State private var alert: WorkspaceAlert?
     @Environment(\.scenePhase) private var scenePhase
 
     /// How long a notice over the composer stays.
@@ -57,6 +63,10 @@ struct AgentView: View {
             attachments: hub.acceptsAttachments(model.ref.machineID) || !composer.attachments.isEmpty
                 ? $composer.attachments : nil,
             sending: composer.isSending ? (model.uploadProgress ?? 0) : nil,
+            // Embedded, the workspace screen's `•••` offers it.
+            closeAgentName: embedded
+                ? nil
+                : session.flatMap { WorkspaceListActions.canClose($0, hub: hub) ? SessionName.base(of: $0.session) : nil },
             actions: AgentScreen.Actions(
                 send: { send($0, attachments: $1, viaVoice: false) },
                 sendVoice: { send($0, attachments: [], viaVoice: true) },
@@ -64,8 +74,10 @@ struct AgentView: View {
                 forceStop: { stop(hard: true) },
                 loadOlder: { Task { await model.loadOlder() } },
                 retry: { Task { await model.retry() } },
-                seeAllPending: { openPending() })
+                seeAllPending: { openPending() },
+                closeAgent: { WorkspaceListActions.closeAgent(model.ref, hub: hub, alert: { alert = $0 }) })
         )
+        .workspaceAlert($alert)
         .task { await model.run() }
         .task(id: notice?.id) {
             guard notice != nil else { return }

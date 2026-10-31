@@ -9,26 +9,41 @@ struct WorkspaceScreenActions {
     var rename: (String) -> Void = { _ in }
     /// Confirmed: close the workspace and its terminals.
     var close: () -> Void = {}
+    /// Confirmed: close the terminal tab the agent runs in on the Mac.
+    var closeAgent: (SessionRef) -> Void = { _ in }
 }
 
-/// What `•••` offers. Closing a single pane waits for the terminal version.
+/// What `•••` offers. Closing a shell's pane waits for the terminal version.
 enum WorkspaceMenuItem: CaseIterable {
     case rename
+    /// The agent of the chip shown; it asks to confirm first.
+    case closeAgent
     case closeWorkspace
+
+    /// The items in the menu's order; "Close Agent" only while the chip shown runs a live agent its Mac can
+    /// close (`WorkspaceView.closableAgent`).
+    static func items(canCloseAgent: Bool) -> [WorkspaceMenuItem] {
+        allCases.filter { $0 != .closeAgent || canCloseAgent }
+    }
 
     var title: String {
         switch self {
         case .rename: String(localized: "workspace.menu.rename")
+        case .closeAgent: String(localized: "agent.close.menu")
         case .closeWorkspace: String(localized: "workspace.menu.close")
         }
     }
+
+    /// Shown red, apart from Rename.
+    var isDestructive: Bool { self != .rename }
 }
 
 /// One workspace's screen, from plain values so render tests can show any state; `WorkspaceView` feeds
 /// it from the hub.
 ///
 /// - Bar: "‹ Workspace" (the system's back button), the workspace's name over its git branch in
-///   monospace, and `•••` with "Rename Workspace" and "Close Workspace…" (red; it asks first).
+///   monospace, and `•••` with "Rename Workspace", then, in red and each asking first, "Close Agent" while
+///   the chip shown runs a live agent the Mac can close (`closableAgent`), and "Close Workspace…".
 /// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted.
 /// - Below, one page per chip, swiped sideways like the chips are tapped: a chip that runs an agent
 ///   shows the agent's chat (`agent`: the existing agent screen as a pane); any other shows
@@ -45,6 +60,9 @@ struct WorkspaceScreen<AgentPane: View>: View {
     var now = Date()
     /// Rename and close reach the Mac: it is online and takes them.
     var canControl = true
+    /// The chip shown, when it runs a live agent its Mac can close (`WorkspaceView.closableAgent`): `•••`
+    /// offers "Close Agent".
+    var closableAgent: WorkspacePane?
     /// A mic is listening: the pages do not follow a sideways drag, so a drag to the left on the mic (its
     /// cancel) never turns the page instead.
     var pagingLocked = false
@@ -58,6 +76,7 @@ struct WorkspaceScreen<AgentPane: View>: View {
 
     @State private var renaming = false
     @State private var closing = false
+    @State private var closingAgent: WorkspacePane?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -94,6 +113,9 @@ struct WorkspaceScreen<AgentPane: View>: View {
         } message: {
             Text(LocalizedStringResource("workspaces.close.confirm"))
         }
+        .agentCloseConfirmation($closingAgent, name: { PaneChips.label(for: $0) }) { pane in
+            if let ref = pane.session?.ref { actions.closeAgent(ref) }
+        }
         .workspaceAlert($alert)
     }
 
@@ -119,15 +141,27 @@ struct WorkspaceScreen<AgentPane: View>: View {
     }
 
     private var menu: some View {
-        Menu {
-            Button(WorkspaceMenuItem.rename.title) { renaming = true }
+        let items = WorkspaceMenuItem.items(canCloseAgent: closableAgent != nil)
+        return Menu {
+            ForEach(items.filter { !$0.isDestructive }, id: \.self, content: menuButton)
+            // The red items, which ask first, in a group of their own (HIG: Menus).
             Divider()
-            Button(WorkspaceMenuItem.closeWorkspace.title, role: .destructive) { closing = true }
+            ForEach(items.filter(\.isDestructive), id: \.self, content: menuButton)
         } label: {
             Label(String(localized: "workspace.menu"), systemImage: "ellipsis.circle")
         }
         .disabled(!canControl)
         .accessibilityIdentifier("workspace.menu")
+    }
+
+    private func menuButton(_ item: WorkspaceMenuItem) -> some View {
+        Button(item.title, role: item.isDestructive ? .destructive : nil) {
+            switch item {
+            case .rename: renaming = true
+            case .closeAgent: closingAgent = closableAgent
+            case .closeWorkspace: closing = true
+            }
+        }
     }
 
     // MARK: - Pages

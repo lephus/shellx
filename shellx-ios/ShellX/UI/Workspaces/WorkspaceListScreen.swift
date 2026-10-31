@@ -58,7 +58,7 @@ struct WorkspaceGroup: Identifiable, Equatable {
 ///   of the online Macs when there are several) and Settings.
 /// - "Needs you · N", "Running · N" and "Just finished · N": a `FocusRowView` card per session, each
 ///   group only while it has some; "No agent is running" when all three are empty. A card opens its
-///   session.
+///   session; swipe it to the left for Close (Macs in `closableMachines`), which asks first.
 /// - "Workspaces": one group per Mac, the default Mac first: its header (opens "Your Macs"), then a
 ///   one-line card per workspace in the Mac's order, then "Agents outside workspaces · N" when some
 ///   live sessions have no card. A Mac that cannot list workspaces says so in a card; an offline one
@@ -76,6 +76,8 @@ struct WorkspaceListScreen: View {
         var rename: (WorkspaceRef, String) -> Void = { _, _ in }
         /// Confirmed: close the workspace and its terminals.
         var close: (WorkspaceRef) -> Void = { _ in }
+        /// Confirmed: close the terminal tab the agent runs in on its Mac.
+        var closeAgent: (SessionRef) -> Void = { _ in }
         var openPending: () -> Void = {}
         var openSettings: () -> Void = {}
         var openMachines: () -> Void = {}
@@ -99,12 +101,16 @@ struct WorkspaceListScreen: View {
     var now = Date()
     /// Two or more Macs are paired: the agent cards name their Mac.
     var showsMachineNames = false
+    /// The Macs that close an agent for the phone now (`WorkspaceListView.closableMachines`): their agent
+    /// cards swipe to Close.
+    var closableMachines: Set<String> = []
     var actions = Actions()
     /// Why the last command did not work; the screen shows it until it is dismissed.
     @Binding var alert: WorkspaceAlert?
 
     @State private var renaming: WorkspaceRow?
     @State private var closing: WorkspaceRow?
+    @State private var closingAgent: FocusItem?
 
     var body: some View {
         // Titles and Mac headers are rows, not section headers: a plain list's headers stick and keep a
@@ -165,6 +171,7 @@ struct WorkspaceListScreen: View {
         } message: { _ in
             Text(LocalizedStringResource("workspaces.close.confirm"))
         }
+        .agentCloseConfirmation($closingAgent, name: \.name) { actions.closeAgent($0.id) }
         .workspaceAlert($alert)
     }
 
@@ -258,6 +265,18 @@ struct WorkspaceListScreen: View {
                 .listRowInsets(Self.cardInsets)
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if closableMachines.contains(item.session.machineID), item.session.session.state != .ended {
+                        // Not `.destructive`: that role lets iOS animate the row away before the
+                        // confirmation the button only opens.
+                        Button {
+                            closingAgent = item
+                        } label: {
+                            Label(String(localized: "agent.close"), systemImage: "xmark")
+                        }
+                        .tint(Color("StatusError"))
+                    }
+                }
             }
         }
     }

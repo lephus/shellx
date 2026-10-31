@@ -4,9 +4,10 @@ import SwiftUI
 /// One agent's screen, from plain values so render tests can show any state; `AgentView` feeds it
 /// from `AgentThreadModel`, the hub and the decision center.
 ///
-/// - Navigation bar: the workspace, and "Stop" while the session works or waits for the user. Embedded
-///   as a workspace screen's pane (`embedded`) it has no navigation bar of its own: the screen around
-///   it has one, and "Stop" sits at the end of the header.
+/// - Navigation bar: the workspace, "Stop" while the session works or waits for the user, and `•••` with
+///   "Close Agent" (red; it asks first) while the agent can be closed (`closeAgentName`). Embedded as a
+///   workspace screen's pane (`embedded`) it has no navigation bar of its own: the screen around it has
+///   one, with "Close Agent" in its `•••`, and "Stop" sits at the end of the header.
 /// - Top, pinned: the header ("Claude Code · Mac", state) and, while this workspace has pending
 ///   requests, the "Needs you · N" bar that opens them on their own page.
 /// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries. It follows
@@ -28,6 +29,8 @@ struct AgentScreen: View {
         var retry: () -> Void = {}
         /// The "Needs you" bar: this workspace's pending cards.
         var seeAllPending: () -> Void = {}
+        /// Close Agent, once confirmed: closes the terminal tab the agent runs in on its Mac.
+        var closeAgent: () -> Void = {}
     }
 
     /// Where the chat's bottom sentinel sits, to scroll to.
@@ -65,9 +68,14 @@ struct AgentScreen: View {
     var attachments: Binding<[OutgoingAttachment]>? = nil
     /// How far the attachments of the message being sent got; not nil locks the composer.
     var sending: Double? = nil
+    /// The agent's name, for "Close <name>?", while `•••` offers "Close Agent": the session has not ended and
+    /// its Mac takes `agent.close` (`WorkspaceListActions.canClose`). Nil shows no `•••`; standalone only.
+    var closeAgentName: String? = nil
     var actions = Actions()
 
     @State private var confirmsForceStop = false
+    /// The name in the Close Agent confirmation while it is up.
+    @State private var closing: String?
     @State private var follow = ChatFollow()
     /// The first entry when older ones were asked for: the chat stays on it when they arrive.
     @State private var olderAnchor: String?
@@ -82,7 +90,10 @@ struct AgentScreen: View {
         .modifier(
             NavigationChrome(
                 enabled: !embedded, title: ref.workspaceTitle,
-                stop: canStop ? StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true }) : nil)
+                stop: canStop ? StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true }) : nil,
+                menu: closeAgentName.map { name in
+                    AgentMenu(enabled: !offline, closeAgent: { closing = name })
+                })
         )
         .confirmationDialog(
             Text(verbatim: String(localized: "agent.forceStop.title \(agent) \(ref.workspaceTitle)")),
@@ -93,6 +104,7 @@ struct AgentScreen: View {
         } message: {
             Text(LocalizedStringResource("agent.forceStop.message"))
         }
+        .agentCloseConfirmation($closing, name: { $0 }) { _ in actions.closeAgent() }
     }
 
     // MARK: - Top
@@ -279,12 +291,14 @@ struct AgentScreen: View {
     }
 }
 
-/// The agent screen's navigation title and, while it can be stopped, "Stop" in the toolbar: all of it
-/// off when the screen is a pane of the workspace screen, which has its own bar.
+/// The agent screen's navigation title and, while it can be stopped, "Stop" in the toolbar, then `•••`
+/// while the agent can be closed: all of it off when the screen is a pane of the workspace screen, which
+/// has its own bar.
 private struct NavigationChrome: ViewModifier {
     let enabled: Bool
     let title: String
     let stop: StopButton?
+    let menu: AgentMenu?
 
     func body(content: Content) -> some View {
         if enabled {
@@ -295,9 +309,31 @@ private struct NavigationChrome: ViewModifier {
                     if let stop {
                         ToolbarItem(placement: .topBarTrailing) { stop }
                     }
+                    if let menu {
+                        ToolbarItem(placement: .topBarTrailing) { menu }
+                    }
                 }
         } else {
             content
         }
+    }
+}
+
+/// `•••` in the agent screen's toolbar: "Close Agent", red, which asks to confirm first (the owner presents
+/// the confirmation; HIG: Pull-down buttons). Off while the Mac is not online.
+private struct AgentMenu: View {
+    let enabled: Bool
+    let closeAgent: () -> Void
+
+    var body: some View {
+        Menu {
+            Button(role: .destructive, action: closeAgent) {
+                Label(String(localized: "agent.close.menu"), systemImage: "xmark")
+            }
+        } label: {
+            Label(String(localized: "agent.menu"), systemImage: "ellipsis.circle")
+        }
+        .disabled(!enabled)
+        .accessibilityIdentifier("agent.menu")
     }
 }
