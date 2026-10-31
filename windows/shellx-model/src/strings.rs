@@ -1,4 +1,5 @@
-//! UI strings: Vietnamese by default, English via `SHELLX_LANG=en`.
+//! UI strings: they follow the Windows display language (Vietnamese on a
+//! Vietnamese Windows, English otherwise); `SHELLX_LANG=en|vi` overrides it.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lang {
@@ -7,18 +8,25 @@ pub enum Lang {
 }
 
 impl Lang {
-    /// `en`, `EN`, `en-US` (any value starting with "en", case-insensitive) select English;
-    /// everything else, including no value, selects Vietnamese.
-    pub fn from_env_value(v: Option<&str>) -> Lang {
-        match v {
-            Some(s) if s.trim().to_ascii_lowercase().starts_with("en") => Lang::En,
-            _ => Lang::Vi,
+    /// `env` is `SHELLX_LANG`, `ui_lang_id` the Windows display language
+    /// (`os_info::ui_language_id`, a LANGID). A value starting with `vi` or
+    /// `en` (trimmed, case-insensitive) wins; anything else leaves it to
+    /// Windows, whose primary language 0x2A is Vietnamese and every other (or
+    /// an unreadable one) English.
+    pub fn from_system(env: Option<&str>, ui_lang_id: Option<u16>) -> Lang {
+        if let Some(v) = env {
+            let v = v.trim().to_ascii_lowercase();
+            if v.starts_with("vi") {
+                return Lang::Vi;
+            }
+            if v.starts_with("en") {
+                return Lang::En;
+            }
         }
-    }
-
-    /// Reads `SHELLX_LANG`.
-    pub fn from_env() -> Lang {
-        Lang::from_env_value(std::env::var("SHELLX_LANG").ok().as_deref())
+        match ui_lang_id {
+            Some(id) if id & 0x3ff == 0x2a => Lang::Vi,
+            _ => Lang::En,
+        }
     }
 }
 
@@ -196,14 +204,14 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
     match lang {
         Lang::Vi => match key {
             Str::AppName => "ShellX",
-            Str::MachinesHeader => "MÁY CỦA BẠN",
+            Str::MachinesHeader => "Máy của bạn",
             Str::ThisMachine => "máy này",
             Str::Offline => "ngoại tuyến",
             Str::Online => "trực tuyến",
             Str::Connecting => "đang kết nối…",
             Str::Reconnecting => "đang kết nối lại…",
             Str::E2eFooter => "Mã hoá đầu cuối · relay.shellx.pro",
-            Str::SearchPlaceholder => "Tìm phiên, máy, lệnh… Ctrl+K",
+            Str::SearchPlaceholder => "Tìm phiên, máy, lệnh…",
             Str::Login => "Đăng nhập",
             Str::Logout => "Đăng xuất",
             Str::Email => "Email",
@@ -249,7 +257,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Account => "Tài khoản",
             Str::Updates => "Cập nhật",
             Str::Language => "Ngôn ngữ",
-            Str::LanguageHint => "đặt SHELLX_LANG=en để dùng tiếng Anh",
+            Str::LanguageHint => "Theo ngôn ngữ hiển thị của Windows",
             Str::LanguageName => "Tiếng Việt",
             Str::CheckUpdate => "Kiểm tra cập nhật",
             Str::Checking => "Đang kiểm tra…",
@@ -276,13 +284,13 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
         Lang::En => match key {
             Str::AppName => "ShellX",
             Str::MachinesHeader => "YOUR MACHINES",
-            Str::ThisMachine => "this machine",
+            Str::ThisMachine => "this PC",
             Str::Offline => "offline",
             Str::Online => "online",
             Str::Connecting => "connecting…",
             Str::Reconnecting => "reconnecting…",
             Str::E2eFooter => "End-to-end encrypted · relay.shellx.pro",
-            Str::SearchPlaceholder => "Search sessions, machines, commands… Ctrl+K",
+            Str::SearchPlaceholder => "Search sessions, machines, commands…",
             Str::Login => "Sign in",
             Str::Logout => "Sign out",
             Str::Email => "Email",
@@ -328,7 +336,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Account => "Account",
             Str::Updates => "Updates",
             Str::Language => "Language",
-            Str::LanguageHint => "set SHELLX_LANG=vi for Vietnamese",
+            Str::LanguageHint => "Follows the Windows display language",
             Str::LanguageName => "English",
             Str::CheckUpdate => "Check for updates",
             Str::Checking => "Checking…",
@@ -460,7 +468,7 @@ mod tests {
 
     #[test]
     fn exact_vi_strings() {
-        assert_eq!(t(Lang::Vi, Str::MachinesHeader), "MÁY CỦA BẠN");
+        assert_eq!(t(Lang::Vi, Str::MachinesHeader), "Máy của bạn");
         assert_eq!(t(Lang::Vi, Str::Reconnecting), "đang kết nối lại…");
         assert_eq!(
             t(Lang::Vi, Str::E2eFooter),
@@ -472,6 +480,21 @@ mod tests {
         assert_eq!(t(Lang::Vi, Str::StatusError), "lỗi");
         assert_eq!(t(Lang::En, Str::MachinesHeader), "YOUR MACHINES");
         assert_eq!(t(Lang::En, Str::StatusWaiting), "waiting");
+        assert_eq!(t(Lang::En, Str::ThisMachine), "this PC");
+        assert_eq!(t(Lang::Vi, Str::ThisMachine), "máy này");
+        assert_eq!(t(Lang::Vi, Str::SearchPlaceholder), "Tìm phiên, máy, lệnh…");
+        assert_eq!(
+            t(Lang::En, Str::SearchPlaceholder),
+            "Search sessions, machines, commands…"
+        );
+        assert_eq!(
+            t(Lang::Vi, Str::LanguageHint),
+            "Theo ngôn ngữ hiển thị của Windows"
+        );
+        assert_eq!(
+            t(Lang::En, Str::LanguageHint),
+            "Follows the Windows display language"
+        );
         assert_eq!(t(Lang::Vi, Str::IconCredits), t(Lang::En, Str::IconCredits));
         assert_eq!(
             t(Lang::Vi, Str::ShellExitsAtStart),
@@ -501,14 +524,21 @@ mod tests {
     }
 
     #[test]
-    fn env_parsing() {
-        assert_eq!(Lang::from_env_value(Some("en")), Lang::En);
-        assert_eq!(Lang::from_env_value(Some("EN")), Lang::En);
-        assert_eq!(Lang::from_env_value(Some("en-US")), Lang::En);
-        assert_eq!(Lang::from_env_value(Some("vi")), Lang::Vi);
-        assert_eq!(Lang::from_env_value(Some("fr")), Lang::Vi);
-        assert_eq!(Lang::from_env_value(Some("")), Lang::Vi);
-        assert_eq!(Lang::from_env_value(None), Lang::Vi);
+    fn language_follows_windows_unless_overridden() {
+        // No override: the Windows display language decides (0x2A = Vietnamese).
+        assert_eq!(Lang::from_system(None, Some(0x042A)), Lang::Vi);
+        assert_eq!(Lang::from_system(None, Some(0x0409)), Lang::En);
+        assert_eq!(Lang::from_system(None, None), Lang::En);
+        // SHELLX_LANG starting with en or vi wins either way.
+        assert_eq!(Lang::from_system(Some("en"), Some(0x042A)), Lang::En);
+        assert_eq!(Lang::from_system(Some("EN-us"), Some(0x042A)), Lang::En);
+        assert_eq!(Lang::from_system(Some(" vi "), Some(0x0409)), Lang::Vi);
+        assert_eq!(Lang::from_system(Some("vi"), Some(0x0409)), Lang::Vi);
+        assert_eq!(Lang::from_system(Some("vi"), None), Lang::Vi);
+        // Anything else is ignored.
+        assert_eq!(Lang::from_system(Some(""), Some(0x042A)), Lang::Vi);
+        assert_eq!(Lang::from_system(Some("fr"), Some(0x0409)), Lang::En);
+        assert_eq!(Lang::from_system(Some("fr"), Some(0x042A)), Lang::Vi);
     }
 
     #[test]

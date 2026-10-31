@@ -73,7 +73,7 @@ Environment variables:
 
 | Variable | Effect |
 |---|---|
-| `SHELLX_LANG=en` | English UI strings (any value starting with `en`); anything else or unset is Vietnamese |
+| `SHELLX_LANG` | Overrides the UI language: a value starting with `en` is English, one starting with `vi` is Vietnamese. Anything else or unset follows the Windows display language (Vietnamese on a Vietnamese Windows, English otherwise, and English on a Mac) |
 | `SHELLX_SHELL` | Program to start in new local panes instead of `powershell.exe -NoLogo` (no arguments) |
 | `SHELLX_API_BASE` | API base URL for `config.set`; honored in debug builds only. Release builds always use `https://relay.shellx.pro` |
 

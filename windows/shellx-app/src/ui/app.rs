@@ -15,6 +15,7 @@ use super::assets::Assets;
 use super::root::RootView;
 use crate::core_service::{ConfiguredCore, MachineFacts};
 use crate::fonts;
+use crate::os_info;
 use crate::shell_info::BASE_TITLE;
 
 /// App-wide services the views read with `cx.global::<Services>()`.
@@ -37,7 +38,10 @@ pub fn run() {
             eprintln!("failed to register the embedded fonts: {error:#}");
         }
         cx.set_global(Services {
-            lang: Lang::from_env(),
+            lang: Lang::from_system(
+                std::env::var("SHELLX_LANG").ok().as_deref(),
+                os_info::ui_language_id(),
+            ),
             core: Arc::new(ConfiguredCore::this_pc(MachineFacts::this_pc())),
         });
 

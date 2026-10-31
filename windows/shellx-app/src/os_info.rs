@@ -57,6 +57,20 @@ pub fn utc_offset_secs() -> i32 {
     }
 }
 
+/// The Windows display language as a LANGID (`GetUserDefaultUILanguage`,
+/// 0x042A for vi-VN); `None` off Windows. `Lang::from_system` reads it.
+pub fn ui_language_id() -> Option<u16> {
+    #[cfg(windows)]
+    {
+        // SAFETY: takes no arguments and returns the id by value.
+        Some(unsafe { windows_sys::Win32::Globalization::GetUserDefaultUILanguage() })
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
 /// Whether a screen reader (Narrator, NVDA, JAWS) says it is running
 /// (`SPI_GETSCREENREADER`; Narrator sets it while it runs). False off Windows
 /// or when the query fails.
@@ -116,6 +130,15 @@ mod tests {
         assert_eq!(device_name_from(None), "PC Windows");
         assert_eq!(device_name_from(Some("  ".into())), "PC Windows");
         assert_eq!(device_name_from(Some("DESKTOP-1".into())), "DESKTOP-1");
+    }
+
+    #[test]
+    fn ui_language_id_is_known_only_on_windows() {
+        if cfg!(not(windows)) {
+            assert_eq!(ui_language_id(), None);
+        } else {
+            assert!(ui_language_id().is_some_and(|id| id != 0));
+        }
     }
 
     #[test]
