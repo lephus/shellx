@@ -159,4 +159,21 @@ extension AgentChatSessionRegistryLifecycleTests {
         #expect(registry.noteTranscriptInterrupt(sessionID: working, at: Self.time(102)) == false)
         #expect(registry.record(sessionID: working)?.state == .working(since: Self.time(103)))
     }
+
+    @MainActor
+    @Test("A transcript interrupt marker older than the session's latest hook settles nothing")
+    func transcriptInterruptMarkerBeforeALaterHookKeepsTheTurn() throws {
+        let registry = AgentChatSessionRegistry()
+        let sessionID = "marker-before-prompt"
+        let surfaceID = UUID().uuidString
+        Self.hook(registry, sessionID, .userPromptSubmit, surface: surfaceID, at: 101)
+        // A prompt sent while working keeps the turn's start time, but is activity after the marker.
+        Self.hook(registry, sessionID, .userPromptSubmit, surface: surfaceID, at: 103)
+
+        #expect(registry.noteTranscriptInterrupt(sessionID: sessionID, at: Self.time(102)) == false)
+
+        let record = try #require(registry.record(sessionID: sessionID))
+        #expect(record.state == .working(since: Self.time(101)))
+        #expect(record.lastActivityAt == Self.time(103))
+    }
 }

@@ -431,6 +431,12 @@ struct WorkspaceProgramStatusTests {
                     await Self.waitUntil { service.sessionRecord(sessionID: session)?.state == .idle },
                     "Esc during \(tool) left the chat session \(String(describing: service.sessionRecord(sessionID: session)?.state))"
                 )
+                // The row stays as it is: Subagents or Waiting can also be a turn that ended with background
+                // work still live, which the edge cannot tell apart from an Esc. The next hook settles it.
+                #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .running)
+                let row = workspace.agentStatusEntriesByPanelId[panelId]?["claude_code"]
+                #expect(row?.value == "Busy")
+                #expect(row?.workState == workState)
             }
         }
     }
@@ -505,8 +511,107 @@ struct WorkspaceProgramStatusTests {
         }
     }
 
+    /// A permission prompt that still waits keeps Claude's record blocked: nothing ends, so even with no grace
+    /// the pane's Needs input row, the waiting border and the chat session all keep waiting.
+    @Test func claudeLivePromptKeepsItsRowAndChatSessionWaiting() async throws {
+        try await withChatService { service in
+            let workspace = Workspace()
+            let panelId = try #require(workspace.focusedPanelId)
+            let session = UUID().uuidString
+            let asked = Date().addingTimeInterval(-10)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: session, hookEventName: .permissionRequest, source: "claude",
+                surfaceId: panelId.uuidString, receivedAt: asked
+            ))
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+            workspace.setStatusEntry(
+                SidebarStatusEntry(key: "claude_code", value: "Needs input", icon: "bell.fill", timestamp: asked),
+                key: "claude_code",
+                panelId: panelId
+            )
+
+            workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+            workspace.applyProgramStatus(
+                ProgramStatusReport(state: .blocked, kind: .permission, app: "claude-code"),
+                panelId: panelId
+            )
+            // The grace is skipped: any settlement the reports scheduled has run by now.
+            try await Task.sleep(nanoseconds: 100_000_000)
+
+            #expect(workspace.agentTurnSettlementTasks.isEmpty)
+            #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .needsInput)
+            #expect(workspace.agentNeedsInput)
+            #expect(workspace.agentStatusEntriesByPanelId[panelId]?["claude_code"]?.value == "Needs input")
+            #expect(service.sessionRecord(sessionID: session)?.state == .needsInput(since: asked))
+        }
+    }
+
+    /// Claude keeps its record blocked while a permission prompt or a question waits, and reports working again
+    /// once the person answers, often long before the next hook: an AskUserQuestion or ExitPlanMode under
+    /// bypassPermissions has none until the next tool, an approved tool none until it ends. The pane's Needs
+    /// input row returns to Running at that edge, so the waiting border stops while the agent goes on.
+    @Test func claudeAnswerReturnsTheNeedsInputRowToRunning() throws {
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        let asked = Date().addingTimeInterval(-10)
+        // The PreToolUse hook's sidebar row for an AskUserQuestion under bypassPermissions.
+        workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+        workspace.setStatusEntry(
+            SidebarStatusEntry(key: "claude_code", value: "Needs input", icon: "bell.fill", timestamp: asked),
+            key: "claude_code",
+            panelId: panelId
+        )
+        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+
+        workspace.applyProgramStatus(
+            ProgramStatusReport(state: .blocked, kind: .question, app: "claude-code"),
+            panelId: panelId
+        )
+        // working → blocked: the question waits.
+        #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .needsInput)
+        #expect(workspace.agentNeedsInput)
+
+        // blocked → working: the person answered.
+        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+
+        #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .running)
+        #expect(!workspace.agentNeedsInput)
+        let row = try #require(workspace.agentStatusEntriesByPanelId[panelId]?["claude_code"])
+        #expect(row.workState == .running)
+        #expect(row.icon == "bolt.fill")
+        #expect(row.timestamp > asked)
+    }
+
+    /// The journal shows a failed turn as needs input with the error triangle. Claude reporting working again
+    /// does not answer a failure: its row stays.
+    @Test func claudeAnswerLeavesAFailureRowAsItIs() throws {
+        let workspace = Workspace()
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+        workspace.setStatusEntry(
+            SidebarStatusEntry(
+                key: "claude_code",
+                value: "Usage limit",
+                icon: "exclamationmark.triangle.fill",
+                color: "#FF453A",
+                timestamp: Date().addingTimeInterval(-10)
+            ),
+            key: "claude_code",
+            panelId: panelId
+        )
+
+        workspace.applyProgramStatus(
+            ProgramStatusReport(state: .blocked, kind: .permission, app: "claude-code"),
+            panelId: panelId
+        )
+        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+
+        #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .needsInput)
+        #expect(workspace.agentStatusEntriesByPanelId[panelId]?["claude_code"]?.value == "Usage limit")
+    }
+
     /// Runs `body` with a private agent chat service as the app's, and the settlement grace skipped.
-    private func withChatService(_ body: (AgentChatTranscriptService) async throws -> Void) async throws {
+    func withChatService(_ body: (AgentChatTranscriptService) async throws -> Void) async throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("program-status-chat-\(UUID().uuidString)", isDirectory: true)
         let previousService = TerminalController.shared.agentChatTranscriptService
@@ -527,7 +632,7 @@ struct WorkspaceProgramStatusTests {
         try await body(service)
     }
 
-    private static func waitUntil(_ condition: () -> Bool) async -> Bool {
+    static func waitUntil(_ condition: () -> Bool) async -> Bool {
         for _ in 0..<300 {
             if condition() { return true }
             try? await Task.sleep(nanoseconds: 10_000_000)

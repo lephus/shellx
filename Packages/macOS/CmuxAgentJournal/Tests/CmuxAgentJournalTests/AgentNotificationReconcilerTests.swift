@@ -676,6 +676,27 @@ struct AgentNotificationReconcilerTests {
         #expect(later.identity != wait.identity)
     }
 
+    /// The app's own answer for a Claude pane: Claude reports working again over OSC 7501 once its prompt is
+    /// answered. That resolution carries no request or turn identity (Claude's hooks send no turn id), so it
+    /// retires the one wait of the turn and projects running; the turn's next tool event then stays running.
+    @Test func claudeProgramStatusAnswerRetiresThePendingWait() throws {
+        var reconciler = AgentNotificationReconciler()
+        _ = reconciler.apply(event(1, .turnStarted, source: "claude", turn: nil, notify: false))
+        let wait = reconciler.apply(event(2, .approvalRequested, source: "claude", turn: nil, request: "toolu_1"))
+        var answerDraft = event(3, .attentionResolved, source: "claude", turn: nil, notify: false,
+                                declaredPhase: .running, nativeEvent: "program_status_working").draft
+        answerDraft.attention = nil
+        let answer = AgentJournalEvent(sequence: 3, committedAtMs: 1003, draft: answerDraft)
+
+        #expect(reconciler.apply(answer).invalidatedCorrelationKeys == [try #require(wait.identity)])
+        #expect(reconciler.lifecycleEvent(answer).draft.declaredPhase == .running)
+
+        let tool = event(4, .stateChanged, source: "claude", turn: nil, notify: false,
+                         declaredPhase: .running, nativeEvent: "PreToolUse")
+        _ = reconciler.apply(tool)
+        #expect(reconciler.lifecycleEvent(tool).draft.declaredPhase == .running)
+    }
+
     @Test(arguments: ["claude", "codex"])
     func idleAttentionResolutionProjectsIdle(source: String) {
         var reconciler = AgentNotificationReconciler()

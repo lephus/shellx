@@ -4637,6 +4637,7 @@
 		5732A0055732A0055732A005 /* WorkspacePresentationModeChangeObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0055732B0055732B005 /* WorkspacePresentationModeChangeObserver.swift */; };
 		5732A0065732A0065732A006 /* WorkspacePresentationModeContentTopPaddingModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0065732B0065732B006 /* WorkspacePresentationModeContentTopPaddingModifier.swift */; };
 		5732A0105732A0105732A010 /* WorkspacePresentationModeRuntimeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0105732B0105732B010 /* WorkspacePresentationModeRuntimeCache.swift */; };
+		F5A53CB393C756B2A02AB6ED /* WorkspaceProgramStatusTests+Journal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC2C248324BD315F4C7141F /* WorkspaceProgramStatusTests+Journal.swift */; };
 		98303425ACB3352DC719B54C /* WorkspaceProgramStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0EA0EDB1794309910E7A5B /* WorkspaceProgramStatusTests.swift */; };
 		1A1B2C3D4E5F607180000001 /* WorkspacePromptSubmit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D4E5F607180000002 /* WorkspacePromptSubmit.swift */; };
 		1A1B2C3D4E5F607180000003 /* WorkspacePromptSubmitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1B2C3D4E5F607180000004 /* WorkspacePromptSubmitTests.swift */; };
@@ -9267,6 +9268,7 @@
 		5732B0055732B0055732B005 /* WorkspacePresentationModeChangeObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePresentationModeChangeObserver.swift; sourceTree = "<group>"; };
 		5732B0065732B0065732B006 /* WorkspacePresentationModeContentTopPaddingModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePresentationModeContentTopPaddingModifier.swift; sourceTree = "<group>"; };
 		5732B0105732B0105732B010 /* WorkspacePresentationModeRuntimeCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePresentationModeRuntimeCache.swift; sourceTree = "<group>"; };
+		7BC2C248324BD315F4C7141F /* WorkspaceProgramStatusTests+Journal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceProgramStatusTests+Journal.swift"; sourceTree = "<group>"; };
 		AF0EA0EDB1794309910E7A5B /* WorkspaceProgramStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceProgramStatusTests.swift"; sourceTree = "<group>"; };
 		1A1B2C3D4E5F607180000002 /* WorkspacePromptSubmit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePromptSubmit.swift; sourceTree = "<group>"; };
 		1A1B2C3D4E5F607180000004 /* WorkspacePromptSubmitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePromptSubmitTests.swift; sourceTree = "<group>"; };
@@ -14230,6 +14232,7 @@
 				E63B12CC16FAF68578D975CD /* ShellXPhonePushForwarderTests.swift */,
 				266067737E97125F58936046 /* AgentChatSessionRegistryLifecycleTests+Interrupt.swift */,
 				BB3F0B13A2B1144786869759 /* ShellXSidebarWaitingBorderTests.swift */,
+				7BC2C248324BD315F4C7141F /* WorkspaceProgramStatusTests+Journal.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19571,6 +19574,7 @@
 				C0DE12746000000000000009 /* WorkspaceManualPullRequestTests.swift in Sources */,
 				0F2C25F9170130F8DC09DD1B /* WorkspaceManualUnreadTests.swift in Sources */,
 				D305133E351288EA04E14A27 /* WorkspaceMergeDropTests.swift in Sources */,
+				F5A53CB393C756B2A02AB6ED /* WorkspaceProgramStatusTests+Journal.swift in Sources */,
 				98303425ACB3352DC719B54C /* WorkspaceProgramStatusTests.swift in Sources */,
 				1A1B2C3D4E5F607180000003 /* WorkspacePromptSubmitTests.swift in Sources */,
 				DCC935C5F55C1DCB33E25521 /* WorkspacePullRequestSidebarTests.swift in Sources */,
