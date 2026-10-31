@@ -45,9 +45,6 @@ pub struct AccountService {
     checking: bool,
     /// A check has finished since the app started.
     checked: bool,
-    /// The user closed the "update available" banner; the next check result
-    /// shows it again.
-    banner_hidden: bool,
 }
 
 impl AccountService {
@@ -105,7 +102,6 @@ impl AccountService {
             update: UpdateStatus::Unknown,
             checking: false,
             checked: false,
-            banner_hidden: false,
         };
         svc.apply(AccountEvent::Started, cx);
         // Startup check: queued behind the first account call, so
@@ -174,16 +170,6 @@ impl AccountService {
         self.checked
     }
 
-    /// The banner is shown for `Available` until the user closes it.
-    pub fn banner_visible(&self) -> bool {
-        matches!(self.update, UpdateStatus::Available { .. }) && !self.banner_hidden
-    }
-
-    pub fn hide_banner(&mut self, cx: &mut Context<Self>) {
-        self.banner_hidden = true;
-        cx.notify();
-    }
-
     /// Runs `version.check` on the worker now (startup, every 6 h, and the
     /// settings button). One at a time.
     pub fn check_update(&mut self, cx: &mut Context<Self>) {
@@ -204,7 +190,6 @@ impl AccountService {
         }
         self.checking = false;
         self.checked = true;
-        self.banner_hidden = false;
         cx.notify();
     }
 

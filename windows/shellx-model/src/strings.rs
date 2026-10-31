@@ -39,7 +39,6 @@ pub enum Str {
     Online,
     Connecting,
     Reconnecting,
-    E2eFooter,
     SearchPlaceholder,
     Login,
     Logout,
@@ -130,6 +129,13 @@ pub enum Str {
     SignInEllipsis,
     /// Under "not signed in" in Settings -> Account.
     SignInSubtitle,
+    /// Tooltip of the sidebar footer's "?" button.
+    Help,
+    /// The help menu's items (the Mac's wording).
+    SettingsEllipsis,
+    CheckForUpdates,
+    Docs,
+    GitHub,
 }
 
 impl Str {
@@ -141,7 +147,6 @@ impl Str {
         Str::Online,
         Str::Connecting,
         Str::Reconnecting,
-        Str::E2eFooter,
         Str::SearchPlaceholder,
         Str::Login,
         Str::Logout,
@@ -219,6 +224,11 @@ impl Str {
         Str::EmailAddress,
         Str::SignInEllipsis,
         Str::SignInSubtitle,
+        Str::Help,
+        Str::SettingsEllipsis,
+        Str::CheckForUpdates,
+        Str::Docs,
+        Str::GitHub,
     ];
 }
 
@@ -233,7 +243,6 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Online => "trực tuyến",
             Str::Connecting => "đang kết nối…",
             Str::Reconnecting => "đang kết nối lại…",
-            Str::E2eFooter => "Mã hoá đầu cuối · relay.shellx.pro",
             Str::SearchPlaceholder => "Tìm phiên, máy, lệnh…",
             Str::Login => "Đăng nhập",
             Str::Logout => "Đăng xuất",
@@ -311,6 +320,11 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::EmailAddress => "Địa chỉ email",
             Str::SignInEllipsis => "Đăng nhập…",
             Str::SignInSubtitle => "Đăng nhập bằng tài khoản ShellX của bạn.",
+            Str::Help => "Trợ giúp",
+            Str::SettingsEllipsis => "Cài đặt…",
+            Str::CheckForUpdates => "Kiểm tra cập nhật",
+            Str::Docs => "Tài liệu",
+            Str::GitHub => "GitHub",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -320,7 +334,6 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Online => "online",
             Str::Connecting => "connecting…",
             Str::Reconnecting => "reconnecting…",
-            Str::E2eFooter => "End-to-end encrypted · relay.shellx.pro",
             Str::SearchPlaceholder => "Search sessions, machines, commands…",
             Str::Login => "Sign in",
             Str::Logout => "Sign out",
@@ -398,6 +411,11 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::EmailAddress => "Email",
             Str::SignInEllipsis => "Sign In…",
             Str::SignInSubtitle => "Sign in with your ShellX account.",
+            Str::Help => "Help",
+            Str::SettingsEllipsis => "Settings…",
+            Str::CheckForUpdates => "Check for Updates",
+            Str::Docs => "Docs",
+            Str::GitHub => "GitHub",
         },
     }
 }
@@ -434,6 +452,14 @@ pub fn update_available(lang: Lang, version: &str) -> String {
     match lang {
         Lang::Vi => format!("{} {version}", t(lang, Str::UpdateAvailable)),
         Lang::En => format!("{}: {version}", t(lang, Str::UpdateAvailable)),
+    }
+}
+
+/// The sidebar footer's pill: "Có bản cập nhật: 1.5.4" / "Update Available: 1.5.4".
+pub fn update_available_pill(lang: Lang, version: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Có bản cập nhật: {version}"),
+        Lang::En => format!("Update Available: {version}"),
     }
 }
 
@@ -502,17 +528,13 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 85);
+        assert_eq!(Str::ALL.len(), 89);
     }
 
     #[test]
     fn exact_vi_strings() {
         assert_eq!(t(Lang::Vi, Str::MachinesHeader), "Máy của bạn");
         assert_eq!(t(Lang::Vi, Str::Reconnecting), "đang kết nối lại…");
-        assert_eq!(
-            t(Lang::Vi, Str::E2eFooter),
-            "Mã hoá đầu cuối · relay.shellx.pro"
-        );
         assert_eq!(t(Lang::Vi, Str::StatusWaiting), "chờ bạn");
         assert_eq!(t(Lang::Vi, Str::StatusRunning), "chạy");
         assert_eq!(t(Lang::Vi, Str::StatusDone), "xong");
@@ -601,6 +623,33 @@ mod tests {
         );
         assert_eq!(t(Lang::Vi, Str::Cancel), "Hủy");
         assert_eq!(t(Lang::En, Str::Cancel), "Cancel");
+    }
+
+    #[test]
+    fn sidebar_footer_strings_match_the_mac() {
+        let pairs = [
+            (Str::Help, "Trợ giúp", "Help"),
+            (Str::SettingsEllipsis, "Cài đặt…", "Settings…"),
+            (
+                Str::CheckForUpdates,
+                "Kiểm tra cập nhật",
+                "Check for Updates",
+            ),
+            (Str::Docs, "Tài liệu", "Docs"),
+            (Str::GitHub, "GitHub", "GitHub"),
+        ];
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            update_available_pill(Lang::Vi, "1.5.4"),
+            "Có bản cập nhật: 1.5.4"
+        );
+        assert_eq!(
+            update_available_pill(Lang::En, "1.5.4"),
+            "Update Available: 1.5.4"
+        );
     }
 
     #[test]

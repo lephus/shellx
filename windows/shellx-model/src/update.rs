@@ -1,7 +1,7 @@
-//! `version.check` result -> update status and banner.
+//! `version.check` result -> update status and the footer pill text.
 
 use crate::core_api::{CoreErr, VersionInfo};
-use crate::strings::{Lang, Str, t, update_available};
+use crate::strings::{Lang, update_available_pill};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UpdateStatus {
@@ -65,11 +65,12 @@ pub fn download_url(status: &UpdateStatus) -> Option<&str> {
     }
 }
 
-pub fn banner(status: &UpdateStatus, lang: Lang) -> Option<String> {
+/// The sidebar footer's pill: only for an available update. A forced update
+/// has its own overlay.
+pub fn pill_text(status: &UpdateStatus, lang: Lang) -> Option<String> {
     match status {
-        UpdateStatus::Available { version, .. } => Some(update_available(lang, version)),
-        UpdateStatus::Required { .. } => Some(t(lang, Str::UpdateRequired).to_string()),
-        UpdateStatus::UpToDate | UpdateStatus::Unknown => None,
+        UpdateStatus::Available { version, .. } => Some(update_available_pill(lang, version)),
+        UpdateStatus::Required { .. } | UpdateStatus::UpToDate | UpdateStatus::Unknown => None,
     }
 }
 
@@ -178,25 +179,26 @@ mod tests {
     }
 
     #[test]
-    fn banner_text() {
+    fn pill_text_only_for_an_available_update() {
         let a = UpdateStatus::Available {
-            version: "2.0.1".into(),
+            version: "1.5.4".into(),
             url: None,
         };
         assert_eq!(
-            banner(&a, Lang::Vi).as_deref(),
-            Some("Có bản cập nhật 2.0.1")
+            pill_text(&a, Lang::Vi).as_deref(),
+            Some("Có bản cập nhật: 1.5.4")
         );
         assert_eq!(
-            banner(&a, Lang::En).as_deref(),
-            Some("Update available: 2.0.1")
+            pill_text(&a, Lang::En).as_deref(),
+            Some("Update Available: 1.5.4")
         );
         let r = UpdateStatus::Required {
             min: "2.0.0".into(),
             url: None,
         };
-        assert_eq!(banner(&r, Lang::Vi).as_deref(), Some("Cần cập nhật"));
-        assert_eq!(banner(&UpdateStatus::UpToDate, Lang::Vi), None);
-        assert_eq!(banner(&UpdateStatus::Unknown, Lang::En), None);
+        assert_eq!(pill_text(&r, Lang::Vi), None);
+        assert_eq!(pill_text(&r, Lang::En), None);
+        assert_eq!(pill_text(&UpdateStatus::UpToDate, Lang::Vi), None);
+        assert_eq!(pill_text(&UpdateStatus::Unknown, Lang::En), None);
     }
 }

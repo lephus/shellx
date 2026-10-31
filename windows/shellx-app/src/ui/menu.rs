@@ -3,16 +3,18 @@
 //!
 //! The caller decides where it shows: it puts `popover` inside an absolutely
 //! positioned box at the anchor point, and the menu's top-left goes there
-//! (moved back into the window if it would spill out). It is drawn after
-//! everything else, so it covers what is under it. It is not a panel: it
-//! holds no focus, so the keyboard stays where it was. A press outside it,
-//! or a click on a row (after the row's action), calls `on_close`.
+//! (moved back into the window if it would spill out). `popover_above` is the
+//! same for a button at the window's bottom: the menu's bottom-left goes at
+//! the anchor point, so it opens upward. It is drawn after everything else,
+//! so it covers what is under it. It is not a panel: it holds no focus, so
+//! the keyboard stays where it was. A press outside it, or a click on a row
+//! (after the row's action), calls `on_close`.
 
 use std::rc::Rc;
 
 use gpui::{
-    App, ClickEvent, IntoElement, MouseDownEvent, SharedString, Window, anchored, deferred, div,
-    point, prelude::*, px,
+    App, ClickEvent, Corner, IntoElement, MouseDownEvent, Pixels, SharedString, Window, anchored,
+    deferred, div, point, prelude::*, px,
 };
 
 use super::theme;
@@ -30,9 +32,28 @@ pub(super) struct MenuItem {
     pub on_click: Box<Action>,
 }
 
+/// Opens down from the anchor point, 4 px below it.
 pub(super) fn popover(
     items: Vec<MenuItem>,
     on_close: impl Fn(&mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    menu(items, on_close, Corner::TopLeft, px(4.0))
+}
+
+/// Opens up from the anchor point, 4 px above it.
+pub(super) fn popover_above(
+    items: Vec<MenuItem>,
+    on_close: impl Fn(&mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    menu(items, on_close, Corner::BottomLeft, px(-4.0))
+}
+
+/// `corner` of the menu goes `gap` (down is positive) from the anchor point.
+fn menu(
+    items: Vec<MenuItem>,
+    on_close: impl Fn(&mut Window, &mut App) + 'static,
+    corner: Corner,
+    gap: Pixels,
 ) -> impl IntoElement {
     let on_close: Rc<Action> = Rc::new(on_close);
     let mut list = div()
@@ -94,7 +115,8 @@ pub(super) fn popover(
     }
     deferred(
         anchored()
-            .offset(point(px(0.0), px(4.0)))
+            .anchor(corner)
+            .offset(point(px(0.0), gap))
             .snap_to_window_with_margin(px(8.0))
             .child(list),
     )

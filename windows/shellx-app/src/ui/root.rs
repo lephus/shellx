@@ -117,6 +117,8 @@ pub struct RootView {
     navigating: bool,
     /// The title bar "+" chevron's menu is showing.
     new_menu_open: bool,
+    /// The sidebar footer "?" button's menu is showing.
+    help_open: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -192,6 +194,7 @@ impl RootView {
             last_focus,
             navigating: false,
             new_menu_open: false,
+            help_open: false,
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
@@ -562,6 +565,24 @@ impl RootView {
         }
     }
 
+    pub(super) fn help_open(&self) -> bool {
+        self.help_open
+    }
+
+    /// The sidebar footer "?": shows or hides its menu.
+    pub(super) fn toggle_help_menu(&mut self, cx: &mut Context<Self>) {
+        self.help_open = !self.help_open;
+        cx.notify();
+    }
+
+    /// A press outside the help menu, or a click on one of its rows.
+    pub(super) fn close_help_menu(&mut self, cx: &mut Context<Self>) {
+        if self.help_open {
+            self.help_open = false;
+            cx.notify();
+        }
+    }
+
     /// Makes `slot`'s selected terminal the focused one (a button of a
     /// region's tab bar acts on that region, not on the focused one).
     fn focus_slot(&mut self, slot: SlotId) {
@@ -705,11 +726,12 @@ impl RootView {
 
     /// Title bar button and `AppCommand::ToggleSidebar` (Ctrl+Shift+B, only
     /// while no panel is open). Hiding the sidebar closes the machine picker
-    /// that lives in it.
+    /// and the help menu that live in it.
     pub fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar_visible = !self.sidebar_visible;
         if !self.sidebar_visible {
             self.pairing.update(cx, |p, cx| p.close_picker(cx));
+            self.help_open = false;
         }
         self.after_focus_change(window, cx);
     }
@@ -897,23 +919,13 @@ impl Render for RootView {
                 &rows,
                 &local_id,
                 picker.as_deref(),
+                &self.account,
+                self.help_open,
                 lang,
                 cx,
             ))
         } else {
             None
-        };
-        let account = self.account.read(cx);
-        let banner = match account.update_status() {
-            status @ UpdateStatus::Available { version, .. } if account.banner_visible() => {
-                Some(update_banner::banner(
-                    lang,
-                    version,
-                    download_url(status).map(str::to_string),
-                    self.account.clone(),
-                ))
-            }
-            _ => None,
         };
         let overlay = self.required(cx).map(|(min, url)| {
             update_banner::required_overlay(lang, &min, url, &self.overlay_focus)
@@ -952,7 +964,6 @@ impl Render for RootView {
             .relative()
             .overflow_hidden()
             .bg(theme::bg())
-            .children(banner)
             .child(panes)
             // The pairing card, centered over the main area.
             .children(pairing);

@@ -1,6 +1,7 @@
 //! Machine sidebar (spec §7.1 items 1-3 and 6): logo + wordmark, the
 //! "MÁY CỦA BẠN" header, one group per machine from
-//! `shellx_model::sidebar::build_groups`, and the end-to-end footer.
+//! `shellx_model::sidebar::build_groups`, and the footer (the "?" help menu,
+//! the version and, when an update is available, its pill).
 //! "THIẾT BỊ ĐANG KẾT NỐI" (item 5) is out of the MVP.
 //! Under a machine: one workspace card per tab, like the Mac's (a purple
 //! rail, the title, the git branch and the working directory; click selects
@@ -19,19 +20,25 @@
 //! that machine's tabs are listed under it.
 
 use gpui::{
-    ClickEvent, Context, Div, FontWeight, ImageSource, MouseDownEvent, Pixels, Resource,
-    SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
+    ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, MouseDownEvent, Pixels,
+    Resource, SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
 };
-use shellx_model::palette::{Pill, RAIL_PURPLE, SELECTION_TITLE, Status};
+use shellx_model::palette::{
+    PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
+};
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
 use shellx_model::strings::{Lang, Str, pairing_code_display, t};
 use shellx_model::tabs::TabId;
+use shellx_model::update::{UpdateStatus, download_url, pill_text};
 
+use super::account::AccountService;
 use super::assets::Icon;
 use super::button::{Kind, button};
+use super::menu::{self, MenuItem};
 use super::root::RootView;
 use super::theme;
 use super::tooltip::Tooltip;
+use super::update_banner::open_https;
 
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
@@ -61,11 +68,15 @@ pub struct PickerEntry {
 /// `local_id`: this PC's group (its server id when signed in).
 /// `sessions`: every tab, each listed under its `machine_id` group.
 /// `picker`: the "+" list, when open.
+/// `account`: the update status for the footer pill, and "Check for Updates".
+/// `help_open`: the footer "?" menu is showing.
 pub fn render(
     groups: &[MachineGroup],
     sessions: &[SessionRow],
     local_id: &str,
     picker: Option<&[PickerEntry]>,
+    account: &Entity<AccountService>,
+    help_open: bool,
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Div {
@@ -97,7 +108,7 @@ pub fn render(
         .child(brand(lang))
         .child(machines_block(picker, lang, cx))
         .child(list)
-        .child(footer(lang))
+        .child(footer(account, help_open, lang, cx))
 }
 
 fn brand(lang: Lang) -> Div {
@@ -492,23 +503,169 @@ fn pill_label(pill: Pill, lang: Lang) -> Div {
         .child(t(lang, pill.label))
 }
 
-fn footer(lang: Lang) -> Div {
+/// Pages the help menu's Docs and GitHub rows open.
+const DOCS_URL: &str = "https://shellx.pro";
+const GITHUB_URL: &str = "https://github.com/lephus/shellx";
+
+/// Footer height of every control in it, in px.
+const FOOTER_BUTTON: f32 = 22.0;
+
+/// The Mac's footer: the "?" help button, the version, a spacer and, only
+/// while an update is available, its pill.
+fn footer(
+    account: &Entity<AccountService>,
+    help_open: bool,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Div {
+    let status = account.read(cx).update_status().clone();
     div()
         .flex()
+        .flex_row()
+        .flex_none()
         .items_center()
-        .gap(px(8.0))
-        .px(px(14.0))
-        .py(px(10.0))
+        .gap(px(4.0))
+        .pl(px(6.0))
+        .pr(px(10.0))
+        .py(px(6.0))
         .border_t_1()
         .border_color(theme::line())
-        .text_size(theme::SMALL_SIZE)
-        .text_color(theme::muted())
+        .child(help_button(account, help_open, lang, cx))
+        .child(version_label())
+        .child(div().flex_1())
+        .children(update_pill(&status, lang))
+}
+
+/// The "?" (14 px, muted) with its menu opening upward from it.
+fn help_button(
+    account: &Entity<AccountService>,
+    help_open: bool,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Div {
+    let tip: SharedString = t(lang, Str::Help).into();
+    let button = div()
+        .id("sidebar-help")
+        .group("sidebar-help")
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .size(px(FOOTER_BUTTON))
+        .rounded(px(6.0))
+        .cursor_pointer()
+        .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
+        // While the menu is open, a press here closes it and goes no
+        // further: otherwise the menu's "press outside" would close it and
+        // this click would open it again (as the title bar's chevron does).
+        .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+            if this.help_open() {
+                this.close_help_menu(cx);
+                cx.stop_propagation();
+            }
+        }))
+        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_help_menu(cx)))
         .child(
             svg()
-                .path(Icon::ShieldCheck.path())
-                .flex_none()
-                .size(px(13.0))
-                .text_color(theme::done()),
-        )
-        .child(div().min_w_0().truncate().child(t(lang, Str::E2eFooter)))
+                .path(Icon::CircleHelp.path())
+                .size(px(14.0))
+                .text_color(theme::muted())
+                .group_hover("sidebar-help", |style| style.text_color(theme::text_hi())),
+        );
+    div()
+        .relative()
+        .flex_none()
+        .child(button)
+        .when(help_open, |el| {
+            // Anchor point: the button's top-left; the menu sits above it.
+            el.child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .child(help_menu(account, lang, cx)),
+            )
+        })
+}
+
+/// Settings…, Check for Updates, Docs and GitHub.
+fn help_menu(
+    account: &Entity<AccountService>,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> impl IntoElement {
+    let root = cx.entity().downgrade();
+    let link = |label: Str, url: &'static str| MenuItem {
+        label: t(lang, label).into(),
+        shortcut: None,
+        on_click: Box::new(move |_, cx| open_https(cx, url)),
+    };
+    let items = vec![
+        MenuItem {
+            label: t(lang, Str::SettingsEllipsis).into(),
+            shortcut: Some("Ctrl+,"),
+            on_click: Box::new({
+                let root = root.clone();
+                move |window, cx| {
+                    root.update(cx, |this, cx| this.open_settings(window, cx))
+                        .ok();
+                }
+            }),
+        },
+        MenuItem {
+            label: t(lang, Str::CheckForUpdates).into(),
+            shortcut: None,
+            on_click: Box::new({
+                let account = account.clone();
+                move |_, cx| account.update(cx, |account, cx| account.check_update(cx))
+            }),
+        },
+        link(Str::Docs, DOCS_URL),
+        link(Str::GitHub, GITHUB_URL),
+    ];
+    menu::popover_above(items, move |_, cx| {
+        root.update(cx, |this, cx| this.close_help_menu(cx)).ok();
+    })
+}
+
+/// "v1.5.3", 11 px muted.
+fn version_label() -> Div {
+    div()
+        .flex()
+        .flex_none()
+        .items_center()
+        .h(px(FOOTER_BUTTON))
+        .px(px(5.0))
+        .text_size(theme::SMALL_SIZE)
+        .text_color(theme::muted())
+        .child(format!("v{}", shellx_model::VERSION))
+}
+
+/// "Update Available: 1.5.4": a PRIMARY_SOFT capsule that opens the download
+/// link (when the status has an https one) on a click.
+fn update_pill(status: &UpdateStatus, lang: Lang) -> Option<Stateful<Div>> {
+    let text = pill_text(status, lang)?;
+    let url = download_url(status).map(str::to_string);
+    let pill = div()
+        .id("sidebar-update-pill")
+        .flex()
+        .flex_none()
+        .items_center()
+        .h(px(FOOTER_BUTTON))
+        .px(px(8.0))
+        .rounded_full()
+        .border_1()
+        .border_color(theme::hsla(PRIMARY_LINE))
+        .bg(theme::hsla(PRIMARY_SOFT))
+        .text_size(theme::SMALL_SIZE)
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(theme::hsla(PRIMARY_TEXT))
+        .whitespace_nowrap()
+        .child(text);
+    Some(match url {
+        Some(url) => pill
+            .cursor_pointer()
+            .on_click(move |_: &ClickEvent, _, cx| open_https(cx, &url)),
+        None => pill,
+    })
 }
