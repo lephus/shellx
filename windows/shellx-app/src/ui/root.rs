@@ -66,7 +66,7 @@ use shellx_model::modal::{Panel, Panels, RootKey};
 use shellx_model::palette::Status;
 use shellx_model::sidebar::{MachineInfo, build_groups};
 use shellx_model::strings::Lang;
-use shellx_model::tabs::{CloseOutcome, PaneTarget, RespawnGuard, TabId, Tabs};
+use shellx_model::tabs::{CloseOutcome, PaneTarget, RespawnGuard, Tab, TabId, Tabs};
 use shellx_model::update::{UpdateStatus, download_url};
 
 use super::account::AccountService;
@@ -528,9 +528,8 @@ impl RootView {
         self.navigating = false;
     }
 
-    /// A new workspace: Ctrl+Shift+N, the title bar "+" (and its menu) and
-    /// the "+" on this PC's sidebar group (always local). Swallowed while a
-    /// panel is open.
+    /// A new workspace: Ctrl+Shift+N and the title bar "+" (and its menu);
+    /// always local. Swallowed while a panel is open.
     pub fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.panels(cx).allows_app_commands() {
             self.focus_terminal(window, cx);
@@ -545,6 +544,25 @@ impl RootView {
     pub fn new_terminal_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let slot = self.tabs.active().focused_slot();
         self.new_terminal(slot, window, cx);
+    }
+
+    /// The active workspace (`panes::render` lays out its regions).
+    pub(super) fn active_tab(&self) -> &Tab {
+        self.tabs.active()
+    }
+
+    /// The live terminal views, by pane.
+    pub(super) fn pane_host(&self) -> &PaneHost<PaneView> {
+        &self.host
+    }
+
+    /// Where the panes are laid out (measured once drawn).
+    pub(super) fn pane_area(&self) -> &PaneArea {
+        &self.area
+    }
+
+    pub(super) fn sidebar_visible(&self) -> bool {
+        self.sidebar_visible
     }
 
     /// The active workspace's focused terminal (its title names the
@@ -755,18 +773,31 @@ impl RootView {
         self.after_focus_change(window, cx);
     }
 
-    /// Title bar Settings button and `AppCommand::OpenSettings` (Ctrl+,).
-    /// Toggles the settings panel (blocked while a forced update or the
-    /// sign-in dialog shows, both drawn above it). Closes the dropdowns.
+    /// Title bar Settings button and `AppCommand::OpenSettings` (Ctrl+,):
+    /// toggles the settings panel.
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let open = !self.settings.read(cx).is_open();
+        self.set_settings_open(open, window, cx);
+    }
+
+    /// The help menu's "Settings…" and "Check for Updates" (whose result
+    /// shows in Settings -> Updates): opens the settings panel, never closes
+    /// it.
+    pub fn show_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_settings_open(true, window, cx);
+    }
+
+    /// Opens or closes the settings panel (blocked while a forced update or
+    /// the sign-in dialog shows, both drawn above it). Closes the dropdowns.
+    fn set_settings_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.close_menus(cx);
         if !self.panels(cx).may_open(Panel::Settings) {
             return;
         }
-        if self.settings.read(cx).is_open() {
-            self.settings.update(cx, |panel, cx| panel.close(cx));
-        } else {
+        if open {
             self.settings.update(cx, |panel, cx| panel.open(window, cx));
+        } else {
+            self.settings.update(cx, |panel, cx| panel.close(cx));
         }
     }
 
@@ -995,16 +1026,7 @@ impl Render for RootView {
             .read(cx)
             .is_open()
             .then(|| self.pairing.clone());
-        let panes = panes::render(
-            self,
-            lang,
-            self.tabs.active(),
-            &self.host,
-            &self.area,
-            self.sidebar_visible,
-            window,
-            cx,
-        );
+        let panes = panes::render(self, lang, window, cx);
         let main = div()
             .flex()
             .flex_col()

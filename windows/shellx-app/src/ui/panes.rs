@@ -16,13 +16,13 @@ use gpui::{
 };
 use shellx_model::layout::{PaneId, Rect, SlotId};
 use shellx_model::strings::Lang;
-use shellx_model::tabs::{Stack, Tab};
+use shellx_model::tabs::Stack;
 
 use super::root::RootView;
 use super::tab_bar;
 use super::term_view::TermView;
 use super::theme;
-use crate::workspace::{DIVIDER, PaneHost, estimate_pane_area};
+use crate::workspace::{DIVIDER, estimate_pane_area};
 
 /// A live pane in the window: its view, and RootView's subscription to it.
 /// Dropping it drops the view, whose `LocalPty` kills the shell.
@@ -88,16 +88,17 @@ impl PaneArea {
     }
 }
 
+/// The active workspace's regions, laid out in RootView's pane area.
 pub(super) fn render(
     root: &RootView,
     lang: Lang,
-    tab: &Tab,
-    host: &PaneHost<PaneView>,
-    area: &PaneArea,
-    sidebar_visible: bool,
     window: &Window,
     cx: &mut Context<RootView>,
 ) -> Div {
+    let tab = root.active_tab();
+    let host = root.pane_host();
+    let area = root.pane_area();
+    let sidebar_visible = root.sidebar_visible();
     let bounds = area.bounds(window, sidebar_visible);
     let recorder = area.clone();
     let mut container = div()

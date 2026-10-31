@@ -23,6 +23,7 @@ use gpui::{
     ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, MouseDownEvent, Pixels,
     Resource, SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
 };
+use shellx_model::account::AccountState;
 use shellx_model::palette::{
     PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
 };
@@ -80,7 +81,16 @@ pub fn render(
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Div {
-    let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
+    let signed_in = matches!(account.read(cx).state(), AccountState::LoggedIn { .. });
+    // The groups and cards scroll; the brand, the machines header and the
+    // footer stay put.
+    let mut list = div()
+        .id("sidebar-list")
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll();
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
         list = list.child(group_header(ix, group, lang, cx));
@@ -106,7 +116,7 @@ pub fn render(
         .border_r_1()
         .border_color(theme::line())
         .child(brand(lang))
-        .child(machines_block(picker, lang, cx))
+        .child(machines_block(picker, signed_in, lang, cx))
         .child(list)
         .child(footer(account, help_open, lang, cx))
 }
@@ -142,12 +152,17 @@ fn brand(lang: Lang) -> Div {
 /// outside this block closes the list: outside the list *and* the "+", so
 /// pressing the "+" again toggles it instead of closing and reopening it.
 /// The press still reaches what it hit (a terminal click focuses the pane).
-fn machines_block(picker: Option<&[PickerEntry]>, lang: Lang, cx: &mut Context<RootView>) -> Div {
+fn machines_block(
+    picker: Option<&[PickerEntry]>,
+    signed_in: bool,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Div {
     let block = div()
         .flex()
         .flex_col()
         .flex_none()
-        .child(machines_header(lang, cx));
+        .child(machines_header(signed_in, lang, cx));
     match picker {
         Some(entries) => block
             .child(machine_picker(entries, lang, cx))
@@ -158,8 +173,15 @@ fn machines_block(picker: Option<&[PickerEntry]>, lang: Lang, cx: &mut Context<R
     }
 }
 
-fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
-    let tip: SharedString = t(lang, Str::AddMachine).into();
+/// `signed_in`: the "+" lists machines; signed out it opens the sign-in
+/// dialog, and its tooltip says so.
+fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> Div {
+    let tip = if signed_in {
+        Str::AddMachine
+    } else {
+        Str::SignInEllipsis
+    };
+    let tip: SharedString = t(lang, tip).into();
     // GPUI 0.2.2 has no letter-spacing, so the mockup's .08em tracking is
     // not reproduced; the string is upper-case already.
     div()
@@ -606,8 +628,9 @@ fn help_menu(
             shortcut: Some("Ctrl+,"),
             on_click: Box::new({
                 let root = root.clone();
+                // Opens Settings, never closes it (Ctrl+, toggles).
                 move |window, cx| {
-                    root.update(cx, |this, cx| this.open_settings(window, cx))
+                    root.update(cx, |this, cx| this.show_settings(window, cx))
                         .ok();
                 }
             }),
@@ -617,7 +640,14 @@ fn help_menu(
             shortcut: None,
             on_click: Box::new({
                 let account = account.clone();
-                move |_, cx| account.update(cx, |account, cx| account.check_update(cx))
+                let root = root.clone();
+                // The result ("Checking…", "Up to date", a new version)
+                // shows in Settings -> Updates, so that opens too.
+                move |window, cx| {
+                    account.update(cx, |account, cx| account.check_update(cx));
+                    root.update(cx, |this, cx| this.show_settings(window, cx))
+                        .ok();
+                }
             }),
         },
         link(Str::Docs, DOCS_URL),

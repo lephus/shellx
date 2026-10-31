@@ -150,7 +150,9 @@ impl PairingPanel {
         cx.notify();
     }
 
-    /// Esc, or the sidebar hiding: the "+" list goes away.
+    /// The "+" list goes away: Esc, a press outside it, a click on one of
+    /// its entries (`request`), or the sidebar hiding (RootView's
+    /// `close_menus` and `close_machine_picker`).
     pub fn close_picker(&mut self, cx: &mut Context<Self>) {
         if self.picker_open {
             self.picker_open = false;
