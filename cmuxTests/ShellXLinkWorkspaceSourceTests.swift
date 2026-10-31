@@ -402,9 +402,16 @@ struct ShellXLinkWorkspaceSourceTests {
 
     /// A listed workspace `id` holding one terminal `terminal`.
     private static func agentWorkspace(_ id: UUID, terminal: UUID, order: Int = 0) -> LinkWorkspace {
+        agentWorkspace(id, terminals: [terminal], order: order)
+    }
+
+    /// A listed workspace `id` holding `terminals`, in that order.
+    private static func agentWorkspace(_ id: UUID, terminals: [UUID], order: Int = 0) -> LinkWorkspace {
         LinkWorkspace(
             workspaceId: id.uuidString, title: "w", order: order, directory: nil, branch: nil, ports: nil,
-            terminals: [LinkTerminal(terminalId: terminal.uuidString, title: "claude", order: 0, selected: true)]
+            terminals: terminals.enumerated().map { index, terminal in
+                LinkTerminal(terminalId: terminal.uuidString, title: "claude", order: index, selected: index == 0)
+            }
         )
     }
 
@@ -430,7 +437,9 @@ struct ShellXLinkWorkspaceSourceTests {
         #expect(mac.surfaceCloses.isEmpty)
     }
 
-    /// A live agent whose surface is in no listed workspace, as in an SSH workspace: nothing closes.
+    /// A live agent whose surface is in no listed workspace, as in an SSH workspace: nothing closes, whatever
+    /// workspace its record names. The record's workspace does not count either way: a listed terminal closes in the
+    /// workspace the list shows it in, even when the record names one the list does not hold.
     @Test func closeAgentOnAnUnlistedSurfaceIsNotFound() async {
         let (mac, source) = Self.makeSource()
         let listed = UUID(), listedTerminal = UUID()
@@ -440,8 +449,28 @@ struct ShellXLinkWorkspaceSourceTests {
 
         #expect(await source.closeAgent(sessionId: "ssh") == .notFound)
         #expect(await source.closeAgent(sessionId: "moved") == .notFound)
-        #expect(await source.closeAgent(sessionId: "other") == .notFound)
         #expect(mac.surfaceCloses.isEmpty)
+
+        #expect(await source.closeAgent(sessionId: "other") == .ok)
+        #expect(mac.surfaceCloses.map(\.workspaceId) == [listed])
+        #expect(mac.surfaceCloses.map(\.surfaceId) == [listedTerminal])
+    }
+
+    /// The agent's tab was dragged to another workspace after the agent started, so its record still names the
+    /// first one (`CMUX_WORKSPACE_ID` at shell start). The phone shows it where the list does, and it closes there.
+    @Test func closeAgentOfAMovedTabClosesItInItsCurrentWorkspace() async {
+        let (mac, source) = Self.makeSource()
+        let started = UUID(), startedTerminal = UUID()
+        let current = UUID(), currentTerminal = UUID(), agent = UUID()
+        mac.workspaces = [
+            Self.agentWorkspace(started, terminal: startedTerminal),
+            Self.agentWorkspace(current, terminals: [currentTerminal, agent], order: 1),
+        ]
+        mac.agentSurfaces = ["s1": (started, agent)]
+
+        #expect(await source.closeAgent(sessionId: "s1") == .ok)
+        #expect(mac.surfaceCloses.map(\.workspaceId) == [current])
+        #expect(mac.surfaceCloses.map(\.surfaceId) == [agent])
     }
 
     @Test func closeAgentBlockedIsRefused() async {
@@ -516,13 +545,20 @@ struct ShellXLinkWorkspaceSourceTests {
             ("no pid", record { $0.pid = nil }),
             ("exited", record { $0.pid = deadPID }),
             ("not Claude", codex),
-            ("no workspace", record { $0.workspaceID = nil }),
-            ("garbled workspace", record { $0.workspaceID = "ws-1" }),
             ("no surface", record { $0.surfaceID = nil }),
             ("garbled surface", record { $0.surfaceID = "" }),
         ]
         for (name, candidate) in notLive {
             #expect(ShellXLinkWorkspaceSource.liveAgentSurface(candidate) == nil, "\(name) named a surface")
+        }
+        // The record's workspace is where the shell started and goes stale once the tab moves: the list finds the
+        // workspace from the terminal, so the record's is not needed.
+        let anyWorkspace: [(String, AgentChatSessionRecord)] = [
+            ("no workspace", record { $0.workspaceID = nil }),
+            ("garbled workspace", record { $0.workspaceID = "ws-1" }),
+        ]
+        for (name, candidate) in anyWorkspace {
+            #expect(ShellXLinkWorkspaceSource.liveAgentSurface(candidate) != nil, "\(name) named no surface")
         }
     }
 
