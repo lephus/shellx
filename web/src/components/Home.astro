@@ -4,9 +4,11 @@ import HeroDemo from './HeroDemo.astro';
 import Pillars from './Pillars.astro';
 import SecurityFlow from './SecurityFlow.astro';
 import Downloads from './Downloads.astro';
+import VideoPlayer from './VideoPlayer.astro';
 import { ui, type Lang, pathFor } from '../i18n/ui';
-import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, supportEmail, windowsDownloadUrl } from '../lib/site';
+import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
 import { appId, author, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
+import { video } from '../lib/videos';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -42,9 +44,7 @@ const ld = [
     applicationCategory: 'DeveloperApplication', applicationSubCategory: 'Remote terminal',
     operatingSystem: 'macOS 14+, Windows 10+, iOS 15+, Android 8+',
     softwareVersion: desktopVersion,
-    softwareRequirements: lang === 'vi'
-      ? 'App cho máy tính: macOS 14+ hoặc Windows 10 (1809)+. App điện thoại: iOS 15+ hoặc Android 8.0+.'
-      : 'Desktop app: macOS 14+ or Windows 10 (1809)+. Phone app: iOS 15+ or Android 8.0+.',
+    softwareRequirements: 'Desktop app: macOS 14+ or Windows 10 (1809)+. Phone app: iOS 15+ or Android 8.0+.',
     downloadUrl: [macDownloadUrl(), windowsDownloadUrl()],
     description: t.homeDescription, url, inLanguage: lang,
     image: `${site}/og/og-${lang}.png`, screenshot: `${site}/og/og-${lang}.png`,
@@ -67,7 +67,7 @@ const ld = [
       '@type': 'HowToStep', position: i + 1, text, url: `${url}#start`,
     })),
   },
-  { '@context': 'https://schema.org', ...organization, email: supportEmail },
+  { '@context': 'https://schema.org', ...organization, sameAs: [discordUrl] },
   { '@context': 'https://schema.org', ...author },
   {
     '@context': 'https://schema.org', '@type': 'WebSite', '@id': `${site}/#website`,
@@ -85,6 +85,7 @@ const features = [
   { title: t.feature6Title, body: t.feature6, icon: 'M3 5h13v9H3zM7 18h5M9.5 14v4M17 9h4v11h-4z' },
 ];
 const steps = [t.step1, t.step2, t.step3];
+const intro = video(lang, 'intro');
 ---
 <Base lang={lang} page="home" title={t.homeTitle} description={t.homeDescription}>
   <Fragment slot="head">
@@ -108,12 +109,27 @@ const steps = [t.step1, t.step2, t.step3];
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
             <span data-os-label>{t.ctaFree}</span>
           </a>
-          <a class="btn btn-ghost" href="#how">{t.ctaHow}</a>
+          <a class="btn btn-ghost" href="#video">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>
+            {t.ctaWatch}
+          </a>
         </div>
         <p class="e2e">{t.e2e}</p>
       </div>
       <HeroDemo text={t.heroDemoText} phoneStatus={t.heroPhoneStatus} />
     </div>
+  </section>
+
+  <section class="wrap section" id="video" aria-labelledby="video-h">
+    <header class="sec-head" data-reveal>
+      <p class="eyebrow">{t.videoEyebrow}</p>
+      <h2 id="video-h">{t.videoHeading}</h2>
+      <p class="muted">{t.videoLead}</p>
+    </header>
+    <div class="intro" data-reveal>
+      <VideoPlayer video={intro} lang={lang} />
+    </div>
+    <p class="more-video"><a class="btn btn-ghost" href={pathFor(lang, 'videos')}>{t.videoFull} →</a></p>
   </section>
 
   <section class="wrap section" id="how" aria-labelledby="how-h">
@@ -187,6 +203,7 @@ const steps = [t.step1, t.step2, t.step3];
         <li style={`--i:${i}`}><span class="num" aria-hidden="true">{i + 1}</span><p>{s}</p></li>
       ))}
     </ol>
+    <p class="more-video"><a href={pathFor(lang, 'videos')}>{t.stepsVideo} →</a></p>
   </section>
 
   <section class="wrap section narrow" id="faq" aria-labelledby="faq-h">
@@ -204,10 +221,10 @@ const steps = [t.step1, t.step2, t.step3];
     <div class="contact" data-reveal>
       <h2 id="contact-h">{t.contactHeading}</h2>
       <p class="muted">{t.contactLead}</p>
-      <a class="btn btn-ghost" href={`mailto:${supportEmail}`}>
+      <a class="btn btn-ghost" href={discordUrl} rel="noopener">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18v12H3zM3 7l9 6 9-6" /></svg>
-        {supportEmail}
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9 10.5h.01M15 10.5h.01" /></svg>
+        {t.contactCta}
       </a>
     </div>
   </section>
@@ -354,6 +371,10 @@ const steps = [t.step1, t.step2, t.step3];
            color: #fff; background: linear-gradient(135deg, var(--purple), var(--pink)); }
   .feature:nth-child(3n + 2) .f-ico { background: linear-gradient(135deg, var(--blue), var(--purple)); }
   .feature:nth-child(3n) .f-ico { background: linear-gradient(135deg, var(--pink), var(--purple)); }
+
+  .intro { max-width: 56rem; margin: 0 auto; }
+  .more-video { text-align: center; margin: 1.75rem 0 0; }
+  #start .more-video { margin-top: 2.5rem; font-weight: 600; }
 
   .security { display: grid; grid-template-columns: 1fr 1.1fr; gap: 3rem; align-items: center; }
   .checks { list-style: none; padding: 0; margin: 1.5rem 0; }

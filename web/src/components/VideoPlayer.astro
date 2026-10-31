@@ -1,0 +1,23 @@
+---
+// A self-hosted video: nothing loads until it is played (preload="none"), the poster holds its place.
+// The captions are burned into the picture, so there is no <track>.
+import { ui, type Lang } from '../i18n/ui';
+import type { Video } from '../lib/videos';
+
+interface Props { video: Video; lang: Lang }
+const { video: v, lang } = Astro.props;
+const t = ui[lang];
+---
+<video class="player" controls preload="none" playsinline poster={v.poster} width="1920" height="1080"
+       aria-label={v.title} data-video={v.id}>
+  <source src={v.mp4} type="video/mp4" />
+  <p>{t.videoUnsupported} <a href={v.mp4}>{t.videoDownload}</a></p>
+</video>
+
+<style>
+  .player {
+    display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 18px;
+    background: #000; border: 1px solid var(--border);
+    box-shadow: 0 40px 80px -50px rgba(124, 58, 237, 0.9);
+  }
+</style>
