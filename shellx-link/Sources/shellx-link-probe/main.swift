@@ -29,6 +29,7 @@ enum Probe {
           shellx-link-probe chat-send <session_id> --state <dir> [--machine <id>] --text-file <file>
           shellx-link-probe chat-stop <session_id> --state <dir> [--machine <id>] [--hard]
           shellx-link-probe agent-close <session_id> --state <dir> [--machine <id>]
+          shellx-link-probe terminal-close <workspace_id> <terminal_id> --state <dir> [--machine <id>]
           shellx-link-probe bench --state <dir> [--machine <id>] --socket <path> [--count <n>] [--mode <mode>]
 
         --state is a directory only you can read (created 0700 when missing); keep it outside any
@@ -47,6 +48,8 @@ enum Probe {
         unless the Mac answers ok.
         agent-close closes the terminal a live agent runs in on the Mac (the whole workspace when it is the
         workspace's last tab of any kind); take the session_id from sessions. It exits 2 unless the Mac answers ok.
+        terminal-close closes one terminal tab of a workspace on the Mac (the whole workspace when it is the
+        workspace's last tab); take both ids from workspaces. It exits 2 unless the Mac answers ok.
         watch logs pending requests, session states and chat entries until the session ends
         (exit 4) or --seconds pass (exit 0). With --recheck it then tries to connect again twice:
         with a ticket minted before the end (the Mac's handshake check) and with a new ticket (the
@@ -114,6 +117,9 @@ enum Probe {
         case "agent-close":
             try args.expect(positional: 1, options: ["state", "machine"])
             try await Commands.agentClose(args)
+        case "terminal-close":
+            try args.expect(positional: 2, options: ["state", "machine"])
+            try await Commands.terminalClose(args)
         case "bench":
             try args.expect(positional: 0, options: ["state", "machine", "socket", "count", "mode"])
             try await Bench(args: args).run()

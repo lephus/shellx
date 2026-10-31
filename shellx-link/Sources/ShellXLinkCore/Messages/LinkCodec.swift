@@ -35,6 +35,7 @@ public enum LinkCodec {
         static let workspaceRename = "workspace.rename", workspaceRenameResult = "workspace.rename.result"
         static let workspaceClose = "workspace.close", workspaceCloseResult = "workspace.close.result"
         static let agentClose = "agent.close", agentCloseResult = "agent.close.result"
+        static let terminalClose = "terminal.close", terminalCloseResult = "terminal.close.result"
     }
 
     // Per-message bodies (keys are snake_case on the wire).
@@ -80,7 +81,8 @@ public enum LinkCodec {
     private struct WorkspaceRename: Codable { var callId: String; var workspaceId: String; var title: String }
     private struct WorkspaceClose: Codable { var callId: String; var workspaceId: String }
     private struct AgentClose: Codable { var callId: String; var sessionId: String }
-    /// `workspace.rename.result`, `workspace.close.result` and `agent.close.result`.
+    private struct TerminalClose: Codable { var callId: String; var workspaceId: String; var terminalId: String }
+    /// `workspace.rename.result`, `workspace.close.result`, `agent.close.result` and `terminal.close.result`.
     private struct WorkspaceOutcome: Codable { var callId: String; var outcome: WorkspaceControlOutcome }
 
     private struct Envelope { var v: Int; var t: String }
@@ -227,6 +229,13 @@ public enum LinkCodec {
             case let .agentCloseResult(callId, outcome):
                 try requireValid(callId)
                 data = try enc(T.agentCloseResult, WorkspaceOutcome(callId: callId, outcome: outcome))
+            case let .terminalClose(callId, workspaceId, terminalId):
+                try requireValid(callId)
+                data = try enc(
+                    T.terminalClose, TerminalClose(callId: callId, workspaceId: workspaceId, terminalId: terminalId))
+            case let .terminalCloseResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.terminalCloseResult, WorkspaceOutcome(callId: callId, outcome: outcome))
             case .unknown: throw LinkCodecError.cannotEncodeUnknown
             }
         } catch let e as LinkCodecError {
@@ -358,6 +367,12 @@ public enum LinkCodec {
         case T.agentCloseResult:
             let b = try call(WorkspaceOutcome.self, \.callId)
             return .agentCloseResult(callId: b.callId, outcome: b.outcome)
+        case T.terminalClose:
+            let b = try call(TerminalClose.self, \.callId)
+            return .terminalClose(callId: b.callId, workspaceId: b.workspaceId, terminalId: b.terminalId)
+        case T.terminalCloseResult:
+            let b = try call(WorkspaceOutcome.self, \.callId)
+            return .terminalCloseResult(callId: b.callId, outcome: b.outcome)
         default: return .unknown(type: env.t, callId: readCallId(d))
         }
     }

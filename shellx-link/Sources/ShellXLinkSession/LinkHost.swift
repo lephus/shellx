@@ -18,6 +18,7 @@ public actor LinkHost {
     private nonisolated let workspaces: (any WorkspaceSource)?
     private nonisolated let workspaceControl: (any WorkspaceControl)?
     private nonisolated let agentControl: (any AgentControl)?
+    private nonisolated let terminalControl: (any TerminalControl)?
     private nonisolated let hostVersion: String
     private nonisolated let machineName: String
     private nonisolated let timings: LinkTimings
@@ -36,24 +37,26 @@ public actor LinkHost {
     ///     answered `unsupported`.
     ///   - agentControl: closing an agent's terminal; with it the host offers the `agent_close` feature, without it
     ///     `agent.close` is answered `unsupported`.
+    ///   - terminalControl: closing one terminal tab of a listed workspace; with it the host offers the
+    ///     `terminal_close` feature, without it `terminal.close` is answered `unsupported`.
     public init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
         workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
-        agentControl: (any AgentControl)? = nil,
+        agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
         hostVersion: String, machineName: String
     ) {
         self.init(
             key: key, trustedClients: trustedClients, feed: feed, sessions: sessions, chat: chat,
             workspaces: workspaces, workspaceControl: workspaceControl, agentControl: agentControl,
-            hostVersion: hostVersion, machineName: machineName, timings: .standard)
+            terminalControl: terminalControl, hostVersion: hostVersion, machineName: machineName, timings: .standard)
     }
 
     init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)?, chat: (any AgentChatSource)?,
         workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
-        agentControl: (any AgentControl)? = nil,
+        agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
         hostVersion: String, machineName: String, timings: LinkTimings
     ) {
         self.key = key
@@ -64,6 +67,7 @@ public actor LinkHost {
         self.workspaces = workspaces
         self.workspaceControl = workspaceControl
         self.agentControl = agentControl
+        self.terminalControl = terminalControl
         self.hostVersion = hostVersion
         self.machineName = machineName
         self.timings = timings
@@ -74,7 +78,7 @@ public actor LinkHost {
     /// Flow: Noise handshake (responder), `hello` -> `welcome`, then `agent.changed` pushes for
     /// every feed change and answers to `agent.snapshot.get`, `agent.reply`, `ping` and, with the
     /// sources, the session, chat, workspace and agent calls (`agent.sessions.get`, `chat.*`, `workspace.*`,
-    /// `agent.close`), plus pushes
+    /// `agent.close`, `terminal.close`), plus pushes
     /// for every session change, chat entry, transcript reset (`chat.reset`) and workspace change.
     /// Cancelling the calling task ends the session.
     public func serve(_ circuit: any RelayCircuit) async {
@@ -158,6 +162,7 @@ public actor LinkHost {
         if workspaces != nil { features.append(ShellXLink.workspacesFeature) }
         if workspaceControl != nil { features.append(ShellXLink.workspaceControlFeature) }
         if agentControl != nil { features.append(ShellXLink.agentCloseFeature) }
+        if terminalControl != nil { features.append(ShellXLink.terminalCloseFeature) }
         do {
             try await channel.send(.welcome(
                 protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName,
@@ -222,6 +227,7 @@ public actor LinkHost {
         let workspaces = self.workspaces
         let workspaceControl = self.workspaceControl
         let agentControl = self.agentControl
+        let terminalControl = self.terminalControl
         // The uploads of this session: an id means nothing in another one, and they end with this scope.
         var uploads = AttachmentUploads(now: timings.now)
         while true {
@@ -409,6 +415,16 @@ public actor LinkHost {
                     let outcome = await agentControl.closeAgent(sessionId: sessionId)
                     try? await channel.send(.agentCloseResult(callId: callId, outcome: outcome))
                 }
+            case let .terminalClose(callId, workspaceId, terminalId):
+                guard let terminalControl else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no terminal control", callId: callId)
+                    continue
+                }
+                // Closing a terminal may take a while; keep reading meanwhile.
+                group.addTask {
+                    let outcome = await terminalControl.closeTerminal(workspaceId: workspaceId, terminalId: terminalId)
+                    try? await channel.send(.terminalCloseResult(callId: callId, outcome: outcome))
+                }
             case .pong, .unknown, .error:
                 break
             case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged:
@@ -419,7 +435,7 @@ public actor LinkHost {
                  let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
                  let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
                  let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
-                 let .agentCloseResult(callId, _):
+                 let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _):
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }

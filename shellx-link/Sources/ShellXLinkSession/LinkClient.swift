@@ -76,7 +76,8 @@ public actor LinkClient {
     /// capability only when it is here: for `ShellXLink.attachmentsFeature`, `uploadAttachment` and
     /// `chatSend(attachments:)`; for `ShellXLink.workspacesFeature`, `workspaces()` and `workspaceChanges`; for
     /// `ShellXLink.workspaceControlFeature`, `createWorkspace`, `renameWorkspace` and `closeWorkspace`; for
-    /// `ShellXLink.agentCloseFeature`, `closeAgent`. A string this version does not know is kept, and ignored.
+    /// `ShellXLink.agentCloseFeature`, `closeAgent`; for `ShellXLink.terminalCloseFeature`, `closeTerminal`. A string
+    /// this version does not know is kept, and ignored.
     public nonisolated let hostFeatures: Set<String>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
@@ -422,6 +423,22 @@ public actor LinkClient {
         return outcome
     }
 
+    /// Closes one terminal tab of a workspace the Mac lists, on the Mac, which keeps its own rules: it closes the
+    /// whole workspace when that tab is its last one, for example. Call it only when ``hostFeatures`` lists
+    /// `ShellXLink.terminalCloseFeature`. A terminal that is not in a local workspace of the Mac's list (an SSH
+    /// workspace's, or one that is gone) comes as the outcome `.notFound`, and one the Mac refuses to act on (remote
+    /// control blocked, or its rule) as `.refused`; `.failed` when it could not act. Unlike ``closeAgent(sessionId:)``
+    /// the Mac does not look for a live agent: the tab was picked by the user.
+    ///
+    /// Not safe to repeat: after a timeout or a lost connection it is unknown whether the Mac acted, so read the
+    /// workspace list again instead. Throws `.remote(code: "unsupported", ...)` when the host takes no terminal
+    /// control, `.timedOut` after the request timeout, and `.sessionClosed` when the session ends first.
+    public func closeTerminal(workspaceId: String, terminalId: String) async throws -> WorkspaceControlOutcome {
+        let answer = try await call { .terminalClose(callId: $0, workspaceId: workspaceId, terminalId: terminalId) }
+        guard case let .terminalCloseResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
     /// Waits for the turn to upload. Throws `CancellationError` when the caller is cancelled first, and the session's
     /// end error when it ends first; either way the caller holds no turn.
     private func acquireUploadTurn() async throws {
@@ -536,7 +553,7 @@ public actor LinkClient {
              let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
              let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
              let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
-             let .agentCloseResult(callId, _):
+             let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _):
             // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
             waiters.removeValue(forKey: callId)?.resume(returning: message)
         case let .sessionsChanged(revision, upserted, removed):
@@ -563,7 +580,7 @@ public actor LinkClient {
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
              .chatInterrupt, .attachBegin, .attachChunk, .attachEnd, .workspacesGet, .workspaceCreate,
-             .workspaceRename, .workspaceClose, .agentClose:
+             .workspaceRename, .workspaceClose, .agentClose, .terminalClose:
             break
         }
         return true
