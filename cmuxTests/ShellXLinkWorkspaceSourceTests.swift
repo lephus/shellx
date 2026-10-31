@@ -473,6 +473,59 @@ struct ShellXLinkWorkspaceSourceTests {
         #expect(mac.surfaceCloses.count == 1)
     }
 
+    /// The live control's gate (PROTOCOL.md 10, "Shell fall-through"): only a Claude agent that has not ended, whose
+    /// pid the Mac knows and finds alive, and that is bound to a workspace and a terminal, names a surface to close.
+    /// Once the agent has exited, its tab runs the user's shell, which a phone must never close.
+    @Test func liveAgentSurfaceNamesOnlyALiveAgentBoundToATab() throws {
+        // A process that has exited (reaped), so its pid names no agent.
+        let exited = Process()
+        exited.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try exited.run()
+        exited.waitUntilExit()
+        let deadPID = Int(exited.processIdentifier)
+        let workspace = UUID(), surface = UUID()
+        let base = AgentChatSessionRecord(
+            sessionID: "s1", agentKind: .claude, workspaceID: workspace.uuidString, surfaceID: surface.uuidString,
+            state: .idle, lastActivityAt: Date(), pid: Int(getpid())
+        )
+        func record(_ change: (inout AgentChatSessionRecord) -> Void) -> AgentChatSessionRecord {
+            var changed = base
+            change(&changed)
+            return changed
+        }
+
+        let live = try #require(ShellXLinkWorkspaceSource.liveAgentSurface(base))
+        #expect(live.workspaceId == workspace)
+        #expect(live.surfaceId == surface)
+        let working = ShellXLinkWorkspaceSource.liveAgentSurface(record { $0.state = .working(since: Date()) })
+        #expect(working?.surfaceId == surface)
+        // The registry may keep ids in lower case; the list names them in upper case.
+        let lower = ShellXLinkWorkspaceSource.liveAgentSurface(record {
+            $0.workspaceID = workspace.uuidString.lowercased()
+            $0.surfaceID = surface.uuidString.lowercased()
+        })
+        #expect(lower?.workspaceId == workspace && lower?.surfaceId == surface)
+
+        let codex = AgentChatSessionRecord(
+            sessionID: "s2", agentKind: .codex, workspaceID: workspace.uuidString, surfaceID: surface.uuidString,
+            state: .idle, lastActivityAt: Date(), pid: Int(getpid())
+        )
+        let notLive: [(String, AgentChatSessionRecord?)] = [
+            ("unknown", nil),
+            ("ended", record { $0.state = .ended }),
+            ("no pid", record { $0.pid = nil }),
+            ("exited", record { $0.pid = deadPID }),
+            ("not Claude", codex),
+            ("no workspace", record { $0.workspaceID = nil }),
+            ("garbled workspace", record { $0.workspaceID = "ws-1" }),
+            ("no surface", record { $0.surfaceID = nil }),
+            ("garbled surface", record { $0.surfaceID = "" }),
+        ]
+        for (name, candidate) in notLive {
+            #expect(ShellXLinkWorkspaceSource.liveAgentSurface(candidate) == nil, "\(name) named a surface")
+        }
+    }
+
     // MARK: - The live agent-surface close
 
     /// Runs `body` with a window-less manager holding two workspaces as the controller's active one, its
