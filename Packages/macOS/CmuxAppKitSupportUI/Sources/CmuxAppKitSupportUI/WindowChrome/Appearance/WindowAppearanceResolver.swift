@@ -1,6 +1,7 @@
 import AppKit
 public import SwiftUI
 import CmuxFoundation
+import ShellXBrand
 
 /// Builds `WindowAppearanceSnapshot` values from injected terminal and user settings.
 public struct WindowAppearanceResolver {
@@ -52,7 +53,8 @@ public struct WindowAppearanceResolver {
                 ambientScheme: settings.colorScheme
             ),
             reducesTransparency: settings.reduceTransparency,
-            ambientColorScheme: settings.colorScheme
+            ambientColorScheme: settings.colorScheme,
+            sidebarTintSource: settings.sidebarTintSource
         )
     }
 
@@ -84,6 +86,8 @@ public struct WindowAppearanceResolver {
             sidebarTintHexLight: defaults.string(forKey: "sidebarTintHexLight"),
             sidebarTintHexDark: defaults.string(forKey: "sidebarTintHexDark"),
             sidebarTintOpacity: defaults.object(forKey: "sidebarTintOpacity") as? Double ?? tintDefaults.opacity,
+            sidebarTintSource: defaults.string(forKey: "sidebarTintSource")
+                .flatMap(ShellXSidebarTintSource.init(rawValue:)) ?? .automatic,
             sidebarCornerRadius: defaults.object(forKey: "sidebarCornerRadius") as? Double ?? 0.0,
             sidebarBlurOpacity: defaults.object(forKey: "sidebarBlurOpacity") as? Double ?? 1.0,
             bgGlassEnabled: defaults.object(forKey: "bgGlassEnabled") as? Bool ?? false,

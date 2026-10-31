@@ -1,3 +1,4 @@
+public import ShellXBrand
 public import SwiftUI
 
 /// User settings needed to resolve window appearance.
@@ -31,6 +32,10 @@ public struct WindowAppearanceUserSettingsSnapshot {
     /// Sidebar tint opacity.
     public let sidebarTintOpacity: Double
 
+    /// Whether the sidebar takes its color from the terminal theme or keeps
+    /// the tint above.
+    public let sidebarTintSource: ShellXSidebarTintSource
+
     /// Sidebar corner radius.
     public let sidebarCornerRadius: Double
 
@@ -60,6 +65,7 @@ public struct WindowAppearanceUserSettingsSnapshot {
         sidebarTintHexLight: String?,
         sidebarTintHexDark: String?,
         sidebarTintOpacity: Double,
+        sidebarTintSource: ShellXSidebarTintSource = .automatic,
         sidebarCornerRadius: Double,
         sidebarBlurOpacity: Double,
         bgGlassEnabled: Bool,
@@ -76,6 +82,7 @@ public struct WindowAppearanceUserSettingsSnapshot {
         self.sidebarTintHexLight = sidebarTintHexLight
         self.sidebarTintHexDark = sidebarTintHexDark
         self.sidebarTintOpacity = sidebarTintOpacity
+        self.sidebarTintSource = sidebarTintSource
         self.sidebarCornerRadius = sidebarCornerRadius
         self.sidebarBlurOpacity = sidebarBlurOpacity
         self.bgGlassEnabled = bgGlassEnabled

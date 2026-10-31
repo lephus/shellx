@@ -892,12 +892,17 @@ final class CmuxSettingsFileStore {
         if let value = jsonBool(section["matchTerminalBackground"]) {
             snapshot.managedUserDefaults[SidebarMatchTerminalBackgroundSettings.userDefaultsKey] = .bool(value)
         }
+        var tintHex: String?
+        var tintHexLight: String?
+        var tintHexDark: String?
+        var tintOpacity: Double?
         if let raw = jsonString(section["tintColor"]) {
             guard let normalized = WorkspaceTabColorSettings.normalizedHex(raw) else {
                 logInvalid("sidebarAppearance.tintColor", sourcePath: sourcePath)
                 return
             }
             snapshot.managedUserDefaults["sidebarTintHex"] = .string(normalized)
+            tintHex = normalized
         }
         if section.keys.contains("lightModeTintColor") {
             guard let value = parseNullableHex(
@@ -906,6 +911,7 @@ final class CmuxSettingsFileStore {
                 sourcePath: sourcePath
             ) else { return }
             snapshot.managedUserDefaults["sidebarTintHexLight"] = .nullableString(value)
+            tintHexLight = value
         }
         if section.keys.contains("darkModeTintColor") {
             guard let value = parseNullableHex(
@@ -914,10 +920,24 @@ final class CmuxSettingsFileStore {
                 sourcePath: sourcePath
             ) else { return }
             snapshot.managedUserDefaults["sidebarTintHexDark"] = .nullableString(value)
+            tintHexDark = value
         }
         if let value = jsonDouble(section["tintOpacity"]) {
             let clamped = min(max(value, 0), 1)
             snapshot.managedUserDefaults["sidebarTintOpacity"] = .double(clamped)
+            tintOpacity = clamped
+        }
+        // A tint of the user's own applies even after Settings › Sidebar was
+        // set to follow the theme; the template's default tint leaves that
+        // choice alone.
+        let tintIsUsersOwn = !SidebarTintSourceOption.automatic.followsTerminalTheme(
+            tintHex: tintHex ?? ShellXPalette.panel.hexString,
+            tintHexLight: tintHexLight,
+            tintHexDark: tintHexDark,
+            tintOpacity: tintOpacity ?? 1
+        )
+        if tintIsUsersOwn {
+            snapshot.managedUserDefaults["sidebarTintSource"] = .string(SidebarTintSourceOption.custom.rawValue)
         }
     }
 

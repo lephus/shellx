@@ -2,6 +2,7 @@ public import AppKit
 public import SwiftUI
 public import CmuxFoundation
 public import CmuxWorkspaces
+public import ShellXBrand
 
 /// Resolved window chrome appearance for a single render pass.
 public struct WindowAppearanceSnapshot {
@@ -41,9 +42,12 @@ public struct WindowAppearanceSnapshot {
     /// The light/dark decision for the left sidebar's backdrop and content.
     ///
     /// A sidebar that shares the terminal backdrop follows the terminal
-    /// authority. A separate sidebar draws a material that resolves against
-    /// the app appearance, so its content must follow that same appearance or
-    /// text is drawn for a scheme its own background does not use.
+    /// authority. A separate sidebar that follows the theme draws a color
+    /// taken from the terminal theme, and one with the user's own opaque tint
+    /// draws that tint, so its content follows the color drawn. A separate
+    /// sidebar with a translucent tint of the user's own shows a material that
+    /// resolves against the app appearance, so its content must follow that
+    /// same appearance or text is drawn for a scheme its own background does not use.
     public let sidebarColorScheme: ColorScheme
 
     /// Creates a resolved window appearance snapshot.
@@ -57,15 +61,55 @@ public struct WindowAppearanceSnapshot {
         windowGlassSettings: WindowGlassSettingsSnapshot,
         resolvedColorScheme: ColorScheme? = nil,
         reducesTransparency: Bool = false,
-        ambientColorScheme: ColorScheme? = nil
+        ambientColorScheme: ColorScheme? = nil,
+        sidebarTintSource: ShellXSidebarTintSource = .automatic
     ) {
         let resolvedScheme = resolvedColorScheme ?? Self.colorScheme(
             forTerminalBackgroundColor: terminalBackgroundColor,
             opacity: Double(Self.clampedOpacity(Double(terminalBackgroundOpacity)))
         )
-        let sidebarScheme = unifySurfaceBackdrops
-            ? resolvedScheme
-            : (ambientColorScheme ?? resolvedScheme)
+        let appScheme = ambientColorScheme ?? resolvedScheme
+        let ownTintHex = (appScheme == .dark ? sidebarSettings.tintHexDark : sidebarSettings.tintHexLight)
+            ?? sidebarSettings.tintHex
+        let sidebarScheme: ColorScheme
+        var sidebarTintHex = sidebarSettings.tintHex
+        var sidebarTintHexLight = sidebarSettings.tintHexLight
+        var sidebarTintHexDark = sidebarSettings.tintHexDark
+        var sidebarTintOpacity = sidebarSettings.tintOpacity
+        if unifySurfaceBackdrops {
+            sidebarScheme = resolvedScheme
+        } else if sidebarTintSource.followsTerminalTheme(
+            tintHex: sidebarSettings.tintHex,
+            tintHexLight: sidebarSettings.tintHexLight,
+            tintHexDark: sidebarSettings.tintHexDark,
+            tintOpacity: sidebarSettings.tintOpacity
+        ) {
+            let themeTint = WindowChromeSidebarTintDefaults.themeTint(
+                forTerminalBackground: terminalBackgroundColor,
+                rendered: Self.resolvedChromeBackgroundColor(
+                    backgroundColor: terminalBackgroundColor,
+                    opacity: Double(Self.clampedOpacity(Double(terminalBackgroundOpacity))),
+                    colorScheme: resolvedScheme
+                )
+            )
+            // The theme decides the whole color, so a light or dark override
+            // or an opacity left from the user's own tint does not apply.
+            sidebarTintHex = themeTint.hexString()
+            sidebarTintHexLight = nil
+            sidebarTintHexDark = nil
+            sidebarTintOpacity = 1
+            sidebarScheme = WindowChromeColorResolver().readableColorScheme(for: themeTint)
+        } else if sidebarSettings.tintOpacity >= 0.999, let ownTint = NSColor(hex: ownTintHex) {
+            // An opaque tint covers the material, so the text follows the
+            // tint. The tint is fixed to the one the app appearance picks, so
+            // the scheme chosen here cannot select a different override.
+            sidebarTintHex = ownTintHex
+            sidebarTintHexLight = nil
+            sidebarTintHexDark = nil
+            sidebarScheme = WindowChromeColorResolver().readableColorScheme(for: ownTint)
+        } else {
+            sidebarScheme = appScheme
+        }
         self.terminalBackgroundColor = terminalBackgroundColor
         self.terminalBackgroundOpacity = terminalBackgroundOpacity
         self.terminalBackgroundBlur = terminalBackgroundBlur
@@ -75,10 +119,10 @@ public struct WindowAppearanceSnapshot {
             materialRawValue: sidebarSettings.materialRawValue,
             blendModeRawValue: sidebarSettings.blendModeRawValue,
             stateRawValue: sidebarSettings.stateRawValue,
-            tintHex: sidebarSettings.tintHex,
-            tintHexLight: sidebarSettings.tintHexLight,
-            tintHexDark: sidebarSettings.tintHexDark,
-            tintOpacity: sidebarSettings.tintOpacity,
+            tintHex: sidebarTintHex,
+            tintHexLight: sidebarTintHexLight,
+            tintHexDark: sidebarTintHexDark,
+            tintOpacity: sidebarTintOpacity,
             cornerRadius: sidebarSettings.cornerRadius,
             blurOpacity: sidebarSettings.blurOpacity,
             colorScheme: sidebarScheme

@@ -67,12 +67,14 @@ import Testing
             unifySurfaceBackdrops: false,
             sidebarBlendMode: "withinWindow",
             sidebarTintHexDark: "#FF0000",
+            sidebarTintOpacity: 0.4,
             bgGlassEnabled: false
         ))
 
         #expect(snapshot.resolvedColorScheme == expectedScheme)
         #expect(snapshot.chromeColorScheme == expectedScheme)
-        // A separate sidebar follows the ambient scheme (makeSettings: .dark).
+        // A separate sidebar with a translucent chosen tint follows the
+        // ambient scheme (makeSettings: .dark).
         #expect(snapshot.sidebarContentColorScheme == .dark)
         #expect(snapshot.sidebarSettings.colorScheme == .dark)
     }
@@ -107,9 +109,14 @@ import Testing
                 resolvedColorScheme: terminalScheme
             )
         )
+        // A translucent chosen tint keeps the sidebar on the ambient scheme;
+        // a default or opaque tint follows the color drawn
+        // (SidebarFollowsTerminalThemeTests).
         let snapshot = resolver.current(settings: makeSettings(
             unifySurfaceBackdrops: false,
             sidebarBlendMode: "withinWindow",
+            sidebarTintHexDark: "#FF0000",
+            sidebarTintOpacity: 0.4,
             bgGlassEnabled: false,
             colorScheme: ambientScheme
         ))
@@ -120,10 +127,10 @@ import Testing
         #expect(snapshot.sidebarSettings.colorScheme == ambientScheme)
     }
 
-    /// A separate sidebar draws a material that resolves against the app
-    /// appearance, so its content must follow that appearance even when an
-    /// opaque terminal theme disagrees. A sidebar sharing the terminal
-    /// backdrop keeps following the terminal.
+    /// A separate sidebar with a translucent chosen tint draws a material that
+    /// resolves against the app appearance, so its content must follow that appearance
+    /// even when an opaque terminal theme disagrees. A sidebar sharing the
+    /// terminal backdrop keeps following the terminal.
     @Test(arguments: [
         (false, ColorScheme.dark, ColorScheme.light, ColorScheme.light),
         (false, ColorScheme.light, ColorScheme.dark, ColorScheme.dark),
@@ -148,6 +155,8 @@ import Testing
         let snapshot = resolver.current(settings: makeSettings(
             unifySurfaceBackdrops: unifySurfaceBackdrops,
             sidebarBlendMode: "withinWindow",
+            sidebarTintHexDark: "#FF0000",
+            sidebarTintOpacity: 0.4,
             bgGlassEnabled: false,
             colorScheme: ambientScheme
         ))

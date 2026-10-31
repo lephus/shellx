@@ -524,6 +524,54 @@ final class KeyboardShortcutSettingsFileStoreStartupTests: XCTestCase {
         }
     }
 
+    /// A sidebar tint of the user's own in cmux.json keeps applying after
+    /// Settings › Sidebar was set to follow the theme; the template's default
+    /// tint leaves that choice alone.
+    func testSettingsFileSidebarTintOfTheUsersOwnSetsCustomSource() throws {
+        let defaults = UserDefaults.standard
+        let sourceKey = "sidebarTintSource"
+        try preservingDefaults(keys: [
+            sourceKey,
+            "sidebarTintHex",
+            "sidebarTintOpacity",
+            settingsFileBackupsDefaultsKey,
+            importedManagedDefaultsKey
+        ]) {
+            let directoryURL = try makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: directoryURL) }
+            let settingsFileURL = directoryURL.appendingPathComponent("cmux.json", isDirectory: false)
+
+            defaults.set("theme", forKey: sourceKey)
+            try writeSettingsFile(
+                """
+                {
+                  "sidebarAppearance": {
+                    "tintColor": "#100B1D",
+                    "tintOpacity": 1
+                  }
+                }
+                """,
+                to: settingsFileURL
+            )
+            _ = KeyboardShortcutSettingsFileStore(primaryPath: settingsFileURL.path, fallbackPath: nil, additionalFallbackPaths: [], startWatching: false)
+            XCTAssertEqual(defaults.string(forKey: sourceKey), "theme")
+
+            try writeSettingsFile(
+                """
+                {
+                  "sidebarAppearance": {
+                    "tintColor": "#202040"
+                  }
+                }
+                """,
+                to: settingsFileURL
+            )
+            _ = KeyboardShortcutSettingsFileStore(primaryPath: settingsFileURL.path, fallbackPath: nil, additionalFallbackPaths: [], startWatching: false)
+            XCTAssertEqual(defaults.string(forKey: "sidebarTintHex"), "#202040")
+            XCTAssertEqual(defaults.string(forKey: sourceKey), "custom")
+        }
+    }
+
     func testSettingsFileParsesMarkdownTypographyDefaults() throws {
         let defaults = UserDefaults.standard
 
