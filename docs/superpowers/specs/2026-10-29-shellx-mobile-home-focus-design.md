@@ -189,6 +189,28 @@ Luật này dùng cho **mọi danh sách phiên** trên điện thoại: ba nhó
   `workspace.close`.
 - Mac chưa có feature này (gồm 1.5.1): không hiện nút vuốt, không hiện mục trong màn agent.
 
+### 6.6 Đóng một tab bất kỳ (phần 3, thêm 2026-10-31)
+
+- **Hành vi** **[người dùng, 2026-10-31: "các tab đang running cũng nên cho phép đóng từ mobile", chọn "Đóng mọi
+  tab"]**: điện thoại đóng được **mọi** tab terminal của một workspace cục bộ trên Mac, kể cả tab chỉ chạy shell
+  hay một lệnh (dev server, build…). Mac đóng tab đó như người dùng đóng trên desktop, dừng mọi thứ đang chạy
+  trong nó. Luật tab cuối giống 6.5: tab cuối của workspace thì đóng workspace (mặc định), Mac bật "Keep Workspace
+  Open" thì từ chối.
+- **Chỗ đặt** **[người dùng chọn "menu ••• + nhấn giữ tab"]**:
+  - menu `•••` của màn workspace: mục "Đóng tab…" cho tab đang hiện (agent hay shell). Mục "Đóng agent…" của
+    menu này gộp vào "Đóng tab…";
+  - nhấn giữ một chip tab bất kỳ: menu ngữ cảnh có "Đóng tab…".
+  - Vuốt đóng agent ở màn chính và mục "Đóng agent…" trong màn agent giữ như 6.5.
+- **Hỏi lại**: luôn có hộp xác nhận ghi tên tab và "Tab và mọi thứ đang chạy trong nó trên Mac sẽ bị dừng".
+  Đã xác nhận thì Mac không hỏi lại (`force=true`).
+- **Giao thức**: feature `terminal_close`, lệnh `terminal.close` (`call_id`, `workspace_id`, `terminal_id`), trả lời
+  `terminal.close.result` (`call_id`, `outcome`) với bộ `outcome` như `workspace.close.result`. Mac chỉ đóng một
+  terminal có trong một workspace cục bộ nó đang liệt kê; khác đi thì `not_found`. Bị quản lý thiết bị chặn điều
+  khiển từ xa thì `refused`. Không gửi lại sau khi mất kết nối.
+- **An toàn**: lệnh chỉ mang hai id, không chạy lệnh hay nội dung nào; chỉ chạm tab mà điện thoại đã thấy trong
+  `workspace.list`; không bao giờ là workspace SSH/từ xa. Cập nhật PROTOCOL.md §10 như 6.5.
+- Mac chưa có `terminal_close`: không hiện "Đóng tab…" ở đâu cả.
+
 ## 7. Kiểm thử và dogfood
 
 - **ShellXAppCore**: test cho phần chia nhóm (đầu vào: phiên, yêu cầu đang chờ, `finishedSessionIds`,
