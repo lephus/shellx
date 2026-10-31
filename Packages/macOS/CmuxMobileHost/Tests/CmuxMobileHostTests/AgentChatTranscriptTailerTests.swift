@@ -15,6 +15,7 @@ struct AgentChatTranscriptTailerTests {
         var appendedIDs: [String] { lock.lock(); defer { lock.unlock() }; return recorded.flatMap(\.appended).map(\.id) }
         var titles: [String] { lock.lock(); defer { lock.unlock() }; return recorded.compactMap(\.discoveredTitle) }
         var resets: Int { lock.lock(); defer { lock.unlock() }; return recorded.filter(\.didReset).count }
+        var lastAppended: [ChatMessage] { lock.lock(); defer { lock.unlock() }; return recorded.last?.appended ?? [] }
     }
 
     private static func json(_ object: [String: Any]) -> String {
@@ -29,6 +30,12 @@ struct AgentChatTranscriptTailerTests {
     private static func assistantLine(_ uuid: String, _ text: String) -> String {
         json(["type": "assistant", "message": ["role": "assistant", "content": [["type": "text", "text": text]]],
               "uuid": uuid, "timestamp": "2026-10-27T05:00:01.000Z", "sessionId": "s"])
+    }
+
+    /// The line Claude Code writes when the user stops a turn with Esc.
+    private static func interruptLine(_ uuid: String, at timestamp: String) -> String {
+        json(["type": "user", "message": ["role": "user", "content": [["type": "text", "text": "[Request interrupted by user]"]]],
+              "uuid": uuid, "timestamp": timestamp, "interruptedMessageId": "msg_01", "sessionId": "s"])
     }
 
     /// A transcript path in a project folder that does not exist yet.
@@ -171,6 +178,28 @@ struct AgentChatTranscriptTailerTests {
         #expect(await Self.waitUntil { !batches.appendedIDs.isEmpty })
         #expect(batches.appendedIDs.count == 1)
         #expect(await tailer.history(beforeSeq: nil, limit: 50).messages.count == 2)
+        await tailer.stop()
+    }
+
+    /// Claude Code runs no hook for an Esc interrupt; the agent chat service settles the turn from the marker it
+    /// writes instead. A marker already on disk is not published, but the newest history page serves it once the
+    /// tailer started (a phone opening the chat); a later one arrives in a live batch.
+    @Test func testInterruptMarkerIsServedFromBackfillAndPublishedLive() async throws {
+        let (home, file) = try Self.missingTranscript()
+        defer { try? FileManager.default.removeItem(at: home) }
+        try Self.append([Self.userLine("u-1", "Old prompt"), Self.interruptLine("i-1", at: "2026-10-27T05:00:02.000Z")], to: file)
+        let batches = Batches()
+        let tailer = AgentChatTranscriptTailer(sessionID: "s", agentKind: .claude, path: file.path) { batches.record($0) }
+        await tailer.start()
+
+        let backfill = await tailer.history(beforeSeq: nil, limit: 16).messages
+        #expect(ChatMessage.trailingUserInterrupt(in: backfill) == Date(timeIntervalSince1970: 1_793_077_202))
+        #expect(batches.appendedIDs.isEmpty)
+
+        try Self.append([Self.assistantLine("a-1", "Resumed"), Self.interruptLine("i-2", at: "2026-10-27T05:00:09.000Z")], to: file)
+
+        #expect(await Self.waitUntil { batches.appendedIDs.contains("i-2") })
+        #expect(ChatMessage.trailingUserInterrupt(in: batches.lastAppended) == Date(timeIntervalSince1970: 1_793_077_209))
         await tailer.stop()
     }
 }

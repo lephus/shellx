@@ -1,3 +1,6 @@
+import CMUXAgentLaunch
+import CmuxAgentChat
+import CmuxMobileHost
 import Foundation
 import Testing
 import CmuxSidebar
@@ -333,6 +336,94 @@ struct WorkspaceProgramStatusTests {
         let records = try #require(payload["records"] as? [[String: Any]])
         #expect(records.isEmpty)
         #expect(workspace.programStatusStoresByPanelId.isEmpty)
+    }
+
+    /// Claude Code runs no Stop hook when the user stops a turn with Esc, and its process waits at the prompt,
+    /// so the phone's chat session stayed working for days ("Running · 52 hours"). Its OSC 7501 working record
+    /// ending settles the pane after the grace, and the same settlement settles the chat session on that terminal.
+    @Test func claudeEscSettlesTheChatSessionOnItsTerminal() async throws {
+        try await withChatService { service in
+            let workspace = Workspace()
+            let panelId = try #require(workspace.focusedPanelId)
+            let session = UUID().uuidString
+            let prompted = Date().addingTimeInterval(-10)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: session, hookEventName: .userPromptSubmit, source: "claude",
+                surfaceId: panelId.uuidString, receivedAt: prompted
+            ))
+            // The prompt hook's sidebar row.
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
+            workspace.setStatusEntry(
+                SidebarStatusEntry(key: "claude_code", value: "Running", timestamp: prompted, workState: .running),
+                key: "claude_code",
+                panelId: panelId
+            )
+            workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+
+            // Esc: Claude Code clears its working record and runs no Stop hook.
+            workspace.applyProgramStatus(ProgramStatusReport(state: .clear), panelId: panelId)
+
+            #expect(await Self.waitUntil { workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .idle })
+            #expect(await Self.waitUntil { service.sessionRecord(sessionID: session)?.state == .idle })
+            #expect(service.sessionRecord(sessionID: session)?.hasHookLifecycleState == true)
+        }
+    }
+
+    /// Esc on a Claude permission prompt: the typed key moved the chat session from needs-input to working, and
+    /// Claude's blocked record ends with no hook. The chat session settles although the pane's row is not a
+    /// hook-reported Running row, and that row stays as it was.
+    @Test func claudeEscOnPermissionPromptSettlesTheChatSession() async throws {
+        try await withChatService { service in
+            let workspace = Workspace()
+            let panelId = try #require(workspace.focusedPanelId)
+            let session = UUID().uuidString
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: session, hookEventName: .permissionRequest, source: "claude",
+                surfaceId: panelId.uuidString, receivedAt: Date().addingTimeInterval(-10)
+            ))
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+            workspace.applyProgramStatus(
+                ProgramStatusReport(state: .blocked, kind: .permission, app: "claude-code"),
+                panelId: panelId
+            )
+            // The Esc key is explicit input on the terminal before Claude reacts to it.
+            #expect(service.noteExplicitInput(surfaceID: panelId.uuidString) == 1)
+
+            workspace.applyProgramStatus(ProgramStatusReport(state: .clear), panelId: panelId)
+
+            #expect(await Self.waitUntil { service.sessionRecord(sessionID: session)?.state == .idle })
+            #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .needsInput)
+        }
+    }
+
+    /// Runs `body` with a private agent chat service as the app's, and the settlement grace skipped.
+    private func withChatService(_ body: (AgentChatTranscriptService) async throws -> Void) async throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("program-status-chat-\(UUID().uuidString)", isDirectory: true)
+        let previousService = TerminalController.shared.agentChatTranscriptService
+        let previousWait = Workspace.agentTurnSettlementWait
+        let service = AgentChatTranscriptService(
+            registry: AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home)),
+            resolver: AgentChatTranscriptResolver(homeDirectory: home, environment: [:]),
+            hasEventSubscribers: { false },
+            emitEventPayload: { _ in }
+        )
+        TerminalController.shared.agentChatTranscriptService = service
+        Workspace.agentTurnSettlementWait = { _ in }
+        defer {
+            TerminalController.shared.agentChatTranscriptService = previousService
+            Workspace.agentTurnSettlementWait = previousWait
+            try? FileManager.default.removeItem(at: home)
+        }
+        try await body(service)
+    }
+
+    private static func waitUntil(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<300 {
+            if condition() { return true }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return condition()
     }
 
     @Test func sanitizesInvisibleFormattingAndCapsDisplay() {

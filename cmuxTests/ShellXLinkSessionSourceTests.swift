@@ -57,6 +57,38 @@ struct ShellXLinkSessionSourceTests {
         )
     }
 
+    /// A transcript holding `lines`, as Claude Code writes it.
+    private static func transcript(in home: URL, lines: [String]) throws -> URL {
+        let url = home.appendingPathComponent("\(UUID().uuidString).jsonl")
+        try lines.map { $0 + "\n" }.joined().write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    private static func append(_ line: String, to transcript: URL) throws {
+        let handle = try FileHandle(forWritingTo: transcript)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((line + "\n").utf8))
+        try handle.close()
+    }
+
+    private static func transcriptLine(text: String, at offset: TimeInterval, extra: [String: Any] = [:]) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var object: [String: Any] = [
+            "type": "user", "isSidechain": false, "uuid": UUID().uuidString, "sessionId": "s",
+            "message": ["role": "user", "content": [["type": "text", "text": text]]],
+            "timestamp": formatter.string(from: start.addingTimeInterval(offset)),
+        ]
+        object.merge(extra) { _, new in new }
+        return String(decoding: try! JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+    }
+
+    /// The line Claude Code writes when the user stops a turn (Esc), or rejects a tool prompt with Esc.
+    private static func interruptLine(at offset: TimeInterval, forToolUse: Bool = false) -> String {
+        let text = forToolUse ? "[Request interrupted by user for tool use]" : "[Request interrupted by user]"
+        return transcriptLine(text: text, at: offset, extra: ["interruptedMessageId": "msg_01"])
+    }
+
     private static func ms(_ offset: TimeInterval) -> Int64 {
         Int64((start.addingTimeInterval(offset).timeIntervalSince1970 * 1000).rounded())
     }
@@ -240,6 +272,111 @@ struct ShellXLinkSessionSourceTests {
         // An idle session stays as it is: no change is published.
         await MainActor.run { acceptedInterrupt(working, surface: workingSurface) }
         #expect(await source.sessions().revision == base + 3)
+    }
+
+    /// Claude Code runs no hook when the user stops a turn with Esc on the Mac; its process waits at the prompt,
+    /// so the phone showed "Running · 52 hours". Once the agent's own activity report ends on its terminal (the
+    /// sidebar's OSC 7501 settlement), the session turns idle and every phone is told. A session that went on
+    /// after that report stays working.
+    @Test func testMacInterruptSettlesSessionToIdle() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let stopped = UUID().uuidString, resumed = UUID().uuidString
+        let stoppedSurface = UUID().uuidString, resumedSurface = UUID().uuidString
+        let (service, source) = await MainActor.run { Self.makeSource(home: home) }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(stopped, .sessionStart, surface: stoppedSurface))
+            service.noteHookEvent(Self.event(stopped, .userPromptSubmit, surface: stoppedSurface, at: 3))
+            service.noteHookEvent(Self.event(resumed, .sessionStart, surface: resumedSurface))
+            service.noteHookEvent(Self.event(resumed, .userPromptSubmit, surface: resumedSurface, at: 3))
+            service.noteHookEvent(Self.event(resumed, .preToolUse, surface: resumedSurface, at: 6))
+        }
+        let changes = SessionChanges()
+        let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; this call orders it before the settlement.
+        let base = await source.sessions().revision
+
+        let edge = Self.start.addingTimeInterval(5)
+        let settled = await MainActor.run {
+            service.noteTurnSettled(surfaceID: stoppedSurface, agentKind: .claude, at: edge)
+                + service.noteTurnSettled(surfaceID: resumedSurface, agentKind: .claude, at: edge)
+        }
+
+        #expect(settled == 1)
+        #expect(await Self.waitUntil { changes.all.count == 1 })
+        let change = try #require(changes.all.first)
+        #expect(change.revision == base + 1)
+        #expect(change.upserted.map(\.sessionId) == [stopped])
+        #expect(change.upserted.first?.state == .idle)
+        #expect(change.upserted.first?.stateSinceMs == nil)
+        let now = await source.sessions()
+        #expect(now.revision == base + 1)
+        #expect(now.sessions.first { $0.sessionId == resumed }?.state == .working)
+        #expect(now.sessions.first { $0.sessionId == resumed }?.stateSinceMs == Self.ms(3))
+    }
+
+    /// With a phone connected the transcript is tailed, and the "[Request interrupted by user]" line Claude Code
+    /// writes when the user stops a turn settles the session by itself.
+    @Test func testTranscriptInterruptMarkerSettlesSessionToIdle() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let session = UUID().uuidString
+        let transcript = try Self.transcript(in: home, lines: [Self.transcriptLine(text: "Refactor the parser", at: 2)])
+        let (service, source) = await MainActor.run { Self.makeSource(home: home) }
+        let changes = SessionChanges()
+        let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; this call orders it before the hooks, which then tail.
+        _ = await source.sessions()
+        await MainActor.run {
+            service.noteHookEvent(Self.event(session, .sessionStart, transcriptPath: transcript.path))
+            service.noteHookEvent(Self.event(session, .userPromptSubmit, transcriptPath: transcript.path, at: 2))
+        }
+        // Waits for the tailer's first read, so the marker arrives as a live append.
+        _ = await service.history(sessionID: session, beforeSeq: nil, limit: 1)
+        #expect(await source.sessions().sessions.first { $0.sessionId == session }?.state == .working)
+
+        try Self.append(Self.interruptLine(at: 4), to: transcript)
+
+        #expect(await Self.waitUntil {
+            changes.all.last?.upserted.first { $0.sessionId == session }?.state == .idle
+        })
+        let listed = await source.sessions().sessions.first { $0.sessionId == session }
+        #expect(listed?.state == .idle)
+        #expect(listed?.stateSinceMs == nil)
+    }
+
+    /// A session stopped while no phone was connected: nothing tailed its transcript. Opening its chat reads the
+    /// transcript, and an interrupt marker that ends it settles the session, here the "for tool use" marker of an
+    /// Esc on a permission prompt. A hook after the marker (a newer prompt) wins over it.
+    @Test func testOpeningChatSettlesSessionWhoseTranscriptEndsInterrupted() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let stopped = UUID().uuidString, resumed = UUID().uuidString
+        let lines = [Self.transcriptLine(text: "Deploy it", at: 2), Self.interruptLine(at: 5, forToolUse: true)]
+        let stoppedPath = try Self.transcript(in: home, lines: lines).path
+        let resumedPath = try Self.transcript(in: home, lines: lines).path
+        let (service, source) = await MainActor.run { Self.makeSource(home: home) }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(stopped, .sessionStart, transcriptPath: stoppedPath))
+            service.noteHookEvent(Self.event(stopped, .userPromptSubmit, transcriptPath: stoppedPath, at: 2))
+            service.noteHookEvent(Self.event(stopped, .permissionRequest, transcriptPath: stoppedPath, at: 4))
+            service.noteHookEvent(Self.event(resumed, .sessionStart, transcriptPath: resumedPath))
+            service.noteHookEvent(Self.event(resumed, .userPromptSubmit, transcriptPath: resumedPath, at: 7))
+        }
+        #expect(await source.sessions().sessions.first { $0.sessionId == stopped }?.state == .needsInput)
+
+        for session in [resumed, stopped] {
+            #expect(await service.history(sessionID: session, beforeSeq: nil, limit: 50)?.messages.count == 2)
+        }
+
+        #expect(await Self.waitUntil { service.sessionRecord(sessionID: stopped)?.state == .idle })
+        let listed = await source.sessions().sessions
+        #expect(listed.first { $0.sessionId == stopped }?.state == .idle)
+        #expect(listed.first { $0.sessionId == stopped }?.stateSinceMs == nil)
+        #expect(listed.first { $0.sessionId == resumed }?.state == .working)
+        #expect(listed.first { $0.sessionId == resumed }?.stateSinceMs == Self.ms(7))
     }
 
     @Test func testEndedSubscriberStopsObserving() async throws {

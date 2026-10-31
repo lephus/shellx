@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import CmuxAgentChat
@@ -104,5 +105,82 @@ extension ClaudeTranscriptParserTests {
         #expect(result.messages[1].id == "a-m#1")
         #expect(result.messages[0].seq == 5)
         #expect(result.messages[1].seq == 5)
+    }
+
+    // MARK: - User interrupts
+
+    /// The line Claude Code 2.1 writes when the user stops a turn with Esc, as found in real transcripts.
+    private func interruptLine(
+        _ text: String,
+        uuid: String = "u-int",
+        timestamp: String = "2026-06-12T05:09:00.000Z",
+        isSidechain: Bool = false
+    ) -> String {
+        let object: [String: Any] = [
+            "parentUuid": "a-1", "isSidechain": isSidechain, "type": "user",
+            "message": ["role": "user", "content": [["type": "text", "text": text]]],
+            "uuid": uuid, "timestamp": timestamp, "interruptedMessageId": "msg_01X", "sessionId": "s-1",
+        ]
+        return String(decoding: try! JSONSerialization.data(withJSONObject: object), as: UTF8.self)
+    }
+
+    @Test("both interrupt markers end the turn at their own time")
+    func interruptMarkersEndTheTurn() throws {
+        let interruptedAt = try #require(ISO8601DateFormatter.fractional.date(from: "2026-06-12T05:09:00.000Z"))
+        for marker in ["[Request interrupted by user]", "[Request interrupted by user for tool use]"] {
+            let result = parser.parse(
+                lines: [
+                    userLine(content: "fix the bug"),
+                    assistantLine(blocks: [["type": "text", "text": "Looking."]]),
+                    interruptLine(marker),
+                ],
+                startingSeq: 0
+            )
+            let last = try #require(result.messages.last)
+            #expect(last.isUserInterruptMarker)
+            #expect(ChatMessage.trailingUserInterrupt(in: result.messages) == interruptedAt)
+            #expect(result.messages.dropLast().allSatisfy { !$0.isUserInterruptMarker })
+        }
+    }
+
+    @Test("a marker the conversation went on after does not end the turn")
+    func interruptMarkerFollowedByMoreConversationIsNotTrailing() {
+        let marker = interruptLine("[Request interrupted by user]")
+        let reply = assistantLine(blocks: [["type": "text", "text": "Continuing."]], timestamp: "2026-06-12T05:09:01.000Z")
+        let prompt = userLine(uuid: "u-2", content: "try again", timestamp: "2026-06-12T05:09:02.000Z")
+        for lines in [[marker, reply], [marker, prompt]] {
+            let result = parser.parse(lines: lines, startingSeq: 0)
+            #expect(result.messages.first?.isUserInterruptMarker == true)
+            #expect(ChatMessage.trailingUserInterrupt(in: result.messages) == nil)
+        }
+        #expect(ChatMessage.trailingUserInterrupt(in: []) == nil)
+    }
+
+    @Test("a prompt that only quotes the marker, or a subagent's marker, is not an interrupt")
+    func quotedOrSidechainMarkerIsNotAnInterrupt() {
+        let quoted = parser.parse(
+            lines: [userLine(content: "[Request interrupted by user] why did you stop?")],
+            startingSeq: 0
+        )
+        #expect(quoted.messages.count == 1)
+        #expect(ChatMessage.trailingUserInterrupt(in: quoted.messages) == nil)
+
+        let sidechain = parser.parse(
+            lines: [
+                assistantLine(blocks: [["type": "text", "text": "Done."]]),
+                interruptLine("[Request interrupted by user]", isSidechain: true),
+            ],
+            startingSeq: 0
+        )
+        #expect(sidechain.messages.count == 1)
+        #expect(ChatMessage.trailingUserInterrupt(in: sidechain.messages) == nil)
+    }
+}
+
+private extension ISO8601DateFormatter {
+    static var fractional: ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }
 }
