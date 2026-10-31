@@ -1,9 +1,14 @@
 //! One modal rule for the window's panels (RootView): while any panel is
-//! open, app commands (Ctrl+Shift+T/W/D/E, Ctrl+, , the sidebar toggle,
-//! tab and pane focus, terminal clicks) are swallowed; Esc closes the
-//! topmost closable panel; the forced-update overlay closes the settings
-//! panel and cannot itself be closed; the keyboard goes back to the terminal
-//! only when the last panel has closed.
+//! open, app commands (Ctrl+Shift+T/W/B, Ctrl+, , Alt+Shift+= and Alt+Shift+-
+//! splits, Alt+arrows, tab and pane focus, terminal clicks) are swallowed; Esc
+//! closes the topmost closable panel; the forced-update overlay closes the
+//! settings panel and cannot itself be closed; the keyboard goes back to the
+//! terminal only when the last panel has closed. The machines "+" list is not
+//! a panel: it never holds the keyboard.
+//!
+//! Typed text is never swallowed (`Panels::root_key`): on Windows a key-down
+//! that was handled is not translated, so no WM_CHAR follows and the field
+//! (or the terminal) would never see the letter.
 
 use crate::keys::{AppCommand, KeyAction};
 
@@ -18,8 +23,6 @@ pub enum Panel {
     Pairing,
     /// The sign-in fields in the sidebar.
     Login,
-    /// The machines-header "+" list in the sidebar.
-    Picker,
 }
 
 /// What the window root does with a key that reached it.
@@ -43,7 +46,6 @@ fn rank(panel: Panel) -> u8 {
         Panel::Settings => 1,
         Panel::Pairing => 2,
         Panel::Login => 3,
-        Panel::Picker => 4,
     }
 }
 
@@ -54,7 +56,6 @@ pub struct Panels {
     pub settings: bool,
     pub pairing: bool,
     pub login: bool,
-    pub picker: bool,
 }
 
 impl Panels {
@@ -65,7 +66,6 @@ impl Panels {
             (self.settings, Panel::Settings),
             (self.pairing, Panel::Pairing),
             (self.login, Panel::Login),
-            (self.picker, Panel::Picker),
         ]
         .into_iter()
         .find_map(|(open, panel)| open.then_some(panel))
@@ -101,21 +101,22 @@ impl Panels {
     }
 
     /// What the root does with `action` (from `map_key`); `plain_escape` is
-    /// Esc without modifiers.
+    /// Esc without modifiers. Typed text and IME keys (`Text`, `Ignore`)
+    /// always pass: the open panel's field (or the terminal) takes them from
+    /// the platform's text path.
     pub fn root_key(&self, action: &KeyAction, plain_escape: bool) -> RootKey {
-        if self.top() == Some(Panel::ForcedUpdate) {
-            return RootKey::Swallow;
-        }
-        if self.any_open() {
-            return if plain_escape {
-                RootKey::CloseTop
-            } else {
-                RootKey::Swallow
-            };
-        }
-        match action {
-            KeyAction::App(command) => RootKey::Run(*command),
-            _ => RootKey::Pass,
+        let text = matches!(action, KeyAction::Text | KeyAction::Ignore);
+        match self.top() {
+            // Nothing closes the overlay, Esc included.
+            Some(Panel::ForcedUpdate) if text => RootKey::Pass,
+            Some(Panel::ForcedUpdate) => RootKey::Swallow,
+            Some(_) if plain_escape => RootKey::CloseTop,
+            Some(_) if text => RootKey::Pass,
+            Some(_) => RootKey::Swallow,
+            None => match action {
+                KeyAction::App(command) => RootKey::Run(*command),
+                _ => RootKey::Pass,
+            },
         }
     }
 }
@@ -241,13 +242,6 @@ mod tests {
                 },
                 Panel::Login,
             ),
-            (
-                Panels {
-                    picker: true,
-                    ..Panels::default()
-                },
-                Panel::Picker,
-            ),
         ];
         for (p, panel) in each {
             assert!(!p.allows_app_commands(), "{panel:?}");
@@ -262,7 +256,6 @@ mod tests {
             settings: true,
             pairing: true,
             login: true,
-            picker: true,
             ..Panels::default()
         };
         let mut closed = Vec::new();
@@ -272,16 +265,12 @@ mod tests {
                 Panel::Settings => p.settings = false,
                 Panel::Pairing => p.pairing = false,
                 Panel::Login => p.login = false,
-                Panel::Picker => p.picker = false,
                 Panel::ForcedUpdate => unreachable!(),
             }
             // commands stay swallowed until the last one closed
             assert_eq!(p.allows_app_commands(), p.top().is_none());
         }
-        assert_eq!(
-            closed,
-            [Panel::Settings, Panel::Pairing, Panel::Login, Panel::Picker]
-        );
+        assert_eq!(closed, [Panel::Settings, Panel::Pairing, Panel::Login]);
         assert!(p.allows_app_commands());
     }
 
@@ -294,12 +283,6 @@ mod tests {
             ..Panels::default()
         };
         assert!(login.may_open(Panel::Login));
-        let picker = Panels {
-            picker: true,
-            ..Panels::default()
-        };
-        // the sign-in fields sit above the picker
-        assert!(picker.may_open(Panel::Login));
         for above in [
             Panels {
                 pairing: true,

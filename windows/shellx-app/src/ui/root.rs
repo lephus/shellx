@@ -24,10 +24,13 @@
 //! every remote pane.
 //!
 //! One modal rule (`shellx_model::modal`): while a panel is open (forced
-//! update overlay, settings, pairing, sign-in fields, machine picker) the
-//! topmost one holds the keyboard, app commands and pane clicks are
-//! swallowed, Esc closes the topmost closable one, and the terminal gets the
-//! keyboard back when the last one closes. The overlay closes settings.
+//! update overlay, settings, pairing, sign-in fields) the topmost one holds
+//! the keyboard, app commands and pane clicks are swallowed, Esc closes the
+//! topmost closable one, and the terminal gets the keyboard back when the
+//! last one closes. The overlay closes settings. Typed text is never
+//! swallowed (a handled key-down yields no WM_CHAR on Windows). The machines
+//! "+" list is not a panel: it closes on a click outside it and never holds
+//! the keyboard.
 //!
 //! A shell that exits as it starts would respawn the last pane forever:
 //! `RespawnGuard` holds the pane after 5 respawns in 10 s (a message and
@@ -42,10 +45,10 @@ use gpui::{
     Subscription, Window, div, prelude::*, px, relative, svg,
 };
 use shellx_model::core_api::CoreCall;
-use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
+use shellx_model::keys::{AppCommand, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId};
 use shellx_model::links::RemoteLink as LinkRecord;
-use shellx_model::modal::{Panel, Panels};
+use shellx_model::modal::{Panel, Panels, RootKey};
 use shellx_model::palette::Status;
 use shellx_model::sidebar::{MachineInfo, build_groups};
 use shellx_model::strings::Lang;
@@ -88,10 +91,6 @@ pub struct RootView {
     account_watch: AccountWatch,
     /// Holds the keyboard while the forced-update overlay is up.
     overlay_focus: FocusHandle,
-    /// The machine picker's own focus (tracked by the picker list, never by
-    /// an inert element): holds the keyboard while the picker is the topmost
-    /// panel, so Esc bubbles to `on_key_down`.
-    picker_focus: FocusHandle,
     /// Stops respawning a last pane whose shell exits as it starts.
     respawn: RespawnGuard,
     started: Instant,
@@ -167,7 +166,6 @@ impl RootView {
             remotes: RemoteTabs::new(),
             account_watch: AccountWatch::default(),
             overlay_focus: cx.focus_handle(),
-            picker_focus: cx.focus_handle(),
             respawn: RespawnGuard::new(),
             started: Instant::now(),
             _subscriptions: subscriptions,
@@ -202,7 +200,6 @@ impl RootView {
             settings: self.settings.read(cx).is_open(),
             pairing: pairing.is_open(),
             login: self.sidebar_visible && self.login.read(cx).is_open(),
-            picker: self.sidebar_visible && pairing.picker_open(),
         }
     }
 
@@ -214,7 +211,6 @@ impl RootView {
             Some(Panel::Settings) => self.settings.read(cx).focus_handle(cx),
             Some(Panel::Pairing) => self.pairing.read(cx).focus_handle(cx),
             Some(Panel::Login) => self.login.read(cx).focus_target(cx),
-            Some(Panel::Picker) => self.picker_focus.clone(),
             None => match self.host.get(self.tabs.active().focused) {
                 Some(live) => live.view.read(cx).focus_handle(cx),
                 None => return,
@@ -230,7 +226,6 @@ impl RootView {
             Some(Panel::Settings) => self.settings.update(cx, |p, cx| p.close(cx)),
             Some(Panel::Pairing) => self.pairing.update(cx, |p, cx| p.close(cx)),
             Some(Panel::Login) => self.login.update(cx, |p, cx| p.close(cx)),
-            Some(Panel::Picker) => self.pairing.update(cx, |p, cx| p.close_picker(cx)),
             Some(Panel::ForcedUpdate) | None => return false,
         }
         self.after_focus_change(window, cx);
@@ -502,9 +497,15 @@ impl RootView {
     }
 
     /// The machines-header "+": the list of machines to request access to.
-    /// While it is open it is a panel (Esc closes it).
+    /// It is not a panel: the keyboard stays where it was.
     pub fn toggle_machine_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.pairing.update(cx, |panel, cx| panel.toggle_picker(cx));
+        self.after_focus_change(window, cx);
+    }
+
+    /// A click outside the "+" list closes it (the click itself still runs).
+    pub fn close_machine_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.pairing.update(cx, |panel, cx| panel.close_picker(cx));
         self.after_focus_change(window, cx);
     }
 
@@ -537,7 +538,9 @@ impl RootView {
     /// Window shortcuts that no pane handled (e.g. focus outside the panes).
     /// A focused TermView maps keys itself and stops the ones it uses. While
     /// a panel is open, keys its field did not use end here: Esc closes the
-    /// topmost panel, every app command is swallowed.
+    /// topmost panel, every app command is swallowed. Typed text and IME keys
+    /// are never stopped: a handled key-down yields no WM_CHAR on Windows,
+    /// so the field would never see the letter (`Panels::root_key`).
     fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;
@@ -548,27 +551,24 @@ impl RootView {
             shift: mods.shift,
             win: mods.platform,
         };
-        let panels = self.panels(cx);
-        if panels.top() == Some(Panel::ForcedUpdate) {
-            cx.stop_propagation();
-            return;
-        }
-        if panels.any_open() {
-            let plain = !(mods.control || mods.alt || mods.shift || mods.platform);
-            if plain && key.key == "escape" {
-                self.close_top_panel(window, cx);
-            }
-            cx.stop_propagation();
-            return;
-        }
+        let plain_escape =
+            !(mods.control || mods.alt || mods.shift || mods.platform) && key.key == "escape";
         let focused = self.focused_view(cx);
         let ctx = KeyCtx {
             has_selection: focused.is_some_and(TermView::has_selection),
             composing: focused.is_some_and(TermView::composing),
         };
-        if let KeyAction::App(command) = map_key(&key, &ctx) {
-            cx.stop_propagation();
-            self.run_command(command, window, cx);
+        match self.panels(cx).root_key(&map_key(&key, &ctx), plain_escape) {
+            RootKey::Pass => {}
+            RootKey::Swallow => cx.stop_propagation(),
+            RootKey::CloseTop => {
+                self.close_top_panel(window, cx);
+                cx.stop_propagation();
+            }
+            RootKey::Run(command) => {
+                cx.stop_propagation();
+                self.run_command(command, window, cx);
+            }
         }
     }
 
@@ -725,9 +725,7 @@ impl Render for RootView {
                 &rows,
                 &local_id,
                 &login,
-                picker
-                    .as_deref()
-                    .map(|entries| (entries, &self.picker_focus)),
+                picker.as_deref(),
                 lang,
                 cx,
             ))

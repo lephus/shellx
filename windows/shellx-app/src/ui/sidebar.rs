@@ -10,13 +10,14 @@
 //! Another online machine without access shows "Xin quyền truy cập", which
 //! opens the pairing panel (`pairing.rs`); while waiting, the row shows the
 //! code instead. The "+" in the machines header opens a small list of the
-//! account's other machines without a link (same action). An online machine
+//! account's other machines without a link (same action); it never holds the
+//! keyboard and closes on a click outside it and the "+". An online machine
 //! with access shows "Mở", which opens a tab with its terminal (Task 13b);
 //! that machine's tabs are listed under it.
 
 use gpui::{
-    AnyView, App, ClickEvent, Context, Div, Entity, FocusHandle, FontWeight, ImageSource,
-    IntoElement, Pixels, Render, Resource, SharedString, Stateful, Window, div, img, prelude::*,
+    AnyView, App, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement,
+    MouseDownEvent, Pixels, Render, Resource, SharedString, Stateful, Window, div, img, prelude::*,
     px, svg,
 };
 use shellx_model::palette::{Pill, Status};
@@ -54,20 +55,17 @@ pub struct PickerEntry {
 /// `local_id`: this PC's group (its server id when signed in).
 /// `sessions`: every tab, each listed under its `machine_id` group.
 /// `login`: the sign-in card, drawn under this PC's sessions.
-/// `picker`: the "+" list and its focus handle, when open.
+/// `picker`: the "+" list, when open.
 pub fn render(
     groups: &[MachineGroup],
     sessions: &[SessionRow],
     local_id: &str,
     login: &Entity<LoginPanel>,
-    picker: Option<(&[PickerEntry], &FocusHandle)>,
+    picker: Option<&[PickerEntry]>,
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Div {
     let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
-    if let Some((entries, focus)) = picker {
-        list = list.child(machine_picker(entries, focus, lang, cx));
-    }
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
         list = list.child(group_header(ix, group, local, lang, cx));
@@ -96,7 +94,7 @@ pub fn render(
         .border_r_1()
         .border_color(theme::line())
         .child(brand(lang))
-        .child(machines_header(lang, cx))
+        .child(machines_block(picker, lang, cx))
         .child(list)
         .child(footer(lang))
 }
@@ -124,6 +122,26 @@ fn brand(lang: Lang) -> Div {
                 .text_color(theme::text_hi())
                 .child(t(lang, Str::AppName)),
         )
+}
+
+/// The machines header with the "+" list under it while it is open. A press
+/// outside this block closes the list: outside the list *and* the "+", so
+/// pressing the "+" again toggles it instead of closing and reopening it.
+/// The press still reaches what it hit (a terminal click focuses the pane).
+fn machines_block(picker: Option<&[PickerEntry]>, lang: Lang, cx: &mut Context<RootView>) -> Div {
+    let block = div()
+        .flex()
+        .flex_col()
+        .flex_none()
+        .child(machines_header(lang, cx));
+    match picker {
+        Some(entries) => block
+            .child(machine_picker(entries, lang, cx))
+            .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.close_machine_picker(window, cx);
+            })),
+        None => block,
+    }
 }
 
 fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
@@ -196,15 +214,9 @@ fn new_tab_button(lang: Lang, cx: &mut Context<RootView>) -> Stateful<Div> {
 /// The "+" list: the account's other machines without a link. Online ones
 /// request access on click; offline ones are dimmed (approval needs the
 /// other machine).
-fn machine_picker(
-    entries: &[PickerEntry],
-    focus: &FocusHandle,
-    lang: Lang,
-    cx: &mut Context<RootView>,
-) -> Div {
-    // The picker holds the keyboard while open (Esc bubbles to RootView).
+fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView>) -> Div {
+    // Not a panel: no focus handle, so the keyboard stays where it was.
     let mut list = div()
-        .track_focus(focus)
         .flex()
         .flex_col()
         .mx(px(10.0))
