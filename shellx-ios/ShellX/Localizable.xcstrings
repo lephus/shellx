@@ -56,7 +56,7 @@
       }
     },
     "agent.close.menu": {
-      "comment": "Item of the ••• menu on an agent screen and on a workspace screen (shown red): close the agent's terminal tab on the Mac; it asks to confirm first.",
+      "comment": "Item of the ••• menu on an agent screen (shown red): close the agent's terminal tab on the Mac; it asks to confirm first.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3434,6 +3434,78 @@
         }
       }
     },
+    "terminal.close": {
+      "comment": "The red button that confirms closing a terminal tab on the Mac (the system adds Cancel).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close Tab"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng tab"
+          }
+        }
+      }
+    },
+    "terminal.close.confirm": {
+      "comment": "Message of the confirmation before closing a terminal tab: closing stops what runs in it, and the last tab takes its workspace with it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tab and everything running in it on the Mac will be stopped. If it is the workspace's last tab, the workspace closes too."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab và mọi thứ đang chạy trong nó trên Mac sẽ bị dừng. Nếu đó là tab cuối của workspace, workspace cũng đóng theo."
+          }
+        }
+      }
+    },
+    "terminal.close.menu": {
+      "comment": "Item of the ••• menu on a workspace screen and of the menu a long press on a tab's chip opens (shown red): close that terminal tab on the Mac, whether it runs an agent or a shell; it asks to confirm first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close Tab…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng tab…"
+          }
+        }
+      }
+    },
+    "terminal.close.title %@": {
+      "comment": "Title of the confirmation before closing a terminal tab; the argument is the tab's name as its chip shows it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close tab %@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng tab %@?"
+          }
+        }
+      }
+    },
     "update.later": {
       "comment": "Button of the update popup: closes it; it shows again the next time the app opens.",
       "extractionState": "manual",
@@ -3974,6 +4046,24 @@
         }
       }
     },
+    "workspaces.alert.refused.closeTab": {
+      "comment": "Alert: the Mac refused to close a terminal tab, because it blocks remote control, or because the tab is the last one of a workspace that is pinned, is the last in its window, or is set to stay open when its last tab closes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac won't close this tab: remote control is blocked, or it's the last tab of a workspace that is pinned, the last in its window, or set to stay open."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không cho đóng tab này: điều khiển từ xa đang bị chặn, hoặc đó là tab cuối của một workspace đang ghim, là workspace cuối của cửa sổ, hoặc được đặt để giữ lại."
+          }
+        }
+      }
+    },
     "workspaces.alert.refused.control": {
       "comment": "Alert: the Mac refused to make or rename a workspace because it blocks remote control.",
       "extractionState": "manual",
@@ -3988,6 +4078,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac đang chặn điều khiển từ xa"
+          }
+        }
+      }
+    },
+    "workspaces.alert.tabNotClosable": {
+      "comment": "Alert: the Mac could not close a terminal tab because the tab is no longer there.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac can't close this tab: it is no longer there."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không đóng được tab này: tab không còn trên Mac."
           }
         }
       }

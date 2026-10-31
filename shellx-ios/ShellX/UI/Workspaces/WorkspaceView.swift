@@ -7,7 +7,8 @@ import SwiftUI
 ///
 /// When the pane shown is closed on the Mac, the next chip shows and a short line says why
 /// (`paneClosedNotice`). It leaves on its own when the workspace it showed is closed on the Mac: it
-/// pops, and the list says so in a short line. When the Mac is removed from this iPhone it pops without
+/// pops, and the list says so in a short line. A tab, or a workspace, the user closed from this screen
+/// goes the same way without either line. When the Mac is removed from this iPhone it pops without
 /// a word; a list emptied for any other reason (the Mac offline, no longer reachable) keeps the last
 /// chips. A workspace the Mac has not listed yet (a create answers before the list that holds it) shows
 /// a spinner; one that does not come says it is not found.
@@ -41,7 +42,7 @@ struct WorkspaceView: View {
                 WorkspaceScreen(
                     title: model.workspace?.title ?? "", branch: model.workspace?.branch, panes: model.panes,
                     selected: model.selectedTerminalId, canControl: model.canControl,
-                    closableAgent: Self.closableAgent(model, hub: scope.hub),
+                    canCloseTab: WorkspaceListActions.canCloseTab(machineID: ref.machineID, hub: scope.hub),
                     pagingLocked: voiceService?.isListening ?? false, notice: notice,
                     actions: WorkspaceScreenActions.make(
                         scope: scope, model: model,
@@ -86,24 +87,14 @@ struct WorkspaceView: View {
         .onDisappear { scope.hub.markSeen(ref) }
     }
 
-    /// The workspace is gone: back to the list, with a line saying why unless the user closed it here.
+    /// The workspace is gone: back to the list, with a line saying why unless the user closed it, or its
+    /// last tab, here.
     private func leave() {
-        if let text = Self.leavingNotice(closedHere: closedHere) {
+        if let text = Self.leavingNotice(closedHere: closedHere || model.lastTabClosedHere) {
             scope.listNotice.show(text)
             AccessibilityNotification.Announcement(text).post()
         }
         dismiss()
-    }
-
-    /// The chip shown, when it runs an agent the phone may close (`WorkspaceListActions.canClose`): one
-    /// whose session has not ended, on a Mac that lists `agent_close`. Nil for a shell.
-    static func closableAgent(_ model: WorkspaceScreenModel, hub: MachineHub) -> WorkspacePane? {
-        let panes = model.panes
-        let shown = model.selectedTerminalId ?? panes.first?.id
-        guard let pane = panes.first(where: { $0.id == shown }), let session = pane.session,
-            WorkspaceListActions.canClose(session, hub: hub)
-        else { return nil }
-        return pane
     }
 
     /// What the screen says when the pane shown was closed on the Mac and the next chip shows.
@@ -119,8 +110,8 @@ struct WorkspaceView: View {
 /// The workspace screen's controls wired to the hub. Built outside the view body, so a test can run each
 /// action and see the hub call it makes and what the screen does with the answer (`WorkspaceFeedback`,
 /// the words the list says too): a workspace that is gone refreshes the list, anything that did not work
-/// is an alert, and an answer of "done" shows nothing (the Mac's push renames the workspace, or removes
-/// it and the screen leaves).
+/// is an alert, and an answer of "done" shows nothing (the Mac's push renames the workspace, removes a
+/// tab and the next chip shows, or removes the workspace and the screen leaves).
 extension WorkspaceScreenActions {
     /// `alert` gets what to tell the user; `closing` is called when the user's close goes out. `done` gets
     /// the task of each command, so a caller (a test) can wait for it.
@@ -151,10 +142,17 @@ extension WorkspaceScreenActions {
                 closing()
                 run(.close) { await hub.closeWorkspace(ref) }
             },
-            closeAgent: { session in
-                // Not `closing`: the workspace stays unless the agent's tab was its last, and then the list
-                // says it closed on the Mac.
-                WorkspaceListActions.closeAgent(session, hub: hub, alert: alert, done: done)
+            closeTab: { terminalId in
+                // Not `closing`: the workspace stays unless the tab was its last. The model knows the user
+                // closed it here, so neither the tab's leaving nor the workspace's says "closed on the Mac".
+                model.closesHere(terminalId)
+                WorkspaceListActions.closeTab(
+                    machineID: ref.machineID, workspaceId: ref.workspaceId, terminalId: terminalId, hub: hub,
+                    alert: { kind in
+                        model.keeps(terminalId)
+                        alert(kind)
+                    },
+                    done: done)
             })
     }
 }

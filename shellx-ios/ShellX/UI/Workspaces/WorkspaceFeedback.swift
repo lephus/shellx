@@ -8,6 +8,8 @@ enum WorkspaceCommand: Equatable {
     case close
     /// Closes the terminal tab an agent runs in (`MachineHub.closeAgent(_:)`).
     case closeAgent
+    /// Closes one terminal tab of a workspace, agent or shell (`MachineHub.closeTerminal(_:workspaceId:terminalId:)`).
+    case closeTab
 }
 
 /// What the list says when a command did not simply work. The words always say what to do next.
@@ -20,6 +22,11 @@ enum WorkspaceAlert: String, CaseIterable, Identifiable {
     case refusedCloseAgent
     /// The Mac has no terminal tab for the agent, or the agent has stopped already.
     case agentNotClosable
+    /// The Mac would not close a tab: remote control is blocked, or the tab is the last of a workspace the
+    /// Mac keeps (pinned, the last in its window, or set to stay open).
+    case refusedCloseTab
+    /// The Mac no longer has the tab.
+    case tabNotClosable
     case failed
     case unknown
 
@@ -32,6 +39,8 @@ enum WorkspaceAlert: String, CaseIterable, Identifiable {
         case .refusedControl: String(localized: "workspaces.alert.refused.control")
         case .refusedCloseAgent: String(localized: "workspaces.alert.refused.closeAgent")
         case .agentNotClosable: String(localized: "workspaces.alert.agentNotClosable")
+        case .refusedCloseTab: String(localized: "workspaces.alert.refused.closeTab")
+        case .tabNotClosable: String(localized: "workspaces.alert.tabNotClosable")
         case .failed: String(localized: "workspaces.alert.failed")
         case .unknown: String(localized: "workspaces.alert.unknown")
         }
@@ -56,13 +65,19 @@ enum WorkspaceFeedback: Equatable {
             guard command == .create, let workspaceId else { return .nothing }
             return .open(WorkspaceRef(machineID: machineID, workspaceId: workspaceId))
         case .notFound:
-            // An agent the Mac cannot close is no sign the workspace list is stale: say why instead.
-            return command == .closeAgent ? .alert(.agentNotClosable) : .refresh
+            switch command {
+            // An agent or a tab the Mac cannot close: say why rather than refresh the list without a word (its
+            // push brings the tab's leaving anyway).
+            case .closeAgent: return .alert(.agentNotClosable)
+            case .closeTab: return .alert(.tabNotClosable)
+            case .create, .rename, .close: return .refresh
+            }
         case .refused:
             switch command {
             case .close: return .alert(.refusedClose)
-            // Not only blocked remote control: the Mac's own rules can keep the agent's tab too.
+            // Not only blocked remote control: the Mac's own rules can keep the tab too.
             case .closeAgent: return .alert(.refusedCloseAgent)
+            case .closeTab: return .alert(.refusedCloseTab)
             case .create, .rename: return .alert(.refusedControl)
             }
         case .failed:
@@ -91,8 +106,8 @@ extension View {
 extension View {
     /// Asks before an agent is closed: "Close <name>?", what closing does on the Mac, and one red "Close"
     /// (the system adds Cancel). Shown while `item` is set; `name` gives the agent's name, `close` runs once
-    /// the user confirmed. The home's cards, the agent screen and the workspace screen ask the same way
-    /// (HIG: Action sheets).
+    /// the user confirmed. The home's cards and the agent screen ask the same way (HIG: Action sheets); the
+    /// workspace screen closes a tab instead, and asks as `WorkspaceScreen` says.
     func agentCloseConfirmation<Item>(
         _ item: Binding<Item?>, name: @escaping (Item) -> String, close: @escaping (Item) -> Void
     ) -> some View {

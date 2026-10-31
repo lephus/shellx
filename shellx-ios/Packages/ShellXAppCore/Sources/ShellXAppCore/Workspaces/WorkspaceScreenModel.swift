@@ -18,6 +18,8 @@ import ShellXLinkCore
 ///   workspace) is `.waiting`; after `patience` the model asks the Mac for its list once more, and when the
 ///   workspace is still absent the phase is `.notFound` (it still shows if a push lists it later).
 /// - A Mac that goes offline leaves the last known list in place, so the chips stay.
+/// - A tab the user closes from this iPhone (`closesHere(_:)`) leaves without a word: the next chip shows
+///   without `shownPaneClosed`, and a workspace that goes with its last tabs sets `lastTabClosedHere`.
 ///
 /// `run()` follows the hub while the screen is shown.
 @MainActor @Observable
@@ -42,8 +44,12 @@ public final class WorkspaceScreenModel {
     /// The terminal id of the chip shown; nil while the workspace has no terminal.
     public private(set) var selectedTerminalId: String?
     /// How many times the chip shown left the Mac's list while the workspace stayed (it was closed on the
-    /// Mac): the screen moved to the next chip, and says so in a short line (spec section 6.2).
+    /// Mac): the screen moved to the next chip, and says so in a short line (spec section 6.2). A tab closed
+    /// from this iPhone (`closesHere(_:)`) does not count: the user knows why it went.
     public private(set) var shownPaneClosed = 0
+    /// The workspace left the Mac's list (`.dismissed`) after its last tabs were closed from this iPhone
+    /// (`closesHere(_:)`): the screen leaves without saying the workspace was closed on the Mac.
+    public private(set) var lastTabClosedHere = false
 
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
@@ -58,6 +64,11 @@ public final class WorkspaceScreenModel {
     /// user, or the chip shown left and the next one took its place. Until then the screen may still move to
     /// the pane waiting for the user.
     @ObservationIgnored private var settled = false
+    /// The tabs this iPhone asked the Mac to close (`closesHere(_:)`), less those the Mac kept (`keeps(_:)`).
+    @ObservationIgnored private var closingHere: Set<String> = []
+    /// The terminal ids, in chip order, the workspace had when it last had any: a Mac may list the workspace
+    /// with no tab for a moment before it goes.
+    @ObservationIgnored private var lastTerminalIds: [String] = []
 
     /// `sleep` waits out `patience`; tests pass one they release by hand.
     public init(
@@ -156,6 +167,19 @@ public final class WorkspaceScreenModel {
         settled = true
     }
 
+    /// The user closed the tab `terminalId` from this iPhone, and the close is on its way to the Mac: when the
+    /// Mac's list drops it, the next chip shows without a word (`shownPaneClosed` stays), and a workspace that
+    /// goes with it sets `lastTabClosedHere`.
+    public func closesHere(_ terminalId: String) {
+        closingHere.insert(terminalId)
+    }
+
+    /// The Mac did not close the tab `terminalId` after all (`closesHere(_:)`): if it goes later, the Mac
+    /// closed it, and the screen says so.
+    public func keeps(_ terminalId: String) {
+        closingHere.remove(terminalId)
+    }
+
     /// The chip that takes the place of `gone`: the next one that is still there, else the one before.
     /// `before` are the chips' ids as they were, `now` as they are.
     static func successor(of gone: String, before: [String], now: [String]) -> String? {
@@ -204,7 +228,10 @@ public final class WorkspaceScreenModel {
             // Never listed: still on its way (or `.notFound`).
             guard seen else { return }
             switch Self.absence(of: machine) {
-            case .closed: phase = .dismissed
+            case .closed:
+                // Before the phase: the screen reads it as it leaves.
+                lastTabClosedHere = !lastTerminalIds.isEmpty && lastTerminalIds.allSatisfy(closingHere.contains)
+                phase = .dismissed
             case .machineRemoved: phase = .machineRemoved
             case .unknown: break
             }
@@ -217,7 +244,7 @@ public final class WorkspaceScreenModel {
         if let selected = selectedTerminalId, !ids.contains(selected) {
             selectedTerminalId = Self.successor(of: selected, before: knownTerminalIds, now: ids)
             settled = true
-            shownPaneClosed += 1
+            if !closingHere.contains(selected) { shownPaneClosed += 1 }
         } else if selectedTerminalId == nil {
             let choice = Self.defaultChoice(in: workspace, pending: pendingHere, sessions: sessionsHere)
             selectedTerminalId = choice.terminalId
@@ -232,6 +259,7 @@ public final class WorkspaceScreenModel {
             }
         }
         knownTerminalIds = ids
+        if !ids.isEmpty { lastTerminalIds = ids }
     }
 
     private var pendingHere: [MachinePendingItem] {

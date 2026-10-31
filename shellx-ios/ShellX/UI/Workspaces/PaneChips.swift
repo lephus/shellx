@@ -4,6 +4,10 @@ import SwiftUI
 /// The row of chips under the workspace screen's bar: one per terminal of the workspace, in the Mac's
 /// order, the one shown highlighted. A chip that runs an agent has a dot in the colour of the agent's
 /// state (`AgentStateStyle`). The row scrolls sideways, and keeps the chip shown in view.
+///
+/// While `close` is set, a long press on any chip opens a context menu with "Close Tab…" (red; the caller
+/// asks to confirm first). Without it a chip has no context menu: an item that cannot work is left out,
+/// not dimmed (HIG: Context menus), and `•••` keeps "Close Tab…" for the chip shown.
 struct PaneChips: View {
     let panes: [WorkspacePane]
     /// The terminal id of the chip shown.
@@ -11,6 +15,8 @@ struct PaneChips: View {
     /// The time the agents' states are read at.
     var now = Date()
     let select: (String) -> Void
+    /// The user chose "Close Tab…" on this chip; nil while its Mac cannot close tabs.
+    var close: ((WorkspacePane) -> Void)? = nil
 
     private static let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
 
@@ -33,7 +39,7 @@ struct PaneChips: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(panes) { pane in chip(pane).id(pane.id) }
+                    ForEach(panes) { pane in closable(chip(pane), pane: pane).id(pane.id) }
                 }
                 .padding(.horizontal, 12)
             }
@@ -46,6 +52,21 @@ struct PaneChips: View {
             }
         }
         .accessibilityIdentifier("workspace.chips")
+    }
+
+    /// `chip` with its "Close Tab…" context menu, while `close` is set.
+    @ViewBuilder private func closable(_ chip: some View, pane: WorkspacePane) -> some View {
+        if let close {
+            chip.contextMenu {
+                Button(role: .destructive) {
+                    close(pane)
+                } label: {
+                    Label(String(localized: "terminal.close.menu"), systemImage: "xmark")
+                }
+            }
+        } else {
+            chip
+        }
     }
 
     private func chip(_ pane: WorkspacePane) -> some View {

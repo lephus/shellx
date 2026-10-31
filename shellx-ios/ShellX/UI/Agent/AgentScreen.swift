@@ -7,7 +7,7 @@ import SwiftUI
 /// - Navigation bar: the workspace, "Stop" while the session works or waits for the user, and `•••` with
 ///   "Close Agent" (red; it asks first) while the agent can be closed (`closeAgentName`). Embedded as a
 ///   workspace screen's pane (`embedded`) it has no navigation bar of its own: the screen around it has
-///   one, with "Close Agent" in its `•••`, and "Stop" sits at the end of the header.
+///   one, with "Close Tab…" for the agent's tab in its `•••`, and "Stop" sits at the end of the header.
 /// - Top, pinned: the header ("Claude Code · Mac", state) and, while this workspace has pending
 ///   requests, the "Needs you · N" bar that opens them on their own page.
 /// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries. It follows

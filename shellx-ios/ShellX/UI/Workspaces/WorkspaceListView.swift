@@ -85,7 +85,8 @@ struct WorkspaceListView: View {
 /// - ＋, rename and close run the hub's workspace commands, once each, and `WorkspaceFeedback` says
 ///   what follows: a new workspace opens, a gone one refreshes the list, anything else is an alert;
 /// - a confirmed Close on an agent card closes the agent (`closeAgent(_:hub:alert:done:)`, which the
-///   other screens' Close goes through too).
+///   other screens' Close goes through too). The workspace screen closes any tab through
+///   `closeTab(machineID:workspaceId:terminalId:hub:alert:done:)`.
 @MainActor
 enum WorkspaceListActions {
     /// `done` gets the task of each command, so a caller (a test) can wait for it. `creating` is set
@@ -143,8 +144,8 @@ enum WorkspaceListActions {
 
 extension WorkspaceListActions {
     /// The agents whose close is on its way to their Mac. Every Close goes through `closeAgent` (the home's
-    /// cards, the agents outside workspaces, the agent screen's and the workspace screen's `•••`), so a
-    /// second tap, or a swipe while a menu's close waits, sends nothing until the Mac answered the first.
+    /// cards, the agents outside workspaces, the agent screen's `•••`), so a second tap, or a swipe while a
+    /// menu's close waits, sends nothing until the Mac answered the first.
     private static var closingAgents: Set<SessionRef> = []
 
     /// An agent the phone may offer to close: its session has not ended (the terminal of an agent that
@@ -168,6 +169,48 @@ extension WorkspaceListActions {
                 let result = await hub.closeAgent(ref)
                 closingAgents.remove(ref)
                 let feedback = WorkspaceFeedback.of(result, for: .closeAgent, machineID: ref.machineID)
+                if case let .alert(kind) = feedback { alert(kind) }
+                return feedback
+            })
+    }
+}
+
+// MARK: - Closing a tab
+
+extension WorkspaceListActions {
+    /// A tab whose close is on its way: its Mac and its terminal id.
+    private struct ClosingTab: Hashable {
+        let machineID: String
+        let terminalId: String
+    }
+
+    /// The tabs whose close is on its way to their Mac. The workspace screen's `•••` and a chip's long-press
+    /// both go through `closeTab`, so a second Close Tab on the same tab, from either, sends nothing until
+    /// the Mac answered the first.
+    private static var closingTabs: Set<ClosingTab> = []
+
+    /// The phone may offer to close this Mac's tabs, agent or shell: it listed `terminal_close` when it was last
+    /// online. The workspace screen's `•••` that offers it is off while the Mac is not online, and a chip's
+    /// long-press offers it only then.
+    static func canCloseTab(machineID: String, hub: MachineHub) -> Bool {
+        hub.supportsTerminalClose(machineID)
+    }
+
+    /// Closes the tab `terminalId` of the workspace `workspaceId` on the Mac `machineID` once the user
+    /// confirmed, unless a close of it waits for the Mac already. `WorkspaceFeedback` says what follows:
+    /// nothing when it worked (the tab, or its workspace when it was the last tab, leaves by the Mac's push),
+    /// else an alert through `alert`. `done` gets the task, so a caller (a test) can wait for it.
+    static func closeTab(
+        machineID: String, workspaceId: String, terminalId: String, hub: MachineHub,
+        alert: @escaping (WorkspaceAlert) -> Void, done: @escaping (Task<WorkspaceFeedback, Never>) -> Void = { _ in }
+    ) {
+        let tab = ClosingTab(machineID: machineID, terminalId: terminalId)
+        guard closingTabs.insert(tab).inserted else { return }
+        done(
+            Task {
+                let result = await hub.closeTerminal(machineID, workspaceId: workspaceId, terminalId: terminalId)
+                closingTabs.remove(tab)
+                let feedback = WorkspaceFeedback.of(result, for: .closeTab, machineID: machineID)
                 if case let .alert(kind) = feedback { alert(kind) }
                 return feedback
             })

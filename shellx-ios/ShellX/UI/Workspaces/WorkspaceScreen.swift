@@ -9,27 +9,27 @@ struct WorkspaceScreenActions {
     var rename: (String) -> Void = { _ in }
     /// Confirmed: close the workspace and its terminals.
     var close: () -> Void = {}
-    /// Confirmed: close the terminal tab the agent runs in on the Mac.
-    var closeAgent: (SessionRef) -> Void = { _ in }
+    /// Confirmed: close the terminal tab with this id on the Mac, and stop what runs in it.
+    var closeTab: (String) -> Void = { _ in }
 }
 
-/// What `•••` offers. Closing a shell's pane waits for the terminal version.
+/// What `•••` offers.
 enum WorkspaceMenuItem: CaseIterable {
     case rename
-    /// The agent of the chip shown; it asks to confirm first.
-    case closeAgent
+    /// The tab of the chip shown, agent or shell; it asks to confirm first.
+    case closeTab
     case closeWorkspace
 
-    /// The items in the menu's order; "Close Agent" only while the chip shown runs a live agent its Mac can
-    /// close (`WorkspaceView.closableAgent`).
-    static func items(canCloseAgent: Bool) -> [WorkspaceMenuItem] {
-        allCases.filter { $0 != .closeAgent || canCloseAgent }
+    /// The items in the menu's order; "Close Tab…" only while a chip shows and its Mac takes `terminal.close`
+    /// (`WorkspaceListActions.canCloseTab`).
+    static func items(canCloseTab: Bool) -> [WorkspaceMenuItem] {
+        allCases.filter { $0 != .closeTab || canCloseTab }
     }
 
     var title: String {
         switch self {
         case .rename: String(localized: "workspace.menu.rename")
-        case .closeAgent: String(localized: "agent.close.menu")
+        case .closeTab: String(localized: "terminal.close.menu")
         case .closeWorkspace: String(localized: "workspace.menu.close")
         }
     }
@@ -42,9 +42,11 @@ enum WorkspaceMenuItem: CaseIterable {
 /// it from the hub.
 ///
 /// - Bar: "‹ Workspace" (the system's back button), the workspace's name over its git branch in
-///   monospace, and `•••` with "Rename Workspace", then, in red and each asking first, "Close Agent" while
-///   the chip shown runs a live agent the Mac can close (`closableAgent`), and "Close Workspace…".
-/// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted.
+///   monospace, and `•••` with "Rename Workspace", then, in red and each asking first, "Close Tab…" for
+///   the chip shown while its Mac can close tabs (`canCloseTab`), and "Close Workspace…".
+/// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted. While the Mac is online
+///   and can close tabs, a long press on any chip offers "Close Tab…" for it too. Either way one
+///   confirmation names the tab and says what closing it stops (HIG: Action sheets).
 /// - Below, one page per chip, swiped sideways like the chips are tapped: a chip that runs an agent
 ///   shows the agent's chat (`agent`: the existing agent screen as a pane); any other shows
 ///   `ShellPanePlaceholder`. While a mic listens (`pagingLocked`) the pages stay put.
@@ -60,9 +62,9 @@ struct WorkspaceScreen<AgentPane: View>: View {
     var now = Date()
     /// Rename and close reach the Mac: it is online and takes them.
     var canControl = true
-    /// The chip shown, when it runs a live agent its Mac can close (`WorkspaceView.closableAgent`): `•••`
-    /// offers "Close Agent".
-    var closableAgent: WorkspacePane?
+    /// The Mac takes `terminal.close` (`WorkspaceListActions.canCloseTab`): any tab, agent or shell, can be
+    /// closed from `•••` (the chip shown) and from a chip's long-press (while `canControl`).
+    var canCloseTab = false
     /// A mic is listening: the pages do not follow a sideways drag, so a drag to the left on the mic (its
     /// cancel) never turns the page instead.
     var pagingLocked = false
@@ -76,11 +78,14 @@ struct WorkspaceScreen<AgentPane: View>: View {
 
     @State private var renaming = false
     @State private var closing = false
-    @State private var closingAgent: WorkspacePane?
+    /// The tab the user chose to close, until the user confirms or cancels.
+    @State private var closingTab: WorkspacePane?
 
     var body: some View {
         VStack(spacing: 0) {
-            PaneChips(panes: panes, selected: selected, now: now, select: actions.select)
+            PaneChips(
+                panes: panes, selected: selected, now: now, select: actions.select,
+                close: canCloseTab && canControl ? { closingTab = $0 } : nil)
             pager
                 .overlay(alignment: .top) {
                     if let notice {
@@ -113,8 +118,14 @@ struct WorkspaceScreen<AgentPane: View>: View {
         } message: {
             Text(LocalizedStringResource("workspaces.close.confirm"))
         }
-        .agentCloseConfirmation($closingAgent, name: { PaneChips.label(for: $0) }) { pane in
-            if let ref = pane.session?.ref { actions.closeAgent(ref) }
+        .confirmationDialog(
+            closingTab.map { String(localized: "terminal.close.title \(PaneChips.label(for: $0))") } ?? "",
+            isPresented: Binding(get: { closingTab != nil }, set: { if !$0 { closingTab = nil } }),
+            titleVisibility: .visible, presenting: closingTab
+        ) { pane in
+            Button(String(localized: "terminal.close"), role: .destructive) { actions.closeTab(pane.id) }
+        } message: { _ in
+            Text(LocalizedStringResource("terminal.close.confirm"))
         }
         .workspaceAlert($alert)
     }
@@ -140,8 +151,14 @@ struct WorkspaceScreen<AgentPane: View>: View {
         .accessibilityIdentifier("workspace.title")
     }
 
+    /// The chip shown: the one selected, else the first.
+    private var shownPane: WorkspacePane? {
+        let shown = selected ?? panes.first?.id
+        return panes.first { $0.id == shown }
+    }
+
     private var menu: some View {
-        let items = WorkspaceMenuItem.items(canCloseAgent: closableAgent != nil)
+        let items = WorkspaceMenuItem.items(canCloseTab: canCloseTab && shownPane != nil)
         return Menu {
             ForEach(items.filter { !$0.isDestructive }, id: \.self, content: menuButton)
             // The red items, which ask first, in a group of their own (HIG: Menus).
@@ -158,7 +175,7 @@ struct WorkspaceScreen<AgentPane: View>: View {
         Button(item.title, role: item.isDestructive ? .destructive : nil) {
             switch item {
             case .rename: renaming = true
-            case .closeAgent: closingAgent = closableAgent
+            case .closeTab: closingTab = shownPane
             case .closeWorkspace: closing = true
             }
         }

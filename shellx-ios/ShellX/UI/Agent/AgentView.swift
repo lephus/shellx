@@ -63,7 +63,7 @@ struct AgentView: View {
             attachments: hub.acceptsAttachments(model.ref.machineID) || !composer.attachments.isEmpty
                 ? $composer.attachments : nil,
             sending: composer.isSending ? (model.uploadProgress ?? 0) : nil,
-            // Embedded, the workspace screen's `•••` offers it.
+            // Embedded, the workspace screen's `•••` closes the agent's tab instead ("Close Tab…").
             closeAgentName: embedded
                 ? nil
                 : session.flatMap { WorkspaceListActions.canClose($0, hub: hub) ? SessionName.base(of: $0.session) : nil },
