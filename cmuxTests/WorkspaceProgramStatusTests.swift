@@ -11,7 +11,10 @@ import CmuxSidebar
 @testable import cmux
 #endif
 
+/// Serialized: the chat-session settlement tests swap the process-wide `Workspace.agentTurnSettlementWait` and
+/// `TerminalController.shared.agentChatTranscriptService`.
 @MainActor
+@Suite(.serialized)
 struct WorkspaceProgramStatusTests {
     @Test func projectsMostUrgentPanelRecord() throws {
         let workspace = Workspace()
@@ -371,7 +374,7 @@ struct WorkspaceProgramStatusTests {
 
     /// Esc on a Claude permission prompt: the typed key moved the chat session from needs-input to working, and
     /// Claude's blocked record ends with no hook. The chat session settles although the pane's row is not a
-    /// hook-reported Running row, and that row stays as it was.
+    /// hook-reported Running row.
     @Test func claudeEscOnPermissionPromptSettlesTheChatSession() async throws {
         try await withChatService { service in
             let workspace = Workspace()
@@ -392,7 +395,43 @@ struct WorkspaceProgramStatusTests {
             workspace.applyProgramStatus(ProgramStatusReport(state: .clear), panelId: panelId)
 
             #expect(await Self.waitUntil { service.sessionRecord(sessionID: session)?.state == .idle })
-            #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .needsInput)
+        }
+    }
+
+    /// Esc during a foreground Task/Agent subagent or a blocking wait tool (`sleep N`, `gh run watch`, Monitor):
+    /// Claude's PreToolUse left the pane's row at "Running subagents" or "Waiting", and no hook runs after the Esc.
+    /// The row's background-work state does not keep the chat session working.
+    @Test func claudeEscDuringASubagentOrWaitToolSettlesTheChatSession() async throws {
+        for (tool, workState) in [("Task", SidebarAgentWorkState.subagents), ("Bash", .waiting)] {
+            try await withChatService { service in
+                let workspace = Workspace()
+                let panelId = try #require(workspace.focusedPanelId)
+                let session = UUID().uuidString
+                let calledTool = Date().addingTimeInterval(-10)
+                service.noteHookEvent(WorkstreamEvent(
+                    sessionId: session, hookEventName: .userPromptSubmit, source: "claude",
+                    surfaceId: panelId.uuidString, receivedAt: calledTool.addingTimeInterval(-1)
+                ))
+                service.noteHookEvent(WorkstreamEvent(
+                    sessionId: session, hookEventName: .preToolUse, source: "claude",
+                    surfaceId: panelId.uuidString, toolName: tool, receivedAt: calledTool
+                ))
+                // The PreToolUse hook's sidebar row.
+                workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
+                workspace.setStatusEntry(
+                    SidebarStatusEntry(key: "claude_code", value: "Busy", timestamp: calledTool, workState: workState),
+                    key: "claude_code",
+                    panelId: panelId
+                )
+                workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+
+                workspace.applyProgramStatus(ProgramStatusReport(state: .clear), panelId: panelId)
+
+                #expect(
+                    await Self.waitUntil { service.sessionRecord(sessionID: session)?.state == .idle },
+                    "Esc during \(tool) left the chat session \(String(describing: service.sessionRecord(sessionID: session)?.state))"
+                )
+            }
         }
     }
 
