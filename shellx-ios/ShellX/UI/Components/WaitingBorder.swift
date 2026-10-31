@@ -13,8 +13,9 @@ import SwiftUI
 /// no view at all, so nothing runs.
 ///
 /// What turns is the gradient square as a layer (a rotation), and the ring only masks it, so a frame
-/// changes one transform and the gradient is never drawn again. `TimelineView(.animation)` ticks with the
-/// display and stops with the scene.
+/// changes one transform and the gradient is never drawn again. `TimelineView(.animation)` ticks at most
+/// 30 times a second, enough for a slow turn, so a 120 Hz display does not redraw it four times as often,
+/// and it stops with the scene.
 struct WaitingBorder: View {
     /// The colours of the gradient, `0xRRGGBB`: the same at both ends, so the turn has no seam. Fixed in
     /// light and dark: the user chose a multicolor border for this one state.
@@ -23,6 +24,10 @@ struct WaitingBorder: View {
     static let lineWidth: CGFloat = 2
     /// Seconds for one turn.
     static let turn: TimeInterval = 3
+    /// The shortest time between two frames of the turn: 30 frames a second.
+    static let frameInterval: TimeInterval = 1.0 / 30
+    /// The gradient's colours, made once from `palette`.
+    private static let colors: [Color] = palette.map(color)
 
     let cornerRadius: CGFloat
 
@@ -30,7 +35,7 @@ struct WaitingBorder: View {
 
     /// Whether an agent in `state` waits for the user's answer, and so gets the border. An agent whose
     /// Mac is not online shows as "Offline" and cannot be answered: no border.
-    static func isActive(for state: AgentState, online: Bool = true) -> Bool {
+    static func isActive(for state: AgentState, online: Bool) -> Bool {
         online && state == .needsInput
     }
 
@@ -47,7 +52,9 @@ struct WaitingBorder: View {
     var body: some View {
         Group {
             if Self.animates(reduceMotion: reduceMotion) {
-                TimelineView(.animation) { context in ring(angle: Self.angle(at: context.date)) }
+                TimelineView(.animation(minimumInterval: Self.frameInterval)) { context in
+                    ring(angle: Self.angle(at: context.date))
+                }
             } else {
                 ring(angle: 0)
             }
@@ -61,7 +68,7 @@ struct WaitingBorder: View {
     private func ring(angle: Double) -> some View {
         GeometryReader { proxy in
             let side = hypot(proxy.size.width, proxy.size.height)
-            AngularGradient(colors: Self.palette.map(Self.color), center: .center)
+            AngularGradient(colors: Self.colors, center: .center)
                 .frame(width: side, height: side)
                 .rotationEffect(.degrees(angle))
                 .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -72,7 +79,7 @@ struct WaitingBorder: View {
         }
     }
 
-    private static func color(_ hex: UInt32) -> Color {
+    private nonisolated static func color(_ hex: UInt32) -> Color {
         Color(
             red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255)

@@ -37,9 +37,9 @@ final class WaitingBorderRenderTests: XCTestCase {
     // MARK: - When it shows
 
     func testOnlyAnAgentThatWaitsForTheUserHasTheBorder() {
-        XCTAssertTrue(WaitingBorder.isActive(for: .needsInput))
+        XCTAssertTrue(WaitingBorder.isActive(for: .needsInput, online: true))
         for state in [AgentState.working, .idle, .ended, .other("thinking")] {
-            XCTAssertFalse(WaitingBorder.isActive(for: state), "\(state) does not wait for the user")
+            XCTAssertFalse(WaitingBorder.isActive(for: state, online: true), "\(state) does not wait for the user")
         }
         XCTAssertFalse(
             WaitingBorder.isActive(for: .needsInput, online: false),
@@ -88,6 +88,7 @@ final class WaitingBorderRenderTests: XCTestCase {
         XCTAssertEqual(angle(3), 0, accuracy: 0.001, "one turn, then again")
         XCTAssertEqual(angle(4.5), 180, accuracy: 0.001)
         XCTAssertEqual(angle(300.75), 90, accuracy: 0.001)
+        XCTAssertEqual(1 / WaitingBorder.frameInterval, 30, accuracy: 0.001, "at most 30 frames a second, at any display rate")
     }
 
     func testReduceMotionKeepsTheBorderStill() {
