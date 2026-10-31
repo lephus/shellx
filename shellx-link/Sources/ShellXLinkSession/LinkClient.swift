@@ -408,7 +408,7 @@ public actor LinkClient {
     }
 
     /// Closes the terminal an agent session runs in on the Mac, which keeps its own rules: it closes the whole
-    /// workspace when that terminal is its last one, for example. Call it only when ``hostFeatures`` lists
+    /// workspace when that terminal is its last tab of any kind, for example. Call it only when ``hostFeatures`` lists
     /// `ShellXLink.agentCloseFeature`. An id the Mac does not list as a live agent in a local workspace (one that
     /// has ended, for example) comes as the outcome `.notFound`, and one it refuses to act on (remote control
     /// blocked, or its rule) as `.refused`; `.failed` when it could not act.

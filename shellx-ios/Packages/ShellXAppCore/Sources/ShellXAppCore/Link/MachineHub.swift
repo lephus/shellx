@@ -535,7 +535,7 @@ public final class MachineHub {
     }
 
     /// Closes the terminal an agent runs in on its Mac, which keeps its own rules: it closes the whole
-    /// workspace when that terminal is its last one, `.refused` when remote control is blocked or the
+    /// workspace when that terminal is its last tab of any kind, `.refused` when remote control is blocked or the
     /// workspace is protected, `.notFound` for a session that has ended (its terminal runs the user's shell
     /// by then). `.ok` means the Mac closed it; the session turns `.ended` when the Mac's list change
     /// arrives, not before. A Mac that did not list `agent_close` (`supportsAgentClose(_:)`) gets nothing

@@ -46,7 +46,7 @@ enum Probe {
         Mac chooses; workspace-rename and workspace-close take the workspace_id from that list. They exit 2
         unless the Mac answers ok.
         agent-close closes the terminal a live agent runs in on the Mac (the whole workspace when it is the
-        workspace's last terminal); take the session_id from sessions. It exits 2 unless the Mac answers ok.
+        workspace's last tab of any kind); take the session_id from sessions. It exits 2 unless the Mac answers ok.
         watch logs pending requests, session states and chat entries until the session ends
         (exit 4) or --seconds pass (exit 0). With --recheck it then tries to connect again twice:
         with a ticket minted before the end (the Mac's handshake check) and with a new ticket (the
