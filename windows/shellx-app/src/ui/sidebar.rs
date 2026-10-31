@@ -2,8 +2,9 @@
 //! "MÁY CỦA BẠN" header, one group per machine from
 //! `shellx_model::sidebar::build_groups`, and the end-to-end footer.
 //! "THIẾT BỊ ĐANG KẾT NỐI" (item 5) is out of the MVP.
-//! Under this PC: one session row per local tab (click selects the tab),
-//! and a "+" on the group header that opens a new local tab.
+//! Under a machine: one workspace card per tab, like the Mac's (a purple
+//! rail, the title, the git branch and the working directory; click selects
+//! the tab). New workspaces are made from the title bar's "+".
 //! Signed in, the groups are the account's machines (this PC first, the
 //! others below, offline ones dimmed with "ngoại tuyến · lần cuối HH:MM");
 //! signed out, this PC is the only group and the sidebar never asks for a
@@ -19,9 +20,9 @@
 
 use gpui::{
     ClickEvent, Context, Div, FontWeight, ImageSource, MouseDownEvent, Pixels, Resource,
-    SharedString, Stateful, div, img, prelude::*, px, svg,
+    SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
 };
-use shellx_model::palette::{Pill, Status};
+use shellx_model::palette::{Pill, RAIL_PURPLE, SELECTION_TITLE, Status};
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
 use shellx_model::strings::{Lang, Str, pairing_code_display, t};
 use shellx_model::tabs::TabId;
@@ -34,7 +35,7 @@ use super::tooltip::Tooltip;
 
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
-/// One session row: one per tab, under the machine its panes run on.
+/// One workspace card: one per tab, under the machine its panes run on.
 pub struct SessionRow {
     pub tab: TabId,
     /// The group it is listed under (this PC's id for a local tab).
@@ -44,6 +45,10 @@ pub struct SessionRow {
     pub selected: bool,
     /// `Status::pill` decides the pill; local shells are `Idle` (no pill).
     pub status: Status,
+    /// The working directory (`~` for home), or a Mac pane's Mac name.
+    pub path: Option<String>,
+    /// The git branch of a local pane's directory.
+    pub branch: Option<String>,
 }
 
 /// A machine in the machines-header "+" list (another machine, no link).
@@ -67,7 +72,7 @@ pub fn render(
     let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
-        list = list.child(group_header(ix, group, local, lang, cx));
+        list = list.child(group_header(ix, group, lang, cx));
         if local && !group.sessions_visible {
             continue;
         }
@@ -75,7 +80,7 @@ pub fn render(
         // offline: their panes show "ngoại tuyến".
         for (ix, row) in sessions.iter().enumerate() {
             if row.machine_id == group.machine_id {
-                list = list.child(session_row(ix, row, lang, cx));
+                list = list.child(workspace_card(ix, row, lang, cx));
             }
         }
     }
@@ -102,7 +107,9 @@ fn brand(lang: Lang) -> Div {
         Icon::Logo.path().into(),
     )))
     .flex_none()
-    .size(px(20.0));
+    .size(px(18.0));
+    // The Mac's brand row is in the system font, so this is the UI font
+    // (inherited), not the Space Grotesk wordmark.
     div()
         .flex()
         .items_center()
@@ -113,8 +120,8 @@ fn brand(lang: Lang) -> Div {
         .child(logo)
         .child(
             div()
-                .font(theme::wordmark_font())
-                .text_size(theme::WORDMARK_SIZE)
+                .text_size(theme::BRAND_SIZE)
+                .font_weight(FontWeight::SEMIBOLD)
                 .text_color(theme::text_hi())
                 .child(t(lang, Str::AppName)),
         )
@@ -149,9 +156,10 @@ fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
         .items_center()
         .justify_between()
         .px(px(14.0))
-        .pt(px(12.0))
-        .pb(px(6.0))
-        .text_size(theme::SMALL_SIZE)
+        .pt(px(10.0))
+        .pb(px(4.0))
+        .text_size(theme::HEADER_SIZE)
+        .font_weight(FontWeight::MEDIUM)
         .text_color(theme::muted())
         .child(t(lang, Str::MachinesHeader))
         .child(
@@ -163,7 +171,7 @@ fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
                 .flex()
                 .items_center()
                 .justify_center()
-                .size(px(20.0))
+                .size(px(24.0))
                 .rounded(px(4.0))
                 .cursor_pointer()
                 .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
@@ -173,38 +181,12 @@ fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
                 .child(
                     svg()
                         .path(Icon::AddPlus.path())
-                        .size(px(14.0))
+                        .size(px(18.0))
                         .text_color(theme::muted())
                         .group_hover("sidebar-add-machine", |style| {
                             style.text_color(theme::text())
                         }),
                 ),
-        )
-}
-
-/// "+" on this PC's group header: a new local workspace (tooltip "Phiên mới").
-fn new_tab_button(lang: Lang, cx: &mut Context<RootView>) -> Stateful<Div> {
-    let tip: SharedString = t(lang, Str::NewWorkspace).into();
-    div()
-        .id("sidebar-new-tab")
-        .group("sidebar-new-tab")
-        .flex()
-        .flex_none()
-        .items_center()
-        .justify_center()
-        .size(px(20.0))
-        .rounded(px(4.0))
-        .cursor_pointer()
-        .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
-        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-            this.new_tab(window, cx);
-        }))
-        .child(
-            svg()
-                .path(Icon::AddPlus.path())
-                .size(px(14.0))
-                .text_color(theme::muted())
-                .group_hover("sidebar-new-tab", |style| style.text_color(theme::text())),
         )
 }
 
@@ -270,13 +252,7 @@ fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView
     list
 }
 
-fn group_header(
-    ix: usize,
-    group: &MachineGroup,
-    local: bool,
-    lang: Lang,
-    cx: &mut Context<RootView>,
-) -> Div {
+fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<RootView>) -> Div {
     let icon = match group.icon {
         MachineIcon::Laptop => Icon::Laptop,
         MachineIcon::Desktop => Icon::Desktop,
@@ -297,26 +273,34 @@ fn group_header(
                 .size(px(16.0))
                 .text_color(theme::muted()),
         )
+        // "Name · this PC": the note sits right after the name.
         .child(
             div()
+                .flex()
+                .items_center()
+                .gap(px(4.0))
+                .flex_1()
                 .min_w_0()
-                .truncate()
-                .text_color(theme::text_hi())
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(group.title.clone()),
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .text_size(theme::CARD_TITLE_SIZE)
+                        .text_color(theme::text_hi())
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(group.title.clone()),
+                )
+                .when_some(group.note.clone(), |row, note| {
+                    row.child(
+                        div()
+                            .flex_none()
+                            .text_size(theme::SMALL_SIZE)
+                            .text_color(theme::muted())
+                            .child(format!("· {note}")),
+                    )
+                }),
         )
-        .when_some(group.note.clone(), |row, note| {
-            row.child(
-                div()
-                    .flex_none()
-                    .text_size(theme::SMALL_SIZE)
-                    .text_color(theme::muted())
-                    .child(format!("· {note}")),
-            )
-        })
-        .child(div().flex_1())
-        .child(div().flex_none().size(px(6.0)).rounded_full().bg(dot))
-        .when(local, |row| row.child(new_tab_button(lang, cx)));
+        .child(div().flex_none().size(px(6.0)).rounded_full().bg(dot));
 
     div()
         .flex()
@@ -398,7 +382,11 @@ fn row_action(
     }
 }
 
-fn session_row(
+/// One workspace, like the Mac's card: a purple rail on the left edge, the
+/// title, then (when there are any) the git branch and the directory. The
+/// selected card has a fill and a 1 px edge; the edge is there (clear) on
+/// the others so selecting never moves the text.
+fn workspace_card(
     ix: usize,
     row: &SessionRow,
     lang: Lang,
@@ -406,18 +394,57 @@ fn session_row(
 ) -> Stateful<Div> {
     let selected = row.selected;
     let tab = row.tab;
-    div()
-        .id(("sidebar-session", ix))
+    let title_color = if selected {
+        theme::hsla(SELECTION_TITLE)
+    } else {
+        theme::text_hi()
+    };
+    let title_line = div()
         .flex()
         .items_center()
         .gap(px(8.0))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .text_size(theme::CARD_TITLE_SIZE)
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(title_color)
+                .child(row.title.clone()),
+        )
+        .when_some(row.status.pill(), |el, pill| {
+            el.child(pill_label(pill, lang))
+        });
+    let content = div()
+        .flex()
+        .flex_col()
+        .gap(px(2.0))
+        .pl(px(12.0))
+        .pr(px(8.0))
+        .py(px(6.0))
+        .child(title_line)
+        .when_some(row.branch.as_ref(), |el, branch| {
+            el.child(card_line(format!("\u{2387} {branch}")))
+        })
+        .when_some(row.path.as_ref(), |el, path| {
+            el.child(card_line(path.clone()))
+        });
+    div()
+        .id(("sidebar-session", ix))
+        .relative()
+        .flex()
+        .flex_col()
         .mx(px(8.0))
         .my(px(2.0))
-        .px(px(10.0))
-        .py(px(7.0))
-        .rounded(px(8.0))
+        .rounded(px(6.0))
+        .border_1()
+        .border_color(transparent_black())
         .cursor_pointer()
-        .when(selected, |el| el.bg(theme::hsla(theme::SESSION_SELECTED)))
+        .when(selected, |el| {
+            el.bg(theme::hsla(theme::SESSION_SELECTED))
+                .border_color(theme::border())
+        })
         .when(!selected, |el| {
             el.hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
         })
@@ -425,23 +452,33 @@ fn session_row(
             this.select_tab(tab, window, cx);
         }))
         .child(
-            svg()
-                .path(Icon::Terminal.path())
-                .flex_none()
-                .size(px(13.0))
-                .text_color(theme::muted()),
-        )
-        .child(
             div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_color(theme::text_hi())
-                .child(row.title.clone()),
+                .absolute()
+                .left_0()
+                .top_0()
+                .bottom_0()
+                .w(px(3.0))
+                .rounded_tl(px(6.0))
+                .rounded_bl(px(6.0))
+                .bg(theme::hsla(RAIL_PURPLE.with_alpha(0.95))),
         )
-        .when_some(row.status.pill(), |el, pill| {
-            el.child(pill_label(pill, lang))
-        })
+        .child(content)
+}
+
+/// A secondary line of a card: 11 px, muted, cut off at the card's edge.
+/// The text sits in a row as a `flex_1` child, like the title: as a plain
+/// child of the column GPUI measures it at width 0 first and keeps that
+/// (the line would show only "…").
+fn card_line(text: String) -> Div {
+    div().flex().child(
+        div()
+            .flex_1()
+            .min_w_0()
+            .truncate()
+            .text_size(theme::SMALL_SIZE)
+            .text_color(theme::muted())
+            .child(text),
+    )
 }
 
 fn pill_label(pill: Pill, lang: Lang) -> Div {

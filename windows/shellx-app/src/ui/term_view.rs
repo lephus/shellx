@@ -517,7 +517,6 @@ impl TermView {
 
     /// The OSC 7 URL of a local pane's shell (`crate::cwd::cwd_from_osc7`).
     /// A remote pane shows a Mac terminal: its folder is not a path here.
-    #[allow(dead_code)] // the sidebar card (Task 9) reads it
     pub(super) fn cwd(&self) -> Option<String> {
         match &self.backend {
             Backend::Local { core, .. } => core.pwd(),

@@ -78,6 +78,7 @@ use super::theme;
 use super::titlebar;
 use super::update_banner;
 use crate::core_service::MachineFacts;
+use crate::cwd::{BranchCache, cwd_from_osc7, row_lines};
 use crate::remote_link::{PaneEvent, PaneSink};
 use crate::remote_session::RemoteSession;
 use crate::remote_tabs::{AccountWatch, RemoteTabs, open_want, split_target, start_app_session};
@@ -91,6 +92,10 @@ pub struct RootView {
     sidebar_visible: bool,
     /// `%COMPUTERNAME%`: this PC's name while it has no server entry.
     computer_name: Option<String>,
+    /// The home folder (`USERPROFILE`, else `HOME`): a card shows it as `~`.
+    home: Option<String>,
+    /// Git branch per working directory, for the workspace cards.
+    branches: BranchCache,
     account: Entity<AccountService>,
     sign_in: Entity<SignInDialog>,
     settings: Entity<SettingsPanel>,
@@ -120,6 +125,9 @@ impl RootView {
         let (tabs, _) = Tabs::new();
         let last_focus = tabs.active().focused;
         let computer_name = std::env::var("COMPUTERNAME").ok();
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .ok();
         let core = cx.global::<Services>().core.clone();
         let pairing = cx.new(|cx| PairingPanel::new(core.clone(), cx));
         let account = cx.new(|cx| AccountService::new(core, MachineFacts::this_pc(), cx));
@@ -169,6 +177,8 @@ impl RootView {
             area: PaneArea::default(),
             sidebar_visible: true,
             computer_name,
+            home,
+            branches: BranchCache::new(),
             account,
             sign_in,
             settings,
@@ -801,6 +811,26 @@ impl RootView {
             None => session_title(title.as_deref(), lang),
         }
     }
+
+    /// The path and git branch lines of a workspace card: a local pane's
+    /// directory (from its shell's OSC 7) and the branch checked out there;
+    /// a Mac pane shows the Mac's name and no branch (`cwd::row_lines`).
+    fn card_lines(&mut self, pane: PaneId, cx: &App) -> (Option<String>, Option<String>) {
+        let remote = self
+            .pane_machine(pane)
+            .map(|machine| self.machine_name(machine, cx));
+        let cwd = self
+            .host
+            .get(pane)
+            .and_then(|live| live.view.read(cx).cwd())
+            .and_then(|url| cwd_from_osc7(&url));
+        let (path, wants_branch) =
+            row_lines(cwd.as_deref(), remote.as_deref(), self.home.as_deref());
+        let branch = cwd
+            .filter(|_| wants_branch)
+            .and_then(|cwd| self.branches.get(&cwd, Instant::now()));
+        (path, branch)
+    }
 }
 
 /// Where Back / Forward may land: an open terminal other than the focused
@@ -839,22 +869,29 @@ impl Render for RootView {
             let active = self.tabs.active().id;
             // A tab is listed under the machine its panes run on (a Mac tab
             // under that Mac's group; under this PC if the Mac is not listed).
-            let rows: Vec<SessionRow> = self
+            let tabs: Vec<(TabId, PaneId)> = self
                 .tabs
                 .tabs()
                 .iter()
-                .map(|tab| SessionRow {
-                    tab: tab.id,
+                .map(|tab| (tab.id, tab.focused))
+                .collect();
+            let mut rows = Vec::with_capacity(tabs.len());
+            for (tab, focused) in tabs {
+                let (path, branch) = self.card_lines(focused, cx);
+                rows.push(SessionRow {
+                    tab,
                     machine_id: self
-                        .pane_machine(tab.focused)
+                        .pane_machine(focused)
                         .filter(|m| groups.iter().any(|g| g.machine_id == *m))
                         .unwrap_or(local_id.as_str())
                         .to_string(),
-                    title: self.tab_title(tab.focused, lang, cx),
-                    selected: tab.id == active,
+                    title: self.tab_title(focused, lang, cx),
+                    selected: tab == active,
                     status: Status::Idle,
-                })
-                .collect();
+                    path,
+                    branch,
+                });
+            }
             Some(sidebar::render(
                 &groups,
                 &rows,

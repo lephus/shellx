@@ -5,9 +5,6 @@
 //! `display_path` shortens it with `~` like the Mac sidebar, and `git_branch`
 //! reads the branch from `.git/HEAD` (no `git` process, no libgit).
 
-// The sidebar card (Task 9) is the only caller; remove this then.
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -99,6 +96,24 @@ fn is_drive_path(path: &str) -> bool {
 
 fn same_char(a: char, b: char, ignore_case: bool) -> bool {
     a == b || (ignore_case && a.to_lowercase().eq(b.to_lowercase()))
+}
+
+/// The path line of a sidebar card and whether to look up its branch. A pane
+/// that shows a Mac gives the Mac's name (a local folder means nothing
+/// there); a local pane gives its `cwd` with `~`, and asks for the branch.
+/// A local pane that has not reported a directory gives neither.
+pub fn row_lines(
+    local_cwd: Option<&str>,
+    remote_machine: Option<&str>,
+    home: Option<&str>,
+) -> (Option<String>, bool) {
+    if let Some(machine) = remote_machine {
+        return (Some(machine.to_string()), false);
+    }
+    match local_cwd {
+        Some(cwd) => (Some(display_path(cwd, home)), true),
+        None => (None, false),
+    }
 }
 
 /// The branch checked out in the repository that contains `cwd`: the name
@@ -240,6 +255,28 @@ mod tests {
         );
         assert_eq!(display_path("/Users/a/p", Some("/Users/a")), "~/p");
         assert_eq!(display_path("/Users/a/p", None), "/Users/a/p");
+    }
+
+    #[test]
+    fn row_lines_for_local_and_remote_panes() {
+        let home = Some(r"C:\Users\Admin");
+        // A pane that shows a Mac: the Mac's name, never a branch lookup.
+        assert_eq!(
+            row_lines(None, Some("MacBook"), home),
+            (Some("MacBook".to_string()), false)
+        );
+        // Even a stale local cwd does not leak into a remote pane's row.
+        assert_eq!(
+            row_lines(Some(r"C:\x"), Some("MacBook"), home),
+            (Some("MacBook".to_string()), false)
+        );
+        // A local pane: the path with `~`, and look the branch up.
+        assert_eq!(
+            row_lines(Some(r"C:\Users\Admin\code"), None, home),
+            (Some(r"~\code".to_string()), true)
+        );
+        // No directory reported yet: no path line, no branch.
+        assert_eq!(row_lines(None, None, home), (None, false));
     }
 
     #[test]

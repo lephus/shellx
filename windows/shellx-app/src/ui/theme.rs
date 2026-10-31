@@ -18,7 +18,11 @@ pub const CAPTION_FALLBACK: &str = "Segoe MDL2 Assets";
 pub const UI_SIZE: Pixels = px(13.0);
 pub const SMALL_SIZE: Pixels = px(11.0);
 pub const PILL_SIZE: Pixels = px(10.0);
-pub const WORDMARK_SIZE: Pixels = px(16.0);
+/// Sidebar like the Mac's: brand name, machine and workspace titles, the
+/// machines header.
+pub const BRAND_SIZE: Pixels = px(14.0);
+pub const CARD_TITLE_SIZE: Pixels = px(12.0);
+pub const HEADER_SIZE: Pixels = px(10.5);
 pub const CAPTION_GLYPH_SIZE: Pixels = px(10.0);
 
 /// Sidebar session rows (mockup `.sess.cur` / `.sess:hover`).
