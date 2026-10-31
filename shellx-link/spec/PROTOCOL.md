@@ -746,7 +746,8 @@ terminal that session is bound to, and only while that terminal still exists and
 never sends the text to, or closes, another terminal. What remains is the moment between that check and the
 typing: an agent that exits within it can still let one message reach the terminal, the same window the
 Mac's own remote-control path has. For `agent.close` the same moment lets a terminal that has just turned
-into the user's shell be closed.
+into the user's shell be closed. `terminal.close` is not bound by this rule: it closes a tab the user picked,
+whatever runs there (Tabs, below).
 
 **Attachments.** `attach.*` lets a phone put files on the Mac, so what it may choose is narrow. The phone
 never picks a path: the host names the directory, the file name and the file mode. An image is saved the
@@ -817,7 +818,8 @@ three questions a remote command channel must answer, one by one.
   is never listed there, so it is `not_found` and nothing closes. The shell fall-through rule above applies: a
   session that has ended, whose agent process the host does not know by process id, or whose process is no
   longer alive when the call arrives is answered `not_found` before any terminal is touched, so once the agent
-  has exited its terminal, which now runs the user's shell, cannot be closed by a phone. The host closes only
+  has exited its terminal, which now runs the user's shell, cannot be closed through `agent.close`;
+  `terminal.close` (Tabs, below) closes a tab the user picked. The host closes only
   the terminal that session is bound to, and only while that terminal still exists and still hosts the agent,
   in the workspace the host's list shows it in now (a tab dragged to another workspace closes there). When that
   terminal is the last tab of its workspace (counting tabs of every kind, not only terminals), the Mac closes

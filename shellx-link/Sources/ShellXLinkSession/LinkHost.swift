@@ -417,7 +417,8 @@ public actor LinkHost {
                 }
             case let .terminalClose(callId, workspaceId, terminalId):
                 guard let terminalControl else {
-                    await Self.sendError(on: channel, "unsupported", "this host takes no terminal control", callId: callId)
+                    await Self.sendError(
+                        on: channel, "unsupported", "this host takes no terminal control", callId: callId)
                     continue
                 }
                 // Closing a terminal may take a while; keep reading meanwhile.
