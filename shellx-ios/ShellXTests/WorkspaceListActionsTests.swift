@@ -272,6 +272,84 @@ final class WorkspaceListActionsTests: XCTestCase {
         XCTAssertEqual(calls, [])
     }
 
+    // MARK: - Closing an agent
+
+    /// A Mac with the workspace `shellx`, where the agent `claude` (session `s1`) works.
+    private func macWithAnAgent(name: String = "MacBook Pro", acceptsAgentClose: Bool = true) async -> FakeMac {
+        let mac = FakeMac(name: name, acceptsAgentClose: acceptsAgentClose)
+        await mac.setWorkspaces([workspace("shellx")])
+        await mac.upsertSession(
+            AgentSession(
+                sessionId: "s1", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx", state: .working))
+        return mac
+    }
+
+    private func agentRef(_ mac: FakeMac) -> SessionRef {
+        SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+    }
+
+    func testCloseAgentAsksTheMacOnce() async throws {
+        let mac = await macWithAnAgent()
+        let rig = try await makeRig([mac])
+        let running = await eventually { rig.hub.machines.first?.state == .online && rig.hub.liveSessions.count == 1 }
+        XCTAssertTrue(running)
+        await mac.holdWorkspaceControl()
+
+        rig.actions.closeAgent(agentRef(mac))
+        rig.actions.closeAgent(agentRef(mac))
+        XCTAssertEqual(rig.screen.tasks.count, 1, "the second tap started nothing")
+        let held = await eventually { await mac.agentCloses == ["s1"] }
+        XCTAssertTrue(held)
+        await mac.releaseWorkspaceControl()
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .nothing, "the card leaves for Ended by the Mac's push")
+        let calls = await mac.agentCloses
+        XCTAssertEqual(calls, ["s1"])
+        XCTAssertEqual(rig.screen.alerts, [])
+        let ended = await eventually { rig.hub.liveSessions.isEmpty }
+        XCTAssertTrue(ended)
+
+        // Answered: Close goes out again (and the Mac says this agent has stopped).
+        rig.actions.closeAgent(agentRef(mac))
+        XCTAssertEqual(rig.screen.tasks.count, 2)
+        let again = await rig.lastFeedback()
+        XCTAssertEqual(again, .alert(.agentNotClosable))
+    }
+
+    func testCloseAgentTheMacCannotCloseIsAnAlert() async throws {
+        let mac = await macWithAnAgent()
+        let rig = try await makeRig([mac])
+        let running = await eventually { rig.hub.machines.first?.state == .online && rig.hub.liveSessions.count == 1 }
+        XCTAssertTrue(running)
+        let lists = await mac.workspaceListCount
+        await mac.setNextAgentCloseOutcome(.notFound)
+
+        rig.actions.closeAgent(agentRef(mac))
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .alert(.agentNotClosable))
+        XCTAssertEqual(rig.screen.alerts, [.agentNotClosable])
+        let listsAfter = await mac.workspaceListCount
+        XCTAssertEqual(listsAfter, lists, "an agent the Mac cannot close is not a workspace list gone stale")
+        XCTAssertEqual(rig.hub.liveSessions.count, 1, "the agent still runs")
+    }
+
+    func testOnlyAnOnlineMacThatTakesAgentCloseOffersIt() async throws {
+        let modern = await macWithAnAgent(name: "MacBook Pro")
+        let old = await macWithAnAgent(name: "iMac", acceptsAgentClose: false)
+        let rig = try await makeRig([modern, old])
+        let ready = await eventually {
+            rig.hub.machines.count == 2 && rig.hub.machines.allSatisfy { $0.state == .online }
+        }
+        XCTAssertTrue(ready)
+
+        XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [modern.machine.machineID])
+
+        await rig.hub.stopAll()
+        XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [], "no Close while the Mac is away")
+    }
+
     func testPullToRefreshAsksTheOnlineMacsAgain() async throws {
         let mac = await macWithWorkspaces(["shellx"])
         let rig = try await makeRig([mac])

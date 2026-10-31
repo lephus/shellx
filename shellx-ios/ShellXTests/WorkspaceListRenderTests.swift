@@ -418,6 +418,14 @@ final class WorkspaceListRenderTests: XCTestCase {
         XCTAssertEqual(WorkspaceFeedback.of(.refused, for: .close, machineID: m), .alert(.refusedClose))
         XCTAssertEqual(WorkspaceFeedback.of(.refused, for: .create, machineID: m), .alert(.refusedControl))
         XCTAssertEqual(WorkspaceFeedback.of(.refused, for: .rename, machineID: m), .alert(.refusedControl))
+        // Closing an agent: the session moves to Ended by push; an agent the Mac cannot close (no terminal tab
+        // there, or stopped already) says so, as the list of workspaces has nothing to refresh.
+        XCTAssertEqual(WorkspaceFeedback.of(.ok(workspaceId: nil), for: .closeAgent, machineID: m), .nothing)
+        XCTAssertEqual(WorkspaceFeedback.of(.notFound, for: .closeAgent, machineID: m), .alert(.agentNotClosable))
+        XCTAssertEqual(WorkspaceFeedback.of(.refused, for: .closeAgent, machineID: m), .alert(.refusedControl))
+        XCTAssertEqual(WorkspaceFeedback.of(.offline, for: .closeAgent, machineID: m), .alert(.offline))
+        XCTAssertEqual(WorkspaceFeedback.of(.failed, for: .closeAgent, machineID: m), .alert(.failed))
+        XCTAssertEqual(WorkspaceFeedback.of(.unknown, for: .closeAgent, machineID: m), .alert(.unknown))
     }
 
     func testEveryAlertSaysSomethingDifferent() {
