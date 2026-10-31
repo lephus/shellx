@@ -226,6 +226,111 @@ final class WorkspaceSessionTests: XCTestCase {
         XCTAssertEqual(result.outcome, .ok)
     }
 
+    // MARK: - Agent control
+
+    func testWelcomeListsAgentCloseOnlyWithControl() async throws {
+        let agents = FakeAgentControl()
+        let alone = try await welcomeFeatures(makeHost(agentControl: agents))
+        XCTAssertEqual(alone, [ShellXLink.agentCloseFeature])
+        XCTAssertEqual(alone, ["agent_close"])
+
+        let without = try await welcomeFeatures(makeHost(workspaces: FakeWorkspaceSource(), control: FakeWorkspaceControl()))
+        XCTAssertEqual(without, ["workspaces", "workspace_control"], "a host without agent control does not offer it")
+
+        let all = try await welcomeFeatures(
+            makeHost(
+                chat: FakeChatSource(acceptsAttachments: true), workspaces: FakeWorkspaceSource(),
+                control: FakeWorkspaceControl(), agentControl: agents))
+        XCTAssertEqual(all, ["attachments", "workspaces", "workspace_control", "agent_close"])
+
+        let client = try await connect(makeHost(agentControl: agents))
+        XCTAssertEqual(client.hostFeatures, ["agent_close"])
+    }
+
+    func testAgentCloseUnsupportedWithoutControl() async throws {
+        // Workspace control alone does not take `agent.close`.
+        let client = try await connect(makeHost(workspaces: FakeWorkspaceSource(), control: FakeWorkspaceControl()))
+        await expectRemote("unsupported") { try await client.closeAgent(sessionId: "sess-1") }
+        // The session is still usable after the refusal.
+        let snapshot = try await within { try await client.snapshot() }
+        XCTAssertEqual(snapshot.pending, [])
+
+        // The refusal names the call, so a raw client sees `error` with its call_id.
+        let rig = makeHost()
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawChannel(end, rig)
+        try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
+        _ = try await within { try await raw.receive() }
+        try await raw.send(.agentClose(callId: "c1", sessionId: "sess-1"))
+        let answer = try await within { try await raw.receive() }
+        guard case let .error(code, _, callId) = answer else { return XCTFail("expected error, got \(answer)") }
+        XCTAssertEqual(code, "unsupported")
+        XCTAssertEqual(callId, "c1")
+    }
+
+    func testAgentCloseReachesControl() async throws {
+        let agents = FakeAgentControl()
+        let client = try await connect(makeHost(agentControl: agents))
+
+        let closed = try await within { try await client.closeAgent(sessionId: "sess-1") }
+        XCTAssertEqual(closed, .ok)
+        XCTAssertEqual(agents.calls, ["sess-1"])
+
+        // Every outcome comes back as the control gave it, an unknown one included.
+        agents.setClose(.notFound)
+        let notFound = try await within { try await client.closeAgent(sessionId: "sess-1") }
+        XCTAssertEqual(notFound, .notFound)
+        agents.setClose(.refused)
+        let refused = try await within { try await client.closeAgent(sessionId: "sess-1") }
+        XCTAssertEqual(refused, .refused)
+        agents.setClose(.failed)
+        let failed = try await within { try await client.closeAgent(sessionId: "sess-1") }
+        XCTAssertEqual(failed, .failed)
+        agents.setClose(.other("busy"))
+        let busy = try await within { try await client.closeAgent(sessionId: "sess-1") }
+        XCTAssertEqual(busy, .other("busy"))
+        XCTAssertEqual(agents.calls, ["sess-1", "sess-1", "sess-1", "sess-1", "sess-1"])
+    }
+
+    func testAgentCloseResultFromAClientIsBadRequest() async throws {
+        let agents = FakeAgentControl()
+        let rig = makeHost(agentControl: agents)
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawChannel(end, rig)
+        try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
+        _ = try await within { try await raw.receive() }
+        try await raw.send(.agentCloseResult(callId: "c1", outcome: .ok))
+        let answer = try await within { try await raw.receive() }
+        guard case let .error(code, _, callId) = answer else { return XCTFail("expected error, got \(answer)") }
+        XCTAssertEqual(code, "bad_request")
+        XCTAssertEqual(callId, "c1")
+        XCTAssertEqual(agents.calls, [])
+    }
+
+    func testSlowAgentCloseDoesNotBlockTheSession() async throws {
+        let source = FakeWorkspaceSource([linkWorkspace("w1")])
+        let agents = FakeAgentControl()
+        let gate = Gate()
+        agents.hold(until: gate)
+        let client = try await connect(makeHost(workspaces: source, agentControl: agents))
+
+        let closing = Task { try await client.closeAgent(sessionId: "sess-1") }
+        let reached = await eventually { agents.calls == ["sess-1"] }
+        XCTAssertTrue(reached, "the close never reached the control")
+        // The close is still waiting, and the host keeps answering other calls.
+        let list = try await within { try await client.workspaces() }
+        XCTAssertEqual(list.workspaces.map(\.workspaceId), ["w1"])
+        let second = Task { try await client.closeAgent(sessionId: "sess-2") }
+        let both = await eventually { agents.calls == ["sess-1", "sess-2"] }
+        XCTAssertTrue(both, "a second close waited behind the first")
+
+        gate.open()
+        let outcome = try await within { try await closing.value }
+        XCTAssertEqual(outcome, .ok)
+        let result = try await within { try await second.value }
+        XCTAssertEqual(result, .ok)
+    }
+
     // MARK: - Oversize (PROTOCOL.md section 6)
 
     func testOversizedListIsShrunk() async throws {
@@ -334,14 +439,15 @@ final class WorkspaceSessionTests: XCTestCase {
 
     private func makeHost(
         chat: (any AgentChatSource)? = nil, workspaces: (any WorkspaceSource)? = nil,
-        control: (any WorkspaceControl)? = nil
+        control: (any WorkspaceControl)? = nil, agentControl: (any AgentControl)? = nil
     ) -> Rig {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
         let trusted: Set<Data> = [clientKey.publicKey]
         let host = LinkHost(
             key: hostKey, trustedClients: { trusted }, feed: FakeFeedSource(), sessions: nil, chat: chat,
-            workspaces: workspaces, workspaceControl: control, hostVersion: "test-host", machineName: "Test Mac",
+            workspaces: workspaces, workspaceControl: control, agentControl: agentControl,
+            hostVersion: "test-host", machineName: "Test Mac",
             timings: .standard)
         return Rig(host: host, hostKey: hostKey, clientKey: clientKey)
     }

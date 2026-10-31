@@ -131,6 +131,30 @@ final class FakeWorkspaceControl: WorkspaceControl, @unchecked Sendable {
     }
 }
 
+/// An `AgentControl` that logs the session ids it is asked to close and answers with the outcome it is given.
+final class FakeAgentControl: AgentControl, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _calls: [String] = []
+    private var closed: WorkspaceControlOutcome = .ok
+    private var gate: Gate?
+
+    var calls: [String] { lock.withLock { _calls } }
+
+    func setClose(_ outcome: WorkspaceControlOutcome) { lock.withLock { closed = outcome } }
+
+    /// Every later call waits for `gate` to open before it answers (after it was logged).
+    func hold(until gate: Gate) { lock.withLock { self.gate = gate } }
+
+    func closeAgent(sessionId: String) async -> WorkspaceControlOutcome {
+        let (result, gate) = lock.withLock { () -> (WorkspaceControlOutcome, Gate?) in
+            _calls.append(sessionId)
+            return (closed, self.gate)
+        }
+        await gate?.wait()
+        return result
+    }
+}
+
 /// Suspends `wait()` until `open()` is called, for as many waiters as there are.
 final class Gate: @unchecked Sendable {
     private let lock = NSLock()
