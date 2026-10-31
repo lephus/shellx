@@ -2,6 +2,7 @@ import AppKit
 import CMUXAgentLaunch
 import CmuxAgentChat
 import CmuxMobileHost
+import CmuxSettings
 import CmuxSidebar
 import Foundation
 import ShellXLinkCore
@@ -396,6 +397,186 @@ struct ShellXLinkWorkspaceSourceTests {
         #expect(manager.tabs.count == before + 1)
         #expect(manager.selectedTabId == selected)
     }
+
+    // MARK: - Agent close
+
+    /// A listed workspace `id` holding one terminal `terminal`.
+    private static func agentWorkspace(_ id: UUID, terminal: UUID, order: Int = 0) -> LinkWorkspace {
+        LinkWorkspace(
+            workspaceId: id.uuidString, title: "w", order: order, directory: nil, branch: nil, ports: nil,
+            terminals: [LinkTerminal(terminalId: terminal.uuidString, title: "claude", order: 0, selected: true)]
+        )
+    }
+
+    @Test func closeAgentClosesItsListedSurface() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal)]
+        mac.agentSurfaces = ["s1": (workspace, terminal)]
+
+        #expect(await source.closeAgent(sessionId: "s1") == .ok)
+        #expect(mac.surfaceCloses.map(\.workspaceId) == [workspace])
+        #expect(mac.surfaceCloses.map(\.surfaceId) == [terminal])
+    }
+
+    /// No live agent (unknown, ended, no pid or a dead one, no surface): the terminal may run the user's shell now,
+    /// so nothing closes.
+    @Test func closeAgentNotLiveIsNotFound() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal)]
+
+        #expect(await source.closeAgent(sessionId: "s1") == .notFound)
+        #expect(mac.surfaceCloses.isEmpty)
+    }
+
+    /// A live agent whose surface is in no listed workspace, as in an SSH workspace: nothing closes.
+    @Test func closeAgentOnAnUnlistedSurfaceIsNotFound() async {
+        let (mac, source) = Self.makeSource()
+        let listed = UUID(), listedTerminal = UUID()
+        let ssh = UUID(), sshTerminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(listed, terminal: listedTerminal)]
+        mac.agentSurfaces = ["ssh": (ssh, sshTerminal), "moved": (listed, sshTerminal), "other": (ssh, listedTerminal)]
+
+        #expect(await source.closeAgent(sessionId: "ssh") == .notFound)
+        #expect(await source.closeAgent(sessionId: "moved") == .notFound)
+        #expect(await source.closeAgent(sessionId: "other") == .notFound)
+        #expect(mac.surfaceCloses.isEmpty)
+    }
+
+    @Test func closeAgentBlockedIsRefused() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal)]
+        mac.agentSurfaces = ["s1": (workspace, terminal)]
+        mac.blocked = true
+
+        #expect(await source.closeAgent(sessionId: "s1") == .refused)
+        #expect(mac.surfaceCloses.isEmpty)
+    }
+
+    @Test(arguments: [
+        ("not_found", WorkspaceControlOutcome.notFound),
+        ("protected", WorkspaceControlOutcome.refused),
+        ("invalid_state", WorkspaceControlOutcome.refused),
+        ("denied", WorkspaceControlOutcome.refused),
+        ("internal_error", WorkspaceControlOutcome.failed),
+    ])
+    func closeAgentErrorMapsToOutcome(code: String, outcome: WorkspaceControlOutcome) async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal)]
+        mac.agentSurfaces = ["s1": (workspace, terminal)]
+        mac.closeSurfaceResult = .err(code: code, message: "", data: nil)
+
+        #expect(await source.closeAgent(sessionId: "s1") == outcome)
+        #expect(mac.surfaceCloses.count == 1)
+    }
+
+    // MARK: - The live agent-surface close
+
+    /// Runs `body` with a window-less manager holding two workspaces as the controller's active one, its
+    /// close-workspace-on-last-surface preference set to `closesWorkspace`. Synchronous, so the swap of the active
+    /// manager and its restore are one main-actor job no other test interleaves with.
+    private static func withAgentManager(
+        closesWorkspace: Bool, _ body: (TabManager, _ first: Workspace, _ second: Workspace) throws -> Void
+    ) throws {
+        let suiteName = "ShellXLinkWorkspaceSourceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(closesWorkspace, forKey: SettingCatalog().app.keepWorkspaceOpenWhenClosingLastSurface.userDefaultsKey)
+        let manager = TabManager(autoWelcomeIfNeeded: false, settings: UserDefaultsSettingsClient(defaults: defaults))
+        let previousManager = TerminalController.shared.activeTabManagerForCallerNotification()
+        TerminalController.shared.setActiveTabManager(manager)
+        defer {
+            TerminalController.shared.setActiveTabManager(previousManager)
+            manager.finalizeAllWorkspacesForWindowClose()
+            ClosedItemHistoryStore.shared.removeAll()
+        }
+        let first = try #require(manager.tabs.first)
+        let second = manager.addWorkspace(select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
+        try body(manager, first, second)
+    }
+
+    /// The agent's tab is its workspace's last: with the preference on (the default) the workspace closes, as the
+    /// desktop's Close Tab does, and the Mac's selection stays where it was.
+    @Test func agentSurfaceCloseOnTheLastSurfaceClosesTheWorkspace() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, first, second in
+            #expect(manager.closeWorkspaceOnLastSurfacePreferenceEnabled())
+            let surface = try #require(second.focusedPanelId)
+            #expect(second.panels.count == 1)
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: surface)
+
+            guard case .ok = result else {
+                Issue.record("agent surface close failed: \(result)")
+                return
+            }
+            #expect(!manager.tabs.contains { $0.id == second.id })
+            #expect(manager.tabs.map(\.id) == [first.id])
+            #expect(manager.selectedTabId == first.id)
+        }
+    }
+
+    /// With "Keep Workspace Open" the Mac refuses the agent's last tab, and nothing closes.
+    @Test func agentSurfaceCloseKeepsAWorkspaceWhenThePreferenceIsOff() throws {
+        try Self.withAgentManager(closesWorkspace: false) { manager, _, second in
+            #expect(!manager.closeWorkspaceOnLastSurfacePreferenceEnabled())
+            let surface = try #require(second.focusedPanelId)
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: surface)
+
+            guard case let .err(code, _, _) = result else {
+                Issue.record("agent surface close was not refused")
+                return
+            }
+            #expect(code == "protected")
+            #expect(manager.tabs.contains { $0.id == second.id })
+            #expect(second.panels[surface] != nil)
+        }
+    }
+
+    /// One of two tabs: only that tab closes, the workspace and the selection stay.
+    @Test func agentSurfaceCloseClosesOneOfTwoSurfaces() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, first, second in
+            let kept = try #require(second.focusedPanelId)
+            let pane = try #require(second.paneId(forPanelId: kept))
+            let agent = try #require(second.newTerminalSurface(inPane: pane, focus: false)).id
+            #expect(second.panels.count == 2)
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: agent)
+
+            guard case .ok = result else {
+                Issue.record("agent surface close failed: \(result)")
+                return
+            }
+            #expect(manager.tabs.contains { $0.id == second.id })
+            #expect(second.panels[agent] == nil)
+            #expect(second.panels[kept] != nil)
+            #expect(second.panels.count == 1)
+            #expect(manager.selectedTabId == first.id)
+        }
+    }
+
+    /// A workspace or surface the Mac does not have is not found, and nothing closes.
+    @Test func agentSurfaceCloseOnAMissingTargetIsNotFound() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, _, second in
+            let surface = try #require(second.focusedPanelId)
+
+            for (workspaceID, surfaceID) in [(UUID(), surface), (second.id, UUID())] {
+                let result = TerminalController.shared.v2MobileAgentSurfaceClose(
+                    workspaceID: workspaceID, surfaceID: surfaceID
+                )
+                guard case let .err(code, _, _) = result else {
+                    Issue.record("agent surface close of a missing target succeeded")
+                    continue
+                }
+                #expect(code == "not_found")
+            }
+            #expect(manager.tabs.count == 2)
+            #expect(second.panels[surface] != nil)
+        }
+    }
 }
 
 /// How often a change signal fired.
@@ -413,9 +594,13 @@ private final class FakeMac {
     var createResult: TerminalController.V2CallResult = .ok(["created_workspace_id": "ws-new"] as [String: Any])
     var renameResult: TerminalController.V2CallResult = .ok([String: Any]())
     var closeResult: TerminalController.V2CallResult = .ok([String: Any]())
+    /// The live agents' surfaces, by session id; a session missing here is not a live agent.
+    var agentSurfaces: [String: (workspaceId: UUID, surfaceId: UUID)] = [:]
+    var closeSurfaceResult: TerminalController.V2CallResult = .ok([String: Any]())
     private(set) var creates = 0
     private(set) var renames: [(workspaceId: String, title: String)] = []
     private(set) var closes: [String] = []
+    private(set) var surfaceCloses: [(workspaceId: UUID, surfaceId: UUID)] = []
     private(set) var attachCount = 0
     private var onChange: (@MainActor () -> Void)?
 
@@ -436,6 +621,11 @@ private final class FakeMac {
             close: { [self] workspaceId in
                 closes.append(workspaceId)
                 return closeResult
+            },
+            agentSurface: { [self] sessionId in agentSurfaces[sessionId] },
+            closeSurface: { [self] workspaceId, surfaceId in
+                surfaceCloses.append((workspaceId, surfaceId))
+                return closeSurfaceResult
             },
             isBlocked: { [self] in blocked }
         )
