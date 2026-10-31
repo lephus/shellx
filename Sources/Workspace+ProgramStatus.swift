@@ -258,23 +258,22 @@ extension Workspace {
         guard panels[panelId] != nil else { return }
         let store = programStatusStoresByPanelId[panelId] ?? ProgramStatusRecordStore()
         guard !ProgramStatusAgentSettlement().isActive(statusKey: key, in: store) else { return }
-        // A Waiting or subagent row means the turn ended with background work
-        // still live: neither the row nor the chat session is stale.
-        let reported = agentStatusEntriesByPanelId[panelId]?[key]
-        if let workState = reported?.workState, workState != .running { return }
         let source = key == "claude_code" ? "claude" : key
-        // The chat session on this terminal settles even without a Running
-        // row; its registry keeps any state a hook or input set after the edge.
+        // The chat session on this terminal settles whatever the row says: an
+        // Esc on a prompt leaves no Running row, and one during a subagent or
+        // a wait tool leaves the PreToolUse's Subagents or Waiting row. Its
+        // registry keeps any state a hook or input set after the edge.
         TerminalController.shared.agentChatTranscriptService?.noteTurnSettled(
             surfaceID: panelId.uuidString,
             agentKind: ChatAgentKind(source: source),
             at: edge
         )
-        // Only a foreground Running row that no hook updated since is stale.
+        // Only a foreground Running row is stale. A Waiting or subagent row
+        // means the turn ended with background work still live.
         guard agentLifecycleStatesByPanelId[panelId]?[key] == .running,
-              reported?.workState == .running,
-              let reportedAt = reported?.timestamp,
-              reportedAt <= edge else { return }
+              let reported = agentStatusEntriesByPanelId[panelId]?[key],
+              reported.workState == .running,
+              reported.timestamp <= edge else { return }
 #if DEBUG
         cmuxDebugLog("agentTurn.settleFromProgramStatus panel=\(panelId.uuidString.prefix(8)) key=\(key)")
 #endif
