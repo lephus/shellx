@@ -51,7 +51,11 @@ pub(super) fn render(
         .flex_1()
         .min_w_0()
         .h_full()
-        .overflow_x_scroll();
+        .overflow_x_scroll()
+        // RootView scrolls it to the shown tab when that changes.
+        .when_some(root.tab_strip_scroll(slot), |el, scroll| {
+            el.track_scroll(scroll)
+        });
     for &pane in &stack.panes {
         let title: SharedString = root.tab_title(pane, lang, cx).into();
         tabs = tabs.child(tab(pane, title, pane == shown, focused_slot, lang, cx));

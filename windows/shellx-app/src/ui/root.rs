@@ -48,13 +48,14 @@
 //! terminal (another workspace, tab or region, a new one) is recorded, and
 //! the title bar's Back / Forward walk it, skipping terminals closed since.
 
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Instant;
 
 use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render, Subscription,
-    Window, div, prelude::*, relative,
+    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render, ScrollHandle,
+    Subscription, Window, div, prelude::*, relative,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
@@ -122,6 +123,8 @@ pub struct RootView {
     new_menu_open: bool,
     /// The sidebar footer "?" button's menu is showing.
     help_open: bool,
+    /// Each region's tab strip scroll, and the terminal it last showed.
+    tab_strips: HashMap<SlotId, (ScrollHandle, PaneId)>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -199,6 +202,7 @@ impl RootView {
             navigating: false,
             new_menu_open: false,
             help_open: false,
+            tab_strips: HashMap::new(),
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
@@ -563,6 +567,34 @@ impl RootView {
 
     pub(super) fn sidebar_visible(&self) -> bool {
         self.sidebar_visible
+    }
+
+    /// `slot`'s tab strip scroll (`tab_bar::render`), once seen.
+    pub(super) fn tab_strip_scroll(&self, slot: SlotId) -> Option<&ScrollHandle> {
+        self.tab_strips.get(&slot).map(|(scroll, _)| scroll)
+    }
+
+    /// Keeps a region's shown tab in view: when the region shows another
+    /// terminal (a new tab, a click, a close), its strip scrolls to that tab
+    /// once; between such changes the wheel scrolls freely. A strip seen
+    /// for the first time is left as it is. Strips of closed regions go.
+    fn follow_shown_tabs(&mut self) {
+        let tabs = &self.tabs;
+        self.tab_strips
+            .retain(|slot, _| tabs.tabs().iter().any(|tab| tab.stacks.contains_key(slot)));
+        for (slot, stack) in &tabs.active().stacks {
+            let shown = stack.selected_pane();
+            match self.tab_strips.get_mut(slot) {
+                Some((scroll, last)) if *last != shown => {
+                    *last = shown;
+                    scroll.scroll_to_item(stack.selected);
+                }
+                Some(_) => {}
+                None => {
+                    self.tab_strips.insert(*slot, (ScrollHandle::new(), shown));
+                }
+            }
+        }
     }
 
     /// The active workspace's focused terminal (its title names the
@@ -1026,6 +1058,7 @@ impl Render for RootView {
             .read(cx)
             .is_open()
             .then(|| self.pairing.clone());
+        self.follow_shown_tabs();
         let panes = panes::render(self, lang, window, cx);
         let main = div()
             .flex()
