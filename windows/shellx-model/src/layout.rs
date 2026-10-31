@@ -1,9 +1,16 @@
-//! Split tree of one tab: split, close, geometry, directional focus.
+//! Split tree of one tab: split, close, geometry, directional focus. Its
+//! leaves are regions (`SlotId`); each region holds a stack of terminals
+//! (`PaneId`s, see `tabs::Stack`).
 
 use crate::keys::Dir;
 
+/// One terminal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PaneId(pub u64);
+
+/// One split region (a leaf of the tree).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SlotId(pub u64);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Axis {
@@ -23,7 +30,7 @@ pub struct Rect {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
-    Leaf(PaneId),
+    Leaf(SlotId),
     Split {
         axis: Axis,
         /// Share of the first child, 0.1..=0.9.
@@ -40,7 +47,7 @@ pub struct Layout {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Close {
-    Closed { focus: PaneId },
+    Closed { focus: SlotId },
     Last,
     NotFound,
 }
@@ -48,21 +55,21 @@ pub enum Close {
 const EPS: f32 = 0.5;
 
 impl Node {
-    fn first_leaf(&self) -> PaneId {
+    fn first_leaf(&self) -> SlotId {
         match self {
             Node::Leaf(p) => *p,
             Node::Split { first, .. } => first.first_leaf(),
         }
     }
 
-    fn last_leaf(&self) -> PaneId {
+    fn last_leaf(&self) -> SlotId {
         match self {
             Node::Leaf(p) => *p,
             Node::Split { second, .. } => second.last_leaf(),
         }
     }
 
-    fn collect(&self, out: &mut Vec<PaneId>) {
+    fn collect(&self, out: &mut Vec<SlotId>) {
         match self {
             Node::Leaf(p) => out.push(*p),
             Node::Split { first, second, .. } => {
@@ -72,46 +79,46 @@ impl Node {
         }
     }
 
-    fn split(&mut self, target: PaneId, axis: Axis, new_pane: PaneId) -> bool {
+    fn split(&mut self, target: SlotId, axis: Axis, new_slot: SlotId) -> bool {
         match self {
             Node::Leaf(p) if *p == target => {
                 *self = Node::Split {
                     axis,
                     ratio: 0.5,
                     first: Box::new(Node::Leaf(target)),
-                    second: Box::new(Node::Leaf(new_pane)),
+                    second: Box::new(Node::Leaf(new_slot)),
                 };
                 true
             }
             Node::Leaf(_) => false,
             Node::Split { first, second, .. } => {
-                first.split(target, axis, new_pane) || second.split(target, axis, new_pane)
+                first.split(target, axis, new_slot) || second.split(target, axis, new_slot)
             }
         }
     }
 
-    /// Removes `pane`; returns the focus target when it was found in a split.
-    fn close(&mut self, pane: PaneId) -> Option<PaneId> {
+    /// Removes `slot`; returns the focus target when it was found in a split.
+    fn close(&mut self, slot: SlotId) -> Option<SlotId> {
         let Node::Split { first, second, .. } = self else {
             return None;
         };
-        let placeholder = || Node::Leaf(PaneId(0));
-        if matches!(**first, Node::Leaf(p) if p == pane) {
+        let placeholder = || Node::Leaf(SlotId(0));
+        if matches!(**first, Node::Leaf(p) if p == slot) {
             let sibling = std::mem::replace(&mut **second, placeholder());
             let focus = sibling.first_leaf();
             *self = sibling;
             return Some(focus);
         }
-        if matches!(**second, Node::Leaf(p) if p == pane) {
+        if matches!(**second, Node::Leaf(p) if p == slot) {
             let sibling = std::mem::replace(&mut **first, placeholder());
             let focus = sibling.last_leaf();
             *self = sibling;
             return Some(focus);
         }
-        first.close(pane).or_else(|| second.close(pane))
+        first.close(slot).or_else(|| second.close(slot))
     }
 
-    fn rects(&self, b: Rect, divider: f32, out: &mut Vec<(PaneId, Rect)>) {
+    fn rects(&self, b: Rect, divider: f32, out: &mut Vec<(SlotId, Rect)>) {
         match self {
             Node::Leaf(p) => out.push((*p, b)),
             Node::Split {
@@ -152,9 +159,9 @@ impl Node {
 }
 
 impl Layout {
-    pub fn new(pane: PaneId) -> Layout {
+    pub fn new(slot: SlotId) -> Layout {
         Layout {
-            root: Node::Leaf(pane),
+            root: Node::Leaf(slot),
         }
     }
 
@@ -162,50 +169,51 @@ impl Layout {
         &self.root
     }
 
-    pub fn split(&mut self, target: PaneId, axis: Axis, new_pane: PaneId) -> bool {
-        self.root.split(target, axis, new_pane)
+    pub fn split(&mut self, target: SlotId, axis: Axis, new_slot: SlotId) -> bool {
+        self.root.split(target, axis, new_slot)
     }
 
-    pub fn close(&mut self, pane: PaneId) -> Close {
-        if !self.contains(pane) {
+    pub fn close(&mut self, slot: SlotId) -> Close {
+        if !self.contains(slot) {
             return Close::NotFound;
         }
-        match self.root.close(pane) {
+        match self.root.close(slot) {
             Some(focus) => Close::Closed { focus },
             None => Close::Last,
         }
     }
 
-    pub fn panes(&self) -> Vec<PaneId> {
+    /// Regions in tree order (left to right, top to bottom).
+    pub fn slots(&self) -> Vec<SlotId> {
         let mut v = Vec::new();
         self.root.collect(&mut v);
         v
     }
 
-    pub fn contains(&self, pane: PaneId) -> bool {
-        self.panes().contains(&pane)
+    pub fn contains(&self, slot: SlotId) -> bool {
+        self.slots().contains(&slot)
     }
 
     pub fn len(&self) -> usize {
-        self.panes().len()
+        self.slots().len()
     }
 
     pub fn is_empty(&self) -> bool {
         false
     }
 
-    pub fn rects(&self, bounds: Rect, divider: f32) -> Vec<(PaneId, Rect)> {
+    pub fn rects(&self, bounds: Rect, divider: f32) -> Vec<(SlotId, Rect)> {
         let mut v = Vec::new();
         self.root.rects(bounds, divider, &mut v);
         v
     }
 
-    pub fn neighbor(&self, pane: PaneId, dir: Dir, bounds: Rect, divider: f32) -> Option<PaneId> {
+    pub fn neighbor(&self, slot: SlotId, dir: Dir, bounds: Rect, divider: f32) -> Option<SlotId> {
         let rects = self.rects(bounds, divider);
-        let me = rects.iter().find(|(p, _)| *p == pane)?.1;
+        let me = rects.iter().find(|(p, _)| *p == slot)?.1;
         let overlap = |a0: f32, a1: f32, b0: f32, b1: f32| a1.min(b1) - a0.max(b0);
-        let mut best: Option<(PaneId, f32, f32)> = None;
-        for (p, r) in rects.iter().filter(|(p, _)| *p != pane) {
+        let mut best: Option<(SlotId, f32, f32)> = None;
+        for (p, r) in rects.iter().filter(|(p, _)| *p != slot) {
             let (dist, ov) = match dir {
                 Dir::Right => (
                     r.x - (me.x + me.w),
@@ -250,66 +258,66 @@ mod tests {
         h: 601.0,
     };
 
-    fn p(n: u64) -> PaneId {
-        PaneId(n)
+    fn s(n: u64) -> SlotId {
+        SlotId(n)
     }
 
     #[test]
     fn split_and_close_round_trip() {
-        let mut l = Layout::new(p(1));
-        assert!(l.split(p(1), Axis::Row, p(2)));
-        assert!(!l.split(p(9), Axis::Row, p(3)));
-        assert_eq!(l.panes(), vec![p(1), p(2)]);
+        let mut l = Layout::new(s(1));
+        assert!(l.split(s(1), Axis::Row, s(2)));
+        assert!(!l.split(s(9), Axis::Row, s(3)));
+        assert_eq!(l.slots(), vec![s(1), s(2)]);
         assert_eq!(
-            (l.len(), l.contains(p(2)), l.contains(p(3))),
+            (l.len(), l.contains(s(2)), l.contains(s(3))),
             (2, true, false)
         );
-        assert_eq!(l.close(p(2)), Close::Closed { focus: p(1) });
-        assert_eq!(l, Layout::new(p(1)));
+        assert_eq!(l.close(s(2)), Close::Closed { focus: s(1) });
+        assert_eq!(l, Layout::new(s(1)));
     }
 
     #[test]
     fn close_gives_space_to_sibling() {
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Row, p(2));
-        l.split(p(2), Axis::Row, p(3));
-        assert_eq!(l.close(p(2)), Close::Closed { focus: p(3) });
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Row, s(2));
+        l.split(s(2), Axis::Row, s(3));
+        assert_eq!(l.close(s(2)), Close::Closed { focus: s(3) });
         let r = l.rects(B, 1.0);
         assert_eq!(r.len(), 2);
         assert_eq!(r[0].1.x, 0.0);
         assert!((r[0].1.w + 1.0 + r[1].1.w - B.w).abs() < 1e-3);
         // closing the first child of the root hands everything to the rest
-        assert_eq!(l.close(p(1)), Close::Closed { focus: p(3) });
-        assert_eq!(l.rects(B, 1.0), vec![(p(3), B)]);
+        assert_eq!(l.close(s(1)), Close::Closed { focus: s(3) });
+        assert_eq!(l.rects(B, 1.0), vec![(s(3), B)]);
     }
 
     #[test]
     fn close_focus_moves_to_neighbor() {
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Row, p(2));
-        l.split(p(2), Axis::Column, p(3));
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Row, s(2));
+        l.split(s(2), Axis::Column, s(3));
         // closing a first child focuses the sibling's first leaf
-        assert_eq!(l.close(p(1)), Close::Closed { focus: p(2) });
+        assert_eq!(l.close(s(1)), Close::Closed { focus: s(2) });
         // closing a second child focuses the sibling's last leaf
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Column, p(2));
-        l.split(p(1), Axis::Row, p(3));
-        assert_eq!(l.panes(), vec![p(1), p(3), p(2)]);
-        assert_eq!(l.close(p(2)), Close::Closed { focus: p(3) });
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Column, s(2));
+        l.split(s(1), Axis::Row, s(3));
+        assert_eq!(l.slots(), vec![s(1), s(3), s(2)]);
+        assert_eq!(l.close(s(2)), Close::Closed { focus: s(3) });
     }
 
     #[test]
     fn close_last_reports_last() {
-        let mut l = Layout::new(p(1));
-        assert_eq!(l.close(p(1)), Close::Last);
-        assert_eq!(l, Layout::new(p(1)));
-        assert_eq!(l.close(p(7)), Close::NotFound);
+        let mut l = Layout::new(s(1));
+        assert_eq!(l.close(s(1)), Close::Last);
+        assert_eq!(l, Layout::new(s(1)));
+        assert_eq!(l.close(s(7)), Close::NotFound);
     }
 
     #[test]
     fn rects_respect_divider_and_ratio() {
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Row, p(2));
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Row, s(2));
         let b = Rect {
             x: 10.0,
             y: 20.0,
@@ -335,8 +343,8 @@ mod tests {
                 h: 50.0
             }
         );
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Column, p(2));
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Column, s(2));
         let r = l.rects(
             Rect {
                 x: 0.0,
@@ -369,35 +377,35 @@ mod tests {
     #[test]
     fn neighbor_in_each_direction() {
         // 1 | 2 on top, split each column down: 1/3 left, 2/4 right
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Row, p(2));
-        l.split(p(1), Axis::Column, p(3));
-        l.split(p(2), Axis::Column, p(4));
-        let n = |a, d| l.neighbor(p(a), d, B, 1.0);
-        assert_eq!(n(1, Dir::Right), Some(p(2)));
-        assert_eq!(n(1, Dir::Down), Some(p(3)));
-        assert_eq!(n(4, Dir::Left), Some(p(3)));
-        assert_eq!(n(4, Dir::Up), Some(p(2)));
-        assert_eq!(n(3, Dir::Right), Some(p(4)));
-        assert_eq!(n(2, Dir::Left), Some(p(1)));
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Row, s(2));
+        l.split(s(1), Axis::Column, s(3));
+        l.split(s(2), Axis::Column, s(4));
+        let n = |a, d| l.neighbor(s(a), d, B, 1.0);
+        assert_eq!(n(1, Dir::Right), Some(s(2)));
+        assert_eq!(n(1, Dir::Down), Some(s(3)));
+        assert_eq!(n(4, Dir::Left), Some(s(3)));
+        assert_eq!(n(4, Dir::Up), Some(s(2)));
+        assert_eq!(n(3, Dir::Right), Some(s(4)));
+        assert_eq!(n(2, Dir::Left), Some(s(1)));
         assert_eq!(n(1, Dir::Left), None);
         assert_eq!(n(1, Dir::Up), None);
         assert_eq!(n(4, Dir::Right), None);
         assert_eq!(n(4, Dir::Down), None);
-        assert_eq!(l.neighbor(p(99), Dir::Up, B, 1.0), None);
+        assert_eq!(l.neighbor(s(99), Dir::Up, B, 1.0), None);
     }
 
     #[test]
     fn neighbor_prefers_largest_overlap() {
         // left pane 1 beside a right column of 2 (top, small) and 3 (bottom, big)
-        let mut l = Layout::new(p(1));
-        l.split(p(1), Axis::Row, p(2));
-        l.split(p(2), Axis::Column, p(3));
+        let mut l = Layout::new(s(1));
+        l.split(s(1), Axis::Row, s(2));
+        l.split(s(2), Axis::Column, s(3));
         if let Node::Split { second, .. } = &mut l.root
             && let Node::Split { ratio, .. } = &mut **second
         {
             *ratio = 0.2;
         }
-        assert_eq!(l.neighbor(p(1), Dir::Right, B, 1.0), Some(p(3)));
+        assert_eq!(l.neighbor(s(1), Dir::Right, B, 1.0), Some(s(3)));
     }
 }

@@ -669,7 +669,7 @@ pub fn smoke() -> Result<String> {
         }
         ensure!(tabs.remote_panes().is_empty(), "remote panes left");
         ensure!(
-            tabs.active().layout.panes() == vec![local],
+            tabs.active().panes() == vec![local],
             "the local tab did not stay"
         );
         let deadline = Instant::now() + Duration::from_secs(10);

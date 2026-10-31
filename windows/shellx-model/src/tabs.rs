@@ -1,9 +1,13 @@
 //! Tabs of layouts, pane ownership, local/remote targets.
+//!
+//! A `Tab` is one workspace (a sidebar card). Its layout splits it into
+//! regions (`SlotId`); each region holds a `Stack` of terminals (`PaneId`),
+//! its tab bar, and shows the stack's selected one.
 
 use std::collections::{BTreeMap, VecDeque};
 
 use crate::keys::Dir;
-use crate::layout::{Axis, Close, Layout, PaneId, Rect};
+use crate::layout::{Axis, Close, Layout, PaneId, Rect, SlotId};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PaneTarget {
@@ -17,11 +21,73 @@ pub enum PaneTarget {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TabId(pub u64);
 
+/// The terminals of one region, in tab-bar order. Never empty.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Stack {
+    pub panes: Vec<PaneId>,
+    /// Index of the pane the region shows.
+    pub selected: usize,
+}
+
+impl Stack {
+    fn one(pane: PaneId) -> Stack {
+        Stack {
+            panes: vec![pane],
+            selected: 0,
+        }
+    }
+
+    pub fn selected_pane(&self) -> PaneId {
+        self.panes[self.selected]
+    }
+
+    fn select(&mut self, pane: PaneId) -> bool {
+        match self.panes.iter().position(|p| *p == pane) {
+            Some(i) => {
+                self.selected = i;
+                true
+            }
+            None => false,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Tab {
     pub id: TabId,
     pub layout: Layout,
+    /// One stack per layout slot.
+    pub stacks: BTreeMap<SlotId, Stack>,
+    /// Always the selected pane of its slot.
     pub focused: PaneId,
+}
+
+impl Tab {
+    /// Every terminal: layout slot order, then stack order.
+    pub fn panes(&self) -> Vec<PaneId> {
+        self.layout
+            .slots()
+            .iter()
+            .filter_map(|slot| self.stacks.get(slot))
+            .flat_map(|stack| stack.panes.iter().copied())
+            .collect()
+    }
+
+    pub fn slot_of(&self, pane: PaneId) -> Option<SlotId> {
+        self.stacks
+            .iter()
+            .find(|(_, stack)| stack.panes.contains(&pane))
+            .map(|(slot, _)| *slot)
+    }
+
+    pub fn focused_slot(&self) -> SlotId {
+        self.slot_of(self.focused)
+            .expect("the focused pane is always in a stack")
+    }
+
+    pub fn contains(&self, pane: PaneId) -> bool {
+        self.slot_of(pane).is_some()
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,6 +104,7 @@ pub struct Tabs {
     active: usize,
     targets: BTreeMap<PaneId, PaneTarget>,
     next_pane: u64,
+    next_slot: u64,
     next_tab: u64,
 }
 
@@ -49,6 +116,7 @@ impl Tabs {
             active: 0,
             targets: BTreeMap::new(),
             next_pane: 1,
+            next_slot: 1,
             next_tab: 1,
         };
         let (_, pane) = t.new_tab(PaneTarget::Local);
@@ -61,9 +129,16 @@ impl Tabs {
         p
     }
 
+    fn alloc_slot(&mut self) -> SlotId {
+        let s = SlotId(self.next_slot);
+        self.next_slot += 1;
+        s
+    }
+
     /// Appended after the active tab and made active.
     pub fn new_tab(&mut self, target: PaneTarget) -> (TabId, PaneId) {
         let pane = self.alloc_pane();
+        let slot = self.alloc_slot();
         let id = TabId(self.next_tab);
         self.next_tab += 1;
         self.targets.insert(pane, target);
@@ -76,7 +151,8 @@ impl Tabs {
             at,
             Tab {
                 id,
-                layout: Layout::new(pane),
+                layout: Layout::new(slot),
+                stacks: BTreeMap::from([(slot, Stack::one(pane))]),
                 focused: pane,
             },
         );
@@ -84,26 +160,73 @@ impl Tabs {
         (id, pane)
     }
 
-    /// Splits the active tab's focused pane; the new pane gets focus.
+    /// Splits the active tab's focused region: a new region holding one new
+    /// pane, which gets focus.
     pub fn split_focused(&mut self, axis: Axis, target: PaneTarget) -> PaneId {
         let pane = self.alloc_pane();
+        let slot = self.alloc_slot();
         let tab = &mut self.tabs[self.active];
-        let ok = tab.layout.split(tab.focused, axis, pane);
-        debug_assert!(ok, "focused pane is always in its layout");
+        let ok = tab.layout.split(tab.focused_slot(), axis, slot);
+        debug_assert!(ok, "the focused slot is always in its layout");
+        tab.stacks.insert(slot, Stack::one(pane));
         tab.focused = pane;
         self.targets.insert(pane, target);
         pane
     }
 
+    /// A new terminal in the active tab's focused region, right after the
+    /// one it shows; it is selected and gets focus.
+    pub fn new_surface(&mut self, target: PaneTarget) -> PaneId {
+        let pane = self.alloc_pane();
+        let tab = &mut self.tabs[self.active];
+        let slot = tab.focused_slot();
+        let stack = tab.stacks.get_mut(&slot).expect("every slot has a stack");
+        stack.selected += 1;
+        stack.panes.insert(stack.selected, pane);
+        tab.focused = pane;
+        self.targets.insert(pane, target);
+        pane
+    }
+
+    /// Closes one terminal. In a stack of several, the stack shows the pane
+    /// now at the closed one's index, else the last one (closing a pane it
+    /// does not show keeps the one it shows). The only pane of a region
+    /// closes the region; the only region closes the tab; the last tab
+    /// respawns a local one.
     pub fn close_pane(&mut self, pane: PaneId) -> CloseOutcome {
-        let Some(i) = self.tabs.iter().position(|t| t.layout.contains(pane)) else {
+        let Some(i) = self.tabs.iter().position(|t| t.contains(pane)) else {
             return CloseOutcome::NotFound;
         };
         let tab = &mut self.tabs[i];
-        match tab.layout.close(pane) {
+        let slot = tab.slot_of(pane).expect("the tab contains the pane");
+        let stack = tab.stacks.get_mut(&slot).expect("every slot has a stack");
+        if stack.panes.len() > 1 {
+            let shown = stack.selected_pane();
+            let at = stack
+                .panes
+                .iter()
+                .position(|p| *p == pane)
+                .expect("the stack contains the pane");
+            stack.panes.remove(at);
+            if shown == pane {
+                stack.selected = at.min(stack.panes.len() - 1);
+            } else {
+                stack.select(shown);
+            }
+            if tab.focused == pane {
+                tab.focused = stack.selected_pane();
+            }
+            self.targets.remove(&pane);
+            return CloseOutcome::PaneClosed {
+                tab: tab.id,
+                focus: tab.focused,
+            };
+        }
+        match tab.layout.close(slot) {
             Close::Closed { focus } => {
+                tab.stacks.remove(&slot);
                 if tab.focused == pane {
-                    tab.focused = focus;
+                    tab.focused = tab.stacks[&focus].selected_pane();
                 }
                 let out = CloseOutcome::PaneClosed {
                     tab: tab.id,
@@ -135,19 +258,28 @@ impl Tabs {
         }
     }
 
-    /// Focuses `pane` (and activates its tab).
+    /// Focuses `pane`: activates its tab and selects it in its stack.
     pub fn focus(&mut self, pane: PaneId) {
-        if let Some(i) = self.tabs.iter().position(|t| t.layout.contains(pane)) {
-            self.active = i;
-            self.tabs[i].focused = pane;
+        let Some(i) = self.tabs.iter().position(|t| t.contains(pane)) else {
+            return;
+        };
+        self.active = i;
+        let tab = &mut self.tabs[i];
+        for stack in tab.stacks.values_mut() {
+            if stack.select(pane) {
+                tab.focused = pane;
+                return;
+            }
         }
     }
 
+    /// Moves focus to the neighbour region's selected pane.
     pub fn focus_dir(&mut self, dir: Dir, bounds: Rect, divider: f32) -> bool {
         let tab = &mut self.tabs[self.active];
-        match tab.layout.neighbor(tab.focused, dir, bounds, divider) {
-            Some(p) => {
-                tab.focused = p;
+        let from = tab.focused_slot();
+        match tab.layout.neighbor(from, dir, bounds, divider) {
+            Some(slot) => {
+                tab.focused = tab.stacks[&slot].selected_pane();
                 true
             }
             None => false,
@@ -178,6 +310,11 @@ impl Tabs {
 
     pub fn tabs(&self) -> &[Tab] {
         &self.tabs
+    }
+
+    /// Some tab has `pane`.
+    pub fn contains(&self, pane: PaneId) -> bool {
+        self.tabs.iter().any(|t| t.contains(pane))
     }
 
     pub fn target(&self, pane: PaneId) -> Option<&PaneTarget> {
@@ -374,7 +511,7 @@ mod tests {
             other => panic!("expected Respawned, got {other:?}"),
         }
         assert_eq!(t.tabs().len(), 1);
-        let panes = t.active().layout.panes();
+        let panes = t.active().panes();
         assert_eq!(panes.len(), 1);
         assert_eq!(t.target(panes[0]), Some(&PaneTarget::Local));
         assert_eq!(t.target(first), None);
@@ -388,7 +525,7 @@ mod tests {
         let tab = t.active().id;
         assert_eq!(t.close_pane(b), CloseOutcome::PaneClosed { tab, focus: a });
         assert_eq!(t.tabs().len(), 1);
-        assert_eq!(t.active().layout.panes(), vec![a]);
+        assert_eq!(t.active().panes(), vec![a]);
         // closing an unfocused pane leaves focus alone
         let c = t.split_focused(Axis::Column, PaneTarget::Local);
         assert_eq!(t.close_pane(a), CloseOutcome::PaneClosed { tab, focus: c });
@@ -533,7 +670,7 @@ mod tests {
         }
         assert!(t.remote_panes().is_empty());
         assert_eq!(t.tabs().len(), 1);
-        assert_eq!(t.active().layout.panes(), vec![local]);
+        assert_eq!(t.active().panes(), vec![local]);
         // the last tab remote: closing it respawns a local tab
         let (mut t, first) = Tabs::new();
         let (_, r) = t.new_tab(remote("m1", "1"));
@@ -554,5 +691,166 @@ mod tests {
         t.focus(b);
         assert_eq!(t.active().focused, b);
         assert_ne!(t.active().focused, c);
+    }
+
+    /// The focused slot's stack of the active tab.
+    fn focused_stack(t: &Tabs) -> Stack {
+        let tab = t.active();
+        tab.stacks[&tab.focused_slot()].clone()
+    }
+
+    #[test]
+    fn new_surface_stacks_in_the_focused_slot() {
+        let (mut t, a) = Tabs::new();
+        let b = t.new_surface(PaneTarget::Local);
+        let stack = focused_stack(&t);
+        assert_eq!(stack.panes, vec![a, b]);
+        assert_eq!(stack.selected_pane(), b);
+        assert_eq!(t.active().focused, b);
+        assert_eq!(t.active().layout.slots().len(), 1);
+        // inserted right after the selected pane, not at the end
+        t.focus(a);
+        let c = t.new_surface(PaneTarget::Local);
+        assert_eq!(focused_stack(&t).panes, vec![a, c, b]);
+        assert_eq!(focused_stack(&t).selected_pane(), c);
+        assert_eq!(t.active().focused, c);
+        assert_eq!(t.target(c), Some(&PaneTarget::Local));
+    }
+
+    #[test]
+    fn closing_a_stacked_pane_selects_the_one_at_its_index_then_the_last() {
+        let (mut t, a) = Tabs::new();
+        let b = t.new_surface(PaneTarget::Local);
+        let c = t.new_surface(PaneTarget::Local);
+        t.focus(b);
+        let tab = t.active().id;
+        assert_eq!(focused_stack(&t).panes, vec![a, b, c]);
+        assert_eq!(focused_stack(&t).selected_pane(), b);
+        // b was at index 1: c is there now
+        assert_eq!(t.close_pane(b), CloseOutcome::PaneClosed { tab, focus: c });
+        assert_eq!(focused_stack(&t).panes, vec![a, c]);
+        assert_eq!(focused_stack(&t).selected_pane(), c);
+        // c was at index 1: nothing is there now, so the last one
+        assert_eq!(t.close_pane(c), CloseOutcome::PaneClosed { tab, focus: a });
+        assert_eq!(focused_stack(&t).panes, vec![a]);
+        assert_eq!(focused_stack(&t).selected_pane(), a);
+        assert_eq!((t.target(b), t.target(c)), (None, None));
+        assert!(!t.contains(b) && !t.contains(c));
+        // closing an unselected pane keeps the selection (and the focus)
+        let d = t.new_surface(PaneTarget::Local);
+        let e = t.new_surface(PaneTarget::Local);
+        assert_eq!(focused_stack(&t).panes, vec![a, d, e]);
+        assert_eq!(t.close_pane(a), CloseOutcome::PaneClosed { tab, focus: e });
+        assert_eq!(focused_stack(&t).panes, vec![d, e]);
+        assert_eq!(focused_stack(&t).selected_pane(), e);
+        assert_eq!(t.tabs().len(), 1);
+        assert_eq!(t.active().layout.slots().len(), 1);
+    }
+
+    #[test]
+    fn closing_the_last_pane_of_a_slot_closes_the_slot() {
+        let (mut t, a) = Tabs::new();
+        let a2 = t.new_surface(PaneTarget::Local);
+        let left = t.active().focused_slot();
+        let b = t.split_focused(Axis::Row, PaneTarget::Local);
+        let tab = t.active().id;
+        assert_eq!(t.active().layout.slots().len(), 2);
+        // focus goes to the selected pane of the slot Layout::close names
+        assert_eq!(t.close_pane(b), CloseOutcome::PaneClosed { tab, focus: a2 });
+        assert_eq!(t.active().layout.slots(), vec![left]);
+        assert_eq!(t.active().stacks.len(), 1);
+        assert_eq!(t.active().slot_of(b), None);
+        assert_eq!(t.target(b), None);
+        assert!(!t.contains(b) && t.contains(a) && t.contains(a2));
+        // the slot's stack empties pane by pane, then the tab goes as today
+        assert_eq!(t.close_pane(a2), CloseOutcome::PaneClosed { tab, focus: a });
+        assert!(matches!(t.close_pane(a), CloseOutcome::Respawned { .. }));
+        assert_eq!(t.tabs().len(), 1);
+        assert_eq!(t.active().panes().len(), 1);
+    }
+
+    #[test]
+    fn focus_selects_the_pane_in_its_stack() {
+        let (mut t, a) = Tabs::new();
+        let first = t.active().id;
+        let b = t.new_surface(PaneTarget::Local);
+        let (second, _) = t.new_tab(PaneTarget::Local);
+        assert_eq!(t.active().id, second);
+        t.focus(a);
+        assert_eq!(t.active().id, first);
+        assert_eq!(t.active().focused, a);
+        assert_eq!(focused_stack(&t).selected_pane(), a);
+        assert_eq!(focused_stack(&t).panes, vec![a, b]);
+        // an unknown pane changes nothing
+        t.focus(PaneId(999));
+        assert_eq!((t.active().id, t.active().focused), (first, a));
+    }
+
+    #[test]
+    fn focus_dir_moves_to_the_neighbour_slots_selected_pane() {
+        let (mut t, a) = Tabs::new();
+        let b = t.split_focused(Axis::Row, PaneTarget::Local);
+        let b2 = t.new_surface(PaneTarget::Local);
+        t.focus(b);
+        assert_eq!(focused_stack(&t).panes, vec![b, b2]);
+        assert!(t.focus_dir(Dir::Left, B, 1.0));
+        assert_eq!(t.active().focused, a);
+        // back to the right slot: its selected pane (b), not its newest (b2)
+        assert!(t.focus_dir(Dir::Right, B, 1.0));
+        assert_eq!(t.active().focused, b);
+        assert!(!t.focus_dir(Dir::Right, B, 1.0));
+        assert_eq!(t.active().focused, b);
+    }
+
+    #[test]
+    fn split_puts_one_new_pane_in_a_new_slot() {
+        let (mut t, a) = Tabs::new();
+        let a2 = t.new_surface(PaneTarget::Local);
+        let old = t.active().focused_slot();
+        let b = t.split_focused(Axis::Column, PaneTarget::Local);
+        let tab = t.active();
+        let slot = tab.focused_slot();
+        assert_ne!(slot, old);
+        assert_eq!(tab.layout.slots(), vec![old, slot]);
+        assert_eq!(tab.stacks[&slot].panes, vec![b]);
+        assert_eq!(tab.stacks[&slot].selected_pane(), b);
+        assert_eq!(tab.focused, b);
+        assert_eq!(tab.slot_of(b), Some(slot));
+        // the split region keeps its own stack
+        assert_eq!(tab.stacks[&old].panes, vec![a, a2]);
+        assert_eq!(tab.stacks[&old].selected_pane(), a2);
+    }
+
+    #[test]
+    fn new_surface_uses_the_given_target() {
+        // a new terminal on a pane that shows a Mac terminal stays on that Mac
+        let (mut t, local) = Tabs::new();
+        let (_, r) = t.new_tab(remote("m1", "3"));
+        let r2 = t.new_surface(remote("m1", ""));
+        assert_eq!(t.target(r2), Some(&remote("m1", "")));
+        assert_eq!(t.target(local), Some(&PaneTarget::Local));
+        assert_eq!(t.panes_on_machine("m1"), vec![r, r2]);
+        assert_eq!(t.remote_panes(), vec![r, r2]);
+        assert_eq!(t.active().slot_of(r2), t.active().slot_of(r));
+        assert!(t.retarget(r2, "4"));
+        t.close_pane(r2);
+        assert_eq!(t.target(r2), None);
+        assert_eq!(t.panes_on_machine("m1"), vec![r]);
+    }
+
+    #[test]
+    fn tab_panes_lists_every_stacked_pane() {
+        let (mut t, a) = Tabs::new();
+        let b = t.split_focused(Axis::Row, PaneTarget::Local);
+        let b2 = t.new_surface(PaneTarget::Local);
+        t.focus(a);
+        let a2 = t.new_surface(PaneTarget::Local);
+        // layout slot order (left, right), then stack order, not id order
+        assert_eq!(t.active().panes(), vec![a, a2, b, b2]);
+        assert!(t.active().contains(b2) && !t.active().contains(PaneId(999)));
+        assert!(t.contains(a2) && !t.contains(PaneId(999)));
+        let (_, c) = t.new_tab(PaneTarget::Local);
+        assert_eq!(t.active().panes(), vec![c]);
+        assert!(t.contains(b2));
     }
 }

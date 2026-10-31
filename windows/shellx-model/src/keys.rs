@@ -28,7 +28,10 @@ pub struct KeyCtx {
 pub enum AppCommand {
     Copy,
     Paste,
-    NewTab,
+    /// Ctrl+Shift+N: a new workspace (a sidebar card).
+    NewWorkspace,
+    /// Ctrl+Shift+T: a new terminal tab in the focused region.
+    NewTerminal,
     ClosePane,
     NextTab,
     PrevTab,
@@ -79,7 +82,8 @@ fn app_binding(key: &str, ctrl: bool, alt: bool, shift: bool, ctx: &KeyCtx) -> O
         (true, false, false, "c") if ctx.has_selection => Some(Copy),
         (true, false, true, "v") => Some(Paste),
         (false, false, true, "insert") => Some(Paste),
-        (true, false, true, "t") => Some(NewTab),
+        (true, false, true, "n") => Some(NewWorkspace),
+        (true, false, true, "t") => Some(NewTerminal),
         (true, false, true, "w") => Some(ClosePane),
         (true, false, false, "tab") => Some(NextTab),
         (true, false, true, "tab") => Some(PrevTab),
@@ -278,7 +282,6 @@ mod tests {
             map_key(&alt("down"), &NO_SEL),
             app(AppCommand::FocusPane(Dir::Down))
         );
-        assert_eq!(map_key(&cs("t"), &NO_SEL), app(AppCommand::NewTab));
         assert_eq!(map_key(&cs("w"), &NO_SEL), app(AppCommand::ClosePane));
         assert_eq!(map_key(&ctrl("tab"), &NO_SEL), app(AppCommand::NextTab));
         assert_eq!(map_key(&cs("tab"), &NO_SEL), app(AppCommand::PrevTab));
@@ -294,6 +297,17 @@ mod tests {
             map_key(&alt_shift("left"), &NO_SEL),
             chord("alt+shift+left")
         );
+    }
+
+    #[test]
+    fn new_workspace_and_new_terminal_bindings() {
+        assert_eq!(map_key(&cs("n"), &NO_SEL), app(AppCommand::NewWorkspace));
+        assert_eq!(map_key(&cs("N"), &NO_SEL), app(AppCommand::NewWorkspace));
+        assert_eq!(map_key(&cs("t"), &NO_SEL), app(AppCommand::NewTerminal));
+        assert_eq!(map_key(&cs("T"), &NO_SEL), app(AppCommand::NewTerminal));
+        // plain Ctrl+N / Ctrl+T still reach the shell
+        assert_eq!(map_key(&ctrl("n"), &NO_SEL), chord("ctrl+n"));
+        assert_eq!(map_key(&ctrl("t"), &NO_SEL), chord("ctrl+t"));
     }
 
     #[test]

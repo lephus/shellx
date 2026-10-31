@@ -1,9 +1,10 @@
-//! The active tab's split tree (spec §7.1 "Khu vực chính"): each pane is
-//! its `TermView`, absolutely positioned at its `Layout::rects` rect inside
-//! the pane area. The 1 px gaps between rects show the area's LINE
-//! background, which draws the dividers. No divider dragging in the MVP.
-//! Inactive tabs are not rendered; their views (and shells) stay alive in
-//! RootView's pane host.
+//! The active tab's split tree (spec §7.1 "Khu vực chính"): each region
+//! shows its stack's selected pane, that pane's `TermView` absolutely
+//! positioned at the region's `Layout::rects` rect inside the pane area.
+//! The 1 px gaps between rects show the area's LINE background, which draws
+//! the dividers. No divider dragging in the MVP.
+//! Inactive tabs and unselected stacked panes are not rendered; their views
+//! (and shells) stay alive in RootView's pane host.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -111,7 +112,12 @@ pub(super) fn render(
             .left_0()
             .size_full(),
         );
-    for (pane, r) in tab.layout.rects(bounds, DIVIDER) {
+    // Each region shows the selected terminal of its stack; the others
+    // stay alive in the host, like the panes of inactive tabs.
+    for (slot, r) in tab.layout.rects(bounds, DIVIDER) {
+        let Some(pane) = tab.stacks.get(&slot).map(|stack| stack.selected_pane()) else {
+            continue;
+        };
         let Some(live) = host.get(pane) else {
             continue;
         };

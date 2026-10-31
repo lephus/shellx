@@ -1,5 +1,5 @@
 //! One modal rule for the window's panels (RootView): while any panel is
-//! open, app commands (Ctrl+Shift+T/W/B, Ctrl+, , Alt+Shift+= and Alt+Shift+-
+//! open, app commands (Ctrl+Shift+N/T/W/B, Ctrl+, , Alt+Shift+= and Alt+Shift+-
 //! splits, Alt+arrows, tab and pane focus, terminal clicks) are swallowed; Esc
 //! closes the topmost closable panel; the forced-update overlay closes the
 //! settings panel and cannot itself be closed; the keyboard goes back to the
@@ -154,7 +154,7 @@ mod tests {
                 "{p:?}"
             );
             assert_eq!(
-                p.root_key(&KeyAction::App(AppCommand::NewTab), false),
+                p.root_key(&KeyAction::App(AppCommand::NewWorkspace), false),
                 RootKey::Swallow,
                 "{p:?}"
             );
@@ -199,8 +199,8 @@ mod tests {
     fn nothing_open_runs_app_commands_and_passes_the_rest() {
         let p = Panels::default();
         assert_eq!(
-            p.root_key(&KeyAction::App(AppCommand::NewTab), false),
-            RootKey::Run(AppCommand::NewTab)
+            p.root_key(&KeyAction::App(AppCommand::NewWorkspace), false),
+            RootKey::Run(AppCommand::NewWorkspace)
         );
         for action in [
             KeyAction::Text,

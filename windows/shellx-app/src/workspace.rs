@@ -45,11 +45,7 @@ pub fn estimate_pane_area(viewport_w: f32, viewport_h: f32, sidebar_visible: boo
 
 /// Every pane of every tab, in id order.
 pub fn model_panes(tabs: &Tabs) -> Vec<PaneId> {
-    let set: BTreeSet<PaneId> = tabs
-        .tabs()
-        .iter()
-        .flat_map(|tab| tab.layout.panes())
-        .collect();
+    let set: BTreeSet<PaneId> = tabs.tabs().iter().flat_map(|tab| tab.panes()).collect();
     set.into_iter().collect()
 }
 
@@ -290,7 +286,10 @@ mod tests {
         let p3 = tabs.split_focused(Axis::Column, PaneTarget::Local);
         let area = estimate_pane_area(1200.0, 760.0, true);
         let rects = tabs.active().layout.rects(area, DIVIDER);
-        let r = |p| rects.iter().find(|(q, _)| *q == p).unwrap().1;
+        let r = |p| {
+            let slot = tabs.active().slot_of(p).unwrap();
+            rects.iter().find(|(q, _)| *q == slot).unwrap().1
+        };
         // p1 left half, p2 over p3 on the right, 1 px lines between them
         assert_eq!(r(p1).x, 0.0);
         assert_eq!(r(p2).x, r(p1).w + DIVIDER);

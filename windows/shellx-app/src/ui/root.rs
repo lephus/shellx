@@ -17,9 +17,10 @@
 //! Remote panes (Task 13b): "Mở" on a Mac (sidebar row, or the pairing
 //! panel after approval) opens a new tab whose pane is
 //! `PaneTarget::Remote`; `reconcile` opens it through `RemoteTabs` (one
-//! session per Mac, shared by its panes) and a remote `TermView`. A split of
-//! a remote pane opens a new shell on the same Mac; a split of a local pane
-//! and Ctrl+Shift+T stay local. A remote terminal ending closes only its
+//! session per Mac, shared by its panes) and a remote `TermView`. A split or
+//! a new terminal tab (Ctrl+Shift+T) of a remote pane opens a new shell on
+//! the same Mac; of a local pane, a local one. A new workspace
+//! (Ctrl+Shift+N) is always local. A remote terminal ending closes only its
 //! pane (the normal close path, so the last pane respawns a local tab);
 //! every pane the model drops is closed on its session. The machine list
 //! feeds the sessions' online flags; signing out closes every session and
@@ -375,7 +376,8 @@ impl RootView {
             return;
         }
         match command {
-            AppCommand::NewTab => self.new_tab(window, cx),
+            AppCommand::NewWorkspace => self.new_tab(window, cx),
+            AppCommand::NewTerminal => self.new_terminal(window, cx),
             AppCommand::ClosePane => {
                 let pane = self.tabs.active().focused;
                 self.close_pane(pane, window, cx);
@@ -415,7 +417,8 @@ impl RootView {
         cx.notify();
     }
 
-    /// Ctrl+Shift+T and the "+" on this PC's sidebar group (always local).
+    /// A new workspace: Ctrl+Shift+N and the "+" on this PC's sidebar group
+    /// (always local).
     pub fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.tabs.new_tab(PaneTarget::Local);
         self.reconcile(window, cx);
@@ -426,6 +429,18 @@ impl RootView {
     fn split(&mut self, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
         let (target, want) = split_target(&self.tabs, self.tabs.active().focused);
         let pane = self.tabs.split_focused(axis, target);
+        if let Some(want) = want {
+            self.remotes.plan(pane, want);
+        }
+        self.reconcile(window, cx);
+    }
+
+    /// Ctrl+Shift+T: a new terminal tab in the focused region, shown in place
+    /// of the focused one. Like a split, it runs where the focused pane runs:
+    /// a new shell on the same Mac for a remote pane, else a local shell.
+    fn new_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (target, want) = split_target(&self.tabs, self.tabs.active().focused);
+        let pane = self.tabs.new_surface(target);
         if let Some(want) = want {
             self.remotes.plan(pane, want);
         }
