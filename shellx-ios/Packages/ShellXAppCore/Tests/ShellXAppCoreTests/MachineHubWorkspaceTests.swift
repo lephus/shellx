@@ -772,6 +772,13 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertEqual(others.map(\.machineName), ["MacBook Pro", "MacBook Pro"])
         XCTAssertEqual(others.map(\.online), [true, true])
         XCTAssertEqual(hub.otherSessions(machineID: "mac-nobody"), [])
+        // A listed terminal names `s1` and `s3`: none of the others, nor the ended `s4` of a closed workspace.
+        let named = { (machineID: String, sessionId: String) in
+            hub.hasListedTerminal(
+                SessionRef(machineID: machineID, sessionId: sessionId, agent: "claude", workspaceTitle: ""))
+        }
+        XCTAssertEqual(["s1", "s2", "s3", "s4", "s5"].filter { named(id, $0) }, ["s1", "s3"])
+        XCTAssertFalse(named("mac-nobody", "s1"))
     }
 
 

@@ -68,8 +68,9 @@ struct AgentScreen: View {
     var attachments: Binding<[OutgoingAttachment]>? = nil
     /// How far the attachments of the message being sent got; not nil locks the composer.
     var sending: Double? = nil
-    /// The agent's name, for "Close <name>?", while `•••` offers "Close Agent": the session has not ended and
-    /// its Mac takes `agent.close` (`WorkspaceListActions.canClose`). Nil shows no `•••`; standalone only.
+    /// The agent's name, for "Close <name>?", while `•••` offers "Close Agent": the session has not ended, a
+    /// listed tab names it and its Mac takes `agent.close` (`WorkspaceListActions.canClose`). Nil shows no
+    /// `•••`; standalone only.
     var closeAgentName: String? = nil
     var actions = Actions()
 

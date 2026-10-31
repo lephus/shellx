@@ -174,10 +174,23 @@ public final class MachineHub {
     /// is gone or was never named. Most recent activity first.
     public func otherSessions(machineID: String) -> [MachineSession] {
         guard let model = machines.first(where: { $0.id == machineID }) else { return [] }
-        let named = Set(model.workspaces.workspaces.flatMap(\.terminals).compactMap(\.sessionId))
+        let named = Self.namedSessionIds(model)
         return model.sessions.sessions.filter { $0.state != .ended && !named.contains($0.sessionId) }.map {
             MachineSession(machineID: model.id, machineName: model.name, online: model.state == .online, session: $0)
         }
+    }
+
+    /// True when a terminal of the Mac's listed workspaces names the session (`LinkTerminal.sessionId`):
+    /// the Mac finds the session's tab there, which `agent.close` needs. The sessions that have not ended
+    /// and that this is false for are `otherSessions(machineID:)`. False for an unknown Mac.
+    public func hasListedTerminal(_ ref: SessionRef) -> Bool {
+        guard let model = machines.first(where: { $0.id == ref.machineID }) else { return false }
+        return Self.namedSessionIds(model).contains(ref.sessionId)
+    }
+
+    /// The sessions a terminal of the Mac's listed workspaces names.
+    private static func namedSessionIds(_ model: MachineModel) -> Set<String> {
+        Set(model.workspaces.workspaces.flatMap(\.terminals).compactMap(\.sessionId))
     }
 
     /// The Mac's sessions that finished a turn (went from working or waiting to idle) and have not

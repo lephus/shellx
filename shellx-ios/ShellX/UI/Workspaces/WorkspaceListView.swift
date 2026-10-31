@@ -25,7 +25,7 @@ struct WorkspaceListView: View {
         let finishTimes = hub.finishTimes
         let dismissed = scope.endedDismissals.dismissals
         let showsMachineNames = hub.machines.count > 1
-        let closableMachines = Self.closableMachines(hub)
+        let closableAgents = Self.closableAgents(hub)
         TimelineView(.periodic(from: .now, by: 30)) { context in
             WorkspaceListScreen(
                 groups: groups,
@@ -36,7 +36,7 @@ struct WorkspaceListView: View {
                 notice: scope.listNotice.current,
                 now: context.date,
                 showsMachineNames: showsMachineNames,
-                closableMachines: closableMachines,
+                closableAgents: closableAgents,
                 actions: WorkspaceListActions.make(
                     scope: scope, open: open, alert: { alert = $0 },
                     creating: Binding(get: { creating }, set: { creating = $0 })),
@@ -71,10 +71,10 @@ struct WorkspaceListView: View {
         }
     }
 
-    /// The Macs whose agent cards swipe to Close: online now and listing `agent_close`. Like a workspace
-    /// card's Rename and Close, none for a Mac that is away or from before the feature.
-    static func closableMachines(_ hub: MachineHub) -> Set<String> {
-        Set(hub.machines.filter { $0.state == .online && hub.supportsAgentClose($0.id) }.map(\.id))
+    /// The agents whose cards swipe to Close: the ones `WorkspaceListActions.canClose` offers, on a Mac
+    /// online now. Like a workspace card's Rename and Close, none for a Mac that is away.
+    static func closableAgents(_ hub: MachineHub) -> Set<SessionRef> {
+        Set(hub.reachableSessions.filter { $0.online && WorkspaceListActions.canClose($0, hub: hub) }.map(\.ref))
     }
 }
 
@@ -148,11 +148,15 @@ extension WorkspaceListActions {
     /// nothing until the Mac answered the first.
     private static var closingAgents: Set<SessionRef> = []
 
-    /// An agent the phone may offer to close: its session has not ended (the terminal of an agent that
-    /// exited runs the user's shell) and its Mac listed `agent_close`. A menu that offers it is off while the
-    /// Mac is not online; a card's swipe shows only then (`WorkspaceListView.closableMachines`).
+    /// An agent the phone may offer to close, the one rule for every Close Agent (the home's swipe through
+    /// `WorkspaceListView.closableAgents`, the agent screen's `•••`): its session has not ended (the terminal
+    /// of an agent that exited runs the user's shell), a tab of its Mac's listed workspaces names it
+    /// (`MachineHub.hasListedTerminal(_:)`: `agent.close` finds no other, so an agent outside workspaces has
+    /// no Close), and its Mac listed `agent_close`. A menu that offers it is off while the Mac is not online;
+    /// a card's swipe shows only then.
     static func canClose(_ session: MachineSession, hub: MachineHub) -> Bool {
         session.session.state != .ended && hub.supportsAgentClose(session.machineID)
+            && hub.hasListedTerminal(session.ref)
     }
 
     /// Closes the agent of `ref` on its Mac once the user confirmed, unless a close of it waits for the Mac

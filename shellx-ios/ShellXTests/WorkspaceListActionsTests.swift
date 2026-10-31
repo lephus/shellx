@@ -276,9 +276,16 @@ final class WorkspaceListActionsTests: XCTestCase {
     // MARK: - Closing an agent
 
     /// A Mac with the workspace `shellx`, where the agent `claude` (session `s1`) works.
+    /// A Mac with the workspace `shellx`, whose one tab runs the agent `claude` (session `s1`).
     private func macWithAnAgent(name: String = "MacBook Pro", acceptsAgentClose: Bool = true) async -> FakeMac {
         let mac = FakeMac(name: name, acceptsAgentClose: acceptsAgentClose)
-        await mac.setWorkspaces([workspace("shellx")])
+        await mac.setWorkspaces([
+            LinkWorkspace(
+                workspaceId: "ws-shellx", title: "shellx", order: 0,
+                terminals: [
+                    LinkTerminal(terminalId: "shellx-t1", title: "claude", order: 0, selected: true, sessionId: "s1")
+                ])
+        ])
         await mac.upsertSession(
             AgentSession(
                 sessionId: "s1", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx", state: .working))
@@ -361,7 +368,7 @@ final class WorkspaceListActionsTests: XCTestCase {
         }
         XCTAssertTrue(ready)
 
-        XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [modern.machine.machineID])
+        XCTAssertEqual(WorkspaceListView.closableAgents(rig.hub), [agentRef(modern)])
 
         // The modern Mac goes away and does not come back.
         let id = modern.machine.machineID
@@ -370,7 +377,7 @@ final class WorkspaceListActionsTests: XCTestCase {
         let away = await eventually { rig.hub.machines.first { $0.id == id }?.state != .online }
         XCTAssertTrue(away)
         XCTAssertTrue(rig.hub.supportsAgentClose(id), "it took agent.close when it was last online")
-        XCTAssertEqual(WorkspaceListView.closableMachines(rig.hub), [], "no Close while the Mac is away")
+        XCTAssertEqual(WorkspaceListView.closableAgents(rig.hub), [], "no Close while the Mac is away")
     }
 
     /// Close Agent is offered only for an agent a tab of the Mac's listed workspaces names: `agent.close` finds
@@ -414,6 +421,8 @@ final class WorkspaceListActionsTests: XCTestCase {
         XCTAssertFalse(
             rig.hub.otherSessions(machineID: id).contains { WorkspaceListActions.canClose($0, hub: rig.hub) },
             "no agent outside workspaces offers Close")
+        // The home's swipe goes by the same rule.
+        XCTAssertEqual(WorkspaceListView.closableAgents(rig.hub), [try XCTUnwrap(sessions["s1"]).ref])
     }
 
     // MARK: - Closing a tab
