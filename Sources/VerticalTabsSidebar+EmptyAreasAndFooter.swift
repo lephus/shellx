@@ -380,12 +380,14 @@ struct SidebarCloudButton: View {
 /// The running version, shown as plain text right of Help.
 struct SidebarVersionLabel: View {
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.sidebarReadabilityBackdrop) private var readabilityBackdrop
 
     var body: some View {
         if let version, !version.isEmpty {
             Text(verbatim: "v\(version)")
-                .font(.system(size: 11, weight: .regular).monospacedDigit())
-                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .cmuxFont(size: 11, monospacedDigit: true)
+                .foregroundStyle(SidebarAppearanceColorResolver().readableSecondary(for: colorScheme, over: readabilityBackdrop))
                 .lineLimit(1)
                 .fixedSize()
                 .padding(.horizontal, 5)
