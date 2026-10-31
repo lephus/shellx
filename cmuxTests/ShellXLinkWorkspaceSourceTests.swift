@@ -31,7 +31,7 @@ struct ShellXLinkWorkspaceSourceTests {
     private static func makeSource() -> (FakeMac, ShellXLinkWorkspaceSource) {
         let mac = FakeMac()
         let source = ShellXLinkWorkspaceSource(
-            snapshot: { mac.workspaces }, control: mac.control, changeSignal: { mac.signal($0) }
+            snapshot: { mac.snapshot() }, control: mac.control, changeSignal: { mac.signal($0) }
         )
         return (mac, source)
     }
@@ -560,6 +560,124 @@ struct ShellXLinkWorkspaceSourceTests {
         }
     }
 
+    // MARK: - Terminal close
+
+    /// One tab of a listed workspace closes, in the workspace the phone named.
+    @Test func closeTerminalClosesItsListedSurface() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), kept = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminals: [kept, terminal])]
+
+        let outcome = await source.closeTerminal(workspaceId: workspace.uuidString, terminalId: terminal.uuidString)
+
+        #expect(outcome == .ok)
+        #expect(mac.surfaceCloses.map(\.workspaceId) == [workspace])
+        #expect(mac.surfaceCloses.map(\.surfaceId) == [terminal])
+    }
+
+    /// Only the pair the list shows (PROTOCOL.md 10, "Tabs"): a terminal of another workspace, a listed terminal
+    /// named under a workspace the list does not hold (as an SSH one), and a tab that is gone are not found, and
+    /// nothing closes.
+    @Test func closeTerminalOnAnUnlistedSurfaceIsNotFound() async {
+        let (mac, source) = Self.makeSource()
+        let first = UUID(), firstTerminal = UUID()
+        let second = UUID(), secondTerminal = UUID()
+        let ssh = UUID(), sshTerminal = UUID()
+        mac.workspaces = [
+            Self.agentWorkspace(first, terminal: firstTerminal),
+            Self.agentWorkspace(second, terminal: secondTerminal, order: 1),
+        ]
+
+        let pairs: [(String, UUID, UUID)] = [
+            ("another workspace's terminal", first, secondTerminal),
+            ("a listed terminal under an unlisted workspace", ssh, firstTerminal),
+            ("an unlisted workspace's terminal", ssh, sshTerminal),
+            ("a gone tab", first, UUID()),
+        ]
+        for (name, workspace, terminal) in pairs {
+            let outcome = await source.closeTerminal(
+                workspaceId: workspace.uuidString, terminalId: terminal.uuidString
+            )
+            #expect(outcome == .notFound, "\(name) was found")
+        }
+        #expect(mac.surfaceCloses.isEmpty)
+    }
+
+    /// Ids that are empty or not UUIDs are not found, even when the list holds them as given.
+    @Test func closeTerminalWithGarbledIdsIsNotFound() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal), Self.workspace("a", order: 1)]
+
+        let pairs: [(String, String)] = [
+            ("", terminal.uuidString),
+            (workspace.uuidString, ""),
+            ("", ""),
+            ("ws-1", terminal.uuidString),
+            (workspace.uuidString, "t-1"),
+            ("ws-a", "t-a"),
+        ]
+        for (workspaceId, terminalId) in pairs {
+            let outcome = await source.closeTerminal(workspaceId: workspaceId, terminalId: terminalId)
+            #expect(outcome == .notFound, "\(workspaceId) / \(terminalId) was found")
+        }
+        #expect(mac.surfaceCloses.isEmpty)
+    }
+
+    /// While a managed policy blocks remote control nothing is looked up or closed (PROTOCOL.md 10), whatever ids
+    /// the phone sends.
+    @Test func closeTerminalBlockedIsRefused() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal)]
+        mac.blocked = true
+
+        #expect(await source.closeTerminal(workspaceId: workspace.uuidString, terminalId: terminal.uuidString) == .refused)
+        #expect(await source.closeTerminal(workspaceId: "", terminalId: "t-1") == .refused)
+        #expect(await source.closeTerminal(workspaceId: UUID().uuidString, terminalId: UUID().uuidString) == .refused)
+        #expect(mac.surfaceCloses.isEmpty)
+        #expect(mac.snapshotReads == 0)
+    }
+
+    @Test(arguments: [
+        ("not_found", WorkspaceControlOutcome.notFound),
+        ("protected", WorkspaceControlOutcome.refused),
+        ("invalid_state", WorkspaceControlOutcome.refused),
+        ("denied", WorkspaceControlOutcome.refused),
+        ("internal_error", WorkspaceControlOutcome.failed),
+    ])
+    func closeTerminalErrorMapsToOutcome(code: String, outcome: WorkspaceControlOutcome) async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), terminal = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: terminal)]
+        mac.closeSurfaceResult = .err(code: code, message: "", data: nil)
+
+        let result = await source.closeTerminal(workspaceId: workspace.uuidString, terminalId: terminal.uuidString)
+
+        #expect(result == outcome)
+        #expect(mac.surfaceCloses.count == 1)
+    }
+
+    /// No live-agent check, by design (PROTOCOL.md 10, "Tabs"): the user picked this tab, so a shell with no agent
+    /// session closes, and the Mac is not asked for an agent.
+    @Test func closeTerminalNeedsNoAgent() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID(), shell = UUID()
+        mac.workspaces = [
+            LinkWorkspace(
+                workspaceId: workspace.uuidString, title: "w", order: 0, directory: nil, branch: nil, ports: nil,
+                terminals: [LinkTerminal(terminalId: shell.uuidString, title: "zsh", order: 0, selected: true)]
+            ),
+        ]
+
+        let outcome = await source.closeTerminal(workspaceId: workspace.uuidString, terminalId: shell.uuidString)
+
+        #expect(outcome == .ok)
+        #expect(mac.surfaceCloses.map(\.workspaceId) == [workspace])
+        #expect(mac.surfaceCloses.map(\.surfaceId) == [shell])
+        #expect(mac.agentSurfaceLookups == 0)
+    }
+
     // MARK: - The live agent-surface close
 
     /// Runs `body` with a window-less manager holding two workspaces as the controller's active one, its
@@ -664,6 +782,46 @@ struct ShellXLinkWorkspaceSourceTests {
             #expect(second.panels[surface] != nil)
         }
     }
+
+    /// A pinned workspace keeps only its own rule, which is about closing the workspace: one of its two tabs closes.
+    @Test func agentSurfaceCloseInAPinnedWorkspaceClosesOneOfTwoSurfaces() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, _, second in
+            manager.setPinned(second, pinned: true)
+            #expect(second.isPinned)
+            let kept = try #require(second.focusedPanelId)
+            let pane = try #require(second.paneId(forPanelId: kept))
+            let closed = try #require(second.newTerminalSurface(inPane: pane, focus: false)).id
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: closed)
+
+            guard case .ok = result else {
+                Issue.record("surface close in a pinned workspace failed: \(result)")
+                return
+            }
+            #expect(manager.tabs.contains { $0.id == second.id })
+            #expect(second.panels[closed] == nil)
+            #expect(second.panels[kept] != nil)
+        }
+    }
+
+    /// The last tab of a pinned workspace would close the workspace, which the Mac refuses: nothing closes.
+    @Test func agentSurfaceCloseOnAPinnedWorkspacesLastSurfaceIsRefused() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, _, second in
+            manager.setPinned(second, pinned: true)
+            let surface = try #require(second.focusedPanelId)
+            #expect(second.panels.count == 1)
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: surface)
+
+            guard case let .err(code, _, _) = result else {
+                Issue.record("the last tab of a pinned workspace closed")
+                return
+            }
+            #expect(code == "protected")
+            #expect(manager.tabs.contains { $0.id == second.id })
+            #expect(second.panels[surface] != nil)
+        }
+    }
 }
 
 /// How often a change signal fired.
@@ -689,12 +847,20 @@ private final class FakeMac {
     private(set) var renames: [(workspaceId: String, title: String)] = []
     private(set) var closes: [String] = []
     private(set) var surfaceCloses: [(workspaceId: UUID, surfaceId: UUID)] = []
+    /// How often the source read the list, and asked for an agent's terminal.
+    private(set) var snapshotReads = 0
+    private(set) var agentSurfaceLookups = 0
     private(set) var attachCount = 0
     private var onChange: (@MainActor () -> Void)?
 
     var isAttached: Bool { onChange != nil }
 
     func fireChange() { onChange?() }
+
+    func snapshot() -> [LinkWorkspace] {
+        snapshotReads += 1
+        return workspaces
+    }
 
     var control: ShellXLinkWorkspaceSource.Control {
         ShellXLinkWorkspaceSource.Control(
@@ -710,7 +876,10 @@ private final class FakeMac {
                 closes.append(workspaceId)
                 return closeResult
             },
-            agentSurface: { [self] sessionId in agentSurfaces[sessionId]?.surfaceId },
+            agentSurface: { [self] sessionId in
+                agentSurfaceLookups += 1
+                return agentSurfaces[sessionId]?.surfaceId
+            },
             closeSurface: { [self] workspaceId, surfaceId in
                 surfaceCloses.append((workspaceId, surfaceId))
                 return closeSurfaceResult
