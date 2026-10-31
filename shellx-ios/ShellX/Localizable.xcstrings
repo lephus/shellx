@@ -4029,37 +4029,37 @@
       }
     },
     "workspaces.alert.refused.closeAgent": {
-      "comment": "Alert: the Mac refused to close an agent's terminal tab, because it blocks remote control, or because the tab is the last one of a workspace that is pinned, is the last in its window, or is set to stay open when its last tab closes.",
+      "comment": "Alert: the Mac refused to close an agent's terminal tab, because it blocks remote control, because the tab is pinned, or because the tab is the last one of a workspace that is pinned, is the last in its window, or is set to stay open when its last tab closes.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Mac won't close this agent's tab: remote control is blocked, or it's the last tab of a workspace that is pinned, the last in its window, or set to stay open."
+            "value": "The Mac won't close this agent's tab: remote control is blocked, the tab is pinned, or it's the last tab of a workspace that is pinned, the last in its window, or set to stay open."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac không cho đóng tab của agent này: điều khiển từ xa đang bị chặn, hoặc đó là tab cuối của một workspace đang ghim, là workspace cuối của cửa sổ, hoặc được đặt để giữ lại."
+            "value": "Mac không cho đóng tab của agent này: điều khiển từ xa đang bị chặn, tab đang ghim, hoặc đó là tab cuối của một workspace đang ghim, là workspace cuối của cửa sổ, hoặc được đặt để giữ lại."
           }
         }
       }
     },
     "workspaces.alert.refused.closeTab": {
-      "comment": "Alert: the Mac refused to close a terminal tab, because it blocks remote control, or because the tab is the last one of a workspace that is pinned, is the last in its window, or is set to stay open when its last tab closes.",
+      "comment": "Alert: the Mac refused to close a terminal tab, because it blocks remote control, because the tab is pinned, or because the tab is the last one of a workspace that is pinned, is the last in its window, or is set to stay open when its last tab closes.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Mac won't close this tab: remote control is blocked, or it's the last tab of a workspace that is pinned, the last in its window, or set to stay open."
+            "value": "The Mac won't close this tab: remote control is blocked, the tab is pinned, or it's the last tab of a workspace that is pinned, the last in its window, or set to stay open."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac không cho đóng tab này: điều khiển từ xa đang bị chặn, hoặc đó là tab cuối của một workspace đang ghim, là workspace cuối của cửa sổ, hoặc được đặt để giữ lại."
+            "value": "Mac không cho đóng tab này: điều khiển từ xa đang bị chặn, tab đang ghim, hoặc đó là tab cuối của một workspace đang ghim, là workspace cuối của cửa sổ, hoặc được đặt để giữ lại."
           }
         }
       }

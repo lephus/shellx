@@ -17,13 +17,13 @@ enum WorkspaceAlert: String, CaseIterable, Identifiable {
     case offline
     case refusedClose
     case refusedControl
-    /// The Mac would not close an agent's tab: remote control is blocked, or the tab is the last of a
-    /// workspace the Mac keeps (pinned, the last in its window, or set to stay open).
+    /// The Mac would not close an agent's tab: remote control is blocked, the tab is pinned, or it is the
+    /// last of a workspace the Mac keeps (pinned, the last in its window, or set to stay open).
     case refusedCloseAgent
     /// The Mac has no terminal tab for the agent, or the agent has stopped already.
     case agentNotClosable
-    /// The Mac would not close a tab: remote control is blocked, or the tab is the last of a workspace the
-    /// Mac keeps (pinned, the last in its window, or set to stay open).
+    /// The Mac would not close a tab: remote control is blocked, the tab is pinned, or it is the last of a
+    /// workspace the Mac keeps (pinned, the last in its window, or set to stay open).
     case refusedCloseTab
     /// The Mac no longer has the tab.
     case tabNotClosable

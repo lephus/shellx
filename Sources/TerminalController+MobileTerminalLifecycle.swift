@@ -51,7 +51,9 @@ extension TerminalController {
 
     /// ShellX: closes a terminal tab for a phone's `agent.close` or `terminal.close` (ShellX Link). The caller has
     /// checked that this workspace lists that terminal, and for `agent.close` that the agent is live. It never asks:
-    /// the phone has asked its user. On the workspace's last tab it closes the workspace when the Mac's Close Tab would
+    /// the phone has asked its user. A tab pinned on the Mac is `protected`, last tab or not, as the desktop's Close
+    /// Tab refuses it (the forced close below would not). On the workspace's last tab it closes the workspace when
+    /// the Mac's Close Tab would
     /// (``TabManager/closeWorkspaceOnLastSurfacePreferenceEnabled()``), through ``v2MobileWorkspaceClose(params:)``
     /// and its rules (never a pinned workspace or a window's last one), and is `protected` when that preference
     /// keeps the workspace open. Like the other mobile paths it neither selects a workspace nor brings a window
@@ -74,6 +76,14 @@ extension TerminalController {
         guard let tabManager = resolveTabManager(routing: routing),
               let workspace = tabManager.tabs.first(where: { $0.id == workspaceID }) else {
             return notFound
+        }
+        // The desktop's Close Tab refuses a pinned tab, last tab or not; the forced close below would not.
+        if workspace.panels[surfaceID] != nil, workspace.isPanelPinned(surfaceID) {
+            return .err(
+                code: "protected",
+                message: String(localized: "devices.host.pinnedSurface", defaultValue: "Cannot close a pinned tab"),
+                data: nil
+            )
         }
         if workspace.panels[surfaceID] != nil, workspace.panels.count <= 1 {
             guard tabManager.closeWorkspaceOnLastSurfacePreferenceEnabled() else { return lastSurface }
