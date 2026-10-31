@@ -75,8 +75,8 @@ public actor LinkClient {
     /// The optional capabilities the host listed in `welcome.features` (PROTOCOL.md section 4, Features). Use a
     /// capability only when it is here: for `ShellXLink.attachmentsFeature`, `uploadAttachment` and
     /// `chatSend(attachments:)`; for `ShellXLink.workspacesFeature`, `workspaces()` and `workspaceChanges`; for
-    /// `ShellXLink.workspaceControlFeature`, `createWorkspace`, `renameWorkspace` and `closeWorkspace`. A string this
-    /// version does not know is kept, and ignored.
+    /// `ShellXLink.workspaceControlFeature`, `createWorkspace`, `renameWorkspace` and `closeWorkspace`; for
+    /// `ShellXLink.agentCloseFeature`, `closeAgent`. A string this version does not know is kept, and ignored.
     public nonisolated let hostFeatures: Set<String>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
@@ -404,6 +404,21 @@ public actor LinkClient {
     public func closeWorkspace(workspaceId: String) async throws -> WorkspaceControlOutcome {
         let answer = try await call { .workspaceClose(callId: $0, workspaceId: workspaceId) }
         guard case let .workspaceCloseResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
+    /// Closes the terminal an agent session runs in on the Mac, which keeps its own rules: it closes the whole
+    /// workspace when that terminal is its last one, for example. Call it only when ``hostFeatures`` lists
+    /// `ShellXLink.agentCloseFeature`. An id the Mac does not list as a live agent in a local workspace (one that
+    /// has ended, for example) comes as the outcome `.notFound`, and one it refuses to act on (remote control
+    /// blocked, or its rule) as `.refused`; `.failed` when it could not act.
+    ///
+    /// Not safe to repeat: after a timeout or a lost connection it is unknown whether the Mac acted, so read the
+    /// session list again instead. Throws `.remote(code: "unsupported", ...)` when the host takes no agent control,
+    /// `.timedOut` after the request timeout, and `.sessionClosed` when the session ends first.
+    public func closeAgent(sessionId: String) async throws -> WorkspaceControlOutcome {
+        let answer = try await call { .agentClose(callId: $0, sessionId: sessionId) }
+        guard case let .agentCloseResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
         return outcome
     }
 

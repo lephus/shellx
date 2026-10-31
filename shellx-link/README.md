@@ -35,6 +35,7 @@ $probe plan <request_id> --state $state --mode manual|auto_accept|ultraplan|deny
 $probe chat-history <session_id> --state $state [--limit 20] [--before <seq>]
 $probe chat-send <session_id> --state $state --text-file message.txt
 $probe chat-stop <session_id> --state $state [--hard]
+$probe agent-close <session_id> --state $state
 $probe bench --state $state --count 50 --socket /tmp/shellx-debug-<tag>.sock
 $probe unpair --state $state --machine <machine_id>
 $probe logout --state $state

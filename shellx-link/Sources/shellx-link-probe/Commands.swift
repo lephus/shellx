@@ -203,6 +203,18 @@ enum Commands {
         await client.close()
         if outcome != .sent { throw ExitStatus(code: 2) }
     }
+
+    static func agentClose(_ args: Arguments) async throws {
+        let sessionId = args.positional[0]
+        let client = try await Session.open(args).client
+        let started = ContinuousClock.now
+        let outcome = try await client.closeAgent(sessionId: sessionId)
+        Log.line(
+            "agent.close \(Log.shown(sessionId)) outcome=\(Log.shown(outcome.wire))"
+                + " rtt=\(Stats.format(Stats.ms(ContinuousClock.now - started))) ms")
+        await client.close()
+        if outcome != .ok { throw ExitStatus(code: 2) }
+    }
 }
 
 /// A UTF-8 text file given by a flag (`--text-file`, `--feedback-file`), without one trailing newline.

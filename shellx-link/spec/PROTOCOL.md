@@ -143,8 +143,8 @@ Every request that expects exactly one answer carries a `call_id`: `agent.snapsh
 
 Error codes in use: `protocol_mismatch`, `bad_request`, `too_large` (an answer that does not fit a frame,
 section 6, or an `attach.begin` whose `size` is above the limit, section 5), `unsupported` (the host has no
-session list or no chat, takes no attachments, lists no workspaces or takes no workspace control, or does
-not know the call's `t`: it answers each such call with this code and its `call_id`), `not_found`
+session list or no chat, takes no attachments, lists no workspaces, takes no workspace control or no agent
+control, or does not know the call's `t`: it answers each such call with this code and its `call_id`), `not_found`
 (`chat.history.get` for a `session_id` the host does not have). Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
@@ -668,11 +668,11 @@ accepts a pairing request for a machine of the phone's own account.
 
 ## 10. Phone commands
 
-A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt
-it, and make, rename or close a workspace. This section is the safety analysis for those commands. It
-follows the rules a remote command channel must meet: deny by default, allow only the calls a product flow
-needs, scope every call to objects the caller may touch, and never let a call execute or open arbitrary
-content on the Mac.
+A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt it,
+close the terminal it runs in, and make, rename or close a workspace. This section is the safety analysis
+for those commands. It follows the rules a remote command channel must meet: deny by default, allow only the
+calls a product flow needs, scope every call to objects the caller may touch, and never let a call execute
+or open arbitrary content on the Mac.
 
 **Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
 call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
@@ -682,6 +682,8 @@ the host to open or run, and none names a terminal to type into (`chat.send` and
 agent session, and the host types only into that session's terminal: see Shell fall-through below). A call
 names a workspace only to rename or close one that the host's own list holds (`workspace.rename`,
 `workspace.close`), and `workspace.create` names nothing: the host chooses where the new workspace goes.
+`agent.close` names an agent session and nothing else, and the host closes only the terminal that
+session is bound to (Agents below).
 (`attach.begin.name` is a label that the host sanitises, never a path: see Attachments below.)
 
 **Allowed calls.**
@@ -703,21 +705,24 @@ names a workspace only to rename or close one that the host's own list holds (`w
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
 local workspaces. `session_id`, `request_id` and `workspace_id` are looked up in the host's own lists; an id
 it does not have is `not_found` (`unknown` for a reply). A phone cannot name a workspace that is not in the
-list (an SSH or other remote workspace never is), nor a terminal, file, machine or account. Only a phone the
-Mac trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac showed, and
-allowed by the user on that Mac (section 9).
+list (an SSH or other remote workspace never is), nor a terminal, file, machine or account; `agent.close`
+reaches a terminal only through a live agent session the host lists in one of those local workspaces. Only a
+phone the Mac trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac
+showed, and allowed by the user on that Mac (section 9).
 
-**Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in. Once the
-agent has exited, that terminal runs the user's shell or whatever started next: a message would run there
-as a command line, and ctrl-C would stop another program. A host therefore accepts them only for a *live*
-session: one that is not `ended`, whose agent process the host knows by process id, and whose process is
-alive when the call arrives. Any other session, including every ended session it lists (they stay listed
-for their read-only history), is answered `not_found` before any terminal is touched. A session whose
-agent process the host has not learned yet is `not_found` until the agent's next hook names it. The host
-then types only into the terminal that session is bound to, and only while that terminal still exists
-and still hosts the agent; it never sends the text to another terminal. What remains is the moment
-between that check and the typing: an agent that exits within it can still let one message reach the
-terminal, the same window the Mac's own remote-control path has.
+**Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in, and
+`agent.close` closes it. Once the agent has exited, that terminal runs the user's shell or whatever started
+next: a message would run there as a command line, ctrl-C would stop another program, and closing it would
+end the user's shell. A host therefore accepts all three only for a *live* session: one that is not `ended`,
+whose agent process the host knows by process id, and whose process is alive when the call arrives. Any
+other session, including every ended session it lists (they stay listed for their read-only history), is
+answered `not_found` before any terminal is touched. A session whose agent process the host has not learned
+yet is `not_found` until the agent's next hook names it. The host then types into, or closes, only the
+terminal that session is bound to, and only while that terminal still exists and still hosts the agent; it
+never sends the text to, or closes, another terminal. What remains is the moment between that check and the
+typing: an agent that exits within it can still let one message reach the terminal, the same window the
+Mac's own remote-control path has. For `agent.close` the same moment lets a terminal that has just turned
+into the user's shell be closed.
 
 **Attachments.** `attach.*` lets a phone put files on the Mac, so what it may choose is narrow. The phone
 never picks a path: the host names the directory, the file name and the file mode. An image is saved the
@@ -778,20 +783,39 @@ three questions a remote command channel must answer, one by one.
   and which agent session runs in which terminal. It carries no screen content, file, environment variable or
   setting.
 
+**Agents.** `agent.close` is the one call that ends an agent for good, so it answers the same three questions.
+
+- Does it run commands or open content on the Mac? No. The call carries only a `session_id`: no text, key,
+  path, command, program or URL, and nothing is typed into any terminal. Closing the terminal ends what runs
+  in it, as the user's Close Tab does. The Mac does not ask again: a phone is expected to have asked its user.
+- Does it change or destroy what the phone does not own? It reaches only a live Claude Code agent that the
+  host itself lists, in a local workspace that the host lists too. A session in an SSH or other remote workspace
+  is never listed there, so it is `not_found` and nothing closes. The shell fall-through rule above applies: a
+  session that has ended, whose agent process the host does not know by process id, or whose process is no
+  longer alive when the call arrives is answered `not_found` before any terminal is touched, so once the agent
+  has exited its terminal, which now runs the user's shell, cannot be closed by a phone. The host closes only
+  the terminal that session is bound to, and only while that terminal still exists and still hosts the agent.
+  When that terminal is the last one of its workspace, the Mac does what its Close Tab does: by default it
+  closes the workspace, and with its "Keep Workspace Open" preference on it answers `refused` and closes
+  nothing. The Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a
+  window): the answer is `refused`.
+- Does it read state the phone has no business seeing? No. The answer is an `outcome` and nothing else.
+
 More rules: a Mac whose device management (MDM) blocks remote control does not run a Link host at all, and a
-host that sees that policy change during a session answers every `workspace.create`, `workspace.rename` and
-`workspace.close` with `refused` without acting. Removing a phone on the Mac closes its sessions at once
-(above). A control call runs on its own, so a slow Mac does not hold up the session's other calls. The host
-never logs a workspace title, directory, branch or tab title. These are ShellX Link calls, not cmux socket
-methods: the allowlist of the `cmux ssh` relay does not change.
+host that sees that policy change during a session answers every `workspace.create`, `workspace.rename`,
+`workspace.close` and `agent.close` with `refused` without acting. Removing a phone on the Mac closes its
+sessions at once (above). A control call, `agent.close` included, runs on its own, so a slow Mac does not hold
+up the session's other calls. The host never logs a workspace title, directory, branch or tab title, nor the
+title of an agent session. These are ShellX Link calls, not cmux socket methods: the allowlist of the `cmux ssh`
+relay does not change.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
 that trust nor widen it (section 9). Removing the phone on the Mac untrusts its key at once: its live
 sessions close and its next handshake is refused. Removing it on the phone deletes the grant, so the relay
 mints it no new connect ticket, and the Mac drops the key when it next checks the grants. Within that
-trust, typing into the user's own agent session, stopping it, answering its requests, and making, renaming
-and closing its workspaces are what the user could do at the keyboard; the allowed calls limit *which
+trust, typing into the user's own agent session, stopping it, closing its terminal, answering its requests, and
+making, renaming and closing its workspaces are what the user could do at the keyboard; the allowed calls limit *which
 objects* a phone reaches (this Mac's live agent sessions and their pending requests, and its local
 workspaces), not what the user may do with them. Out of reach for a phone in this version: spawning or
 respawning terminals (a new workspace's first terminal apart), keys or text for anything but a live agent,
