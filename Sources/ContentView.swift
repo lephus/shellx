@@ -15866,6 +15866,7 @@ struct SidebarFooterButtons: View {
                     }
                     if shows(.help) {
                         SidebarHelpMenuButton(onSendFeedback: onSendFeedback)
+                        SidebarVersionLabel()
                     }
                     // Right of Help and left of Upgrade, per the footer design.
                     if shows(.cloud) {
