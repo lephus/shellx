@@ -565,6 +565,178 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertTrue(hubB.supportsWorkspaceControl(without.machine.machineID))
     }
 
+    // MARK: - Closing a terminal tab
+
+    private func terminalIds(_ hub: MachineHub, _ mac: FakeMac, _ workspace: String = "shellx") -> [String]? {
+        hub.workspaceRows(machineID: mac.machine.machineID).first { $0.id.workspaceId == "ws-\(workspace)" }?
+            .terminals.map(\.terminalId)
+    }
+
+    /// Every `terminal.close` the Mac received, as `<workspaceId>/<terminalId>`.
+    private func terminalCloseCalls(_ mac: FakeMac) async -> [String] {
+        await mac.terminalCloses.map { "\($0.workspaceId)/\($0.terminalId)" }
+    }
+
+    func testCloseTerminalCallsTheMacAndTheTabGoes() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace("shellx", order: 0, terminals: [linkTerminal("t1", order: 0), linkTerminal("t2", order: 1)]),
+            linkWorkspace("web", order: 1, terminals: [linkTerminal("w1")]),
+        ])
+        let hub = try await makeHub(mac)
+        let id = mac.machine.machineID
+        let up = await eventually { isOnline(hub) && terminalIds(hub, mac) == ["t1", "t2"] }
+        XCTAssertTrue(up)
+
+        let closed = await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "t1")
+
+        XCTAssertEqual(closed, .ok(workspaceId: nil))
+        let calls = await terminalCloseCalls(mac)
+        XCTAssertEqual(calls, ["ws-shellx/t1"])
+        // The Mac's list change takes the tab away; the other workspace is not touched.
+        let gone = await eventually { terminalIds(hub, mac) == ["t2"] }
+        XCTAssertTrue(gone, "\(String(describing: terminalIds(hub, mac)))")
+        XCTAssertEqual(terminalIds(hub, mac, "web"), ["w1"])
+
+        // The last tab closes its workspace, the way the Mac does by default.
+        let last = await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "t2")
+        XCTAssertEqual(last, .ok(workspaceId: nil))
+        let workspaceGone = await eventually { hub.workspaceRows(machineID: id).map(\.title) == ["web"] }
+        XCTAssertTrue(workspaceGone, "\(hub.workspaceRows(machineID: id).map(\.title))")
+    }
+
+    func testCloseTerminalOutcomesMapToResults() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace("shellx", order: 0, terminals: [linkTerminal("t1", order: 0), linkTerminal("t2", order: 1)]),
+            linkWorkspace("web", order: 1, terminals: [linkTerminal("w1")]),
+        ])
+        let hub = try await makeHub(mac)
+        let id = mac.machine.machineID
+        let up = await eventually { isOnline(hub) && terminalIds(hub, mac) == ["t1", "t2"] }
+        XCTAssertTrue(up)
+
+        let expected: [(WorkspaceControlOutcome, WorkspaceCommandResult)] = [
+            (.notFound, .notFound), (.refused, .refused), (.failed, .failed),
+            // An outcome from a newer Mac: it answered, but what it did is not known.
+            (.other("queued"), .unknown),
+        ]
+        for (outcome, result) in expected {
+            await mac.setNextTerminalCloseOutcome(outcome)
+            let closed = await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "t1")
+            XCTAssertEqual(closed, result, "close \(outcome)")
+        }
+
+        // Without a forced outcome the Mac answers for what it lists: a terminal of another workspace, a
+        // terminal that is not there and a workspace that is not there are all `not_found`.
+        let elsewhere = await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "w1")
+        let missing = await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "t-gone")
+        let noWorkspace = await hub.closeTerminal(id, workspaceId: "ws-gone", terminalId: "t1")
+        XCTAssertEqual([elsewhere, missing, noWorkspace], [.notFound, .notFound, .notFound])
+
+        let calls = await terminalCloseCalls(mac)
+        XCTAssertEqual(
+            calls, Array(repeating: "ws-shellx/t1", count: 4) + ["ws-shellx/w1", "ws-shellx/t-gone", "ws-gone/t1"])
+        // None of them was an `ok`: every tab is still there.
+        XCTAssertEqual(terminalIds(hub, mac), ["t1", "t2"])
+        XCTAssertEqual(terminalIds(hub, mac, "web"), ["w1"])
+    }
+
+    func testCloseTerminalWithoutTheFeatureSendsNothing() async throws {
+        let mac = FakeMac(name: "Old Mac", acceptsTerminalClose: false)
+        await mac.setWorkspaces([linkWorkspace("shellx", terminals: [linkTerminal("t1")])])
+        let hub = try await makeHub(mac)
+        let id = mac.machine.machineID
+        let up = await eventually { isOnline(hub) && terminalIds(hub, mac) == ["t1"] }
+        XCTAssertTrue(up)
+
+        // Such a Mac has no terminal control to count a call, and it would answer a `terminal.close` with an
+        // `unsupported` error, which the hub also maps to `.failed`: only the frames the phone sent show
+        // that nothing went out.
+        let before = mac.phoneFrameCount
+        let closed = await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "t1")
+        let after = mac.phoneFrameCount
+
+        XCTAssertEqual(closed, .failed)
+        XCTAssertEqual(after, before, "no frame is sent to a Mac that takes no terminal control")
+        let calls = await terminalCloseCalls(mac)
+        XCTAssertEqual(calls, [])
+        XCTAssertEqual(terminalIds(hub, mac), ["t1"])
+
+        // The count does see a call that is sent: the Mac does take workspace control.
+        let created = await hub.createWorkspace(machineID: id)
+        guard case .ok = created else { return XCTFail("\(created)") }
+        XCTAssertGreaterThan(mac.phoneFrameCount, after)
+    }
+
+    func testCloseTerminalOfflineMacIsOffline() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.failNextConnects(URLError(.notConnectedToInternet), count: 1000)
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(mac, sleep: sleeper.sleep)
+        let down = await eventually {
+            if case .offline = hub.machines.first?.state { return true }
+            return false
+        }
+        XCTAssertTrue(down)
+
+        let closed = await hub.closeTerminal(mac.machine.machineID, workspaceId: "ws-shellx", terminalId: "t1")
+        let unknownMac = await hub.closeTerminal("mac-nobody", workspaceId: "ws-shellx", terminalId: "t1")
+
+        XCTAssertEqual([closed, unknownMac], [.offline, .offline])
+        let calls = await terminalCloseCalls(mac)
+        XCTAssertEqual(calls, [])
+    }
+
+    func testCloseTerminalIsSentOnce() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace("shellx", order: 0, terminals: [linkTerminal("t1", order: 0), linkTerminal("t2", order: 1)])
+        ])
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(mac, sleep: sleeper.sleep)
+        let id = mac.machine.machineID
+        let up = await eventually { isOnline(hub) && terminalIds(hub, mac) == ["t1", "t2"] }
+        XCTAssertTrue(up)
+        await mac.holdWorkspaceControl()
+
+        let call = Task { await hub.closeTerminal(id, workspaceId: "ws-shellx", terminalId: "t1") }
+        let received = await eventually { await mac.terminalCloses.count == 1 }
+        XCTAssertTrue(received)
+        // The host waits for its held call before it lets the session go: drop from the side.
+        let drop = Task { await mac.dropLiveSessions() }
+        let result = await call.value
+        await mac.releaseWorkspaceControl()
+        await drop.value
+
+        XCTAssertEqual(result, .unknown)
+        // The Mac did act (the tab is gone); the phone finds out from the list, not by retrying.
+        sleeper.release()
+        let back = await eventually { isOnline(hub) && terminalIds(hub, mac) == ["t2"] }
+        XCTAssertTrue(back, "\(String(describing: terminalIds(hub, mac)))")
+        let calls = await terminalCloseCalls(mac)
+        XCTAssertEqual(calls, ["ws-shellx/t1"])
+    }
+
+    func testSupportsTerminalCloseFollowsTheFeature() async throws {
+        let withClose = FakeMac(name: "New Mac")
+        let without = FakeMac(name: "Old Mac", acceptsTerminalClose: false)
+
+        let hubA = try await makeHub(withClose)
+        let hubB = try await makeHub(without)
+        let aUp = await eventually { isOnline(hubA) }
+        let bUp = await eventually { isOnline(hubB) }
+        XCTAssertTrue(aUp && bUp)
+
+        XCTAssertTrue(hubA.supportsTerminalClose(withClose.machine.machineID))
+        XCTAssertFalse(hubB.supportsTerminalClose(without.machine.machineID))
+        XCTAssertFalse(hubA.supportsTerminalClose("mac-nobody"))
+        // The features are separate: the Mac without terminal control still takes workspace control and
+        // agent closes.
+        XCTAssertTrue(hubB.supportsWorkspaceControl(without.machine.machineID))
+        XCTAssertTrue(hubB.supportsAgentClose(without.machine.machineID))
+    }
+
     // MARK: - Sessions no terminal names
 
     func testOtherSessionsExcludeChippedOnes() async throws {
