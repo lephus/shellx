@@ -8,8 +8,8 @@ import ShellXLinkCore
 import ShellXLinkSession
 
 /// ShellX: ShellX Link's list of this Mac's workspaces (`workspace.list`), the phone's control of them
-/// (`workspace.create`, `workspace.rename`, `workspace.close`), and closing an agent's tab in them (`agent.close`),
-/// PROTOCOL.md sections 4 ("Workspace") and 10.
+/// (`workspace.create`, `workspace.rename`, `workspace.close`), and closing an agent's tab (`agent.close`) or any
+/// listed tab (`terminal.close`) in them, PROTOCOL.md sections 4 ("Workspace") and 10.
 ///
 /// * The list is every local workspace of every main window, in sidebar order: window order, then the order
 ///   within the window, numbered from 0 without a gap. SSH, remote tmux and cloud workspaces are not listed
@@ -24,12 +24,14 @@ import ShellXLinkSession
 /// * `agent.close` closes only the terminal of a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``), and only
 ///   while the list shows that terminal, in the workspace the list shows it in (a tab dragged elsewhere closes
 ///   there): never an SSH or remote one, and never the shell a tab runs once its agent has exited.
+/// * `terminal.close` closes a tab the user picked, whatever runs in it, and only the pair of workspace and terminal
+///   the list shows: there is no live-agent check.
 ///
 /// Titles, tab titles and directories are never logged. All state is main-actor isolated, like the windows it
 /// reads; `onTermination` only schedules the removal on the main actor, so it never waits for anything `yield`
 /// holds.
 @MainActor
-final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentControl {
+final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentControl, TerminalControl {
     typealias Snapshot = @MainActor () -> [LinkWorkspace]
     /// Starts watching what the list shows and calls `onChange` after a change; returns the function that stops.
     typealias ChangeSignal = @MainActor (_ onChange: @escaping @MainActor () -> Void) -> @MainActor () -> Void
@@ -44,7 +46,8 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
         /// The terminal of a live agent session (``ShellXLinkChatSource/isLiveAgent(_:)``); nil for any other
         /// session, or a live one the Mac has not bound to a terminal.
         var agentSurface: @MainActor @Sendable (_ sessionId: String) -> UUID?
-        /// Closes that terminal, or its workspace when it is the last one.
+        /// Closes that terminal without asking, or its workspace when it is the last tab (`agent.close` and
+        /// `terminal.close`).
         var closeSurface: @MainActor @Sendable (_ workspaceId: UUID, _ surfaceId: UUID) -> V2CallResult
         /// Whether a configuration profile blocks remote control now.
         var isBlocked: @MainActor @Sendable () -> Bool
@@ -179,9 +182,7 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
         guard !control.isBlocked() else { return .refused }
         guard let surface = control.agentSurface(sessionId),
               let workspace = listedWorkspace(holding: surface) else { return .notFound }
-        let outcome = Self.outcome(of: control.closeSurface(workspace, surface), action: "close-agent")
-        if outcome == .ok { refresh() }
-        return outcome
+        return closeListed(surface, in: workspace, action: "close-agent")
     }
 
     /// The terminal `record` names when it is a live agent (``ShellXLinkChatSource/isLiveAgent(_:)``); nil for no
@@ -203,6 +204,33 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
             .first { listed in listed.terminals.contains { $0.terminalId == terminalId } }
             .flatMap { UUID(uuidString: $0.workspaceId) }
     }
+
+    /// Closes a terminal the list shows in `workspace`, refreshing the list once it closed. The outcome is logged by
+    /// code and action only.
+    private func closeListed(_ terminal: UUID, in workspace: UUID, action: String) -> WorkspaceControlOutcome {
+        let outcome = Self.outcome(of: control.closeSurface(workspace, terminal), action: action)
+        if outcome == .ok { refresh() }
+        return outcome
+    }
+
+    // MARK: - TerminalControl
+
+    /// Closes the tab the user picked on the phone (PROTOCOL.md 10, "Tabs"), or its workspace when it is the last tab
+    /// and the Mac's Close Tab would close it. Only the pair of workspace and terminal the list shows: any other pair,
+    /// or an id that is not a UUID, is not found and the Mac is asked nothing. No live-agent check, by design.
+    func closeTerminal(workspaceId: String, terminalId: String) async -> WorkspaceControlOutcome {
+        guard !control.isBlocked() else { return .refused }
+        guard let workspace = UUID(uuidString: workspaceId), let terminal = UUID(uuidString: terminalId),
+              isListed(workspace, terminal: terminal) else { return .notFound }
+        return closeListed(terminal, in: workspace, action: "close-terminal")
+    }
+
+    /// Whether the list shows `terminal` in `workspace` now; never in an SSH or other remote workspace.
+    private func isListed(_ workspace: UUID, terminal: UUID) -> Bool {
+        listedWorkspace(holding: terminal) == workspace
+    }
+
+    // MARK: - Titles and outcomes
 
     /// The title a phone asked for, without control characters or line breaks, trimmed, and cut to
     /// ``maxTitleCharacters`` characters. Format characters such as the joiners of an emoji stay.

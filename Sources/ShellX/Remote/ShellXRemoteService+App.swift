@@ -65,6 +65,7 @@ extension ShellXRemoteEnvironment {
             workspaces: workspaces,
             workspaceControl: workspaces,
             agentControl: workspaces,
+            terminalControl: workspaces,
             hostVersion: device.appVersion,
             machineName: device.machineName,
             phonePush: .live(feed: feed, core: core))
