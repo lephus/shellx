@@ -68,6 +68,9 @@ public actor FakeMac {
     /// False: the host takes no `agent.close` (no `agent_close` feature in `welcome`), like a ShellX from
     /// before it. A host that serves no sessions (`servesSessionsAndChat` false) never advertises it either.
     public nonisolated let acceptsAgentClose: Bool
+    /// False: the host takes no `terminal.close` (no `terminal_close` feature in `welcome`), like a ShellX from
+    /// before it. A host that serves no workspaces (`servesWorkspaces` false) never advertises it either.
+    public nonisolated let acceptsTerminalClose: Bool
     /// How many times a phone tried to connect, failed attempts included.
     public private(set) var connectCount = 0
 
@@ -86,7 +89,8 @@ public actor FakeMac {
     /// passes a fixed one, so what the phone keeps about the Mac survives a relaunch.
     public init(
         name: String, id: String? = nil, servesSessionsAndChat: Bool = true, acceptsAttachments: Bool = true,
-        servesWorkspaces: Bool = true, acceptsWorkspaceControl: Bool = true, acceptsAgentClose: Bool = true
+        servesWorkspaces: Bool = true, acceptsWorkspaceControl: Bool = true, acceptsAgentClose: Bool = true,
+        acceptsTerminalClose: Bool = true
     ) {
         let key = NoiseStaticKey()
         hostKey = key
@@ -95,6 +99,7 @@ public actor FakeMac {
         self.servesWorkspaces = servesWorkspaces
         self.acceptsWorkspaceControl = acceptsWorkspaceControl
         self.acceptsAgentClose = acceptsAgentClose
+        self.acceptsTerminalClose = acceptsTerminalClose
         let sessionSource = FakeMacSessions()
         self.sessionSource = sessionSource
         workspaceSource = FakeMacWorkspaces(sessions: sessionSource)
@@ -167,6 +172,7 @@ public actor FakeMac {
             workspaces: servesWorkspaces ? workspaceSource : nil,
             workspaceControl: servesWorkspaces && acceptsWorkspaceControl ? workspaceSource : nil,
             agentControl: servesSessionsAndChat && acceptsAgentClose ? workspaceSource : nil,
+            terminalControl: servesWorkspaces && acceptsTerminalClose ? workspaceSource : nil,
             hostVersion: "fake", machineName: machine.name)
         let id = UUID()
         live[id] = (macEnd, Task {
@@ -238,6 +244,13 @@ public actor FakeMac {
     /// acts as the real one does: a session it lists that has not ended turns `.ended` (`ok`), any other id
     /// is `not_found`.
     public func setNextAgentCloseOutcome(_ outcome: WorkspaceControlOutcome) { workspaceSource.setNextAgentCloseOutcome(outcome) }
+    /// The workspace id and terminal id of every `terminal.close` the Mac received, in order. Held and
+    /// released with the workspace control calls (`holdWorkspaceControl()`).
+    public var terminalCloses: [(workspaceId: String, terminalId: String)] { workspaceSource.terminalCloses }
+    /// The next `terminal.close` answers `outcome` and, unless it is `ok`, changes nothing. Without it the Mac
+    /// acts as the real one does: a terminal that the named workspace lists is closed (`ok`), and the
+    /// workspace goes with its last terminal; any other pair is `not_found`.
+    public func setNextTerminalCloseOutcome(_ outcome: WorkspaceControlOutcome) { workspaceSource.setNextTerminalCloseOutcome(outcome) }
 
     // MARK: - Chat
 

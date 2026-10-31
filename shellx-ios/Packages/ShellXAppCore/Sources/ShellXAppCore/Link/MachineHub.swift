@@ -218,6 +218,13 @@ public final class MachineHub {
         machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.agentCloseFeature) ?? false
     }
 
+    /// True when the Mac listed the `terminal_close` feature when it was last online: the app offers to
+    /// close a terminal tab for it only then. False for a Mac never online yet, and for one from before the
+    /// feature.
+    public func supportsTerminalClose(_ machineID: String) -> Bool {
+        machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.terminalCloseFeature) ?? false
+    }
+
     /// Asks the Mac (`machineID`), or every online Mac, for its workspace list again: a pull to refresh,
     /// or a command that found its workspace gone. The list is kept in sync by pushes, so this changes
     /// something only when one was missed. Returns when the answers are in.
@@ -543,6 +550,20 @@ public final class MachineHub {
     public func closeAgent(_ ref: SessionRef) async -> WorkspaceCommandResult {
         await workspaceCommand(ref.machineID, feature: ShellXLink.agentCloseFeature) { client in
             WorkspaceCommandResult(outcome: try await client.closeAgent(sessionId: ref.sessionId))
+        }
+    }
+
+    /// Closes one terminal tab of a workspace on its Mac, which keeps its own rules: it closes the whole
+    /// workspace when that is the last tab, `.refused` when remote control is blocked or the workspace is
+    /// protected (or, for the last tab, when the Mac keeps a workspace open), `.notFound` for a terminal the
+    /// Mac does not list in that workspace. Unlike `closeAgent(_:)` it does not look for a live agent: the
+    /// user picked the tab. `.ok` means the Mac closed it; the tab leaves `workspaceRows(machineID:)` when
+    /// the Mac's list change arrives, not before. A Mac that did not list `terminal_close`
+    /// (`supportsTerminalClose(_:)`) gets nothing and the result is `.failed`. Sent once, like the workspace
+    /// commands (see `createWorkspace(machineID:)`).
+    public func closeTerminal(_ machineID: String, workspaceId: String, terminalId: String) async -> WorkspaceCommandResult {
+        await workspaceCommand(machineID, feature: ShellXLink.terminalCloseFeature) { client in
+            WorkspaceCommandResult(outcome: try await client.closeTerminal(workspaceId: workspaceId, terminalId: terminalId))
         }
     }
 

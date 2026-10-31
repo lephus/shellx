@@ -13,7 +13,13 @@ import ShellXLinkSession
 /// (else `not_found`), unless `setNextAgentCloseOutcome(_:)` says otherwise for the next call; on `ok` the
 /// session turns `.ended` and goes out as a session change, the way the real Mac's liveness sweep reports
 /// it once the terminal is gone. `hold()` holds agent closes too.
-final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, @unchecked Sendable {
+///
+/// And its `TerminalControl`. Closing a terminal needs a terminal the named workspace lists (else `not_found`,
+/// which also covers a terminal of another workspace), unless `setNextTerminalCloseOutcome(_:)` says otherwise
+/// for the next call; on `ok` the terminal leaves its workspace, which goes with it when it was the last
+/// terminal, and the change goes out as a `workspace.changed`, the way the real Mac's list update reports it.
+/// Unlike an agent close it looks for no session. `hold()` holds terminal closes too.
+final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, TerminalControl, @unchecked Sendable {
     typealias Change = (revision: Int, upserted: [LinkWorkspace], removed: [String])
 
     private let lock = NSLock()
@@ -28,6 +34,8 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, 
     private var held: [CheckedContinuation<Void, Never>] = []
     private var agentCalls: [String] = []
     private var nextAgentOutcome: WorkspaceControlOutcome?
+    private var terminalCalls: [(workspaceId: String, terminalId: String)] = []
+    private var nextTerminalOutcome: WorkspaceControlOutcome?
     private let sessions: FakeMacSessions
 
     /// `sessions` is the Mac's session list, where a closed agent turns `.ended`.
@@ -39,6 +47,8 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, 
     var controlCalls: [String] { lock.withLock { calls } }
     /// The session id of every `agent.close` received, in order.
     var agentCloses: [String] { lock.withLock { agentCalls } }
+    /// The workspace id and terminal id of every `terminal.close` received, in order.
+    var terminalCloses: [(workspaceId: String, terminalId: String)] { lock.withLock { terminalCalls } }
 
     /// Replaces the list; what differs from the old one goes out as one change. Nothing differs: no change.
     func set(_ workspaces: [LinkWorkspace]) {
@@ -81,7 +91,12 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, 
         lock.withLock { nextAgentOutcome = outcome }
     }
 
-    /// Control calls (workspace and agent) are recorded, then wait for `release()`.
+    /// The next `terminal.close` answers `outcome` and, unless it is `ok`, changes nothing.
+    func setNextTerminalCloseOutcome(_ outcome: WorkspaceControlOutcome) {
+        lock.withLock { nextTerminalOutcome = outcome }
+    }
+
+    /// Control calls (workspace, agent and terminal) are recorded, then wait for `release()`.
     func hold() {
         lock.withLock { holding = true }
     }
@@ -174,6 +189,28 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, 
         session.lastActivityMs = nowMs
         sessions.upsert(session)
         return .ok
+    }
+
+    // MARK: - TerminalControl
+
+    func closeTerminal(workspaceId: String, terminalId: String) async -> WorkspaceControlOutcome {
+        lock.withLock { terminalCalls.append((workspaceId, terminalId)) }
+        await waitWhileHeld()
+        return lock.withLock {
+            defer { nextTerminalOutcome = nil }
+            if let forced = nextTerminalOutcome, forced != .ok { return forced }
+            guard var workspace = byId[workspaceId], workspace.terminals.contains(where: { $0.terminalId == terminalId })
+            else { return .notFound }
+            workspace.terminals.removeAll { $0.terminalId == terminalId }
+            if workspace.terminals.isEmpty {
+                byId.removeValue(forKey: workspaceId)
+                broadcastLocked(upserted: [], removed: [workspaceId])
+            } else {
+                byId[workspaceId] = workspace
+                broadcastLocked(upserted: [workspace], removed: [])
+            }
+            return .ok
+        }
     }
 
     // MARK: - Private

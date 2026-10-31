@@ -5,7 +5,7 @@ import ShellXLinkCore
 public enum WorkspaceCommandResult: Equatable, Sendable {
     /// The Mac did it. `workspaceId` is the new workspace's id after a create, nil for the others.
     case ok(workspaceId: String?)
-    /// The Mac has no workspace with that id.
+    /// The Mac has no such workspace, live agent session or terminal tab (in that workspace).
     case notFound
     /// The Mac does not allow it: remote control is blocked, or its own rule says no (a pinned workspace,
     /// or the last workspace of a window, stays).
