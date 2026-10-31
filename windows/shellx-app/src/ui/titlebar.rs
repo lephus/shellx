@@ -2,7 +2,8 @@
 //! then the Windows caption buttons. The bar is the window's drag area; each
 //! interactive child occludes it, and the caption buttons report their
 //! `WindowControlArea` so Windows hit-testing (snap layouts, double-click to
-//! maximize, drag to move) behaves like a native caption.
+//! maximize, drag to move) behaves like a native caption. On macOS (development
+//! only) there are no caption buttons; a spacer keeps the traffic lights clear.
 
 use gpui::{
     ClickEvent, Context, Div, Pixels, Stateful, Window, WindowControlArea, div, prelude::*, px, svg,
@@ -17,6 +18,8 @@ pub const HEIGHT: Pixels = px(crate::workspace::TITLEBAR_H);
 const CAPTION_WIDTH: Pixels = px(46.0);
 const ICON_SIZE: Pixels = px(16.0);
 const SEARCH_MAX_WIDTH: Pixels = px(360.0);
+/// Room for the macOS traffic-light buttons at the left of the bar.
+const MAC_TRAFFIC_LIGHTS_W: f32 = 72.0;
 
 // Segoe Fluent Icons / Segoe MDL2 Assets caption glyphs.
 const GLYPH_MINIMIZE: &str = "\u{E921}";
@@ -43,6 +46,9 @@ pub fn render(lang: Lang, window: &Window, cx: &mut Context<RootView>) -> Div {
         .border_b_1()
         .border_color(theme::line())
         .window_control_area(WindowControlArea::Drag)
+        .when(cfg!(target_os = "macos"), |bar| {
+            bar.child(div().flex_none().w(px(MAC_TRAFFIC_LIGHTS_W)))
+        })
         .child(div().flex_none().pl(px(8.0)).child(toggle))
         .child(
             div()
@@ -63,7 +69,9 @@ pub fn render(lang: Lang, window: &Window, cx: &mut Context<RootView>) -> Div {
                 .child(bell)
                 .child(settings),
         )
-        .child(caption_buttons(window.is_maximized()))
+        .when(cfg!(windows), |bar| {
+            bar.child(caption_buttons(window.is_maximized()))
+        })
 }
 
 /// 28 px square icon button: MUTED glyph, TEXT on hover. Occludes the drag

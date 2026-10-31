@@ -12,7 +12,7 @@ It is a separate app from the Flutter ShellX for Windows and installs next to it
 |---|---|---|
 | `shellx-model` | Pure Rust: palette, strings, key mapping, paste encoding, split tree, tabs, sidebar, pairing/connection state machine, update rule, `shellx-core` envelope | `cargo test -p shellx-model` on any OS |
 | `shellx-remote` | GPUI-free client for the cmux-tui remote protocol over `cmux-relay`; relay e2e tests are `#[ignore]`d and Unix-only | unit tests on any OS; e2e on Linux CI (`remote-e2e`) |
-| `shellx-app` | The `shellx-desktop.exe` window, ConPTY, TermCore | Windows only (`windows-2025` CI). Do not build it on macOS or Linux; there only the headless `--smoke*` paths and some unit tests run |
+| `shellx-app` | The `shellx-desktop.exe` window, ConPTY, TermCore | Windows only (`windows-2025` CI). On macOS it builds for development screenshots only ([see below](#run-the-window-on-a-mac-development-only)); on Linux only the headless `--smoke*` paths and some unit tests run |
 
 CI is `.github/workflows/shellx-windows.yml` (jobs `model`, `remote-e2e`, `app`, `installer`). The `app` job builds
 `shellx-desktop`, runs the `shellx-model`, `shellx-remote` and `shellx-app` unit tests (step `Test shellx-app`), then the
@@ -32,6 +32,32 @@ gh run download <run-id> -R lephus/shellx -n ShellX-Setup-1.5.3 # ShellX-Setup-1
 The installer is unsigned and per-user (no UAC). SmartScreen shows "Unknown publisher":
 choose "More info", then "Run anyway". Installs to `%LOCALAPPDATA%\Programs\ShellX Native`,
 Start menu entry "ShellX". Needs Windows 10 1809 (build 17763) or later.
+
+## Run the window on a Mac (development only)
+
+The GPUI window also builds on macOS so the UI can be checked with screenshots without a
+Windows PC. This is not a product: nothing ships from it, and it opens `/bin/sh` instead of
+PowerShell. From `windows/`:
+
+```
+cargo build --release -p shellx-app
+dev/mac-shot.sh /tmp/shellx.png        # optional second argument: seconds to wait (default 6)
+```
+
+`dev/mac-shot.sh` starts `target/release/shellx-desktop` with your environment (for example
+`SHELLX_LANG=en`), waits, saves a PNG of its window with `screencapture`, and stops it. It
+exits non-zero if no window appeared. The first release build takes about 5 minutes.
+
+- Never run a debug build of the window: it crashes at startup (a `hashbrown` debug assertion
+  inside `serde_json`; gpui turns on `serde_json`'s `preserve_order` once it is in the build).
+  For the same reason `cargo test -p shellx-app` (debug) fails 11 tests on a Mac and one run
+  can hang; use `cargo test --release -p shellx-app` there. `cargo test -p shellx-model` is fine.
+- The build needs the `ghostty` submodule (the libghostty-vt path dependency); in a git
+  worktree, link or init it first.
+- The window title bar leaves room for the traffic-light buttons instead of drawing the
+  Windows caption buttons.
+- State goes to `~/.local/share/shellx-native` (created with mode 0700, which shellx-core
+  requires).
 
 ## Command line
 

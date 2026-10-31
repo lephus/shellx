@@ -40,7 +40,18 @@ fn native_dir_from(
     }
 }
 
+/// Creates the directory (and parents). On unix it is 0700, which shellx-core
+/// requires of its state dir; Windows keeps the inherited ACL.
 fn ensure(path: PathBuf) -> io::Result<PathBuf> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&path)?;
+    }
+    #[cfg(not(unix))]
     std::fs::create_dir_all(&path)?;
     Ok(path)
 }
@@ -73,6 +84,19 @@ mod tests {
         // does not create anything: only checks the layout
         assert_eq!(n.join("core").parent(), Some(n.as_path()));
         assert_ne!(n.join("core"), n.join("remote"));
+    }
+
+    /// shellx-core refuses a state dir with group/other bits ("need 0700").
+    #[cfg(unix)]
+    #[test]
+    fn created_dirs_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let made = ensure(tmp.path().join("a/b")).unwrap();
+        for dir in [made.as_path(), made.parent().unwrap()] {
+            let mode = std::fs::metadata(dir).unwrap().permissions().mode();
+            assert_eq!(mode & 0o077, 0, "{} is {mode:o}", dir.display());
+        }
     }
 
     #[test]

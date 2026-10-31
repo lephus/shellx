@@ -34,6 +34,12 @@ windows-sys = { version = "0.61", features = [
 ] }
 gpui = { version = "=0.2.2", default-features = false }
 
+# Development only: lets the window run on a Mac to check the UI with
+# screenshots (windows/dev/mac-shot.sh). Not shipped; the font-kit text system
+# and runtime-compiled shaders avoid needing the Xcode Metal toolchain.
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "runtime_shaders"] }
+
 [build-dependencies]
 embed-resource = "3"
 

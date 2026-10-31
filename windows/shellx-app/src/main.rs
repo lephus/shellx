@@ -26,7 +26,8 @@ mod smoke;
 mod term_core;
 mod workspace;
 
-#[cfg(windows)]
+// The window also builds on macOS, for development screenshots only.
+#[cfg(any(windows, target_os = "macos"))]
 mod ui;
 
 fn main() {
@@ -67,10 +68,10 @@ fn main() {
         }
     }
 
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     ui::run();
 
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         eprintln!("the window is Windows-only; use --smoke to exercise the session");
         std::process::exit(2);
