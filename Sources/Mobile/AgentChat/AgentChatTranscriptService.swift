@@ -29,7 +29,7 @@ final class AgentChatTranscriptService {
     /// Current live prose-stream generation per session, consumed only when a
     /// matching authoritative transcript prose line lands for that turn.
     private var proseTurnStates: [String: ProseTurnState] = [:]
-    private var didShutdown = false
+    private(set) var didShutdown = false
     /// Highest transcript seq observed per session, used to bind live preview
     /// settlement to transcript lines that landed after the prompt started.
     private var latestTranscriptSeqBySessionID: [String: Int] = [:]
@@ -635,7 +635,14 @@ final class AgentChatTranscriptService {
         if record.transcriptPath != path {
             registry.update(sessionID: record.sessionID) { $0.transcriptPath = path }
         }
-        Task { await tailer.start() }
+        Task { [weak self] in
+            await tailer.start()
+            // Claude Code runs no hook for an Esc interrupt. A transcript that already ends with its marker
+            // (stopped while nothing tailed it) settles the turn once, as a live marker would.
+            let tail = await tailer.history(beforeSeq: nil, limit: Self.interruptBackfillWindow).messages
+            guard let self, self.tailers[sessionID] === tailer else { return }
+            self.noteTranscriptInterrupt(sessionID: sessionID, in: tail)
+        }
         return tailer
     }
 
@@ -668,9 +675,7 @@ final class AgentChatTranscriptService {
             emit(frame: ChatSessionEventFrame(sessionID: sessionID, event: .updated(batch.updated)))
         }
         updateLatestTranscriptSeq(sessionID: sessionID, messages: batch.appended + batch.updated)
-        if let completedAt = Self.completedAssistantTurnTimestamp(in: batch.appended) {
-            registry.noteAssistantTurnCompleted(sessionID: sessionID, at: completedAt)
-        }
+        noteTranscriptTurnEnd(sessionID: sessionID, appended: batch.appended)
     }
 
     private static func batchContainsAgentProse(_ messages: [ChatMessage], matching turnState: ProseTurnState) -> Bool {
@@ -688,24 +693,6 @@ final class AgentChatTranscriptService {
     private func updateLatestTranscriptSeq(sessionID: String, messages: [ChatMessage]) {
         guard let maxSeq = messages.map(\.seq).max() else { return }
         latestTranscriptSeqBySessionID[sessionID] = max(latestTranscriptSeqBySessionID[sessionID] ?? -1, maxSeq)
-    }
-
-    private static func completedAssistantTurnTimestamp(in messages: [ChatMessage]) -> Date? {
-        guard !messages.isEmpty else { return nil }
-        var completedAt: Date?
-        for message in messages where message.role == .agent {
-            switch message.kind {
-            case .prose, .thought, .unsupported:
-                completedAt = max(completedAt ?? message.timestamp, message.timestamp)
-            case .toolUse, .terminal, .fileEdit, .permissionRequest, .question:
-                return nil
-            case .status:
-                break
-            case .attachment:
-                break
-            }
-        }
-        return completedAt
     }
 
     private func handleRecordChange(_ record: AgentChatSessionRecord, previous: AgentChatSessionRecord?) {
@@ -793,7 +780,7 @@ final class AgentChatTranscriptService {
         proseWakeDriver.refreshDemand()
     }
 
-    private func endProseTurn(sessionID: String) {
+    func endProseTurn(sessionID: String) {
         proseTurnStates[sessionID] = nil
         proseStreamer.turnEnded(sessionID: sessionID)
         proseWakeDriver.refreshDemand()

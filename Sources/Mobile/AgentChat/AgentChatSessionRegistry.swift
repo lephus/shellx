@@ -811,7 +811,7 @@ final class AgentChatSessionRegistry {
     }
 
     /// Resolves indexed records and repairs a missing or stale surface entry.
-    private func indexedRecords(surfaceID: String) -> [AgentChatSessionRecord] {
+    func indexedRecords(surfaceID: String) -> [AgentChatSessionRecord] {
         let before = sessionSurfaceIndex.sessionIDs(surfaceID: surfaceID)
         let sessionIDs = sessionSurfaceIndex.sessionIDs(
             surfaceID: surfaceID,

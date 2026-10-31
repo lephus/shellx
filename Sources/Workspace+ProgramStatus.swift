@@ -1,3 +1,4 @@
+import CmuxAgentChat
 import CmuxAgentJournal
 import CmuxSidebar
 import Foundation
@@ -211,10 +212,14 @@ extension Workspace {
     }
 
     /// Settles a pane whose agent reported the end of its activity over
-    /// OSC 7501 while its hook-driven lifecycle still says running.
+    /// OSC 7501 while its hook-driven lifecycle still says running, and the
+    /// agent chat session on that terminal, which a phone shows.
     ///
     /// Each change for a panel restarts its pending settlement, so the grace
     /// always runs from the latest edge, and a new working report cancels it.
+    /// Every edge is scheduled, whatever the pane's row says: an Esc on a
+    /// permission prompt leaves no Running row, yet ends the chat session's
+    /// turn. The settlement re-checks the row before touching it.
     private func scheduleAgentTurnSettlement(
         panelId: UUID,
         previous: ProgramStatusRecordStore,
@@ -229,7 +234,6 @@ extension Workspace {
             }
         }
         let endedKeys = settlement.endedActivityStatusKeys(previous: previous, current: current)
-            .filter { agentLifecycleStatesByPanelId[panelId]?[$0] == .running }
         let edge = Date()
         for key in endedKeys {
             let taskKey = "\(panelId.uuidString)|\(key)"
@@ -251,16 +255,26 @@ extension Workspace {
     /// agent's activity ended. Any hook report after that edge wins: a late
     /// Stop already settled the turn, and a new prompt started another one.
     func settleAgentTurnFromProgramStatus(key: String, panelId: UUID, edge: Date) {
-        guard panels[panelId] != nil,
-              agentLifecycleStatesByPanelId[panelId]?[key] == .running else { return }
-        // Only a foreground Running row is stale. A Waiting or subagent row
-        // means the turn ended with background work still live.
-        guard let reported = agentStatusEntriesByPanelId[panelId]?[key],
-              reported.workState == .running,
-              reported.timestamp <= edge else { return }
+        guard panels[panelId] != nil else { return }
         let store = programStatusStoresByPanelId[panelId] ?? ProgramStatusRecordStore()
         guard !ProgramStatusAgentSettlement().isActive(statusKey: key, in: store) else { return }
+        // A Waiting or subagent row means the turn ended with background work
+        // still live: neither the row nor the chat session is stale.
+        let reported = agentStatusEntriesByPanelId[panelId]?[key]
+        if let workState = reported?.workState, workState != .running { return }
         let source = key == "claude_code" ? "claude" : key
+        // The chat session on this terminal settles even without a Running
+        // row; its registry keeps any state a hook or input set after the edge.
+        TerminalController.shared.agentChatTranscriptService?.noteTurnSettled(
+            surfaceID: panelId.uuidString,
+            agentKind: ChatAgentKind(source: source),
+            at: edge
+        )
+        // Only a foreground Running row that no hook updated since is stale.
+        guard agentLifecycleStatesByPanelId[panelId]?[key] == .running,
+              reported?.workState == .running,
+              let reportedAt = reported?.timestamp,
+              reportedAt <= edge else { return }
 #if DEBUG
         cmuxDebugLog("agentTurn.settleFromProgramStatus panel=\(panelId.uuidString.prefix(8)) key=\(key)")
 #endif
