@@ -217,6 +217,9 @@ Luật này dùng cho **mọi danh sách phiên** trên điện thoại: ba nhó
 
 - **Khi nào** **[người dùng]**: chỉ khi agent đang chờ người dùng trả lời (phiên `needsInput`: hỏi quyền, hỏi
   câu hỏi). Không áp cho đang chạy, xong hay nhàn rỗi.
+- **Mac offline**: không hiện viền khi Mac của agent đang offline, vì lúc đó không trả lời được: chip tab của
+  agent có chấm xám (VoiceOver đọc "Offline") thay cho trạng thái "Cần bạn", còn thẻ "Cần bạn" mờ đi và chỉ
+  giữ viền mảnh thường.
 - **Ở đâu** **[người dùng: "cả Mac và iPhone"]**:
   - Mac: dòng tab của agent trong sidebar dọc (cùng chỗ có hiệu ứng tên khi agent chạy);
   - iPhone: thẻ trong nhóm "Cần bạn" ở màn chính, và chip tab của agent đó trong màn workspace.
