@@ -33,6 +33,10 @@ final class FakeMacSessions: AgentSessionSource, @unchecked Sendable {
         lock.withLock { revision += 1 }
     }
 
+    func session(_ sessionId: String) -> AgentSession? {
+        lock.withLock { byId[sessionId] }
+    }
+
     func sessions() async -> (revision: Int, sessions: [AgentSession]) {
         lock.withLock {
             lists += 1

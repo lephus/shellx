@@ -65,14 +65,17 @@ public actor FakeMac {
     public nonisolated let servesWorkspaces: Bool
     /// False: the host lists workspaces but takes no control of them (no `workspace_control` feature).
     public nonisolated let acceptsWorkspaceControl: Bool
+    /// False: the host takes no `agent.close` (no `agent_close` feature in `welcome`), like a ShellX from
+    /// before it.
+    public nonisolated let acceptsAgentClose: Bool
     /// How many times a phone tried to connect, failed attempts included.
     public private(set) var connectCount = 0
 
     private var hostKey: NoiseStaticKey
     private let trusted = TrustedPhones()
     private let feed = FakeMacFeed()
-    private let sessionSource = FakeMacSessions()
-    private let workspaceSource = FakeMacWorkspaces()
+    private let sessionSource: FakeMacSessions
+    private let workspaceSource: FakeMacWorkspaces
     private let chat: FakeMacChat
     private var failure: (any Error)?
     private var failuresLeft = 0
@@ -82,7 +85,7 @@ public actor FakeMac {
     /// passes a fixed one, so what the phone keeps about the Mac survives a relaunch.
     public init(
         name: String, id: String? = nil, servesSessionsAndChat: Bool = true, acceptsAttachments: Bool = true,
-        servesWorkspaces: Bool = true, acceptsWorkspaceControl: Bool = true
+        servesWorkspaces: Bool = true, acceptsWorkspaceControl: Bool = true, acceptsAgentClose: Bool = true
     ) {
         let key = NoiseStaticKey()
         hostKey = key
@@ -90,6 +93,10 @@ public actor FakeMac {
         self.acceptsAttachments = acceptsAttachments
         self.servesWorkspaces = servesWorkspaces
         self.acceptsWorkspaceControl = acceptsWorkspaceControl
+        self.acceptsAgentClose = acceptsAgentClose
+        let sessionSource = FakeMacSessions()
+        self.sessionSource = sessionSource
+        workspaceSource = FakeMacWorkspaces(sessions: sessionSource)
         chat = FakeMacChat(acceptsAttachments: acceptsAttachments)
         let id = id ?? UUID().uuidString.lowercased()
         machine = PairedMachine(
@@ -152,6 +159,7 @@ public actor FakeMac {
             sessions: servesSessionsAndChat ? sessionSource : nil, chat: servesSessionsAndChat ? chat : nil,
             workspaces: servesWorkspaces ? workspaceSource : nil,
             workspaceControl: servesWorkspaces && acceptsWorkspaceControl ? workspaceSource : nil,
+            agentControl: servesSessionsAndChat && acceptsAgentClose ? workspaceSource : nil,
             hostVersion: "fake", machineName: machine.name)
         let id = UUID()
         live[id] = (macEnd, Task {
@@ -216,6 +224,13 @@ public actor FakeMac {
     /// when the Mac is slow.
     public func holdWorkspaceControl() { workspaceSource.hold() }
     public func releaseWorkspaceControl() { workspaceSource.release() }
+    /// The session id of every `agent.close` the Mac received, in order. Held and released with the
+    /// workspace control calls (`holdWorkspaceControl()`).
+    public var agentCloses: [String] { workspaceSource.agentCloses }
+    /// The next `agent.close` answers `outcome` and, unless it is `ok`, changes nothing. Without it the Mac
+    /// acts as the real one does: a session it lists that has not ended turns `.ended` (`ok`), any other id
+    /// is `not_found`.
+    public func setNextAgentCloseOutcome(_ outcome: WorkspaceControlOutcome) { workspaceSource.setNextAgentCloseOutcome(outcome) }
 
     // MARK: - Chat
 

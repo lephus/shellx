@@ -212,6 +212,12 @@ public final class MachineHub {
         machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.workspaceControlFeature) ?? false
     }
 
+    /// True when the Mac listed the `agent_close` feature when it was last online: the app offers to close
+    /// an agent for it only then. False for a Mac never online yet, and for one from before the feature.
+    public func supportsAgentClose(_ machineID: String) -> Bool {
+        machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.agentCloseFeature) ?? false
+    }
+
     /// Asks the Mac (`machineID`), or every online Mac, for its workspace list again: a pull to refresh,
     /// or a command that found its workspace gone. The list is kept in sync by pushes, so this changes
     /// something only when one was missed. Returns when the answers are in.
@@ -505,7 +511,7 @@ public final class MachineHub {
     /// result is `.unknown` (the Mac may have acted: look at the list), and nothing is sent to a Mac that
     /// is not `.online` (`.offline`) or that did not list `workspace_control` (`.failed`).
     public func createWorkspace(machineID: String) async -> WorkspaceCommandResult {
-        await workspaceCommand(machineID) { client in
+        await workspaceCommand(machineID, feature: ShellXLink.workspaceControlFeature) { client in
             let answer = try await client.createWorkspace()
             return WorkspaceCommandResult(outcome: answer.outcome, workspaceId: answer.workspaceId)
         }
@@ -514,7 +520,7 @@ public final class MachineHub {
     /// Renames a workspace on its Mac. `title` is at most `ShellXLink.maxWorkspaceTitleBytes` UTF-8
     /// bytes (a longer one is `.failed`). See `createWorkspace(machineID:)`.
     public func renameWorkspace(_ ref: WorkspaceRef, title: String) async -> WorkspaceCommandResult {
-        await workspaceCommand(ref.machineID) { client in
+        await workspaceCommand(ref.machineID, feature: ShellXLink.workspaceControlFeature) { client in
             WorkspaceCommandResult(outcome: try await client.renameWorkspace(workspaceId: ref.workspaceId, title: title))
         }
     }
@@ -523,8 +529,20 @@ public final class MachineHub {
     /// last workspace, for one). The row leaves when the Mac's list change arrives, not before. See
     /// `createWorkspace(machineID:)`.
     public func closeWorkspace(_ ref: WorkspaceRef) async -> WorkspaceCommandResult {
-        await workspaceCommand(ref.machineID) { client in
+        await workspaceCommand(ref.machineID, feature: ShellXLink.workspaceControlFeature) { client in
             WorkspaceCommandResult(outcome: try await client.closeWorkspace(workspaceId: ref.workspaceId))
+        }
+    }
+
+    /// Closes the terminal an agent runs in on its Mac, which keeps its own rules: it closes the whole
+    /// workspace when that terminal is its last one, `.refused` when remote control is blocked or the
+    /// workspace is protected, `.notFound` for a session that has ended (its terminal runs the user's shell
+    /// by then). `.ok` means the Mac closed it; the session turns `.ended` when the Mac's list change
+    /// arrives, not before. A Mac that did not list `agent_close` (`supportsAgentClose(_:)`) gets nothing
+    /// and the result is `.failed`. Sent once, like the workspace commands (see `createWorkspace(machineID:)`).
+    public func closeAgent(_ ref: SessionRef) async -> WorkspaceCommandResult {
+        await workspaceCommand(ref.machineID, feature: ShellXLink.agentCloseFeature) { client in
+            WorkspaceCommandResult(outcome: try await client.closeAgent(sessionId: ref.sessionId))
         }
     }
 
@@ -748,13 +766,14 @@ public final class MachineHub {
         }
     }
 
-    /// Runs one workspace command on the Mac's live session, and says how it went. It is never sent
-    /// twice: after a timeout or a lost link the Mac may or may not have acted (PROTOCOL.md section 7).
+    /// Runs one command that needs the Mac's `feature` on its live session, and says how it went. It is
+    /// never sent twice: after a timeout or a lost link the Mac may or may not have acted (PROTOCOL.md
+    /// section 7).
     private func workspaceCommand(
-        _ machineID: String, _ body: @Sendable (LinkClient) async throws -> WorkspaceCommandResult
+        _ machineID: String, feature: String, _ body: @Sendable (LinkClient) async throws -> WorkspaceCommandResult
     ) async -> WorkspaceCommandResult {
         guard let model = machines.first(where: { $0.id == machineID }), model.state == .online else { return .offline }
-        guard model.hostFeatures.contains(ShellXLink.workspaceControlFeature) else { return .failed }
+        guard model.hostFeatures.contains(feature) else { return .failed }
         do {
             return try await withLink(machineID, body)
         } catch LinkCallError.offline, LinkCallError.needsPairing, LinkCallError.unknownMachine {

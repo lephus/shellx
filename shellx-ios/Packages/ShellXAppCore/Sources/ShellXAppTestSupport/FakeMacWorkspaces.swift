@@ -8,7 +8,12 @@ import ShellXLinkSession
 /// call: a created workspace is added with one terminal, a rename and a close need a workspace the list holds
 /// (else `not_found`), and the last workspace is never closed (`refused`). Every change goes out as a
 /// `workspace.changed` to the sessions that are open.
-final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, @unchecked Sendable {
+///
+/// It is also the Mac's `AgentControl`. Closing an agent needs a session the Mac lists that has not ended
+/// (else `not_found`), unless `setNextAgentCloseOutcome(_:)` says otherwise for the next call; on `ok` the
+/// session turns `.ended` and goes out as a session change, the way the real Mac's liveness sweep reports
+/// it once the terminal is gone. `hold()` holds agent closes too.
+final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, @unchecked Sendable {
     typealias Change = (revision: Int, upserted: [LinkWorkspace], removed: [String])
 
     private let lock = NSLock()
@@ -21,9 +26,19 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, @unchecked Sen
     private var created = 0
     private var holding = false
     private var held: [CheckedContinuation<Void, Never>] = []
+    private var agentCalls: [String] = []
+    private var nextAgentOutcome: WorkspaceControlOutcome?
+    private let sessions: FakeMacSessions
+
+    /// `sessions` is the Mac's session list, where a closed agent turns `.ended`.
+    init(sessions: FakeMacSessions) {
+        self.sessions = sessions
+    }
 
     var listCount: Int { lock.withLock { lists } }
     var controlCalls: [String] { lock.withLock { calls } }
+    /// The session id of every `agent.close` received, in order.
+    var agentCloses: [String] { lock.withLock { agentCalls } }
 
     /// Replaces the list; what differs from the old one goes out as one change. Nothing differs: no change.
     func set(_ workspaces: [LinkWorkspace]) {
@@ -61,7 +76,12 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, @unchecked Sen
         lock.withLock { nextOutcome = outcome }
     }
 
-    /// Control calls are recorded, then wait for `release()`.
+    /// The next `agent.close` answers `outcome` and, unless it is `ok`, changes nothing.
+    func setNextAgentCloseOutcome(_ outcome: WorkspaceControlOutcome) {
+        lock.withLock { nextAgentOutcome = outcome }
+    }
+
+    /// Control calls (workspace and agent) are recorded, then wait for `release()`.
     func hold() {
         lock.withLock { holding = true }
     }
@@ -135,6 +155,25 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, @unchecked Sen
             broadcastLocked(upserted: [], removed: [workspaceId])
             return .ok
         }
+    }
+
+    // MARK: - AgentControl
+
+    func closeAgent(sessionId: String) async -> WorkspaceControlOutcome {
+        lock.withLock { agentCalls.append(sessionId) }
+        await waitWhileHeld()
+        let forced = lock.withLock { () -> WorkspaceControlOutcome? in
+            defer { nextAgentOutcome = nil }
+            return nextAgentOutcome
+        }
+        if let forced, forced != .ok { return forced }
+        guard var session = sessions.session(sessionId), session.state != .ended else { return .notFound }
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        session.state = .ended
+        session.stateSinceMs = nowMs
+        session.lastActivityMs = nowMs
+        sessions.upsert(session)
+        return .ok
     }
 
     // MARK: - Private
