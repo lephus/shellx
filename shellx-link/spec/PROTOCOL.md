@@ -302,20 +302,22 @@ A `workspace_id` the host does not have is `not_found`, not an `error`. A comman
 blocks remote control. A client does not resend a control call after losing the connection: the host may already
 have acted, so it reads the list again.
 
-`agent.close` closes the terminal tab of a live agent session the host lists in a local workspace, without asking. On
-its workspace's last tab (of any kind) the Mac closes the workspace, as its Close Tab does by default; with its "Keep
-Workspace Open When Closing Last Surface" setting on it answers `refused` and closes nothing. `not_found` for an
-unknown, ended or tab-less session. Like a control call it answers with an `outcome`, and a client does not resend
+`agent.close` closes the terminal tab of a live agent session the host lists in a local workspace, without asking. A
+tab pinned on the Mac is `refused` and nothing closes, as the Mac's Close Tab refuses it. On its workspace's last tab
+(of any kind) the Mac closes the workspace, as its Close Tab does by default; with its "Keep Workspace Open When
+Closing Last Surface" setting on it answers `refused` and closes nothing. `not_found` for an unknown, ended or
+tab-less session. Like a control call it answers with an `outcome`, and a client does not resend
 it after losing the connection: the host may already have acted, so it reads the session list again.
 
 `terminal.close` (`terminal_close`) closes one terminal tab of a workspace the host lists, by the `workspace_id` of
 a Workspace and the `terminal_id` of one of its Terminal objects, without asking. It looks for no agent: the user
 picked the tab, so it closes whatever runs there. A pair that is not a terminal of that workspace in the host's list
 is `not_found` and nothing closes: an id the host does not have, a terminal of another workspace, a tab that is
-already gone, and every id of an SSH or other remote workspace, which is never listed. On the workspace's last
-tab the Mac closes the workspace, as its Close Tab does by default; with its "Keep Workspace Open When Closing
-Last Surface" preference on it answers `refused` and closes nothing, and its rules for closing a workspace still
-hold (a pinned workspace, the last workspace of a window). Like `agent.close` it answers with an `outcome`, and a
+already gone, and every id of an SSH or other remote workspace, which is never listed. A tab pinned on the Mac is
+`refused` and nothing closes, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) the Mac
+closes the workspace, as its Close Tab does by default; with its "Keep Workspace Open When Closing Last Surface"
+setting on it answers `refused` and closes nothing, and its rules for closing a workspace still hold (a pinned
+workspace, the last workspace of a window). Like `agent.close` it answers with an `outcome`, and a
 client does not resend it after losing the connection: the host may already have acted, so it reads the
 workspace list again.
 
@@ -376,11 +378,11 @@ it opens the session again.
 - `kind` (`attach.begin`): `image`, `file`.
 - `outcome` of `workspace.create.result`, `workspace.rename.result`, `workspace.close.result` and
   `agent.close.result`: `ok`, `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as
-  closing a pinned workspace, the last workspace of a window, or an agent's last tab while "Keep Workspace Open When
-  Closing Last Surface" is on), `failed`.
+  closing a pinned workspace, the last workspace of a window, a pinned tab, or an agent's last tab while "Keep
+  Workspace Open When Closing Last Surface" is on), `failed`.
 - `outcome` of `terminal.close.result`: `ok`, `not_found`, `refused`, `failed`, as for `agent.close.result`; a
-  terminal that is not in a workspace the host lists is `not_found`, and a workspace's last tab with "Keep Workspace
-  Open When Closing Last Surface" on is `refused`.
+  terminal that is not in a workspace the host lists is `not_found`, and a pinned tab, or a workspace's last tab
+  with "Keep Workspace Open When Closing Last Surface" on, is `refused`.
 
 ## 5. Rules
 
@@ -702,7 +704,8 @@ field of any message names a command line, a program, a directory or other path 
 the host to open or run, and none names a terminal to type into (`chat.send` and `chat.interrupt` name an
 agent session, and the host types only into that session's terminal: see Shell fall-through below). A call
 names a workspace only to rename or close one that the host's own list holds (`workspace.rename`,
-`workspace.close`), and `workspace.create` names nothing: the host chooses where the new workspace goes.
+`workspace.close`), or to find a tab in it (`terminal.close`), and `workspace.create` names nothing: the host
+chooses where the new workspace goes.
 `agent.close` names an agent session and nothing else, and the host closes only the terminal that
 session is bound to (Agents below). `terminal.close` names a workspace and one of its terminals in the host's own
 list, to close that tab and for nothing else (Tabs below).
@@ -721,8 +724,8 @@ list, to close that tab and for nothing else (Tabs below).
 | `workspace.create` | Makes a workspace on the Mac, in a directory the Mac chooses as when the user adds a workspace there. Its terminal starts the user's default shell when it is first shown (the Mac creates it lazily). Does not change the Mac's selection or bring its window to the front | None named: the call carries only `call_id`, no path, command, program, URL or environment |
 | `workspace.rename` | Sets the workspace's title (at most 512 UTF-8 bytes) | One local workspace in the host's list, by `workspace_id` |
 | `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rules: it refuses to close a pinned workspace or the last workspace of a window, and refuses every control call while device management blocks remote control | One local workspace in the host's list, by `workspace_id` |
-| `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes. The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
-| `terminal.close` | Closes that terminal tab, without asking, ending what runs in it, whether or not an agent runs there. On the workspace's last tab it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" preference on it is `refused` and nothing closes, and the Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a window). The Mac refuses while device management blocks remote control | One terminal of a local workspace in the host's list, by `workspace_id` and `terminal_id`; `not_found` for any other pair |
+| `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. A tab pinned on the Mac is `refused`, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes. The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
+| `terminal.close` | Closes that terminal tab, without asking, ending what runs in it, whether or not an agent runs there. A tab pinned on the Mac is `refused`, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes, and the Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a window). The Mac refuses while device management blocks remote control | One terminal of a local workspace in the host's list, by `workspace_id` and `terminal_id`; `not_found` for any other pair |
 | `ping` | None | |
 
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
@@ -808,7 +811,7 @@ three questions a remote command channel must answer, one by one.
   and which agent session runs in which terminal. It carries no screen content, file, environment variable or
   setting.
 
-**Agents.** `agent.close` is the one call that ends an agent for good, so it answers the same three questions.
+**Agents.** `agent.close` is the call that closes an agent by its session, so it answers the same three questions.
 
 - Does it run commands or open content on the Mac? No. The call carries only a `session_id`: no text, key,
   path, command, program or URL, and nothing is typed into any terminal. Closing the terminal ends what runs
@@ -821,7 +824,8 @@ three questions a remote command channel must answer, one by one.
   has exited its terminal, which now runs the user's shell, cannot be closed through `agent.close`;
   `terminal.close` (Tabs, below) closes a tab the user picked. The host closes only
   the terminal that session is bound to, and only while that terminal still exists and still hosts the agent,
-  in the workspace the host's list shows it in now (a tab dragged to another workspace closes there). When that
+  in the workspace the host's list shows it in now (a tab dragged to another workspace closes there). A tab
+  pinned on the Mac is `refused` and nothing closes, as the Mac's Close Tab refuses it. When that
   terminal is the last tab of its workspace (counting tabs of every kind, not only terminals), the Mac closes
   the workspace, as its Close Tab does by default; with its "Keep Workspace Open When Closing Last Surface"
   setting on it answers `refused` and closes nothing. The Mac's rules for closing a workspace still hold (a
@@ -839,9 +843,9 @@ three questions a remote command channel must answer, one by one.
   workspace (never listed) are all `not_found`. Unlike `agent.close` it makes no live-agent check, by design: the
   user picked this tab in the list, so the shell fall-through rule above does not apply to it, and it closes a
   tab whether an agent, a shell or another program runs there. The Mac does not ask again: a phone is expected to
-  have asked its user. On the workspace's last tab the Mac closes the workspace, as its Close Tab does by default;
-  with its "Keep Workspace Open When Closing Last Surface" preference on it answers `refused` and closes
-  nothing. The Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a
+  have asked its user. A tab pinned on the Mac is `refused` and nothing closes, as the Mac's Close Tab refuses
+  it. On the workspace's last tab (of any kind) the Mac closes the workspace, as its Close Tab does by default;
+  with its "Keep Workspace Open When Closing Last Surface" setting on it answers `refused` and closes nothing. The Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a
   window): the answer is `refused`. While device management (MDM) blocks remote control the answer is `refused`
   and nothing is looked up or closed.
 - Does it read state the phone has no business seeing? No. The answer is an `outcome` and nothing else, and the

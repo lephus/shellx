@@ -144,8 +144,8 @@ enum WorkspaceListActions {
 
 extension WorkspaceListActions {
     /// The agents whose close is on its way to their Mac. Every Close goes through `closeAgent` (the home's
-    /// cards, the agents outside workspaces, the agent screen's `•••`), so a second tap, or a swipe while a
-    /// menu's close waits, sends nothing until the Mac answered the first.
+    /// cards, the agent screen's `•••`), so a second tap, or a swipe while a menu's close waits, sends
+    /// nothing until the Mac answered the first.
     private static var closingAgents: Set<SessionRef> = []
 
     /// An agent the phone may offer to close: its session has not ended (the terminal of an agent that

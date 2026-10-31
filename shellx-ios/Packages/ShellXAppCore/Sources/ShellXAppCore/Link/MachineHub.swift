@@ -542,8 +542,8 @@ public final class MachineHub {
     }
 
     /// Closes the terminal an agent runs in on its Mac, which keeps its own rules: it closes the whole
-    /// workspace when that terminal is its last tab of any kind, `.refused` when remote control is blocked or the
-    /// workspace is protected, `.notFound` for a session that has ended (its terminal runs the user's shell
+    /// workspace when that terminal is its last tab of any kind, `.refused` when remote control is blocked, the
+    /// tab is pinned or the workspace is protected, `.notFound` for a session that has ended (its terminal runs the user's shell
     /// by then). `.ok` means the Mac closed it; the session turns `.ended` when the Mac's list change
     /// arrives, not before. A Mac that did not list `agent_close` (`supportsAgentClose(_:)`) gets nothing
     /// and the result is `.failed`. Sent once, like the workspace commands (see `createWorkspace(machineID:)`).
@@ -554,10 +554,10 @@ public final class MachineHub {
     }
 
     /// Closes one terminal tab of a workspace on its Mac, which keeps its own rules: it closes the whole
-    /// workspace when that is the last tab, `.refused` when remote control is blocked or the workspace is
-    /// protected (or, for the last tab, when the Mac keeps a workspace open), `.notFound` for a terminal the
-    /// Mac does not list in that workspace. Unlike `closeAgent(_:)` it does not look for a live agent: the
-    /// user picked the tab. `.ok` means the Mac closed it; the tab leaves `workspaceRows(machineID:)` when
+    /// workspace when that is the last tab (of any kind), `.refused` when remote control is blocked, the tab is
+    /// pinned or the workspace is protected (or, for the last tab, when the Mac keeps a workspace open),
+    /// `.notFound` for a terminal the Mac does not list in that workspace. Unlike `closeAgent(_:)` it does not
+    /// look for a live agent: the user picked the tab. `.ok` means the Mac closed it; the tab leaves `workspaceRows(machineID:)` when
     /// the Mac's list change arrives, not before. A Mac that did not list `terminal_close`
     /// (`supportsTerminalClose(_:)`) gets nothing and the result is `.failed`. Sent once, like the workspace
     /// commands (see `createWorkspace(machineID:)`).
