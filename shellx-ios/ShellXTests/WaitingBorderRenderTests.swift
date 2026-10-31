@@ -10,7 +10,7 @@ import XCTest
 /// system's Reduce Motion setting cannot be set from a test), so they only check what holds at every
 /// angle: the edge is coloured, in several colours.
 @MainActor
-final class WaitingBorderTests: XCTestCase {
+final class WaitingBorderRenderTests: XCTestCase {
     private static let now = Date(timeIntervalSince1970: 1_700_000_000)
     private static let nowMs: Int64 = 1_700_000_000_000
 
@@ -183,20 +183,21 @@ private struct Pixels {
 
     init?(_ image: UIImage) {
         guard let cgImage = image.cgImage, let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
-        width = cgImage.width
-        height = cgImage.height
-        scale = Int(image.scale)
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let (w, h) = (cgImage.width, cgImage.height)
+        var bytes = [UInt8](repeating: 0, count: w * h * 4)
         let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
             guard
                 let context = CGContext(
-                    data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                    bytesPerRow: width * 4, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+                    data: buffer.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                    bytesPerRow: w * 4, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
             else { return false }
-            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
             return true
         }
         guard drawn else { return nil }
+        width = w
+        height = h
+        scale = Int(image.scale)
         data = bytes
     }
 

@@ -6,7 +6,8 @@ import SwiftUI
 /// it has run, "Done", none once it ended or went idle); under them `workspace · agent`, the Mac when
 /// several are paired and how long: since it began to wait ("2 minutes"), or ago for a session that
 /// just finished, ended or went idle (a running one has its time in the tag); and, while it waits for
-/// the user, its question in quotes. A needs-you card has the accent colour as its outline, and a card from a Mac
+/// the user, its question in quotes. A needs-you card has the multicolor waiting border running around it
+/// (`WaitingBorder`; the accent colour as its outline when its Mac is not online), and a card from a Mac
 /// that is not online fades. The card is not a button itself: the list wraps it in a link.
 struct FocusRowView: View {
     /// The group the session is in: it sets the dot, the tag and the outline.
@@ -28,7 +29,8 @@ struct FocusRowView: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 14, style: .continuous) }
+    private static let cornerRadius: CGFloat = 14
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous) }
     private var color: Color { Color(Self.colorName(kind)) }
 
     /// The asset colour of the dot and the tag.
@@ -100,6 +102,13 @@ struct FocusRowView: View {
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
+    /// Whether the multicolor waiting border runs around the card: the agent waits for the user's answer
+    /// (the card is in the needs-you group, which also holds a session that has a request waiting while it
+    /// reports another state) and its Mac is online, so the answer can be given.
+    static func showsWaitingBorder(item: FocusItem, kind: Kind) -> Bool {
+        kind == .needsYou && item.session.online
+    }
+
     /// What the agent asks, in quotes, on a needs-you card; nil otherwise.
     static func quotedQuestion(for item: FocusItem, kind: Kind) -> String? {
         guard kind == .needsYou, let question = item.question, !question.isEmpty else { return nil }
@@ -108,6 +117,7 @@ struct FocusRowView: View {
 
     var body: some View {
         let large = typeSize.isAccessibilitySize
+        let waiting = Self.showsWaitingBorder(item: item, kind: kind)
         VStack(alignment: .leading, spacing: 3) {
             titleLine
             Text(verbatim: Self.subLine(for: item, kind: kind, now: now, showsMachineName: showsMachineName))
@@ -129,7 +139,9 @@ struct FocusRowView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .background(Color.appSurface, in: shape)
-        .overlay { shape.strokeBorder(border, lineWidth: 1) }
+        // The waiting border is 2 points and covers the 1-point outline, which is left out under it.
+        .overlay { if !waiting { shape.strokeBorder(border, lineWidth: 1) } }
+        .waitingBorder(isActive: waiting, cornerRadius: Self.cornerRadius)
         .contentShape(shape)
         .opacity(item.session.online ? 1 : 0.55)
         .accessibilityElement(children: .combine)
