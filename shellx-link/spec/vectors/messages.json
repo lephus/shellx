@@ -1688,6 +1688,50 @@
         "call_id": "c79",
         "outcome": "not_found"
       }
+    },
+    {
+      "name": "terminal_close",
+      "message": {
+        "case": "terminal_close",
+        "call_id": "c90",
+        "workspace_id": "ws-1",
+        "terminal_id": "t-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.close",
+        "call_id": "c90",
+        "workspace_id": "ws-1",
+        "terminal_id": "t-1"
+      }
+    },
+    {
+      "name": "terminal_close_result_ok",
+      "message": {
+        "case": "terminal_close_result",
+        "call_id": "c90",
+        "outcome": "ok"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.close.result",
+        "call_id": "c90",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "terminal_close_result_not_found",
+      "message": {
+        "case": "terminal_close_result",
+        "call_id": "c91",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.close.result",
+        "call_id": "c91",
+        "outcome": "not_found"
+      }
     }
   ],
   "decode_only": [

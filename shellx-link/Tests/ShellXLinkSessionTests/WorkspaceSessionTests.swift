@@ -331,6 +331,113 @@ final class WorkspaceSessionTests: XCTestCase {
         XCTAssertEqual(result, .ok)
     }
 
+    // MARK: - Terminal control
+
+    func testWelcomeListsTerminalCloseOnlyWithControl() async throws {
+        let terminals = FakeTerminalControl()
+        let alone = try await welcomeFeatures(makeHost(terminalControl: terminals))
+        XCTAssertEqual(alone, [ShellXLink.terminalCloseFeature])
+        XCTAssertEqual(alone, ["terminal_close"])
+
+        let without = try await welcomeFeatures(
+            makeHost(workspaces: FakeWorkspaceSource(), control: FakeWorkspaceControl(), agentControl: FakeAgentControl()))
+        XCTAssertEqual(
+            without, ["workspaces", "workspace_control", "agent_close"],
+            "a host without terminal control does not offer it")
+
+        let all = try await welcomeFeatures(
+            makeHost(
+                chat: FakeChatSource(acceptsAttachments: true), workspaces: FakeWorkspaceSource(),
+                control: FakeWorkspaceControl(), agentControl: FakeAgentControl(), terminalControl: terminals))
+        XCTAssertEqual(all, ["attachments", "workspaces", "workspace_control", "agent_close", "terminal_close"])
+
+        let client = try await connect(makeHost(terminalControl: terminals))
+        XCTAssertEqual(client.hostFeatures, ["terminal_close"])
+    }
+
+    func testTerminalCloseUnsupportedWithoutControl() async throws {
+        // Workspace and agent control do not take `terminal.close`.
+        let client = try await connect(
+            makeHost(workspaces: FakeWorkspaceSource(), control: FakeWorkspaceControl(), agentControl: FakeAgentControl()))
+        await expectRemote("unsupported") { try await client.closeTerminal(workspaceId: "ws-1", terminalId: "t-1") }
+        // The session is still usable after the refusal.
+        let snapshot = try await within { try await client.snapshot() }
+        XCTAssertEqual(snapshot.pending, [])
+
+        // The refusal names the call, so a raw client sees `error` with its call_id.
+        let rig = makeHost()
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawChannel(end, rig)
+        try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
+        _ = try await within { try await raw.receive() }
+        try await raw.send(.terminalClose(callId: "c1", workspaceId: "ws-1", terminalId: "t-1"))
+        let answer = try await within { try await raw.receive() }
+        guard case let .error(code, _, callId) = answer else { return XCTFail("expected error, got \(answer)") }
+        XCTAssertEqual(code, "unsupported")
+        XCTAssertEqual(callId, "c1")
+    }
+
+    func testTerminalCloseReachesControl() async throws {
+        let terminals = FakeTerminalControl()
+        let client = try await connect(makeHost(terminalControl: terminals))
+
+        let closed = try await within { try await client.closeTerminal(workspaceId: "ws-1", terminalId: "t-1") }
+        XCTAssertEqual(closed, .ok)
+        XCTAssertEqual(terminals.calls.map { [$0.workspaceId, $0.terminalId] }, [["ws-1", "t-1"]])
+
+        // Every outcome comes back as the control gave it, an unknown one included.
+        terminals.setClose(.notFound)
+        let notFound = try await within { try await client.closeTerminal(workspaceId: "ws-1", terminalId: "t-1") }
+        XCTAssertEqual(notFound, .notFound)
+        terminals.setClose(.refused)
+        let refused = try await within { try await client.closeTerminal(workspaceId: "ws-1", terminalId: "t-1") }
+        XCTAssertEqual(refused, .refused)
+        terminals.setClose(.other("busy"))
+        let busy = try await within { try await client.closeTerminal(workspaceId: "ws-1", terminalId: "t-1") }
+        XCTAssertEqual(busy, .other("busy"))
+        XCTAssertEqual(terminals.calls.count, 4)
+        XCTAssertTrue(terminals.calls.allSatisfy { $0.workspaceId == "ws-1" && $0.terminalId == "t-1" })
+    }
+
+    func testTerminalCloseResultFromAClientIsBadRequest() async throws {
+        let terminals = FakeTerminalControl()
+        let rig = makeHost(terminalControl: terminals)
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawChannel(end, rig)
+        try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
+        _ = try await within { try await raw.receive() }
+        try await raw.send(.terminalCloseResult(callId: "c1", outcome: .ok))
+        let answer = try await within { try await raw.receive() }
+        guard case let .error(code, _, callId) = answer else { return XCTFail("expected error, got \(answer)") }
+        XCTAssertEqual(code, "bad_request")
+        XCTAssertEqual(callId, "c1")
+        XCTAssertEqual(terminals.calls.count, 0)
+    }
+
+    func testSlowTerminalCloseDoesNotBlockTheSession() async throws {
+        let source = FakeWorkspaceSource([linkWorkspace("w1")])
+        let terminals = FakeTerminalControl()
+        let gate = Gate()
+        terminals.hold(until: gate)
+        let client = try await connect(makeHost(workspaces: source, terminalControl: terminals))
+
+        let closing = Task { try await client.closeTerminal(workspaceId: "w1", terminalId: "t-1") }
+        let reached = await eventually { terminals.calls.map(\.terminalId) == ["t-1"] }
+        XCTAssertTrue(reached, "the close never reached the control")
+        // The close is still waiting, and the host keeps answering other calls.
+        let list = try await within { try await client.workspaces() }
+        XCTAssertEqual(list.workspaces.map(\.workspaceId), ["w1"])
+        let second = Task { try await client.closeTerminal(workspaceId: "w1", terminalId: "t-2") }
+        let both = await eventually { terminals.calls.map(\.terminalId) == ["t-1", "t-2"] }
+        XCTAssertTrue(both, "a second close waited behind the first")
+
+        gate.open()
+        let outcome = try await within { try await closing.value }
+        XCTAssertEqual(outcome, .ok)
+        let result = try await within { try await second.value }
+        XCTAssertEqual(result, .ok)
+    }
+
     // MARK: - Oversize (PROTOCOL.md section 6)
 
     func testOversizedListIsShrunk() async throws {
@@ -439,7 +546,8 @@ final class WorkspaceSessionTests: XCTestCase {
 
     private func makeHost(
         chat: (any AgentChatSource)? = nil, workspaces: (any WorkspaceSource)? = nil,
-        control: (any WorkspaceControl)? = nil, agentControl: (any AgentControl)? = nil
+        control: (any WorkspaceControl)? = nil, agentControl: (any AgentControl)? = nil,
+        terminalControl: (any TerminalControl)? = nil
     ) -> Rig {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
@@ -447,7 +555,7 @@ final class WorkspaceSessionTests: XCTestCase {
         let host = LinkHost(
             key: hostKey, trustedClients: { trusted }, feed: FakeFeedSource(), sessions: nil, chat: chat,
             workspaces: workspaces, workspaceControl: control, agentControl: agentControl,
-            hostVersion: "test-host", machineName: "Test Mac",
+            terminalControl: terminalControl, hostVersion: "test-host", machineName: "Test Mac",
             timings: .standard)
         return Rig(host: host, hostKey: hostKey, clientKey: clientKey)
     }

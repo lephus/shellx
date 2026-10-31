@@ -530,6 +530,51 @@ final class LinkCodecTests: XCTestCase {
         }
     }
 
+    func testTerminalCloseRoundTrip() throws {
+        let messages: [LinkMessage] = [
+            .terminalClose(callId: "c1", workspaceId: "ws-1", terminalId: "t-1"),
+            .terminalCloseResult(callId: "c1", outcome: .ok),
+            .terminalCloseResult(callId: "c2", outcome: .notFound),
+            .terminalCloseResult(callId: "c3", outcome: .other("busy")),
+        ]
+        for message in messages {
+            XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(message)), message, "\(message)")
+        }
+        let close = try Self.jsonObject(messages[0])
+        XCTAssertEqual(close["t"] as? String, "terminal.close")
+        XCTAssertEqual(close["call_id"] as? String, "c1")
+        XCTAssertEqual(close["workspace_id"] as? String, "ws-1")
+        XCTAssertEqual(close["terminal_id"] as? String, "t-1")
+        let ok = try Self.jsonObject(messages[1])
+        XCTAssertEqual(ok["t"] as? String, "terminal.close.result")
+        XCTAssertEqual(ok["outcome"] as? String, "ok")
+        XCTAssertEqual(try Self.jsonObject(messages[2])["outcome"] as? String, "not_found")
+        XCTAssertEqual(try Self.jsonObject(messages[3])["outcome"] as? String, "busy")
+        // Both messages need a valid call_id: encoding without one, and decoding a frame that lacks it, are errors.
+        XCTAssertThrowsError(try LinkCodec.encode(.terminalClose(callId: "", workspaceId: "ws-1", terminalId: "t-1"))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.encode(.terminalCloseResult(callId: "", outcome: .ok))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.decode(Data(
+            #"{"v":1,"t":"terminal.close","workspace_id":"ws-1","terminal_id":"t-1"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.decode(Data(#"{"v":1,"t":"terminal.close.result","outcome":"ok"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        // A close missing either id is bad_json too, and keeps its call_id for the error answer.
+        XCTAssertThrowsError(try LinkCodec.decode(Data(
+            #"{"v":1,"t":"terminal.close","call_id":"c9","workspace_id":"ws-1"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: "c9"))
+        }
+        XCTAssertThrowsError(try LinkCodec.decode(Data(
+            #"{"v":1,"t":"terminal.close","call_id":"c9","terminal_id":"t-1"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: "c9"))
+        }
+    }
+
     func testUnknownOutcomeKeepsWire() throws {
         let decoded = try LinkCodec.decode(Data(
             #"{"v":1,"t":"workspace.rename.result","call_id":"c1","outcome":"busy"}"#.utf8))
@@ -557,6 +602,10 @@ final class LinkCodecTests: XCTestCase {
 
     func testAgentCloseFeature() {
         XCTAssertEqual(ShellXLink.agentCloseFeature, "agent_close")
+    }
+
+    func testTerminalCloseFeature() {
+        XCTAssertEqual(ShellXLink.terminalCloseFeature, "terminal_close")
     }
 
     func testWorkspaceShrinkOrder() throws {
@@ -790,6 +839,11 @@ final class LinkCodecTests: XCTestCase {
         case "agent_close": return .agentClose(callId: try s("call_id"), sessionId: try s("session_id"))
         case "agent_close_result":
             return .agentCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
+        case "terminal_close":
+            return .terminalClose(
+                callId: try s("call_id"), workspaceId: try s("workspace_id"), terminalId: try s("terminal_id"))
+        case "terminal_close_result":
+            return .terminalCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)
