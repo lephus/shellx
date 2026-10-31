@@ -822,6 +822,50 @@ struct ShellXLinkWorkspaceSourceTests {
             #expect(second.panels[surface] != nil)
         }
     }
+
+    /// A tab pinned on the Mac is refused, as the desktop's Close Tab refuses it (`agent.close` and `terminal.close`
+    /// both close through here): nothing closes.
+    @Test func agentSurfaceCloseOnAPinnedTabIsRefused() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, _, second in
+            let kept = try #require(second.focusedPanelId)
+            let pane = try #require(second.paneId(forPanelId: kept))
+            let pinned = try #require(second.newTerminalSurface(inPane: pane, focus: false)).id
+            second.setPanelPinned(panelId: pinned, pinned: true)
+            #expect(second.isPanelPinned(pinned))
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: pinned)
+
+            guard case let .err(code, _, _) = result else {
+                Issue.record("a pinned tab closed")
+                return
+            }
+            #expect(code == "protected")
+            #expect(manager.tabs.contains { $0.id == second.id })
+            #expect(second.panels[pinned] != nil)
+            #expect(second.panels[kept] != nil)
+        }
+    }
+
+    /// A pinned last tab is refused too, before the workspace would close with it: the desktop's Close Tab refuses a
+    /// pinned tab whatever else the workspace holds.
+    @Test func agentSurfaceCloseOnAPinnedLastTabIsRefused() throws {
+        try Self.withAgentManager(closesWorkspace: true) { manager, _, second in
+            let surface = try #require(second.focusedPanelId)
+            #expect(second.panels.count == 1)
+            second.setPanelPinned(panelId: surface, pinned: true)
+            #expect(second.isPanelPinned(surface))
+
+            let result = TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: second.id, surfaceID: surface)
+
+            guard case let .err(code, _, _) = result else {
+                Issue.record("a pinned last tab closed its workspace")
+                return
+            }
+            #expect(code == "protected")
+            #expect(manager.tabs.contains { $0.id == second.id })
+            #expect(second.panels[surface] != nil)
+        }
+    }
 }
 
 /// How often a change signal fired.
