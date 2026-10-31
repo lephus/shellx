@@ -1,5 +1,6 @@
 import AppKit
 import Bonsplit
+import CmuxAgentJournal
 import CmuxFoundation
 import CmuxSettings
 import CmuxSidebar
@@ -61,25 +62,47 @@ struct ShellXSidebarWaitingBorderTests {
         #expect(!Self.snapshot(for: workspace).agentNeedsInput)
     }
 
+    /// A failed turn (Claude's StopFailure, a usage limit) reaches the sidebar as needs input with
+    /// the error triangle, because the journal projects its error phase onto needs input. It asks
+    /// nothing of the person, so the row does not wait.
+    @Test func failedAgentDoesNotWait() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+        Self.reportFailure("claude_code", in: workspace, panelId: panelId)
+
+        let snapshot = Self.snapshot(for: workspace)
+        #expect(snapshot.statusPillGlyphKind == .error)
+        #expect(!snapshot.agentNeedsInput)
+    }
+
     /// A failure in one pane takes the status pill, but an agent that asks in another still waits.
     @Test func rowWaitsBesideAFailure() throws {
         let workspace = Workspace()
         defer { workspace.teardownAllPanels() }
         let failed = try #require(workspace.focusedPanelId)
         let asking = try #require(workspace.newTerminalSplit(from: failed, orientation: .horizontal, focus: false)?.id)
-        Self.reportAgent(
-            "codex",
-            status: "Failed",
-            icon: "exclamationmark.triangle.fill",
-            lifecycle: .idle,
-            in: workspace,
-            panelId: failed
-        )
+        Self.reportFailure("codex", in: workspace, panelId: failed)
         Self.reportAgent("claude_code", status: "Needs input", lifecycle: .needsInput, in: workspace, panelId: asking)
 
         let snapshot = Self.snapshot(for: workspace)
         #expect(snapshot.statusPillGlyphKind == .error)
         #expect(snapshot.agentNeedsInput)
+    }
+
+    /// A pane that is gone and a manual workspace loader never make the row wait.
+    @Test func closedPaneAndWorkspaceLoaderNeverWait() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.agentLifecycleStatesByPanelId[UUID()] = ["claude_code": .needsInput]
+        workspace.agentLifecycleStatesByPanelId[panelId] = [
+            AgentHibernationLifecycleStatusKeys.manualKey: .needsInput,
+            "\(AgentHibernationLifecycleStatusKeys.manualKey):build": .needsInput
+        ]
+
+        #expect(!Self.snapshot(for: workspace).agentNeedsInput)
     }
 
     // MARK: - The row
@@ -297,6 +320,19 @@ struct ShellXSidebarWaitingBorderTests {
         if workspace.agentPIDs[key] == nil {
             workspace.agentPIDs[key] = pid_t(5_000 + workspace.agentPIDs.count)
         }
+    }
+
+    /// Reports a failed turn the way the Stop hook does for a `StopFailure`: the red triangle row,
+    /// and the journal's error phase, which the sidebar shows as needs input.
+    private static func reportFailure(_ key: String, in workspace: Workspace, panelId: UUID) {
+        reportAgent(
+            key,
+            status: "Usage limit",
+            icon: "exclamationmark.triangle.fill",
+            lifecycle: AgentJournalLifecycleCenter.lifecycle(for: .error),
+            in: workspace,
+            panelId: panelId
+        )
     }
 
     private static func makeModel(

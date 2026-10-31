@@ -435,6 +435,76 @@ struct WorkspaceProgramStatusTests {
         }
     }
 
+    /// Esc on a Claude permission prompt or question: Claude keeps its OSC 7501 record blocked while the prompt
+    /// waits, and only cancelling it ends the record, with no hook. The pane's "Needs input" row and lifecycle
+    /// settle to idle at that edge, so the status pill and the waiting border stop (spec 2026-10-29 §6.7).
+    @Test func claudeEscOnPermissionPromptIdlesTheSidebarRow() async throws {
+        try await withChatService { service in
+            let workspace = Workspace()
+            let panelId = try #require(workspace.focusedPanelId)
+            let session = UUID().uuidString
+            let asked = Date().addingTimeInterval(-10)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: session, hookEventName: .permissionRequest, source: "claude",
+                surfaceId: panelId.uuidString, receivedAt: asked
+            ))
+            // The Notification hook's sidebar row for the prompt.
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+            workspace.setStatusEntry(
+                SidebarStatusEntry(key: "claude_code", value: "Needs input", icon: "bell.fill", timestamp: asked),
+                key: "claude_code",
+                panelId: panelId
+            )
+            workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+            workspace.applyProgramStatus(
+                ProgramStatusReport(state: .blocked, kind: .permission, app: "claude-code"),
+                panelId: panelId
+            )
+            #expect(workspace.agentNeedsInput)
+
+            workspace.applyProgramStatus(ProgramStatusReport(state: .clear), panelId: panelId)
+
+            #expect(await Self.waitUntil { workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .idle })
+            #expect(!workspace.agentNeedsInput)
+            #expect(workspace.agentStatusEntriesByPanelId[panelId]?["claude_code"]?.value != "Needs input")
+        }
+    }
+
+    /// A turn that failed (`StopFailure`) also ends Claude's record, and the journal shows its error as needs
+    /// input. That row is an error, not a prompt the person cancelled: the edge leaves it as it is.
+    @Test func claudeFailureKeepsItsSidebarRowWhenItsRecordEnds() async throws {
+        try await withChatService { service in
+            let workspace = Workspace()
+            let panelId = try #require(workspace.focusedPanelId)
+            let session = UUID().uuidString
+            let failed = Date().addingTimeInterval(-10)
+            service.noteHookEvent(WorkstreamEvent(
+                sessionId: session, hookEventName: .userPromptSubmit, source: "claude",
+                surfaceId: panelId.uuidString, receivedAt: failed.addingTimeInterval(-5)
+            ))
+            workspace.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .needsInput)
+            workspace.setStatusEntry(
+                SidebarStatusEntry(
+                    key: "claude_code",
+                    value: "Usage limit",
+                    icon: "exclamationmark.triangle.fill",
+                    color: "#FF453A",
+                    timestamp: failed
+                ),
+                key: "claude_code",
+                panelId: panelId
+            )
+            workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+
+            workspace.applyProgramStatus(ProgramStatusReport(state: .error, app: "claude-code"), panelId: panelId)
+
+            // The settlement ran: it settles the chat session before it looks at the row.
+            #expect(await Self.waitUntil { service.sessionRecord(sessionID: session)?.state == .idle })
+            #expect(workspace.agentLifecycleStatesByPanelId[panelId]?["claude_code"] == .needsInput)
+            #expect(workspace.agentStatusEntriesByPanelId[panelId]?["claude_code"]?.value == "Usage limit")
+        }
+    }
+
     /// Runs `body` with a private agent chat service as the app's, and the settlement grace skipped.
     private func withChatService(_ body: (AgentChatTranscriptService) async throws -> Void) async throws {
         let home = FileManager.default.temporaryDirectory
