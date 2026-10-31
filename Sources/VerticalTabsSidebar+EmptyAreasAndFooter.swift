@@ -377,6 +377,24 @@ struct SidebarCloudButton: View {
     }
 }
 
+/// The running version, shown as plain text right of Help.
+struct SidebarVersionLabel: View {
+    private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+
+    var body: some View {
+        if let version, !version.isEmpty {
+            Text(verbatim: "v\(version)")
+                .font(.system(size: 11, weight: .regular).monospacedDigit())
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 5)
+                .frame(height: SidebarFooterButtonMetrics.buttonSize)
+                .accessibilityIdentifier("SidebarVersionLabel")
+        }
+    }
+}
+
 private struct SidebarFooterIconButtonStyleBody: View {
     let configuration: SidebarFooterIconButtonStyle.Configuration
 
