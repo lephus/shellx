@@ -403,6 +403,157 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertEqual(calls, [])
     }
 
+    // MARK: - Closing an agent
+
+    private func sessionRef(_ mac: FakeMac, _ sessionId: String = "s1") -> SessionRef {
+        SessionRef(machineID: mac.machine.machineID, sessionId: sessionId, agent: "claude", workspaceTitle: "shellx")
+    }
+
+    private func focus(_ hub: MachineHub) -> HomeFocus {
+        HomeFocus.make(sessions: hub.reachableSessions, pending: [], finished: hub.finishTimes, now: Date())
+    }
+
+    private func sessionState(_ hub: MachineHub, _ sessionId: String) -> AgentState? {
+        hub.reachableSessions.first { $0.session.sessionId == sessionId }?.session.state
+    }
+
+    func testCloseAgentCallsTheMacAndTheSessionEnds() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        await mac.upsertSession(agentSession("s1", state: .working))
+        let hub = try await makeHub(mac)
+        let running = await eventually { isOnline(hub) && focus(hub).running.map(\.session.session.sessionId) == ["s1"] }
+        XCTAssertTrue(running)
+
+        let closed = await hub.closeAgent(sessionRef(mac))
+
+        XCTAssertEqual(closed, .ok(workspaceId: nil))
+        let calls = await mac.agentCloses
+        XCTAssertEqual(calls, ["s1"])
+        // The Mac reports the session ended, the way its liveness sweep does: it leaves Running for Ended.
+        let ended = await eventually { sessionState(hub, "s1") == .ended }
+        XCTAssertTrue(ended, "\(String(describing: sessionState(hub, "s1")))")
+        let afterwards = focus(hub)
+        XCTAssertEqual(afterwards.running.map(\.session.session.sessionId), [])
+        XCTAssertEqual(afterwards.ended.map(\.session.session.sessionId), ["s1"])
+    }
+
+    func testCloseAgentOutcomesMapToResults() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        await mac.upsertSession(agentSession("s1", state: .working))
+        let hub = try await makeHub(mac)
+        let up = await eventually { isOnline(hub) && sessionState(hub, "s1") == .working }
+        XCTAssertTrue(up)
+
+        let expected: [(WorkspaceControlOutcome, WorkspaceCommandResult)] = [
+            (.notFound, .notFound), (.refused, .refused), (.failed, .failed),
+            // An outcome from a newer Mac: it answered, but what it did is not known.
+            (.other("queued"), .unknown),
+        ]
+        for (outcome, result) in expected {
+            await mac.setNextAgentCloseOutcome(outcome)
+            let closed = await hub.closeAgent(sessionRef(mac))
+            XCTAssertEqual(closed, result, "close \(outcome)")
+        }
+
+        let calls = await mac.agentCloses
+        XCTAssertEqual(calls, ["s1", "s1", "s1", "s1"])
+        // None of them was an `ok`: the session still runs.
+        XCTAssertEqual(sessionState(hub, "s1"), .working)
+    }
+
+    func testRealNotFoundForASessionTheMacDoesNotHave() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.upsertSession(agentSession("s1", state: .ended))
+        let hub = try await makeHub(mac)
+        let up = await eventually { isOnline(hub) && sessionState(hub, "s1") == .ended }
+        XCTAssertTrue(up)
+
+        let unknown = await hub.closeAgent(sessionRef(mac, "s-gone"))
+        let ended = await hub.closeAgent(sessionRef(mac))
+
+        XCTAssertEqual([unknown, ended], [.notFound, .notFound])
+    }
+
+    func testCloseAgentWithoutTheFeatureIsFailedWithoutCalling() async throws {
+        let mac = FakeMac(name: "Old Mac", acceptsAgentClose: false)
+        await mac.upsertSession(agentSession("s1", state: .working))
+        let hub = try await makeHub(mac)
+        let up = await eventually { isOnline(hub) && sessionState(hub, "s1") == .working }
+        XCTAssertTrue(up)
+
+        let closed = await hub.closeAgent(sessionRef(mac))
+
+        XCTAssertEqual(closed, .failed, "nothing is sent to a Mac that takes no agent control")
+        let calls = await mac.agentCloses
+        XCTAssertEqual(calls, [])
+        XCTAssertEqual(sessionState(hub, "s1"), .working)
+    }
+
+    func testCloseAgentOfflineMacIsOffline() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.failNextConnects(URLError(.notConnectedToInternet), count: 1000)
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(mac, sleep: sleeper.sleep)
+        let down = await eventually {
+            if case .offline = hub.machines.first?.state { return true }
+            return false
+        }
+        XCTAssertTrue(down)
+
+        let closed = await hub.closeAgent(sessionRef(mac))
+        let unknownMac = await hub.closeAgent(SessionRef(machineID: "mac-nobody", sessionId: "s1", agent: "claude", workspaceTitle: "shellx"))
+
+        XCTAssertEqual([closed, unknownMac], [.offline, .offline])
+        let calls = await mac.agentCloses
+        XCTAssertEqual(calls, [])
+    }
+
+    func testCloseAgentIsSentOnce() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.upsertSession(agentSession("s1", state: .working))
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(mac, sleep: sleeper.sleep)
+        let up = await eventually { isOnline(hub) && sessionState(hub, "s1") == .working }
+        XCTAssertTrue(up)
+        await mac.holdWorkspaceControl()
+
+        let call = Task { await hub.closeAgent(sessionRef(mac)) }
+        let received = await eventually { await mac.agentCloses == ["s1"] }
+        XCTAssertTrue(received)
+        // The host waits for its held call before it lets the session go: drop from the side.
+        let drop = Task { await mac.dropLiveSessions() }
+        let result = await call.value
+        await mac.releaseWorkspaceControl()
+        await drop.value
+
+        XCTAssertEqual(result, .unknown)
+        // The Mac did act (the session ended); the phone finds out from the list, not by retrying.
+        sleeper.release()
+        let back = await eventually { isOnline(hub) && sessionState(hub, "s1") == .ended }
+        XCTAssertTrue(back, "\(String(describing: sessionState(hub, "s1")))")
+        let calls = await mac.agentCloses
+        XCTAssertEqual(calls.count, 1)
+    }
+
+    func testSupportsAgentCloseFollowsTheFeature() async throws {
+        let withClose = FakeMac(name: "New Mac")
+        let without = FakeMac(name: "Old Mac", acceptsAgentClose: false)
+
+        let hubA = try await makeHub(withClose)
+        let hubB = try await makeHub(without)
+        let aUp = await eventually { isOnline(hubA) }
+        let bUp = await eventually { isOnline(hubB) }
+        XCTAssertTrue(aUp && bUp)
+
+        XCTAssertTrue(hubA.supportsAgentClose(withClose.machine.machineID))
+        XCTAssertFalse(hubB.supportsAgentClose(without.machine.machineID))
+        XCTAssertFalse(hubA.supportsAgentClose("mac-nobody"))
+        // The two features are separate: the old Mac still takes workspace control.
+        XCTAssertTrue(hubB.supportsWorkspaceControl(without.machine.machineID))
+    }
+
     // MARK: - Sessions no terminal names
 
     func testOtherSessionsExcludeChippedOnes() async throws {
