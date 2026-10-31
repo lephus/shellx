@@ -5,6 +5,7 @@ import SwiftUI
 /// Mac's workspaces and the sessions of the reachable Macs (sorted by `HomeFocus` every 30 seconds, so
 /// "just finished" and "ended" age out with the screen open), the decision center what waits for the
 /// user; the actions push screens through `open` and run the workspace commands (`WorkspaceListActions`).
+/// The sessions removed from this phone (`SignedInScope.goneRemovals`) are in no group and no count.
 ///
 /// It also registers where a session opens (`SessionRef`): the home's agent cards push them, and so
 /// do the session lists over it.
@@ -20,23 +21,27 @@ struct WorkspaceListView: View {
         let hub = scope.hub
         // Read here, not in the closure: the hub is observed whatever SwiftUI does with the closure.
         let pending = scope.decisions.visibleItems(hub.pendingItems)
-        let groups = Self.groups(hub)
+        let removed = scope.goneRemovals.removals
+        let groups = Self.groups(hub, removed: removed)
         let sessions = hub.reachableSessions
         let finishTimes = hub.finishTimes
         let dismissed = scope.endedDismissals.dismissals
         let showsMachineNames = hub.machines.count > 1
         let closableAgents = Self.closableAgents(hub)
+        let removableAgents = Self.removableAgents(scope)
         TimelineView(.periodic(from: .now, by: 30)) { context in
             WorkspaceListScreen(
                 groups: groups,
                 focus: HomeFocus.make(
-                    sessions: sessions, pending: pending, finished: finishTimes, dismissed: dismissed, now: context.date),
+                    sessions: sessions, pending: pending, finished: finishTimes, dismissed: dismissed, removed: removed,
+                    now: context.date),
                 pending: pending,
                 creating: creating,
                 notice: scope.listNotice.current,
                 now: context.date,
                 showsMachineNames: showsMachineNames,
                 closableAgents: closableAgents,
+                removableAgents: removableAgents,
                 actions: WorkspaceListActions.make(
                     scope: scope, open: open, alert: { alert = $0 },
                     creating: Binding(get: { creating }, set: { creating = $0 })),
@@ -57,8 +62,10 @@ struct WorkspaceListView: View {
         }
     }
 
-    /// The hub's Macs as groups, the default Mac first and the others in the order they were paired.
-    static func groups(_ hub: MachineHub) -> [WorkspaceGroup] {
+    /// The hub's Macs as groups, the default Mac first and the others in the order they were paired. A Mac's
+    /// "Agents outside workspaces · N" counts the sessions its page lists (`OtherSessionsView.sessions`): none
+    /// that `removed` hides.
+    static func groups(_ hub: MachineHub, removed: GoneRemovals) -> [WorkspaceGroup] {
         let defaultID = hub.defaultMachineID
         let models = hub.machines.filter { $0.id == defaultID } + hub.machines.filter { $0.id != defaultID }
         return models.map { model in
@@ -67,7 +74,7 @@ struct WorkspaceListView: View {
                 rows: hub.workspaceRows(machineID: model.id), allowsControl: hub.supportsWorkspaceControl(model.id),
                 // A Mac not online yet has not said what it lists: no "update ShellX" before it has.
                 listsWorkspaces: model.workspacesSupported || model.state != .online,
-                otherSessionCount: hub.otherSessions(machineID: model.id).count)
+                otherSessionCount: OtherSessionsView.sessions(hub: hub, machineID: model.id, removed: removed).count)
         }
     }
 
@@ -75,6 +82,13 @@ struct WorkspaceListView: View {
     /// online now. Like a workspace card's Rename and Close, none for a Mac that is away.
     static func closableAgents(_ hub: MachineHub) -> Set<SessionRef> {
         Set(hub.reachableSessions.filter { $0.online && WorkspaceListActions.canClose($0, hub: hub) }.map(\.ref))
+    }
+
+    /// The agents whose cards swipe to "Remove from This Phone": the ones an agent screen saw answered
+    /// `not_found` this run, while their Mac reports them as it did then (`GoneRemovalStore.canRemove`). A
+    /// live session never is one.
+    static func removableAgents(_ scope: SignedInScope) -> Set<SessionRef> {
+        scope.goneRemovals.removable(scope.hub.reachableSessions)
     }
 }
 
@@ -86,7 +100,9 @@ struct WorkspaceListView: View {
 ///   what follows: a new workspace opens, a gone one refreshes the list, anything else is an alert;
 /// - a confirmed Close on an agent card closes the agent (`closeAgent(_:hub:alert:done:)`, which the
 ///   other screens' Close goes through too). The workspace screen closes any tab through
-///   `closeTab(machineID:workspaceId:terminalId:hub:alert:done:)`.
+///   `closeTab(machineID:workspaceId:terminalId:hub:alert:done:)`;
+/// - "Remove from This Phone" on a card hides the session on this phone (`GoneRemovalStore.remove`, as the
+///   agent screen and the outside-workspace list do); nothing goes to the Mac.
 @MainActor
 enum WorkspaceListActions {
     /// `done` gets the task of each command, so a caller (a test) can wait for it. `creating` is set
@@ -131,6 +147,9 @@ enum WorkspaceListActions {
                 run(.close, machineID: ref.machineID) { await hub.closeWorkspace(ref) }
             },
             closeAgent: { ref in closeAgent(ref, hub: hub, alert: alert, done: done) },
+            removeFromPhone: { session in
+                withAnimation(.easeInOut(duration: 0.2)) { scope.goneRemovals.remove(session) }
+            },
             openPending: { open(.pending) },
             openSettings: { open(.settings) },
             openMachines: { open(.machines) },

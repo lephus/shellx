@@ -79,7 +79,8 @@ enum AppComposition {
     }
 
     /// One sign-in's scope over `hub`; each agent's chat copy lives in `history`, and the ended sessions
-    /// the user takes off the Ended page are kept in `defaults`. `voice` nil shows no mic.
+    /// the user takes off the Ended page and the gone ones removed from this phone are kept in `defaults`.
+    /// `voice` nil shows no mic.
     static func makeScope(
         hub: MachineHub, history: ConversationStore, latency: LatencyLog, launch: LaunchMark, pairing: PairingModel,
         defaults: UserDefaults = .standard, voice: VoiceService? = nil
@@ -88,7 +89,8 @@ enum AppComposition {
             hub: hub,
             decisions: DecisionCenter(sender: hub, latency: latency, sleep: { try await Task.sleep(for: $0) }),
             pairing: pairing, history: history, launch: launch,
-            endedDismissals: EndedDismissalStore(defaults: defaults), voice: voice)
+            endedDismissals: EndedDismissalStore(defaults: defaults),
+            goneRemovals: GoneRemovalStore(defaults: defaults), voice: voice)
     }
 
     /// The `UserDefaults` flag that says the merged chat's files are gone.

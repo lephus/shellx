@@ -9,7 +9,10 @@ import SwiftUI
 ///
 /// Standalone, its `•••` offers "Close Agent" while the session has not ended and its Mac takes
 /// `agent.close`; the close goes through `WorkspaceListActions.closeAgent`, and an alert says why one did
-/// not work.
+/// not work. Once its Mac answered `not_found` for a session it still lists (`AgentThreadModel.ghost`), the
+/// screen tells the scope (the session's cards then swipe to "Remove from This Phone"), and standalone it
+/// offers "Remove from This Phone" under the gone line and in `•••`: that hides the session on this phone
+/// (`GoneRemovalStore`), nothing goes to the Mac, and the screen goes back.
 ///
 /// The composer offers attachments when the session's Mac takes them, or while some wait in it. A
 /// message with attachments stays in the composer, locked, until the Mac answers; what went is
@@ -27,6 +30,7 @@ struct AgentView: View {
     /// Why the last Close Agent did not work.
     @State private var alert: WorkspaceAlert?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
 
     /// How long a notice over the composer stays.
     static let noticeDuration: Duration = .seconds(4)
@@ -67,6 +71,7 @@ struct AgentView: View {
             closeAgentName: embedded
                 ? nil
                 : session.flatMap { WorkspaceListActions.canClose($0, hub: hub) ? SessionName.base(of: $0.session) : nil },
+            canRemoveFromPhone: Self.removable(model, embedded: embedded) != nil,
             actions: AgentScreen.Actions(
                 send: { send($0, attachments: $1, viaVoice: false) },
                 sendVoice: { send($0, attachments: [], viaVoice: true) },
@@ -75,10 +80,13 @@ struct AgentView: View {
                 loadOlder: { Task { await model.loadOlder() } },
                 retry: { Task { await model.retry() } },
                 seeAllPending: { openPending() },
-                closeAgent: { WorkspaceListActions.closeAgent(model.ref, hub: hub, alert: { alert = $0 }) })
+                closeAgent: { WorkspaceListActions.closeAgent(model.ref, hub: hub, alert: { alert = $0 }) },
+                removeFromPhone: { removeFromPhone() })
         )
         .workspaceAlert($alert)
         .task { await model.run() }
+        // Also when the Mac reports the ghost otherwise: the swipe follows what the Mac reports now.
+        .onChange(of: model.ghost, initial: true) { Self.noteGone(model, in: scope) }
         .task(id: notice?.id) {
             guard notice != nil else { return }
             do { try await Task.sleep(for: Self.noticeDuration) } catch { return }
@@ -105,6 +113,27 @@ struct AgentView: View {
             }
             show(Self.text(for: result, ref: model.ref, machineName: model.machineName))
         }
+    }
+
+    /// The session "Remove from This Phone" takes off, while the screen offers it: standalone (a workspace's
+    /// pane offers none) and its Mac answered `not_found` for a session it still lists
+    /// (`AgentThreadModel.ghost`). Nil for a live session, always.
+    static func removable(_ model: AgentThreadModel, embedded: Bool) -> MachineSession? {
+        embedded ? nil : model.ghost
+    }
+
+    /// Tells the scope the screen's session is gone from its Mac, once its Mac answered `not_found` for a
+    /// session it still lists: its cards on the home and the outside-workspace list swipe to "Remove from
+    /// This Phone" while the Mac reports it so. A pane of the workspace screen tells it too.
+    static func noteGone(_ model: AgentThreadModel, in scope: SignedInScope) {
+        if let ghost = model.ghost { scope.goneRemovals.noteGone(ghost) }
+    }
+
+    /// Hides the gone session on this phone and goes back: the list the screen came from no longer has it.
+    private func removeFromPhone() {
+        guard let ghost = Self.removable(model, embedded: embedded) else { return }
+        scope.goneRemovals.remove(ghost)
+        dismiss()
     }
 
     /// The page of this workspace's pending cards: the same ones the bar counts (`pendingHere`).

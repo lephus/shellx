@@ -99,6 +99,13 @@ public final class AgentThreadModel {
         return machine.sessions.session(ref.sessionId) == nil
     }
 
+    /// The session as its Mac still lists it, once the Mac answered `not_found` for it: a ghost the phone's
+    /// lists would keep showing, which the user may remove from this phone (`GoneRemovalStore`). Nil for a
+    /// session the Mac never answered `not_found` for, and for one its list leaves out (no list shows it).
+    public var ghost: MachineSession? {
+        answeredNotFound ? session : nil
+    }
+
     /// The pending requests of this session's workspace on its Mac, oldest first.
     public var pendingHere: [MachinePendingItem] {
         guard let workspaceId = session?.session.workspaceId else { return [] }

@@ -58,7 +58,8 @@ struct WorkspaceGroup: Identifiable, Equatable {
 ///   of the online Macs when there are several) and Settings.
 /// - "Needs you · N", "Running · N" and "Just finished · N": a `FocusRowView` card per session, each
 ///   group only while it has some; "No agent is running" when all three are empty. A card opens its
-///   session; swipe it to the left for Close (agents in `closableAgents`), which asks first.
+///   session; swipe it to the left for Close (agents in `closableAgents`), which asks first, and for
+///   "Remove from This Phone" (sessions gone from their Mac, in `removableAgents`), which does not.
 /// - "Workspaces": one group per Mac, the default Mac first: its header (opens "Your Macs"), then a
 ///   one-line card per workspace in the Mac's order, then "Agents outside workspaces · N" when some
 ///   live sessions have no card. A Mac that cannot list workspaces says so in a card; an offline one
@@ -78,6 +79,8 @@ struct WorkspaceListScreen: View {
         var close: (WorkspaceRef) -> Void = { _ in }
         /// Confirmed: close the terminal tab the agent runs in on its Mac.
         var closeAgent: (SessionRef) -> Void = { _ in }
+        /// Hide a session gone from its Mac on this phone; nothing is sent to the Mac.
+        var removeFromPhone: (MachineSession) -> Void = { _ in }
         var openPending: () -> Void = {}
         var openSettings: () -> Void = {}
         var openMachines: () -> Void = {}
@@ -103,6 +106,9 @@ struct WorkspaceListScreen: View {
     var showsMachineNames = false
     /// The agents the phone can close now (`WorkspaceListView.closableAgents`): their cards swipe to Close.
     var closableAgents: Set<SessionRef> = []
+    /// The sessions gone from their Mac the phone can remove (`WorkspaceListView.removableAgents`): their cards
+    /// swipe to "Remove from This Phone".
+    var removableAgents: Set<SessionRef> = []
     var actions = Actions()
     /// Why the last command did not work; the screen shows it until it is dismissed.
     @Binding var alert: WorkspaceAlert?
@@ -274,6 +280,14 @@ struct WorkspaceListScreen: View {
                             Label(String(localized: "agent.close"), systemImage: "xmark")
                         }
                         .tint(Color("StatusError"))
+                    }
+                    if removableAgents.contains(item.id) {
+                        // `.destructive`: nothing is asked, so the row may go as soon as it is tapped.
+                        Button(role: .destructive) {
+                            actions.removeFromPhone(item.session)
+                        } label: {
+                            Label(String(localized: "agent.removeFromPhone"), systemImage: "trash")
+                        }
                     }
                 }
             }

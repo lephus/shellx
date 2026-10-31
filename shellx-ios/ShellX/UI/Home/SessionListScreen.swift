@@ -7,8 +7,9 @@ import SwiftUI
 ///
 /// It is laid out as the home is: a plain list with the same room around a card
 /// (`WorkspaceListScreen.cardInsets`) and no gap over the first one. With `remove` each card has a trash
-/// button at its right edge, and swiping the card to the left does the same. No card offers Close: neither
-/// page holds an agent the Mac can close for the phone.
+/// button at its right edge, and swiping the card to the left does the same. A card in `removableGone` (a
+/// session gone from its Mac) swipes to "Remove from This Phone" (`removeGone`). No card offers Close:
+/// neither page holds an agent the Mac can close for the phone.
 struct SessionListScreen: View {
     let title: String
     /// Over the cards, e.g. a Mac's name; none for a list that spans the Macs.
@@ -22,10 +23,16 @@ struct SessionListScreen: View {
     let empty: LocalizedStringResource
     /// Takes a card off the list; nil draws no trash.
     let remove: ((FocusItem) -> Void)?
+    /// The cards whose session is gone from its Mac and may leave this phone (`GoneRemovalStore.removable`):
+    /// they swipe to "Remove from This Phone".
+    let removableGone: Set<SessionRef>
+    /// Hides a card in `removableGone` on this phone; nothing is sent to the Mac.
+    let removeGone: (FocusItem) -> Void
 
     init(
         title: String, header: String?, items: [FocusItem], kind: @escaping (FocusItem) -> FocusRowView.Kind,
-        now: Date, showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil
+        now: Date, showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil,
+        removableGone: Set<SessionRef> = [], removeGone: @escaping (FocusItem) -> Void = { _ in }
     ) {
         self.title = title
         self.header = header
@@ -35,16 +42,20 @@ struct SessionListScreen: View {
         self.showsMachineName = showsMachineName
         self.empty = empty
         self.remove = remove
+        self.removableGone = removableGone
+        self.removeGone = removeGone
     }
 
     /// Every card in the same group.
     init(
         title: String, header: String?, items: [FocusItem], kind: FocusRowView.Kind, now: Date,
-        showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil
+        showsMachineName: Bool, empty: LocalizedStringResource, remove: ((FocusItem) -> Void)? = nil,
+        removableGone: Set<SessionRef> = [], removeGone: @escaping (FocusItem) -> Void = { _ in }
     ) {
         self.init(
             title: title, header: header, items: items, kind: { _ in kind }, now: now,
-            showsMachineName: showsMachineName, empty: empty, remove: remove)
+            showsMachineName: showsMachineName, empty: empty, remove: remove, removableGone: removableGone,
+            removeGone: removeGone)
     }
 
     /// The trash button's square: a touch target of 44 points at the card's right edge, which the card's
@@ -99,6 +110,13 @@ struct SessionListScreen: View {
                                 remove(item)
                             } label: {
                                 Label(String(localized: "ended.remove"), systemImage: "trash")
+                            }
+                        }
+                        if removableGone.contains(item.id) {
+                            Button(role: .destructive) {
+                                removeGone(item)
+                            } label: {
+                                Label(String(localized: "agent.removeFromPhone"), systemImage: "trash")
                             }
                         }
                     }

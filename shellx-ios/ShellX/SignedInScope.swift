@@ -1,8 +1,8 @@
 import ShellXAppCore
 
 /// What the signed-in account's screens share: its hub, the decision center, the pairing model, the
-/// history store and the sweeper of its stale copies, the voice input, the count of open sheets and the
-/// ended sessions taken off the Ended list.
+/// history store and the sweeper of its stale copies, the voice input, the count of open sheets, the
+/// ended sessions taken off the Ended list and the sessions gone from their Mac removed from this phone.
 /// Made with the hub at every sign-in (`AppComposition`) and dropped with it.
 @MainActor
 final class SignedInScope {
@@ -21,12 +21,15 @@ final class SignedInScope {
     let listNotice = ListNotice()
     /// The ended sessions the user took off the Ended page; the home's "Ended" fold leaves them out too.
     let endedDismissals: EndedDismissalStore
+    /// The sessions gone from their Mac that the user removed from this phone (every list and count of
+    /// sessions leaves them out: `GoneRemovals.shown`), and the ones an agent screen saw gone this run.
+    let goneRemovals: GoneRemovalStore
     private let launch: LaunchMark
 
     init(
         hub: MachineHub, decisions: DecisionCenter, pairing: PairingModel, history: ConversationStore,
-        launch: LaunchMark, endedDismissals: EndedDismissalStore, voice: VoiceService? = nil,
-        sheets: SheetPresence = SheetPresence()
+        launch: LaunchMark, endedDismissals: EndedDismissalStore, goneRemovals: GoneRemovalStore,
+        voice: VoiceService? = nil, sheets: SheetPresence = SheetPresence()
     ) {
         self.hub = hub
         self.decisions = decisions
@@ -35,6 +38,7 @@ final class SignedInScope {
         chatCopies = ChatCopySweeper(hub: hub, store: history)
         self.launch = launch
         self.endedDismissals = endedDismissals
+        self.goneRemovals = goneRemovals
         self.voice = voice
         self.sheets = sheets
     }

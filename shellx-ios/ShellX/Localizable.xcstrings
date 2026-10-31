@@ -4549,6 +4549,24 @@
           }
         }
       }
+    },
+    "agent.removeFromPhone": {
+      "comment": "Button under \"This session is gone from the Mac\" on an agent screen, item of its ••• menu (shown red) and swipe action on the card of such a session (home, Agents outside workspaces): hide the session on this phone only. Nothing is sent to the Mac and nothing is asked; the session shows again when its Mac reports a change.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from This Phone"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ khỏi điện thoại"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

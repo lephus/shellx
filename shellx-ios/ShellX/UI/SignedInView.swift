@@ -57,9 +57,9 @@ struct SignedInView: View {
                 case let .workspace(ref):
                     WorkspaceView(scope: scope, ref: ref, open: { path.append($0) })
                 case let .otherSessions(machineID):
-                    OtherSessionsView(hub: hub, machineID: machineID)
+                    OtherSessionsView(hub: hub, removals: scope.goneRemovals, machineID: machineID)
                 case .ended:
-                    EndedSessionsView(hub: hub, dismissals: scope.endedDismissals)
+                    EndedSessionsView(hub: hub, dismissals: scope.endedDismissals, removals: scope.goneRemovals)
                 }
             }
         }

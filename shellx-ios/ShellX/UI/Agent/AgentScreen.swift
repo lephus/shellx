@@ -5,11 +5,14 @@ import SwiftUI
 /// from `AgentThreadModel`, the hub and the decision center.
 ///
 /// - Navigation bar: the workspace, "Stop" while the session works or waits for the user, and `•••` with
-///   "Close Agent" (red; it asks first) while the agent can be closed (`closeAgentName`). Embedded as a
-///   workspace screen's pane (`embedded`) it has no navigation bar of its own: the screen around it has
-///   one, with "Close Tab…" for the agent's tab in its `•••`, and "Stop" sits at the end of the header.
-/// - Top, pinned: the header ("Claude Code · Mac", state) and, while this workspace has pending
-///   requests, the "Needs you · N" bar that opens them on their own page.
+///   "Close Agent" (red; it asks first) while the agent can be closed (`closeAgentName`), and "Remove from
+///   This Phone" (red; nothing is asked) while the session is gone from its Mac (`canRemoveFromPhone`).
+///   Embedded as a workspace screen's pane (`embedded`) it has no navigation bar of its own: the screen
+///   around it has one, with "Close Tab…" for the agent's tab in its `•••`, and "Stop" sits at the end of
+///   the header.
+/// - Top, pinned: the header ("Claude Code · Mac", state), "Remove from This Phone" under the gone line
+///   while `canRemoveFromPhone` (standalone only) and, while this workspace has pending requests, the
+///   "Needs you · N" bar that opens them on their own page.
 /// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries. It follows
 ///   new entries only while its bottom shows; otherwise "New messages ↓" offers to jump down. A tap
 ///   on it closes the keyboard.
@@ -31,6 +34,8 @@ struct AgentScreen: View {
         var seeAllPending: () -> Void = {}
         /// Close Agent, once confirmed: closes the terminal tab the agent runs in on its Mac.
         var closeAgent: () -> Void = {}
+        /// Remove from This Phone: hides the session gone from its Mac on this phone, then goes back.
+        var removeFromPhone: () -> Void = {}
     }
 
     /// Where the chat's bottom sentinel sits, to scroll to.
@@ -72,6 +77,10 @@ struct AgentScreen: View {
     /// listed tab names it and its Mac takes `agent.close` (`WorkspaceListActions.canClose`). Nil shows no
     /// `•••`; standalone only.
     var closeAgentName: String? = nil
+    /// The Mac answered `not_found` for this session, which it still lists (`AgentThreadModel.ghost`): the
+    /// screen offers "Remove from This Phone" under the gone line and in `•••`. Standalone only; never for a
+    /// live session.
+    var canRemoveFromPhone = false
     var actions = Actions()
 
     @State private var confirmsForceStop = false
@@ -82,6 +91,17 @@ struct AgentScreen: View {
     @State private var olderAnchor: String?
 
     private var agent: String { AgentLabel(agent: ref.agent).text }
+    /// A pane of the workspace screen offers no Remove from This Phone: it shows a tab of the Mac's.
+    private var offersRemove: Bool { canRemoveFromPhone && !embedded }
+
+    /// `•••` while it holds something: Close Agent while the agent can be closed, Remove from This Phone
+    /// while it is offered.
+    private var menu: AgentMenu? {
+        guard closeAgentName != nil || offersRemove else { return nil }
+        let close: (() -> Void)? = closeAgentName.map { name in { closing = name } }
+        return AgentMenu(
+            online: !offline, closeAgent: close, removeFromPhone: offersRemove ? actions.removeFromPhone : nil)
+    }
 
     var body: some View {
         conversation
@@ -92,9 +112,7 @@ struct AgentScreen: View {
             NavigationChrome(
                 enabled: !embedded, title: ref.workspaceTitle,
                 stop: canStop ? StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true }) : nil,
-                menu: closeAgentName.map { name in
-                    AgentMenu(enabled: !offline, closeAgent: { closing = name })
-                })
+                menu: menu)
         )
         .confirmationDialog(
             Text(verbatim: String(localized: "agent.forceStop.title \(agent) \(ref.workspaceTitle)")),
@@ -120,6 +138,9 @@ struct AgentScreen: View {
                 if embedded, canStop {
                     StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true })
                 }
+            }
+            if offersRemove {
+                RemoveFromPhoneButton(remove: actions.removeFromPhone)
             }
             if !pending.isEmpty {
                 NeedsYouBar(items: pending, showsMachineName: showsMachineName, open: actions.seeAllPending)
@@ -320,21 +341,56 @@ private struct NavigationChrome: ViewModifier {
     }
 }
 
-/// `•••` in the agent screen's toolbar: "Close Agent", red, which asks to confirm first (the owner presents
-/// the confirmation; HIG: Pull-down buttons). Off while the Mac is not online.
+extension AgentScreen {
+    /// "Remove from This Phone" under the header's "This session is gone from the Mac": hides the session on
+    /// this phone at once (nothing is asked: nothing stops on the Mac, and the session shows again when its
+    /// Mac reports a change).
+    struct RemoveFromPhoneButton: View {
+        let remove: () -> Void
+
+        var body: some View {
+            Button(action: remove) {
+                Label(String(localized: "agent.removeFromPhone"), systemImage: "trash")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .tint(Color("AccentText"))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("agent.removeFromPhone")
+        }
+    }
+}
+
+/// `•••` in the agent screen's toolbar (HIG: Pull-down buttons): "Close Agent", red, which asks to confirm
+/// first (the owner presents the confirmation) and is off while the Mac is not online; and "Remove from This
+/// Phone", red, at once, also while the Mac is away (nothing reaches it). Off when nothing in it works.
 private struct AgentMenu: View {
-    let enabled: Bool
-    let closeAgent: () -> Void
+    /// The Mac is online: Close Agent reaches it.
+    let online: Bool
+    /// Close Agent; nil when the agent cannot be closed.
+    let closeAgent: (() -> Void)?
+    /// Remove from This Phone; nil unless the session is gone from its Mac.
+    let removeFromPhone: (() -> Void)?
 
     var body: some View {
         Menu {
-            Button(role: .destructive, action: closeAgent) {
-                Label(String(localized: "agent.close.menu"), systemImage: "xmark")
+            if let closeAgent {
+                Button(role: .destructive, action: closeAgent) {
+                    Label(String(localized: "agent.close.menu"), systemImage: "xmark")
+                }
+                .disabled(!online)
+            }
+            if let removeFromPhone {
+                Button(role: .destructive, action: removeFromPhone) {
+                    Label(String(localized: "agent.removeFromPhone"), systemImage: "trash")
+                }
             }
         } label: {
             Label(String(localized: "agent.menu"), systemImage: "ellipsis.circle")
         }
-        .disabled(!enabled)
+        .disabled(!online && removeFromPhone == nil)
         .accessibilityIdentifier("agent.menu")
     }
 }

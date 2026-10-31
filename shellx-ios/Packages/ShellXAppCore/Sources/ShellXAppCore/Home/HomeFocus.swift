@@ -50,12 +50,16 @@ public struct HomeFocus: Equatable, Sendable {
     ///   (`endedMs(of:)`); with neither the session is hidden. A negative age (the Mac's clock is ahead)
     ///   counts as 0. A session in `dismissed` (the user took it off the list) is left out too.
     ///
+    /// A session `removed` hides (gone from its Mac, removed from this phone: `GoneRemovals.shown`) is in
+    /// no group, counts in none and takes no request: the sorting runs over the others only.
+    ///
     /// The first three lists are newest activity first, then by (machineID, sessionId). Names are distinct
     /// across those three together; Ended has its own pass.
     public static func make(
         sessions: [MachineSession], pending: [MachinePendingItem], finished: [String: [String: Date]],
-        dismissed: EndedDismissals = .none, now: Date, timeZone: TimeZone = .current
+        dismissed: EndedDismissals = .none, removed: GoneRemovals = .none, now: Date, timeZone: TimeZone = .current
     ) -> HomeFocus {
+        let sessions = removed.shown(sessions)
         var waiting = Set(sessions.filter { $0.session.state == .needsInput }.map(\.ref))
         var questions: [SessionRef: String] = [:]
         for request in pending {
