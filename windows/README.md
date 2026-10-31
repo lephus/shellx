@@ -2,7 +2,9 @@
 
 A native Windows terminal for ShellX: GPUI window (Direct3D 11 + DirectWrite), libghostty-vt
 grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.5.3
-(unsigned). Dark theme only; UI text is Vietnamese by default.
+(unsigned). Dark theme only; the UI language follows the Windows display language
+(Vietnamese on a Vietnamese Windows, English otherwise; `SHELLX_LANG` overrides it, see
+[Command line](#command-line)).
 
 It is a separate app from the Flutter ShellX for Windows and installs next to it.
 
@@ -74,7 +76,7 @@ Environment variables:
 | Variable | Effect |
 |---|---|
 | `SHELLX_LANG` | Overrides the UI language: a value starting with `en` is English, one starting with `vi` is Vietnamese. Anything else or unset follows the Windows display language (Vietnamese on a Vietnamese Windows, English otherwise, and English on a Mac) |
-| `SHELLX_SHELL` | Program to start in new local panes instead of `powershell.exe -NoLogo` (no arguments) |
+| `SHELLX_SHELL` | Program to start in new local panes instead of the default PowerShell, which runs as `powershell.exe -NoLogo -NoExit -Command <prompt hook>` (the hook wraps your `prompt` and reports the working directory with OSC 7). The override gets no arguments and no hook, so sidebar cards show no directory or branch for it |
 | `SHELLX_API_BASE` | API base URL for `config.set`; honored in debug builds only. Release builds always use `https://relay.shellx.pro` |
 
 ## State directories
@@ -91,22 +93,34 @@ Uninstalling ShellX removes the program; the `native\` state is kept.
 
 ## Keyboard shortcuts
 
-Terminal keys follow Windows Terminal; plain `Ctrl+C` / `Ctrl+V` go to the shell.
+Terminal keys follow Windows Terminal; plain `Ctrl+C` / `Ctrl+V` go to the shell (and so
+does every other plain `Ctrl+letter`, for example `Ctrl+N` and `Ctrl+T`).
+
+A workspace is a card in the sidebar; a terminal tab is a tab in the tab bar of one split
+region of a workspace.
 
 | Shortcut | Action |
 |---|---|
 | `Ctrl+Shift+C` | Copy selection |
 | `Ctrl+C` | Copy only while a selection exists; otherwise interrupt (sent to the shell) |
 | `Ctrl+Shift+V`, `Shift+Insert` | Paste |
-| `Ctrl+Shift+T` | New tab |
-| `Ctrl+Shift+W` | Close pane (last pane of last tab opens a fresh local tab) |
-| `Ctrl+Tab`, `Ctrl+PageDown` | Next tab |
-| `Ctrl+Shift+Tab`, `Ctrl+PageUp` | Previous tab |
+| `Ctrl+Shift+N` | New workspace (a local PowerShell) |
+| `Ctrl+Shift+T` | New terminal tab in the focused region. In a region that shows a Mac terminal it opens another terminal on that Mac; otherwise a local PowerShell |
+| `Ctrl+Shift+W` | Close the focused terminal (the last terminal of the last workspace is replaced by a fresh local one) |
+| `Ctrl+Tab`, `Ctrl+PageDown` | Next workspace |
+| `Ctrl+Shift+Tab`, `Ctrl+PageUp` | Previous workspace |
 | `Alt+Shift+=` (`+`) | Split right |
 | `Alt+Shift+-` | Split down |
-| `Alt+Arrows` | Focus pane left / right / up / down |
+| `Alt+Arrows` | Focus region left / right / up / down |
 | `Ctrl+Shift+B` | Toggle sidebar |
 | `Ctrl+,` | Settings |
+
+The same actions are on screen: the title bar has the sidebar toggle, the bell (display
+only), the "+ ▾" new-workspace menu, Back / Forward (focus history across workspaces and
+regions), the search box (display only) and the settings gear; each region has a tab bar
+with a close box per tab and the New terminal / Split right / Split down buttons; the
+sidebar footer has the `?` help menu (Settings…, Check for Updates, Docs, GitHub), the
+version and, when a newer version exists, the "Update Available" pill.
 
 While any panel is open (settings, pairing, sign-in, machine picker, forced-update overlay),
 app shortcuts are swallowed and `Esc` closes the topmost panel (not the forced-update overlay);
@@ -117,12 +131,15 @@ and while the Windows key is held. `Ctrl+Alt` combinations are treated as AltGr 
 
 ## Remote view (Macs)
 
-Sign in (Settings or the sidebar), then request access to a Mac (sidebar "+", pairing code
-shown on both machines, approve on the Mac).
+Sign in (Settings → Account → "Đăng nhập…", which opens the sign-in dialog; the "+" next to
+"Máy của bạn" in the sidebar opens the same dialog while you are signed out), then request
+access to a Mac (that "+" again, pairing code shown on both machines, approve on the Mac).
 
 - "Mở" on a granted Mac in the sidebar, or "Mở" in the pairing panel after approval, opens that
-  Mac's terminal in a new tab. A second "Mở" opens a new shell on the Mac. Splitting a remote pane
-  creates a shell on the Mac; `Ctrl+Shift+T` always opens a local tab.
+  Mac's terminal in a new workspace. A second "Mở" opens a new shell on the Mac. Splitting a
+  remote pane creates a shell on the Mac, and so does `Ctrl+Shift+T` (or the tab bar's New
+  terminal button) in a region that shows a Mac terminal. `Ctrl+Shift+N` and the title bar "+"
+  always open a local workspace.
 - Typed and IME-committed text leaves as one UTF-8 write of the committed text.
 - A pill over the pane shows the state: "đang kết nối…", "đang kết nối lại…" (with the reason),
   "ngoại tuyến", "Phiên ở xa đã kết thúc", "Khóa của máy không khớp, không kết nối", "Cần xin quyền
