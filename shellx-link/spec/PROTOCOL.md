@@ -78,16 +78,16 @@ A frame is one UTF-8 JSON object:
 
 Every request that expects exactly one answer carries a `call_id`: `agent.snapshot.get`,
 `agent.reply`, `agent.sessions.get`, `chat.history.get`, `chat.send`, `chat.interrupt`, `attach.begin`,
-`attach.chunk`, `attach.end`, `workspace.list.get`, `workspace.create`, `workspace.rename` and
-`workspace.close` (and the requests later versions add on the same pattern).
+`attach.chunk`, `attach.end`, `workspace.list.get`, `workspace.create`, `workspace.rename`,
+`workspace.close` and `agent.close` (and the requests later versions add on the same pattern).
 
 - The client chooses it: a string of 1 to 64 UTF-8 bytes, different from every other call of
   that client that is still waiting in the session.
 - The host answers a call with exactly one message carrying the same `call_id`: the matching
   answer (`agent.snapshot`, `agent.reply.result`, `agent.sessions`, `chat.history`,
   `chat.send.result`, `chat.interrupt.result`, `attach.ready`, `attach.chunk.result`, `attach.end.result`,
-  `workspace.list`, `workspace.create.result`, `workspace.rename.result`, `workspace.close.result`), or an
-  `error` that carries it.
+  `workspace.list`, `workspace.create.result`, `workspace.rename.result`, `workspace.close.result`,
+  `agent.close.result`), or an `error` that carries it.
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
 - A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
@@ -136,6 +136,8 @@ Every request that expects exactly one answer carries a `call_id`: `agent.snapsh
 | `workspace.rename.result` | host | Reply to every acceptable `workspace.rename` | `call_id` string, `outcome` string |
 | `workspace.close` | client | The user closes a workspace on the Mac | `call_id` string, `workspace_id` string |
 | `workspace.close.result` | host | Reply to every `workspace.close` | `call_id` string, `outcome` string |
+| `agent.close` | client | The user closes an agent's terminal tab on the Mac | `call_id` string, `session_id` string |
+| `agent.close.result` | host | Reply to every `agent.close` | `call_id` string, `outcome` string |
 | `ping` | either | Keep-alive / latency probe | `nonce` uint64 |
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
@@ -181,6 +183,7 @@ lists it, and ignores a string it does not know. These features are defined:
 - `attachments`: the host takes `attach.*` uploads and `chat.send.attachments` (section 5).
 - `workspaces`: the host answers `workspace.list.get` and pushes `workspace.changed` (Workspace).
 - `workspace_control`: the host takes `workspace.create`, `workspace.rename` and `workspace.close` (Workspace).
+- `agent_close`: the host takes `agent.close` (Workspace).
 
 ### PendingItem
 
@@ -296,6 +299,11 @@ A `workspace_id` the host does not have is `not_found`, not an `error`. A comman
 blocks remote control. A client does not resend a control call after losing the connection: the host may already
 have acted, so it reads the list again.
 
+`agent.close` closes the terminal tab of a live agent session the host lists in a local workspace, without asking; on
+its workspace's last tab the Mac does what its Close Tab does (by default closes the workspace). `not_found` for an
+unknown, ended or tab-less session. Like a control call it answers with an `outcome`, and a client does not resend it
+after losing the connection: the host may already have acted, so it reads the session list again.
+
 ### ChatEntry
 
 | Field | Type | Notes |
@@ -351,9 +359,9 @@ it opens the session again.
   session whose agent is not live, an `ended` one for example (section 10).
 - `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`, with the same `not_found` rule.
 - `kind` (`attach.begin`): `image`, `file`.
-- `outcome` of `workspace.create.result`, `workspace.rename.result` and `workspace.close.result`: `ok`,
-  `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as closing a pinned
-  workspace or the last workspace of a window), `failed`.
+- `outcome` of `workspace.create.result`, `workspace.rename.result`, `workspace.close.result` and
+  `agent.close.result`: `ok`, `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as
+  closing a pinned workspace or the last workspace of a window), `failed`.
 
 ## 5. Rules
 
@@ -543,7 +551,7 @@ Rules:
   succeed or fail the same way.
 
 `message.case` names the message; the other `message` keys use the JSON field names (`decision`
-and PendingItem objects use their wire form). All 37 cases:
+and PendingItem objects use their wire form). All 39 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
@@ -583,6 +591,8 @@ and PendingItem objects use their wire form). All 37 cases:
 | `workspace_rename_result` | `workspace.rename.result` | `call_id`, `outcome` |
 | `workspace_close` | `workspace.close` | `call_id`, `workspace_id` |
 | `workspace_close_result` | `workspace.close.result` | `call_id`, `outcome` |
+| `agent_close` | `agent.close` | `call_id`, `session_id` |
+| `agent_close_result` | `agent.close.result` | `call_id`, `outcome` |
 | `unknown` | any unrecognized `t` | `type` (the `t` value), `call_id` (optional: the frame's valid `call_id`); decode-only |
 
 ## 9. Pairing and trust
@@ -687,6 +697,7 @@ names a workspace only to rename or close one that the host's own list holds (`w
 | `workspace.create` | Makes a workspace on the Mac, in a directory the Mac chooses as when the user adds a workspace there. Its terminal starts the user's default shell when it is first shown (the Mac creates it lazily). Does not change the Mac's selection or bring its window to the front | None named: the call carries only `call_id`, no path, command, program, URL or environment |
 | `workspace.rename` | Sets the workspace's title (at most 512 UTF-8 bytes) | One local workspace in the host's list, by `workspace_id` |
 | `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rules: it refuses to close a pinned workspace or the last workspace of a window, and refuses every control call while device management blocks remote control | One local workspace in the host's list, by `workspace_id` |
+| `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. On the workspace's last tab the Mac does what its Close Tab does (by default closes the workspace). The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
 | `ping` | None | |
 
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own

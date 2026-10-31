@@ -49,6 +49,8 @@ public enum LinkMessage: Equatable, Sendable {
     case workspaceRenameResult(callId: String, outcome: WorkspaceControlOutcome)
     case workspaceClose(callId: String, workspaceId: String)
     case workspaceCloseResult(callId: String, outcome: WorkspaceControlOutcome)
+    case agentClose(callId: String, sessionId: String)
+    case agentCloseResult(callId: String, outcome: WorkspaceControlOutcome)
     /// Decode-only: a well-formed frame whose `t` this version does not know. `callId` is the frame's `call_id`
     /// when it is a valid one (1 to 64 UTF-8 bytes): such a frame is a call of a later version, which a host
     /// answers `error` `unsupported` (PROTOCOL.md section 3).

@@ -34,6 +34,7 @@ public enum LinkCodec {
         static let workspaceCreate = "workspace.create", workspaceCreateResult = "workspace.create.result"
         static let workspaceRename = "workspace.rename", workspaceRenameResult = "workspace.rename.result"
         static let workspaceClose = "workspace.close", workspaceCloseResult = "workspace.close.result"
+        static let agentClose = "agent.close", agentCloseResult = "agent.close.result"
     }
 
     // Per-message bodies (keys are snake_case on the wire).
@@ -78,7 +79,8 @@ public enum LinkCodec {
     }
     private struct WorkspaceRename: Codable { var callId: String; var workspaceId: String; var title: String }
     private struct WorkspaceClose: Codable { var callId: String; var workspaceId: String }
-    /// `workspace.rename.result` and `workspace.close.result`.
+    private struct AgentClose: Codable { var callId: String; var sessionId: String }
+    /// `workspace.rename.result`, `workspace.close.result` and `agent.close.result`.
     private struct WorkspaceOutcome: Codable { var callId: String; var outcome: WorkspaceControlOutcome }
 
     private struct Envelope { var v: Int; var t: String }
@@ -219,6 +221,12 @@ public enum LinkCodec {
             case let .workspaceCloseResult(callId, outcome):
                 try requireValid(callId)
                 data = try enc(T.workspaceCloseResult, WorkspaceOutcome(callId: callId, outcome: outcome))
+            case let .agentClose(callId, sessionId):
+                try requireValid(callId)
+                data = try enc(T.agentClose, AgentClose(callId: callId, sessionId: sessionId))
+            case let .agentCloseResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.agentCloseResult, WorkspaceOutcome(callId: callId, outcome: outcome))
             case .unknown: throw LinkCodecError.cannotEncodeUnknown
             }
         } catch let e as LinkCodecError {
@@ -344,6 +352,12 @@ public enum LinkCodec {
         case T.workspaceCloseResult:
             let b = try call(WorkspaceOutcome.self, \.callId)
             return .workspaceCloseResult(callId: b.callId, outcome: b.outcome)
+        case T.agentClose:
+            let b = try call(AgentClose.self, \.callId)
+            return .agentClose(callId: b.callId, sessionId: b.sessionId)
+        case T.agentCloseResult:
+            let b = try call(WorkspaceOutcome.self, \.callId)
+            return .agentCloseResult(callId: b.callId, outcome: b.outcome)
         default: return .unknown(type: env.t, callId: readCallId(d))
         }
     }

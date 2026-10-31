@@ -520,7 +520,8 @@ public actor LinkClient {
              let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _),
              let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
              let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
-             let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _):
+             let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
+             let .agentCloseResult(callId, _):
             // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
             waiters.removeValue(forKey: callId)?.resume(returning: message)
         case let .sessionsChanged(revision, upserted, removed):
@@ -547,7 +548,7 @@ public actor LinkClient {
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
              .chatInterrupt, .attachBegin, .attachChunk, .attachEnd, .workspacesGet, .workspaceCreate,
-             .workspaceRename, .workspaceClose:
+             .workspaceRename, .workspaceClose, .agentClose:
             break
         }
         return true

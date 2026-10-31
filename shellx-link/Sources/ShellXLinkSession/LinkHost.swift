@@ -390,6 +390,10 @@ public actor LinkHost {
                     let outcome = await workspaceControl.closeWorkspace(workspaceId: workspaceId)
                     try? await channel.send(.workspaceCloseResult(callId: callId, outcome: outcome))
                 }
+            case let .agentClose(callId, _):
+                // Handling arrives with the host's agent control; until then the call is `unsupported`, as for any
+                // call a host does not know.
+                await Self.sendError(on: channel, "unsupported", "this host takes no agent control", callId: callId)
             case .pong, .unknown, .error:
                 break
             case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged:
@@ -399,7 +403,8 @@ public actor LinkHost {
                  let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _),
                  let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
                  let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
-                 let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _):
+                 let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
+                 let .agentCloseResult(callId, _):
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }
