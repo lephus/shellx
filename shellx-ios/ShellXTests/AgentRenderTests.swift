@@ -59,17 +59,18 @@ final class AgentRenderTests: XCTestCase {
         session: MachineSession? = AgentRenderTests.session, entries: [ChatEntry] = AgentRenderTests.everyKind,
         pending: [MachinePendingItem] = [], gone: Bool = false, offline: Bool = false,
         emptyState: AgentThreadModel.EmptyState? = nil, older: AgentThreadModel.Older = .none,
-        notice: String? = nil, draft: String = ""
+        notice: String? = nil, draft: String = "", canRemoveFromPhone: Bool = false, embedded: Bool = false
     ) -> some View {
         let row = session.map { AgentStatusRow(session: $0, now: Self.now) }
         let canStop = row.map { $0.online && ($0.state == .working || $0.state == .needsInput) } ?? false
         return NavigationStack {
             AgentScreen(
-                ref: Self.ref, place: "Claude Code · MacBook Pro", row: { row }, gone: gone, offline: offline,
-                pending: pending, showsMachineName: false, entries: entries,
+                ref: Self.ref, embedded: embedded, place: "Claude Code · MacBook Pro", row: { row }, gone: gone,
+                offline: offline, pending: pending, showsMachineName: false, entries: entries,
                 emptyState: entries.isEmpty ? emptyState : nil, machineName: "MacBook Pro", older: older,
                 loadingOlder: false, canStop: canStop && !gone,
-                notice: notice.map { AgentScreen.Notice(text: $0) }, draft: .constant(draft))
+                notice: notice.map { AgentScreen.Notice(text: $0) }, draft: .constant(draft),
+                canRemoveFromPhone: canRemoveFromPhone)
         }
     }
 
@@ -199,11 +200,30 @@ final class AgentRenderTests: XCTestCase {
         try assertRenders(screen(entries: [], emptyState: .failed), name: "agent-failed")
         try assertRenders(screen(session: nil, gone: true), name: "agent-gone")
         try assertRenders(screen(session: nil, entries: [], gone: true, emptyState: .gone), name: "agent-gone-empty")
+        // Still listed as running by its Mac, which answered `not_found`: it can be removed from the phone.
+        try assertRenders(screen(gone: true, canRemoveFromPhone: true), name: "agent-gone-removable")
+        try assertRenders(
+            screen(entries: [], gone: true, emptyState: .gone, canRemoveFromPhone: true),
+            name: "agent-gone-removable-empty")
         try assertRenders(
             screen(entries: Array(Self.everyKind.prefix(3)), older: .failed), name: "agent-older-failed")
         try assertRenders(
             screen(pending: [Self.pending], older: .loadable).environment(\.dynamicTypeSize, .accessibility3),
             name: "agent-ax3")
+    }
+
+    /// "Remove from This Phone" sits under the gone line, as a full tap target, and has its words; a
+    /// workspace's pane draws none.
+    func testRemoveFromThisPhoneIsUnderTheGoneLine() throws {
+        let words = String(localized: "agent.removeFromPhone")
+        XCTAssertNotEqual(words, "agent.removeFromPhone")
+        XCTAssertFalse(words.hasSuffix("…"), "no ellipsis: nothing is asked")
+        let button = AgentScreen.RemoveFromPhoneButton(remove: {})
+        XCTAssertGreaterThanOrEqual(size(of: button).height, 44, "a full tap target")
+        try assertRenders(
+            screen(gone: true, canRemoveFromPhone: true).environment(\.dynamicTypeSize, .accessibility3),
+            name: "agent-gone-removable-ax3")
+        try assertRenders(screen(gone: true, canRemoveFromPhone: true, embedded: true), name: "agent-gone-pane")
     }
 
     func testNewMessagesButtonRenders() throws {

@@ -581,7 +581,7 @@ final class WorkspaceListActionsTests: XCTestCase {
         XCTAssertTrue(ready)
         rig.hub.defaultMachineID = old.machine.machineID
 
-        let groups = WorkspaceListView.groups(rig.hub)
+        let groups = WorkspaceListView.groups(rig.hub, removed: .none)
 
         XCTAssertEqual(groups.map(\.name), ["iMac", "MacBook Pro"], "the default Mac is first")
         XCTAssertEqual(groups.map(\.isDefault), [true, false])
@@ -596,12 +596,12 @@ final class WorkspaceListActionsTests: XCTestCase {
         let mac = await macWithWorkspaces(["shellx"])
         let rig = try await makeRig([mac])
         // Before the first connection finishes, the Mac has not said what it lists.
-        let groups = WorkspaceListView.groups(rig.hub)
+        let groups = WorkspaceListView.groups(rig.hub, removed: .none)
         if let group = groups.first, group.state != .online {
             XCTAssertTrue(group.listsWorkspaces)
         }
         let online = await eventually { rig.hub.machines.first?.state == .online }
         XCTAssertTrue(online)
-        XCTAssertEqual(WorkspaceListView.groups(rig.hub).first?.listsWorkspaces, true)
+        XCTAssertEqual(WorkspaceListView.groups(rig.hub, removed: .none).first?.listsWorkspaces, true)
     }
 }

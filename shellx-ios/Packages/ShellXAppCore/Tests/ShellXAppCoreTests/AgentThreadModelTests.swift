@@ -293,6 +293,34 @@ final class AgentThreadModelTests: XCTestCase {
         XCTAssertEqual(requests.map(\.sessionId), ["s1", "s2"])
     }
 
+    /// The session the phone may remove (spec 6.8) is one its Mac still lists but answered `not_found` for:
+    /// a live one never is, nor one the Mac's list leaves out (no list shows it).
+    func testOnlyAListedSessionTheMacAnsweredNotFoundForIsAGhost() async throws {
+        let mac = await mac(history: entries(1...2))
+        // `s2` is listed as working, but the Mac has no chat for it: it answers `not_found`.
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        let rig = try await HubRig.make([mac], in: self)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+
+        let (live, _) = model(ref(mac), rig)
+        await live.open()
+        XCTAssertFalse(live.sessionGone)
+        XCTAssertNil(live.ghost, "a live session never is one")
+
+        let (gone, _) = model(ref(mac, "s2", workspace: "web"), rig)
+        XCTAssertNil(gone.ghost, "not before the Mac answered")
+        await gone.open()
+        XCTAssertTrue(gone.sessionGone)
+        XCTAssertEqual(gone.ghost, gone.session)
+        XCTAssertEqual(gone.ghost?.session.state, .working, "still listed as working")
+
+        // Gone from the Mac's list: gone too, but nothing lists it.
+        let (unlisted, _) = model(ref(mac, "s9"), rig)
+        XCTAssertTrue(unlisted.sessionGone)
+        XCTAssertNil(unlisted.ghost)
+    }
+
     func testEmptyStateSaysWhatIsKnown() async throws {
         let mac = await mac(history: [])
         // One transcript line of 20 entries of 4 KB: more than one frame holds, so the Mac answers
