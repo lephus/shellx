@@ -25,6 +25,8 @@ use crate::workspace::TAB_BAR_H;
 
 /// Longest a tab's title grows before it is cut, in px.
 const TITLE_MAX_W: f32 = 180.0;
+/// Narrowest a tab gets, in px: its icon and close box always fit.
+const TAB_MIN_W: f32 = 62.0;
 
 /// The bar over `slot`'s terminal. `focused_slot`: the region the keyboard
 /// goes to. Tab titles come from `RootView::tab_title`.
@@ -37,14 +39,19 @@ pub(super) fn render(
     cx: &mut Context<RootView>,
 ) -> Div {
     let shown = stack.selected_pane();
+    // The tabs keep their width and the strip scrolls sideways (the mouse
+    // wheel scrolls it), so a tab never paints over its neighbour and a
+    // close box never sits in another tab's hit area. The buttons stay
+    // outside the strip, always visible.
     let mut tabs = div()
+        .id(("tab-strip", slot.0))
         .flex()
         .flex_row()
         .items_center()
         .flex_1()
         .min_w_0()
         .h_full()
-        .overflow_hidden();
+        .overflow_x_scroll();
     for &pane in &stack.panes {
         let title: SharedString = root.tab_title(pane, lang, cx).into();
         tabs = tabs.child(tab(pane, title, pane == shown, focused_slot, lang, cx));
@@ -98,8 +105,10 @@ fn tab(
         .flex_row()
         .items_center()
         .gap(px(6.0))
-        .min_w_0()
+        .flex_shrink_0()
+        .min_w(px(TAB_MIN_W))
         .h_full()
+        .overflow_hidden()
         .px(px(10.0))
         .cursor_pointer()
         .when_some(fill, |el, fill| el.bg(fill))
