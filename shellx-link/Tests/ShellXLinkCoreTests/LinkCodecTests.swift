@@ -492,6 +492,44 @@ final class LinkCodecTests: XCTestCase {
         }
     }
 
+    func testAgentCloseRoundTrip() throws {
+        let messages: [LinkMessage] = [
+            .agentClose(callId: "c1", sessionId: "sess-1"),
+            .agentCloseResult(callId: "c1", outcome: .ok),
+            .agentCloseResult(callId: "c2", outcome: .notFound),
+            .agentCloseResult(callId: "c3", outcome: .other("busy")),
+        ]
+        for message in messages {
+            XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(message)), message, "\(message)")
+        }
+        let close = try Self.jsonObject(messages[0])
+        XCTAssertEqual(close["t"] as? String, "agent.close")
+        XCTAssertEqual(close["call_id"] as? String, "c1")
+        XCTAssertEqual(close["session_id"] as? String, "sess-1")
+        let ok = try Self.jsonObject(messages[1])
+        XCTAssertEqual(ok["t"] as? String, "agent.close.result")
+        XCTAssertEqual(ok["outcome"] as? String, "ok")
+        XCTAssertEqual(try Self.jsonObject(messages[2])["outcome"] as? String, "not_found")
+        XCTAssertEqual(try Self.jsonObject(messages[3])["outcome"] as? String, "busy")
+        // Both messages need a valid call_id: encoding without one, and decoding a frame that lacks it, are errors.
+        XCTAssertThrowsError(try LinkCodec.encode(.agentClose(callId: "", sessionId: "sess-1"))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.encode(.agentCloseResult(callId: "", outcome: .ok))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.decode(Data(#"{"v":1,"t":"agent.close","session_id":"sess-1"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.decode(Data(#"{"v":1,"t":"agent.close.result","outcome":"ok"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        // A close without a session_id is bad_json too, and keeps its call_id for the error answer.
+        XCTAssertThrowsError(try LinkCodec.decode(Data(#"{"v":1,"t":"agent.close","call_id":"c9"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: "c9"))
+        }
+    }
+
     func testUnknownOutcomeKeepsWire() throws {
         let decoded = try LinkCodec.decode(Data(
             #"{"v":1,"t":"workspace.rename.result","call_id":"c1","outcome":"busy"}"#.utf8))
@@ -515,6 +553,10 @@ final class LinkCodecTests: XCTestCase {
         XCTAssertEqual(ShellXLink.workspacesFeature, "workspaces")
         XCTAssertEqual(ShellXLink.workspaceControlFeature, "workspace_control")
         XCTAssertEqual(ShellXLink.maxWorkspaceTitleBytes, 512)
+    }
+
+    func testAgentCloseFeature() {
+        XCTAssertEqual(ShellXLink.agentCloseFeature, "agent_close")
     }
 
     func testWorkspaceShrinkOrder() throws {
@@ -745,6 +787,9 @@ final class LinkCodecTests: XCTestCase {
         case "workspace_close": return .workspaceClose(callId: try s("call_id"), workspaceId: try s("workspace_id"))
         case "workspace_close_result":
             return .workspaceCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
+        case "agent_close": return .agentClose(callId: try s("call_id"), sessionId: try s("session_id"))
+        case "agent_close_result":
+            return .agentCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)

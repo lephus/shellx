@@ -1646,6 +1646,48 @@
         "call_id": "c78",
         "outcome": "refused"
       }
+    },
+    {
+      "name": "agent_close",
+      "message": {
+        "case": "agent_close",
+        "call_id": "c78",
+        "session_id": "sess-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.close",
+        "call_id": "c78",
+        "session_id": "sess-1"
+      }
+    },
+    {
+      "name": "agent_close_result_ok",
+      "message": {
+        "case": "agent_close_result",
+        "call_id": "c78",
+        "outcome": "ok"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.close.result",
+        "call_id": "c78",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "agent_close_result_not_found",
+      "message": {
+        "case": "agent_close_result",
+        "call_id": "c79",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.close.result",
+        "call_id": "c79",
+        "outcome": "not_found"
+      }
     }
   ],
   "decode_only": [
