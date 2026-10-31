@@ -114,6 +114,12 @@ struct SidebarWorkspaceSnapshotBuilder {
         /// of its status. Nil when no row shows that agent, with metadata
         /// hidden or compact status on.
         var agentActivityStatusKey: String? = nil
+        /// ShellX (mobile home focus spec §6.7): whether an agent of the
+        /// workspace waits for the person's answer (a permission or a
+        /// question), so the row runs its waiting border. Unlike
+        /// ``nameEffect``, it holds in a light sidebar and whatever
+        /// "Show Loading Spinner" says.
+        var agentNeedsInput = false
 
         var remoteWorkspaceBadgeLabel: String? { deviceWorkspaceLabel ?? cloudWorkspaceLabel }
         var remoteWorkspaceBadgeSymbol: String { deviceWorkspaceLabel == nil ? "cloud" : "desktopcomputer" }

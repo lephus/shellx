@@ -41,6 +41,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let titleView = SidebarRowTextView(lines: 1)
     /// ShellX: the agent's effect on the name, and its one-time flash over the row.
     private lazy var nameEffect = SidebarRowNameEffectPresenter(titleView: titleView, host: contentContainer)
+    /// ShellX: the multicolor border that runs around the row while its agent waits for you.
+    private let waitingBorder = WaitingBorderView()
     private let cloudImageView = NSImageView()
     private let trailingBadge = SidebarRowUnreadBadgeView()
     private var trailingSpinner: GPUSpinnerNSView?
@@ -316,6 +318,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         contentContainer.addSubview(titleView)
         nameEffect.flashView.cornerRadius = backgroundView.layer?.cornerRadius ?? 0
         addSubview(nameEffect.flashView, positioned: .below, relativeTo: contentContainer)
+        waitingBorder.cornerRadius = backgroundView.layer?.cornerRadius ?? 0
+        addSubview(waitingBorder, positioned: .below, relativeTo: contentContainer)
         cloudImageView.setAccessibilityIdentifier("sidebarCloudBadge")
         cloudImageView.setAccessibilityElement(false)
         contentContainer.addSubview(trailingBadge)
@@ -386,6 +390,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         trailingSpinner?.isPresentationActive = isActive
         compactStatusGlyphView.isPresentationActive = isActive
         nameEffect.isPresentationActive = isActive
+        waitingBorder.isPresentationActive = isActive
         for row in metadataRows {
             row.isPresentationActive = isActive
         }
@@ -541,6 +546,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         if let railColor {
             railView.layer?.backgroundColor = railColor.withAlphaComponent(0.95).cgColor
         }
+        // ShellX (spec 2026-10-29 §6.7): light or dark, whatever the name effect does.
+        waitingBorder.isActive = snapshot.agentNeedsInput
 
         // Title line
         cloudImageView.configureSidebarWorkspaceAccessory(
@@ -1598,6 +1605,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             let bgX = outerPad + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
             backgroundView.frame = NSRect(x: bgX, y: 0, width: max(0, width - outerPad - bgX), height: y)
             nameEffect.flashView.frame = backgroundView.frame
+            waitingBorder.frame = backgroundView.frame
             railView.frame = NSRect(x: bgX + 4 - 1, y: 5, width: 3, height: max(0, y - 10))
             railView.layer?.cornerRadius = 1.5
             let indicatorBounds = NSRect(x: 0, y: 0, width: width, height: y)

@@ -26,6 +26,7 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
         let hostTitleSuffix: String?
         let nameEffect: AgentNameEffect?
         let agentActivityText: String?
+        let agentNeedsInput: Bool
     }
 
     var contextMenuImmediateFields: ContextMenuImmediateFields {
@@ -52,7 +53,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             taskStatusInput: taskStatusInput,
             hostTitleSuffix: hostTitleSuffix,
             nameEffect: nameEffect,
-            agentActivityText: agentActivityText
+            agentActivityText: agentActivityText,
+            agentNeedsInput: agentNeedsInput
         )
     }
 
@@ -112,6 +114,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             agentActivityText: snapshot.agentActivityText,
             // Names a row of the metadata entries above, so it stays with them.
             agentActivityStatusKey: agentActivityStatusKey,
+            // The waiting border asks for the person, like the spinner it sits beside.
+            agentNeedsInput: snapshot.agentNeedsInput,
             // The host after a colliding title is part of the title the row shows, so it updates with it.
             hostTitleSuffix: snapshot.hostTitleSuffix
         )

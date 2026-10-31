@@ -4418,6 +4418,7 @@
 		65F8FEC592CFA22BD1F4FA29 /* VMRemoteWorkspaceResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA2691D26BF6676FF32FBC54 /* VMRemoteWorkspaceResolver.swift */; };
 		D017093861349E48BF816E02 /* VMRemoteWorkspaceResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA2691D26BF6676FF32FBC54 /* VMRemoteWorkspaceResolver.swift */; };
 		C37800000000000000000001 /* VMSSHCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37800000000000000000002 /* VMSSHCommandTests.swift */; };
+		4C41E937082B5AC97DBD6CDF /* WaitingBorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1931ACD747A7575EC0269E /* WaitingBorderView.swift */; };
 		C7B206ECEE3E020A96259AFF /* WebKitBrowserReplDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F63189EE1BF0052D9BDC241 /* WebKitBrowserReplDriver.swift */; };
 		A10020000000000000000019 /* WebSurfaceSelectionEvaluationOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1002000000000000000001A /* WebSurfaceSelectionEvaluationOwner.swift */; };
 		A10020000000000000000011 /* WebSurfaceSelectionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10020000000000000000012 /* WebSurfaceSelectionReader.swift */; };
@@ -4475,6 +4476,7 @@
 		C0DE43000000000000000007 /* Workspace+AgentChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE43000000000000000008 /* Workspace+AgentChat.swift */; };
 		A6AC73020000000000000001 /* Workspace+AgentLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AC73020000000000000002 /* Workspace+AgentLifecycle.swift */; };
 		B5838821EAFAC14989AA573C /* Workspace+AgentNameEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDEA50D6001714B8FF4543BA /* Workspace+AgentNameEffects.swift */; };
+		B3DD22963BFAADE3BC337FD4 /* Workspace+AgentNeedsInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D57F9E942109ABC17642389 /* Workspace+AgentNeedsInput.swift */; };
 		5A0420D5417940C6815B1F9E /* Workspace+AgentResumeOwnership.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F89ED4F392842F08A685C41 /* Workspace+AgentResumeOwnership.swift */; };
 		AD24DD8D0278FBE91E0D39B8 /* Workspace+AgentWakeVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47BA6502C83228F85BBEDE5 /* Workspace+AgentWakeVerification.swift */; };
 		8777E0018777E0018777E001 /* Workspace+AttentionFlashRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8777E0028777E0028777E002 /* Workspace+AttentionFlashRouting.swift */; };
@@ -9047,6 +9049,7 @@
 		5A2776CC5FE1E0083FAAB3A8 /* VMReadyPollInterval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMReadyPollInterval.swift; sourceTree = "<group>"; };
 		BA2691D26BF6676FF32FBC54 /* VMRemoteWorkspaceResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMRemoteWorkspaceResolver.swift; sourceTree = "<group>"; };
 		C37800000000000000000002 /* VMSSHCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMSSHCommandTests.swift; sourceTree = "<group>"; };
+		FC1931ACD747A7575EC0269E /* WaitingBorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/AgentActivity/WaitingBorderView.swift; sourceTree = "<group>"; };
 		9F63189EE1BF0052D9BDC241 /* WebKitBrowserReplDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/BrowserRepl/WebKitBrowserReplDriver.swift; sourceTree = "<group>"; };
 		A1002000000000000000001A /* WebSurfaceSelectionEvaluationOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/WebSurfaceSelectionEvaluationOwner.swift; sourceTree = "<group>"; };
 		A10020000000000000000012 /* WebSurfaceSelectionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/WebSurfaceSelectionReader.swift; sourceTree = "<group>"; };
@@ -9103,6 +9106,7 @@
 		C0DE43000000000000000008 /* Workspace+AgentChat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+AgentChat.swift"; sourceTree = "<group>"; };
 		A6AC73020000000000000002 /* Workspace+AgentLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+AgentLifecycle.swift"; sourceTree = "<group>"; };
 		EDEA50D6001714B8FF4543BA /* Workspace+AgentNameEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/AgentActivity/Workspace+AgentNameEffects.swift"; sourceTree = "<group>"; };
+		9D57F9E942109ABC17642389 /* Workspace+AgentNeedsInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/AgentActivity/Workspace+AgentNeedsInput.swift"; sourceTree = "<group>"; };
 		5F89ED4F392842F08A685C41 /* Workspace+AgentResumeOwnership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+AgentResumeOwnership.swift"; sourceTree = "<group>"; };
 		A47BA6502C83228F85BBEDE5 /* Workspace+AgentWakeVerification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+AgentWakeVerification.swift"; sourceTree = "<group>"; };
 		8777E0028777E0028777E002 /* Workspace+AttentionFlashRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Workspace+AttentionFlashRouting.swift"; sourceTree = "<group>"; };
@@ -12615,6 +12619,8 @@
 				4388B332D070BFD818B88E09 /* WorkspaceSetStore.swift */,
 				8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */,
 				4820BE847658E473B2D4C806 /* ShellXPhonePushForwarder.swift */,
+				FC1931ACD747A7575EC0269E /* WaitingBorderView.swift */,
+				9D57F9E942109ABC17642389 /* Workspace+AgentNeedsInput.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -17632,6 +17638,7 @@
 				7A0CE1000000000000000044 /* VMClientSocketCommands+Tunnel.swift in Sources */,
 				ACE4FE2A8F1CC6C0B6A673AB /* VMClientSocketCommands.swift in Sources */,
 				C10DC1000000000000000013 /* VMClientTelemetry+Live.swift in Sources */,
+				4C41E937082B5AC97DBD6CDF /* WaitingBorderView.swift in Sources */,
 				C7B206ECEE3E020A96259AFF /* WebKitBrowserReplDriver.swift in Sources */,
 				A10020000000000000000019 /* WebSurfaceSelectionEvaluationOwner.swift in Sources */,
 				A10020000000000000000011 /* WebSurfaceSelectionReader.swift in Sources */,
@@ -17675,6 +17682,7 @@
 				C0DE43000000000000000007 /* Workspace+AgentChat.swift in Sources */,
 				A6AC73020000000000000001 /* Workspace+AgentLifecycle.swift in Sources */,
 				B5838821EAFAC14989AA573C /* Workspace+AgentNameEffects.swift in Sources */,
+				B3DD22963BFAADE3BC337FD4 /* Workspace+AgentNeedsInput.swift in Sources */,
 				5A0420D5417940C6815B1F9E /* Workspace+AgentResumeOwnership.swift in Sources */,
 				AD24DD8D0278FBE91E0D39B8 /* Workspace+AgentWakeVerification.swift in Sources */,
 				8777E0018777E0018777E001 /* Workspace+AttentionFlashRouting.swift in Sources */,

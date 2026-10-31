@@ -250,6 +250,7 @@ struct SidebarWorkspaceSnapshotFactory {
             nameEffect: nameEffect,
             agentActivityText: nameEffect.map { AgentActivityText().text(for: $0) },
             agentActivityStatusKey: activityStatusKey,
+            agentNeedsInput: workspace.agentNeedsInput,
             hostTitleSuffix: hostTitleSuffix
         )
     }

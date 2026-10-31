@@ -143,4 +143,19 @@ public enum ShellXPalette {
         ShellXColor(hex: 0xc9a7f2),
         ShellXColor(hex: 0xf4a7c0)
     ]
+
+    // MARK: Waiting border (mobile home focus spec §6.7)
+
+    /// Stops of the thin border that runs around a tab whose agent waits for the person's answer:
+    /// blue, violet, pink, amber, and blue again so the turning loop has no seam.
+    ///
+    /// The one place ShellX draws a multicolor gradient on purpose: the person chose it for the
+    /// state that needs their attention.
+    public static let waitingBorderStops: [ShellXColor] = [
+        ShellXColor(hex: 0x60a5fa),
+        ShellXColor(hex: 0xa78bfa),
+        ShellXColor(hex: 0xf472b6),
+        ShellXColor(hex: 0xfbbf24),
+        ShellXColor(hex: 0x60a5fa)
+    ]
 }
