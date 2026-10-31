@@ -15,6 +15,9 @@ enum WorkspaceAlert: String, CaseIterable, Identifiable {
     case offline
     case refusedClose
     case refusedControl
+    /// The Mac would not close an agent's tab: remote control is blocked, or the tab is the last of a
+    /// workspace the Mac keeps (pinned, the last in its window, or set to stay open).
+    case refusedCloseAgent
     /// The Mac has no terminal tab for the agent, or the agent has stopped already.
     case agentNotClosable
     case failed
@@ -27,6 +30,7 @@ enum WorkspaceAlert: String, CaseIterable, Identifiable {
         case .offline: String(localized: "workspaces.alert.offline")
         case .refusedClose: String(localized: "workspaces.alert.refused.close")
         case .refusedControl: String(localized: "workspaces.alert.refused.control")
+        case .refusedCloseAgent: String(localized: "workspaces.alert.refused.closeAgent")
         case .agentNotClosable: String(localized: "workspaces.alert.agentNotClosable")
         case .failed: String(localized: "workspaces.alert.failed")
         case .unknown: String(localized: "workspaces.alert.unknown")
@@ -55,7 +59,12 @@ enum WorkspaceFeedback: Equatable {
             // An agent the Mac cannot close is no sign the workspace list is stale: say why instead.
             return command == .closeAgent ? .alert(.agentNotClosable) : .refresh
         case .refused:
-            return .alert(command == .close ? .refusedClose : .refusedControl)
+            switch command {
+            case .close: return .alert(.refusedClose)
+            // Not only blocked remote control: the Mac's own rules can keep the agent's tab too.
+            case .closeAgent: return .alert(.refusedCloseAgent)
+            case .create, .rename: return .alert(.refusedControl)
+            }
         case .failed:
             return .alert(.failed)
         case .offline:

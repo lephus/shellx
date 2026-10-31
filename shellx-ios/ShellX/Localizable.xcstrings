@@ -62,13 +62,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Close Agent"
+            "value": "Close Agent…"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đóng agent"
+            "value": "Đóng agent…"
           }
         }
       }
@@ -3952,6 +3952,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac không cho đóng workspace này (đang ghim, hoặc là workspace cuối của cửa sổ)."
+          }
+        }
+      }
+    },
+    "workspaces.alert.refused.closeAgent": {
+      "comment": "Alert: the Mac refused to close an agent's terminal tab, because it blocks remote control, or because the tab is the last one of a workspace that is pinned, is the last in its window, or is set to stay open when its last tab closes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac won't close this agent's tab: remote control is blocked, or it's the last tab of a workspace that is pinned, the last in its window, or set to stay open."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không cho đóng tab của agent này: điều khiển từ xa đang bị chặn, hoặc đó là tab cuối của một workspace đang ghim, là workspace cuối của cửa sổ, hoặc được đặt để giữ lại."
           }
         }
       }
