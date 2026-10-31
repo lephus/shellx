@@ -182,9 +182,9 @@ fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
         )
 }
 
-/// "+" on this PC's group header: a new local tab (tooltip "Tab mới").
+/// "+" on this PC's group header: a new local workspace (tooltip "Phiên mới").
 fn new_tab_button(lang: Lang, cx: &mut Context<RootView>) -> Stateful<Div> {
-    let tip: SharedString = t(lang, Str::NewTab).into();
+    let tip: SharedString = t(lang, Str::NewWorkspace).into();
     div()
         .id("sidebar-new-tab")
         .group("sidebar-new-tab")

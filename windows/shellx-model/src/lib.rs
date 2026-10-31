@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod core_api;
+pub mod history;
 pub mod keys;
 pub mod layout;
 pub mod links;

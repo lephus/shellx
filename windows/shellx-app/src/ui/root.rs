@@ -40,6 +40,10 @@
 //! A shell that exits as it starts would respawn the last pane forever:
 //! `RespawnGuard` holds the pane after 5 respawns in 10 s (a message and
 //! "Thử lại" instead of a shell).
+//!
+//! Focus history (`shellx_model::history`): every move of the focused
+//! terminal (another workspace, tab or region, a new one) is recorded, and
+//! the title bar's Back / Forward walk it, skipping terminals closed since.
 
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -51,6 +55,7 @@ use gpui::{
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
+use shellx_model::history::FocusHistory;
 use shellx_model::keys::{AppCommand, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
@@ -99,12 +104,21 @@ pub struct RootView {
     /// Stops respawning a last pane whose shell exits as it starts.
     respawn: RespawnGuard,
     started: Instant,
+    /// Back / Forward of the focused terminal.
+    history: FocusHistory,
+    /// The focused terminal as last recorded (`note_focus`).
+    last_focus: PaneId,
+    /// Set while Back / Forward moves the focus, so the step is not recorded.
+    navigating: bool,
+    /// The title bar "+" chevron's menu is showing.
+    new_menu_open: bool,
     _subscriptions: Vec<Subscription>,
 }
 
 impl RootView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let (tabs, _) = Tabs::new();
+        let last_focus = tabs.active().focused;
         let computer_name = std::env::var("COMPUTERNAME").ok();
         let core = cx.global::<Services>().core.clone();
         let pairing = cx.new(|cx| PairingPanel::new(core.clone(), cx));
@@ -164,6 +178,10 @@ impl RootView {
             overlay_focus: cx.focus_handle(),
             respawn: RespawnGuard::new(),
             started: Instant::now(),
+            history: FocusHistory::new(),
+            last_focus,
+            navigating: false,
+            new_menu_open: false,
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
@@ -295,6 +313,7 @@ impl RootView {
         }
         drop(changed);
         self.focus_terminal(window, cx);
+        self.note_focus();
         cx.notify();
     }
 
@@ -388,10 +407,7 @@ impl RootView {
         }
         match command {
             AppCommand::NewWorkspace => self.new_tab(window, cx),
-            AppCommand::NewTerminal => {
-                let slot = self.tabs.active().focused_slot();
-                self.new_terminal(slot, window, cx);
-            }
+            AppCommand::NewTerminal => self.new_terminal_tab(window, cx),
             AppCommand::ClosePane => {
                 let pane = self.tabs.active().focused;
                 self.close_pane(pane, window, cx);
@@ -432,16 +448,108 @@ impl RootView {
         }
     }
 
+    /// After the model's focus may have moved (also the end of `select_tab`
+    /// and `focus_pane`): keyboard focus follows, and the move is recorded.
     fn after_focus_change(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.focus_terminal(window, cx);
+        self.note_focus();
         cx.notify();
     }
 
-    /// A new workspace: Ctrl+Shift+N and the "+" on this PC's sidebar group
-    /// (always local).
+    /// Records the move from the last recorded terminal to the focused one.
+    /// Not while Back / Forward moves it, and not from a terminal that has
+    /// closed since (closing is not a step to go back over).
+    fn note_focus(&mut self) {
+        let now = self.tabs.active().focused;
+        if !self.navigating && self.tabs.contains(self.last_focus) {
+            self.history.record(self.last_focus, now);
+        }
+        self.last_focus = now;
+    }
+
+    pub(super) fn can_focus_back(&self) -> bool {
+        self.history.can_back(&step_targets(&self.tabs))
+    }
+
+    pub(super) fn can_focus_forward(&self) -> bool {
+        self.history.can_forward(&step_targets(&self.tabs))
+    }
+
+    /// Title bar Back: the terminal focused before (skipping closed ones).
+    pub fn focus_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.step_focus(true, window, cx);
+    }
+
+    /// Title bar Forward: undoes a Back.
+    pub fn focus_forward(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.step_focus(false, window, cx);
+    }
+
+    /// Swallowed while a panel is open, like a pane click.
+    fn step_focus(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.panels(cx).allows_app_commands() {
+            self.focus_terminal(window, cx);
+            return;
+        }
+        let current = self.tabs.active().focused;
+        let target = {
+            let alive = step_targets(&self.tabs);
+            if back {
+                self.history.back(current, &alive)
+            } else {
+                self.history.forward(current, &alive)
+            }
+        };
+        let Some(pane) = target else {
+            return;
+        };
+        self.navigating = true;
+        self.tabs.focus(pane);
+        self.after_focus_change(window, cx);
+        self.navigating = false;
+    }
+
+    /// A new workspace: Ctrl+Shift+N, the title bar "+" (and its menu) and
+    /// the "+" on this PC's sidebar group (always local). Swallowed while a
+    /// panel is open.
     pub fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.panels(cx).allows_app_commands() {
+            self.focus_terminal(window, cx);
+            return;
+        }
         self.tabs.new_tab(PaneTarget::Local);
         self.reconcile(window, cx);
+    }
+
+    /// Ctrl+Shift+T and the "+" menu's "New Tab (Terminal)": a new terminal
+    /// tab in the focused region.
+    pub fn new_terminal_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let slot = self.tabs.active().focused_slot();
+        self.new_terminal(slot, window, cx);
+    }
+
+    /// The active workspace's focused terminal (its title names the
+    /// workspace in the title bar).
+    pub(super) fn active_pane(&self) -> PaneId {
+        self.tabs.active().focused
+    }
+
+    pub(super) fn new_menu_open(&self) -> bool {
+        self.new_menu_open
+    }
+
+    /// The title bar "+" chevron: shows or hides its menu.
+    pub(super) fn toggle_new_menu(&mut self, cx: &mut Context<Self>) {
+        self.new_menu_open = !self.new_menu_open;
+        cx.notify();
+    }
+
+    /// A press outside the "+" menu, or a click on one of its rows.
+    pub(super) fn close_new_menu(&mut self, cx: &mut Context<Self>) {
+        if self.new_menu_open {
+            self.new_menu_open = false;
+            cx.notify();
+        }
     }
 
     /// Makes `slot`'s selected terminal the focused one (a button of a
@@ -695,10 +803,17 @@ impl RootView {
     }
 }
 
+/// Where Back / Forward may land: an open terminal other than the focused
+/// one (a recorded step to the focused terminal itself is skipped).
+fn step_targets(tabs: &Tabs) -> impl Fn(PaneId) -> bool + '_ {
+    let current = tabs.active().focused;
+    move |pane| pane != current && tabs.contains(pane)
+}
+
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
-        let titlebar = titlebar::render(lang, window, cx);
+        let titlebar = titlebar::render(self, lang, window, cx);
         let sidebar = if self.sidebar_visible {
             let machines = self.machines(cx);
             let local_id = this_machine_id(&machines).to_string();

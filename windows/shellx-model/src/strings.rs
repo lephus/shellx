@@ -66,7 +66,12 @@ pub enum Str {
     Version,
     IconCredits,
     CmuxCredits,
-    NewTab,
+    /// The title bar "+" (and its menu's first item); the sidebar's "+".
+    NewWorkspace,
+    /// Tooltip of the title bar "+"'s chevron.
+    NewWorkspaceOptions,
+    /// The "+" menu's second item.
+    NewTerminalTab,
     ClosePane,
     SplitRight,
     SplitDown,
@@ -74,6 +79,12 @@ pub enum Str {
     NewTerminal,
     /// Tooltip of a tab's close button.
     CloseTab,
+    /// Title bar arrows (`history::FocusHistory`).
+    FocusBack,
+    FocusForward,
+    /// Title bar tooltips.
+    ShowHideSidebar,
+    ShowNotifications,
     Copy,
     Paste,
     ToggleSidebar,
@@ -157,12 +168,18 @@ impl Str {
         Str::Version,
         Str::IconCredits,
         Str::CmuxCredits,
-        Str::NewTab,
+        Str::NewWorkspace,
+        Str::NewWorkspaceOptions,
+        Str::NewTerminalTab,
         Str::ClosePane,
         Str::SplitRight,
         Str::SplitDown,
         Str::NewTerminal,
         Str::CloseTab,
+        Str::FocusBack,
+        Str::FocusForward,
+        Str::ShowHideSidebar,
+        Str::ShowNotifications,
         Str::Copy,
         Str::Paste,
         Str::ToggleSidebar,
@@ -243,12 +260,18 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Version => "Phiên bản",
             Str::IconCredits => "coolicons by Kryston Schwarze (CC BY 4.0)",
             Str::CmuxCredits => "Dựa trên cmux (GPL-3.0)",
-            Str::NewTab => "Tab mới",
+            Str::NewWorkspace => "Phiên mới",
+            Str::NewWorkspaceOptions => "Tùy chọn phiên mới",
+            Str::NewTerminalTab => "Tab mới (terminal)",
             Str::ClosePane => "Đóng khung",
             Str::SplitRight => "Chia sang phải",
             Str::SplitDown => "Chia xuống dưới",
             Str::NewTerminal => "Terminal mới",
             Str::CloseTab => "Đóng tab",
+            Str::FocusBack => "Tiêu điểm trước",
+            Str::FocusForward => "Tiêu điểm sau",
+            Str::ShowHideSidebar => "Hiện hoặc ẩn thanh bên",
+            Str::ShowNotifications => "Hiện thông báo",
             Str::Copy => "Sao chép",
             Str::Paste => "Dán",
             Str::ToggleSidebar => "Ẩn/hiện thanh bên",
@@ -324,12 +347,18 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Version => "Version",
             Str::IconCredits => "coolicons by Kryston Schwarze (CC BY 4.0)",
             Str::CmuxCredits => "Based on cmux (GPL-3.0)",
-            Str::NewTab => "New tab",
+            Str::NewWorkspace => "New Workspace",
+            Str::NewWorkspaceOptions => "New workspace options",
+            Str::NewTerminalTab => "New Tab (Terminal)",
             Str::ClosePane => "Close pane",
             Str::SplitRight => "Split right",
             Str::SplitDown => "Split down",
             Str::NewTerminal => "New Terminal",
             Str::CloseTab => "Close Tab",
+            Str::FocusBack => "Focus Back",
+            Str::FocusForward => "Focus Forward",
+            Str::ShowHideSidebar => "Show or hide the sidebar",
+            Str::ShowNotifications => "Show notifications",
             Str::Copy => "Copy",
             Str::Paste => "Paste",
             Str::ToggleSidebar => "Toggle sidebar",
@@ -473,7 +502,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 79);
+        assert_eq!(Str::ALL.len(), 85);
     }
 
     #[test]
@@ -519,6 +548,39 @@ mod tests {
         assert_eq!(t(Lang::En, Str::NewTerminal), "New Terminal");
         assert_eq!(t(Lang::Vi, Str::CloseTab), "Đóng tab");
         assert_eq!(t(Lang::En, Str::CloseTab), "Close Tab");
+    }
+
+    #[test]
+    fn title_bar_strings_match_the_mac() {
+        let pairs = [
+            (Str::NewWorkspace, "Phiên mới", "New Workspace"),
+            (
+                Str::NewWorkspaceOptions,
+                "Tùy chọn phiên mới",
+                "New workspace options",
+            ),
+            (
+                Str::NewTerminalTab,
+                "Tab mới (terminal)",
+                "New Tab (Terminal)",
+            ),
+            (Str::FocusBack, "Tiêu điểm trước", "Focus Back"),
+            (Str::FocusForward, "Tiêu điểm sau", "Focus Forward"),
+            (
+                Str::ShowHideSidebar,
+                "Hiện hoặc ẩn thanh bên",
+                "Show or hide the sidebar",
+            ),
+            (
+                Str::ShowNotifications,
+                "Hiện thông báo",
+                "Show notifications",
+            ),
+        ];
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
     }
 
     #[test]
