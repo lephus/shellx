@@ -40,9 +40,40 @@ public struct ProgramStatusAgentSettlement: Sendable {
         activeStatusKeys(in: store).contains(statusKey)
     }
 
+    /// Agent status keys whose app had a blocked record before a change and,
+    /// after it, reports working with nothing blocked: the agent took the
+    /// answer it waited for and went on.
+    ///
+    /// Claude Code keeps its record blocked while a permission prompt or a
+    /// question waits, and reports working again once the person answers,
+    /// often long before its next hook. A blocked record that ends instead
+    /// (Esc) is ``endedActivityStatusKeys(previous:current:)``.
+    ///
+    /// - Parameters:
+    ///   - previous: The panel's records before the change.
+    ///   - current: The panel's records after the change.
+    /// - Returns: The keys whose agent reported its prompt answered.
+    public func answeredStatusKeys(
+        previous: ProgramStatusRecordStore,
+        current: ProgramStatusRecordStore
+    ) -> Set<String> {
+        let blockedBefore = statusKeys(in: previous) { $0 == .blocked }
+        guard !blockedBefore.isEmpty else { return [] }
+        return blockedBefore
+            .subtracting(statusKeys(in: current) { $0 == .blocked })
+            .intersection(statusKeys(in: current) { $0 == .working })
+    }
+
     private func activeStatusKeys(in store: ProgramStatusRecordStore) -> Set<String> {
+        statusKeys(in: store) { $0 == .working || $0 == .blocked }
+    }
+
+    private func statusKeys(
+        in store: ProgramStatusRecordStore,
+        where matches: (ProgramStatusState) -> Bool
+    ) -> Set<String> {
         var keys = Set<String>()
-        for record in store.records where record.state == .working || record.state == .blocked {
+        for record in store.records where matches(record.state) {
             if let key = statusKey(forApp: store.effectiveApp(for: record)) {
                 keys.insert(key)
             }

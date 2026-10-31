@@ -39,8 +39,10 @@ extension AgentChatSessionRegistry {
     /// Settles a Claude turn its transcript says the user interrupted: the
     /// marker Claude Code writes ends what the transcript holds. A marker from
     /// before the current working or needs-input state began belongs to an
-    /// earlier turn, or a hook after it started a newer one, and settles
-    /// nothing.
+    /// earlier turn, or a hook after it started a newer one; one from before
+    /// the session's latest hook or input was overtaken by it (a prompt sent
+    /// while working keeps the turn's start). Either settles nothing, as for
+    /// ``noteTurnSettled(surfaceID:agentKind:at:)``.
     ///
     /// - Parameters:
     ///   - sessionID: The session whose transcript holds the marker.
@@ -50,6 +52,7 @@ extension AgentChatSessionRegistry {
     func noteTranscriptInterrupt(sessionID: String, at marker: Date) -> Bool {
         guard let current = record(sessionID: sessionID),
               current.agentKind == .claude,
+              current.lastActivityAt <= marker,
               let since = Self.activeSince(current.state),
               since <= marker else { return false }
         settleInterruptedTurn(sessionID: sessionID, at: marker)

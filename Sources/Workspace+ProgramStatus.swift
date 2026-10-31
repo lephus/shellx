@@ -1,5 +1,6 @@
 import CmuxAgentChat
 import CmuxAgentJournal
+import CmuxFoundation
 import CmuxSidebar
 import Foundation
 
@@ -17,6 +18,7 @@ extension Workspace {
         let updatedStore = updateProgramStatusStore(panelId: panelId) { $0.apply(report) }
         guard let store = updatedStore else { return }
         scheduleAgentTurnSettlement(panelId: panelId, previous: previousStore, current: store)
+        resumeAnsweredAgentTurns(panelId: panelId, previous: previousStore, current: store)
         CmuxEventBus.shared.publishProgramStatusChanged(
             workspaceId: id,
             surfaceId: panelId,
@@ -260,7 +262,7 @@ extension Workspace {
         guard panels[panelId] != nil else { return }
         let store = programStatusStoresByPanelId[panelId] ?? ProgramStatusRecordStore()
         guard !ProgramStatusAgentSettlement().isActive(statusKey: key, in: store) else { return }
-        let source = key == "claude_code" ? "claude" : key
+        let source = Self.programStatusAgentSource(forKey: key)
         // The chat session on this terminal settles whatever the row says: an
         // Esc on a prompt leaves no Running row, and one during a subagent or
         // a wait tool leaves the PreToolUse's Subagents or Waiting row. Its
@@ -274,8 +276,11 @@ extension Workspace {
               reported.timestamp <= edge else { return }
         switch agentLifecycleStatesByPanelId[panelId]?[key] {
         case .running?:
-            // Only a foreground Running row is stale. A Waiting or subagent
-            // row means the turn ended with background work still live.
+            // Only a foreground Running row settles. A Waiting or subagent
+            // row stays: the turn may have ended with background work still
+            // live, or the person pressed Esc during a foreground subagent
+            // or wait tool, and the edge cannot tell which. The next hook
+            // settles it.
             guard reported.workState == .running else { return }
         case .needsInput?:
             // Claude keeps its record blocked while a permission prompt or a
@@ -289,29 +294,14 @@ extension Workspace {
 #if DEBUG
         cmuxDebugLog("agentTurn.settleFromProgramStatus panel=\(panelId.uuidString.prefix(8)) key=\(key)")
 #endif
-        let sessionID = surfaceResumeBindingsByPanelId[panelId].flatMap { binding -> String? in
-            guard binding.isAgentHookBinding,
-                  binding.kind?.lowercased() == source else { return nil }
-            return binding.checkpointId
-        }
-        let draft = sessionID.map { sessionID in
-            AgentJournalEventDraft(
-                kind: .turnCompleted,
-                occurredAtMs: Int64(edge.timeIntervalSince1970 * 1_000),
-                source: source,
-                agentKey: key,
-                sessionId: sessionID,
-                workspaceId: id.uuidString,
-                surfaceId: panelId.uuidString,
-                nativeEvent: "program_status_idle"
-            )
-        }
-        if let draft, draft.validationProblem() == nil {
-            // The journal projects the lifecycle, so it and the reducer agree.
-            AgentJournalLifecycleCenter.shared.enqueueAppend(draft)
-        } else {
-            setAgentLifecycle(key: key, panelId: panelId, lifecycle: .idle)
-        }
+        applyProgramStatusLifecycle(
+            .idle,
+            journalKind: .turnCompleted,
+            nativeEvent: "program_status_idle",
+            key: key,
+            panelId: panelId,
+            edge: edge
+        )
         setStatusEntry(
             SidebarStatusEntry(
                 key: key,
@@ -323,5 +313,107 @@ extension Workspace {
             key: key,
             panelId: panelId
         )
+    }
+
+    /// Returns a pane's Needs input rows to Running when their agent reports
+    /// over OSC 7501 that the prompt it waited on was answered. Claude Code
+    /// keeps its record blocked while a permission prompt or a question
+    /// waits, and reports working again once the person answers, often long
+    /// before the next hook: an AskUserQuestion or ExitPlanMode under
+    /// bypassPermissions has none until the next tool, an approved tool none
+    /// until it ends. The row's waiting border stops with it.
+    private func resumeAnsweredAgentTurns(
+        panelId: UUID,
+        previous: ProgramStatusRecordStore,
+        current: ProgramStatusRecordStore
+    ) {
+        let keys = ProgramStatusAgentSettlement().answeredStatusKeys(previous: previous, current: current)
+        guard !keys.isEmpty else { return }
+        let edge = Date()
+        for key in keys {
+            resumeAnsweredAgentTurn(key: key, panelId: panelId, edge: edge)
+        }
+    }
+
+    /// Moves one pane's Needs input row for `key` back to Running at `edge`,
+    /// when its agent reported the prompt answered. A row a hook reported
+    /// after the edge, a failure's row (the journal shows a failed turn as
+    /// needs input too) and a row in any other state stay as they are.
+    private func resumeAnsweredAgentTurn(key: String, panelId: UUID, edge: Date) {
+        guard panels[panelId] != nil,
+              agentLifecycleStatesByPanelId[panelId]?[key] == .needsInput,
+              let reported = agentStatusEntriesByPanelId[panelId]?[key],
+              reported.timestamp <= edge,
+              !SidebarCompactStatusGlyph.reportsError(reported) else { return }
+#if DEBUG
+        cmuxDebugLog("agentTurn.answeredFromProgramStatus panel=\(panelId.uuidString.prefix(8)) key=\(key)")
+#endif
+        // A resolution, not a new turn: the journal retires the wait it
+        // answered, so the turn's next tool event stays running.
+        applyProgramStatusLifecycle(
+            .running,
+            journalKind: .attentionResolved,
+            declaredPhase: .running,
+            nativeEvent: "program_status_working",
+            key: key,
+            panelId: panelId,
+            edge: edge
+        )
+        setStatusEntry(
+            SidebarStatusEntry(
+                key: key,
+                value: String(localized: "agent.generic.status.running", defaultValue: "Running"),
+                icon: "bolt.fill",
+                color: CmuxAccentColor.builtInAgentStatusHex,
+                timestamp: edge,
+                workState: .running
+            ),
+            key: key,
+            panelId: panelId
+        )
+    }
+
+    /// The hook source an OSC 7501 agent status key belongs to.
+    private static func programStatusAgentSource(forKey key: String) -> String {
+        key == "claude_code" ? "claude" : key
+    }
+
+    /// Moves a pane's agent lifecycle at `edge` the way its hooks do: through
+    /// the agent journal when a hook bound the pane's session, so the
+    /// journal's fold and the sidebar agree and later hook events are judged
+    /// against it; directly otherwise.
+    private func applyProgramStatusLifecycle(
+        _ lifecycle: AgentHibernationLifecycleState,
+        journalKind: AgentJournalEventKind,
+        declaredPhase: AgentLifecyclePhase? = nil,
+        nativeEvent: String,
+        key: String,
+        panelId: UUID,
+        edge: Date
+    ) {
+        let source = Self.programStatusAgentSource(forKey: key)
+        let sessionID = surfaceResumeBindingsByPanelId[panelId].flatMap { binding -> String? in
+            guard binding.isAgentHookBinding,
+                  binding.kind?.lowercased() == source else { return nil }
+            return binding.checkpointId
+        }
+        let draft = sessionID.map { sessionID in
+            AgentJournalEventDraft(
+                kind: journalKind,
+                occurredAtMs: Int64(edge.timeIntervalSince1970 * 1_000),
+                source: source,
+                agentKey: key,
+                sessionId: sessionID,
+                workspaceId: id.uuidString,
+                surfaceId: panelId.uuidString,
+                nativeEvent: nativeEvent,
+                declaredPhase: declaredPhase
+            )
+        }
+        if let draft, draft.validationProblem() == nil, AgentJournalLifecycleCenter.shared.isAvailable {
+            AgentJournalLifecycleCenter.shared.enqueueAppend(draft)
+        } else {
+            setAgentLifecycle(key: key, panelId: panelId, lifecycle: lifecycle)
+        }
     }
 }

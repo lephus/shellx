@@ -34,8 +34,19 @@ Program status rows are terminal state, not agent state: they do not change agen
 agent detection, or desktop notifications. Use `cmux notify` or OSC 9/99/777 for notifications.
 
 One exception keeps agent rows honest. Claude Code reports its turns as `app=claude-code`
-records. When such a `working` or `blocked` record ends (a `done`, `idle`, `error` or `clear`
-report, a prompt start, or the process exiting) while that pane's Claude Code row still says
-Running, and no Claude Code hook reports anything for 3 seconds, cmux marks the turn finished and
-shows Idle. This covers turns that end without a Stop hook, such as an Esc interrupt or a Stop hook
-that timed out. It never sends a notification, and it only moves a pane from Running to Idle.
+records: `working` while it works, and `blocked` while a permission prompt or a question waits for
+you.
+
+- When such a `working` or `blocked` record ends (a `done`, `idle`, `error` or `clear` report, a
+  prompt start, or the process exiting) and no Claude Code hook reports anything for 3 seconds,
+  cmux marks the turn finished. A pane row that still says Running shows Idle, and so does a Needs
+  input row whose prompt you cancelled with Esc. A failure's row stays, and so does a Running
+  subagents or Waiting row, because the turn may have left that work running. The agent chat
+  session on that terminal, which the ShellX iPhone app shows, also settles to idle, unless a hook
+  or your typing moved it after the record ended. This covers turns that end without a Stop hook,
+  such as an Esc interrupt or a Stop hook that timed out.
+- When a `blocked` record reports `working` again, you answered the prompt. A pane row that still
+  says Needs input returns to Running at once, so its waiting border stops while Claude Code goes
+  on, often long before the next hook. A failure's row stays.
+
+Neither sends a notification.
