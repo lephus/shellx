@@ -335,6 +335,22 @@ final class WorkspaceListActionsTests: XCTestCase {
         XCTAssertEqual(rig.hub.liveSessions.count, 1, "the agent still runs")
     }
 
+    func testCloseAgentTheMacRefusesSaysWhy() async throws {
+        let mac = await macWithAnAgent()
+        let rig = try await makeRig([mac])
+        let running = await eventually { rig.hub.machines.first?.state == .online && rig.hub.liveSessions.count == 1 }
+        XCTAssertTrue(running)
+        // Remote control blocked, or the agent's tab is the last of a pinned or kept-open workspace.
+        await mac.setNextAgentCloseOutcome(.refused)
+
+        rig.actions.closeAgent(agentRef(mac))
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .alert(.refusedCloseAgent))
+        XCTAssertEqual(rig.screen.alerts, [.refusedCloseAgent])
+        XCTAssertEqual(rig.hub.liveSessions.count, 1, "the agent still runs")
+    }
+
     func testOnlyAnOnlineMacThatTakesAgentCloseOffersIt() async throws {
         let modern = await macWithAnAgent(name: "MacBook Pro")
         let old = await macWithAnAgent(name: "iMac", acceptsAgentClose: false)
