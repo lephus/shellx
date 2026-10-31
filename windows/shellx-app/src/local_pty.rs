@@ -195,10 +195,13 @@ impl ShellCmd {
     }
 }
 
-/// PowerShell: keep the profile's `prompt` and write the working directory
-/// (OSC 7) before it at every prompt. The profile still loads (`-Command`
-/// runs after it); without a `prompt` function the stock look is used.
-const POWERSHELL_HOOK: &str = r#"$__shellxPrompt = $function:prompt; function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; if ($__shellxPrompt) { & $__shellxPrompt } else { "PS $($l.Path)> " } }"#;
+/// PowerShell: wrap the profile's `prompt` so the working directory (OSC 7)
+/// is written at every prompt. The wrapper calls the original FIRST, so a
+/// theme (oh-my-posh, starship) still reads the real `$?` of the user's last
+/// command, and writes OSC 7 after it. Without a `prompt` function the
+/// fallback writes OSC 7 and returns the stock `PS <path>> `. The profile
+/// still loads (`-Command` runs after it).
+const POWERSHELL_HOOK: &str = r#"if ($function:prompt) { $__shellxPrompt = $function:prompt; function global:prompt { $p = & $__shellxPrompt; $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; $p } } else { function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; "PS $($l.Path)> " } }"#;
 
 /// bash (the macOS dev harness): the same OSC 7 before every prompt.
 const BASH_PROMPT_COMMAND: &str = r#"printf '\033]7;file://%s%s\033\\' "$HOSTNAME" "$PWD""#;
@@ -263,6 +266,27 @@ mod tests {
                 .expect("PROMPT_COMMAND is set");
             assert!(prompt_command.contains("]7;file://"));
         }
+    }
+
+    /// Themes (oh-my-posh, starship) read `$?` first in their prompt, so the
+    /// wrapper must call the original before it runs any statement of its own.
+    #[test]
+    fn powershell_hook_runs_the_users_prompt_first() {
+        let (_, wrapped) = POWERSHELL_HOOK
+            .split_once("function global:prompt { ")
+            .unwrap();
+        assert!(
+            wrapped.starts_with("$p = & $__shellxPrompt; "),
+            "the wrapped prompt must start with the original call: {wrapped}"
+        );
+        // OSC 7 is written after it, and the original's string is the result.
+        let called = wrapped.find("$p = &").unwrap();
+        let osc7 = wrapped.find("]7;file://").unwrap();
+        assert!(called < osc7);
+        assert!(wrapped.contains("}; $p }"));
+        // Without a prompt function the fallback still reports the directory.
+        let (_, fallback) = POWERSHELL_HOOK.split_once("} else { ").unwrap();
+        assert!(fallback.contains("]7;file://") && fallback.contains("\"PS $($l.Path)> \""));
     }
 
     /// The dev-harness bash end to end: `cd` makes the prompt hook write an
