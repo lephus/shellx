@@ -34,7 +34,6 @@ struct ShellXCreatorSessionTests {
     private func makeSession(_ launcher: FakeLauncher) -> ShellXCreatorSession {
         ShellXCreatorSession(
             launcher: launcher,
-            claudePath: "/usr/local/bin/claude",
             systemPrompt: "Use {{SHELLX_CLI}} now.",
             workingDirectory: URL(filePath: "/tmp"),
             localeIdentifier: "vi_VN",
@@ -149,5 +148,33 @@ struct ShellXCreatorSessionTests {
         var count = 0
         for await _ in session.events { count += 1 }
         #expect(count == 0)
+    }
+
+    @Test func errorResultBecomesFailedBeforeIdle() async throws {
+        let launcher = FakeLauncher()
+        let session = makeSession(launcher)
+        try await session.start(seed: nil)
+        launcher.continuation.yield(#"{"type":"result","subtype":"success","is_error":true,"result":"Not logged in"}"#)
+        let events = await collect(session) { $0 == .busy(false) }
+        #expect(events == [.failed("Not logged in"), .busy(false)])
+    }
+
+    @Test func errorSubtypeResultBecomesFailed() async throws {
+        let launcher = FakeLauncher()
+        let session = makeSession(launcher)
+        try await session.start(seed: nil)
+        launcher.continuation.yield(#"{"type":"result","subtype":"error_max_turns"}"#)
+        let events = await collect(session) { $0 == .busy(false) }
+        #expect(events == [.failed("error_max_turns"), .busy(false)])
+    }
+
+    @Test func seedFenceOutgrowsBackticksInContent() throws {
+        let automation = ShellXAutomation(
+            id: "i", kind: .skill, name: "n", description: "d",
+            createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0),
+            directory: URL(filePath: "/tmp")
+        )
+        let text = ShellXCreatorSeed(automation: automation, skillMarkdown: "a\n```bash\nls\n```\n").firstMessage
+        #expect(text.contains("````markdown\n"))
     }
 }

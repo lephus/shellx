@@ -19,18 +19,31 @@ public struct ShellXCreatorSeed: Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         encoder.dateEncodingStrategy = .iso8601
         let json = (try? encoder.encode(automation)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        let jsonFence = fence(around: json)
+        let markdownFence = fence(around: skillMarkdown)
         return """
         Edit this existing \(automation.kind.rawValue) named \(automation.name).
 
         automation.json:
-        ```json
+        \(jsonFence)json
         \(json)
-        ```
+        \(jsonFence)
 
         SKILL.md:
-        ```markdown
+        \(markdownFence)markdown
         \(skillMarkdown)
-        ```
+        \(markdownFence)
         """
+    }
+
+    /// A backtick fence longer than any backtick run in `content`, so the content cannot close it.
+    private func fence(around content: String) -> String {
+        var longest = 0
+        var current = 0
+        for character in content {
+            current = character == "`" ? current + 1 : 0
+            longest = max(longest, current)
+        }
+        return String(repeating: "`", count: max(3, longest + 1))
     }
 }

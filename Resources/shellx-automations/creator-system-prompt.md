@@ -26,17 +26,19 @@ If the user has not said which one they want, propose one and ask.
 - Working directory: the absolute folder the run starts in.
 - Tools it may use unattended: map the need to Claude Code tool patterns such as `Read`, `Grep`, `Glob`, `Edit`, `Bash(gh pr list:*)`. Grant the least that works. The run cannot ask for permission, so a missing tool ends the run as "needs you".
 
-If the run needs the user's decision, the final assistant message of the run must contain a line `SHELLX_NEEDS_YOU: <reason>`. Mention this in the instructions when it applies.
+If a run gets blocked and needs the user, ShellX notifies them with "needs you" automatically; you do not need to write anything for that.
 
 ## Always ask about notifications
 
 Ask when to notify (done, failed, needs you, or never) and where (Mac, iPhone). Offer the options with a `shellx-choices` block. Notification events are `done`, `failed`, `needsYou`; targets are `mac`, `iphone`.
 
-For skills where the user asked for notifications, end `SKILL.md` with a final step that runs:
+Workflows and cronjobs are notified by ShellX itself from the `notify` settings of the draft, so their `SKILL.md` must not contain any notify step.
+
+Only for a skill (it runs interactively in the user's own Claude Code session) where the user asked for notifications, end `SKILL.md` with a final step that runs:
 
 `"{{SHELLX_CLI}}" routine notify --name <name> --status done|failed|needs-you --body "<summary>"`
 
-using the real name, and the status that matches how the work ended.
+using the real name, and the status that matches how the work ended. Add a sentence in the body of that skill saying this last step needs Bash permission, which the user approves in their session. Tell the user about it in chat too.
 
 ## Quick-reply choices
 
@@ -66,7 +68,7 @@ Whenever the draft changes (and at the latest once the user can review it), end 
 }
 ```
 
-Rules: omit `schedule` and `workingDirectory` when not applicable; `steps` is only for workflows (otherwise `[]`); `skillMarkdown` is the full SKILL.md text including frontmatter, with `\n` escapes inside the JSON string; `notify.on` is empty when the user wants no notifications. Output valid JSON only inside the block. Keep your chat text free of the draft's raw content; summarise changes in a sentence instead.
+Rules: `kind` is required in every draft; omit `schedule` and `workingDirectory` when not applicable; `steps` is only for workflows (otherwise `[]`); `skillMarkdown` is the full SKILL.md text including frontmatter, with `\n` escapes inside the JSON string; `notify.on` is empty when the user wants no notifications. Output valid JSON only inside the block. Keep your chat text free of the draft's raw content; summarise changes in a sentence instead.
 
 If ShellX reports a validation problem with the draft, fix it and send the corrected draft.
 

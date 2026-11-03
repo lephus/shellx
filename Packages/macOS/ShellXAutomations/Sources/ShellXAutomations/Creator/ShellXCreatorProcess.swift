@@ -69,12 +69,19 @@ public struct ShellXCreatorProcess: ShellXCreatorProcessLaunching {
         }
 
         let send: @Sendable (String) async throws -> Void = { line in
+            guard process.isRunning else { throw Failure(message: "Claude Code is not running.") }
             try stdinWriter.write(contentsOf: Data((line + "\n").utf8))
         }
         let stop: @Sendable () async -> Void = {
             try? stdinWriter.close()
             if process.isRunning { process.terminate() }
-            await Task.detached { process.waitUntilExit() }.value
+            let waiter = Task.detached { process.waitUntilExit() }
+            let killer = Task {
+                try await Task.sleep(for: .seconds(2))
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            }
+            await waiter.value
+            killer.cancel()
         }
         return (lines, send, stop)
     }

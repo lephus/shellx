@@ -19,8 +19,9 @@ public struct ShellXAssistantBlockParser: Sendable {
         var visible = ""
         while true {
             if inBlock {
-                guard let close = pending.range(of: Self.fence) else { return visible }
-                pending = Self.dropingLeadingNewline(String(pending[close.upperBound...]))
+                // A fence line without its newline may still grow (```json), so wait for the newline.
+                guard let close = Self.closingFence(in: pending[...]), close.terminated else { return visible }
+                pending = String(pending[close.range.upperBound...])
                 inBlock = false
                 continue
             }
@@ -72,7 +73,7 @@ public struct ShellXAssistantBlockParser: Sendable {
             }
             let bodyStart = infoEnd < afterFence.endIndex ? afterFence.index(after: infoEnd) : infoEnd
             let body = afterFence[bodyStart...]
-            let close = body.range(of: Self.fence)
+            let close = Self.closingFence(in: body)?.range
             let json = close.map { body[..<$0.lowerBound] } ?? body
             let data = Data(json.utf8)
             switch info.trimmingCharacters(in: .whitespaces) {
@@ -88,14 +89,30 @@ public struct ShellXAssistantBlockParser: Sendable {
                 break
             }
             guard let close else { rest = ""; break }
-            rest = Substring(Self.dropingLeadingNewline(String(body[close.upperBound...])))
+            rest = body[close.upperBound...]
         }
         visible += rest
         return (visible.trimmingCharacters(in: .whitespacesAndNewlines), draft, choices)
     }
 
-    private static func dropingLeadingNewline(_ text: String) -> String {
-        text.hasPrefix("\n") ? String(text.dropFirst()) : text
+    /// Finds the first line that is only a fence (plus trailing spaces).
+    ///
+    /// `range` covers the line including its newline; `terminated` tells whether the newline was present.
+    /// Valid JSON bodies hold newlines only as `\n` escapes, so a line-start fence is never inside the JSON.
+    private static func closingFence(in text: Substring) -> (range: Range<Substring.Index>, terminated: Bool)? {
+        var lineStart = text.startIndex
+        while lineStart < text.endIndex {
+            let newline = text[lineStart...].firstIndex(of: "\n")
+            let lineEnd = newline ?? text.endIndex
+            let line = text[lineStart..<lineEnd]
+            if line.hasPrefix(fence), line.dropFirst(fence.count).allSatisfy({ $0 == " " }) {
+                let end = newline.map { text.index(after: $0) } ?? text.endIndex
+                return (lineStart..<end, newline != nil)
+            }
+            guard let newline else { return nil }
+            lineStart = text.index(after: newline)
+        }
+        return nil
     }
 
     private static func trailingBackticks(_ text: String) -> Int {

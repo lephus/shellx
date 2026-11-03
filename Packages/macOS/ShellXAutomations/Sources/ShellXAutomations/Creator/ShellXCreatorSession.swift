@@ -7,8 +7,6 @@ public import Foundation
 public actor ShellXCreatorSession {
     /// Events for the UI; finishes when the session is cancelled.
     public nonisolated let events: AsyncStream<ShellXCreatorEvent>
-    /// Path of the `claude` executable the launcher was built for.
-    public nonisolated let claudePath: String
 
     private let continuation: AsyncStream<ShellXCreatorEvent>.Continuation
     private let launcher: any ShellXCreatorProcessLaunching
@@ -24,14 +22,12 @@ public actor ShellXCreatorSession {
     ///
     /// - Parameters:
     ///   - launcher: Starts Claude Code.
-    ///   - claudePath: Path of the `claude` executable.
     ///   - systemPrompt: Prompt text; `{{SHELLX_CLI}}` is replaced with `cliPath`.
     ///   - workingDirectory: Scratch directory Claude Code runs in.
     ///   - localeIdentifier: Locale the assistant replies in by default.
     ///   - cliPath: Absolute path of the `shellx` CLI.
     public init(
         launcher: any ShellXCreatorProcessLaunching,
-        claudePath: String,
         systemPrompt: String,
         workingDirectory: URL,
         localeIdentifier: String,
@@ -39,7 +35,6 @@ public actor ShellXCreatorSession {
     ) {
         (events, continuation) = AsyncStream<ShellXCreatorEvent>.makeStream()
         self.launcher = launcher
-        self.claudePath = claudePath
         self.workingDirectory = workingDirectory
         self.systemPrompt = systemPrompt.replacingOccurrences(of: "{{SHELLX_CLI}}", with: cliPath)
             + "\n\nReply in the language of this locale unless the user writes in another language: \(localeIdentifier)."
@@ -66,7 +61,14 @@ public actor ShellXCreatorSession {
                 await self?.processEnded(error: error)
             }
         }
-        if let seed { try await send(seed.firstMessage) }
+        if let seed {
+            do {
+                try await send(seed.firstMessage)
+            } catch {
+                await cancel()
+                throw error
+            }
+        }
     }
 
     /// Sends a user message and marks the session busy.
@@ -120,6 +122,11 @@ public actor ShellXCreatorSession {
             continuation.yield(.assistantMessage(text: result.visible, choices: result.choices))
         case "result":
             parser = ShellXAssistantBlockParser()
+            let subtype = object["subtype"] as? String
+            if object["is_error"] as? Bool == true || (subtype != nil && subtype != "success") {
+                let text = (object["result"] as? String) ?? ""
+                continuation.yield(.failed(text.isEmpty ? (subtype ?? "Claude Code reported an error.") : text))
+            }
             continuation.yield(.busy(false))
         default:
             break

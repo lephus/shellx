@@ -75,4 +75,28 @@ struct ShellXAssistantBlockParserTests {
         #expect(draft?.skillMarkdown == "")
         #expect(draft?.notify == ShellXNotifySettings(on: [.done], targets: []))
     }
+
+    @Test func fencedSkillMarkdownInsideDraftDoesNotCloseBlock() {
+        var parser = ShellXAssistantBlockParser()
+        let json = ##"{"kind":"skill","name":"x","description":"d","skillMarkdown":"# T\n```bash\nls\n```\nend"}"##
+        let text = "Ok.\n```shellx-draft\n\(json)\n```\nBye"
+        var visible = ""
+        for chunk in stride(from: 0, to: text.count, by: 7) {
+            let start = text.index(text.startIndex, offsetBy: chunk)
+            let end = text.index(start, offsetBy: min(7, text.count - chunk))
+            visible += parser.ingest(delta: String(text[start..<end]))
+        }
+        #expect(visible == "Ok.\nBye")
+        let result = parser.finish(fullText: text)
+        #expect(result.draft?.skillMarkdown == "# T\n```bash\nls\n```\nend")
+        #expect(result.visible == "Ok.\nBye")
+    }
+
+    @Test func closingFenceSplitAcrossDeltas() {
+        var parser = ShellXAssistantBlockParser()
+        var visible = parser.ingest(delta: "A\n```shellx-draft\n{\"kind\":\"skill\"}\n``")
+        visible += parser.ingest(delta: "`")
+        visible += parser.ingest(delta: "\nAfter")
+        #expect(visible == "A\nAfter")
+    }
 }
