@@ -67,7 +67,7 @@ const ld = [
       '@type': 'HowToStep', position: i + 1, text, url: `${url}#start`,
     })),
   },
-  { '@context': 'https://schema.org', ...organization, sameAs: [discordUrl] },
+  { '@context': 'https://schema.org', ...organization, sameAs: [discordUrl, 'https://github.com/lephus/shellx'] },
   { '@context': 'https://schema.org', ...author },
   {
     '@context': 'https://schema.org', '@type': 'WebSite', '@id': `${site}/#website`,
