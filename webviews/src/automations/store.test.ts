@@ -305,3 +305,23 @@ test("Edit on the automation already being edited goes back to its draft without
   expect(store.getState().view).toBe("creator");
   expect(calls.filter((c) => c.method === "creator.start")).toHaveLength(1);
 });
+
+test("an event the discarded session sent while it was being stopped does not reach the next creator", async () => {
+  let emitStale: () => void = () => {};
+  const f = fakeBridge({
+    "automations.list": () => ({ automations: [dto({})] }),
+    "creator.cancel": () => (emitStale(), null),
+  });
+  const store = new AutomationsStore(f.bridge);
+  await store.start();
+  emitStale = () => f.emit(creator({ type: "textDelta", text: "stale" }));
+  await store.startCreator();
+  await store.sendMessage("hi");
+  await store.leaveCreator();
+
+  store.requestDiscard();
+  await store.confirmDiscard();
+
+  expect(store.getState().creator.streaming).toBeNull();
+  expect(store.getState().creator.busy).toBe(false);
+});

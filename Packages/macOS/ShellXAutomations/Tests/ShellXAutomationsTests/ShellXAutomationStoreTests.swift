@@ -139,6 +139,24 @@ private struct Fixture {
         #expect(!FileManager.default.fileExists(atPath: newFolder.appending(path: ".shellx.json").path))
     }
 
+    @Test func externalSkillKeepsItsFolderWhenItsNameIsUnchanged() async throws {
+        let f = Fixture()
+        let folder = f.environment.skillsRoot.appending(path: "foo")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "---\nname: bar\ndescription: Old\n---\n".write(to: folder.appending(path: "SKILL.md"), atomically: true, encoding: .utf8)
+        #expect(try await f.store.automation(id: "external:foo")?.name == "bar")
+
+        let edited = ShellXAutomationDraft(
+            kind: .skill, name: "bar", description: "New",
+            skillMarkdown: "---\nname: bar\ndescription: New\n---\nBetter\n"
+        )
+        let saved = try await f.store.save(edited, replacing: "external:foo")
+
+        #expect(saved.id == "external:foo")
+        #expect(try String(contentsOf: folder.appending(path: "SKILL.md"), encoding: .utf8) == edited.skillMarkdown)
+        #expect(!FileManager.default.fileExists(atPath: f.environment.skillsRoot.appending(path: "bar").path))
+    }
+
     @Test func externalSkillCannotBecomeAnAutomation() async throws {
         let f = Fixture()
         let other = f.environment.skillsRoot.appending(path: "other")
