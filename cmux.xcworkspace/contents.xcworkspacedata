@@ -333,6 +333,9 @@
       <FileRef
          location = "group:CmuxWorkspaces">
       </FileRef>
+      <FileRef
+         location = "group:ShellXAutomations">
+      </FileRef>
    </Group>
    <Group
       location = "container:Examples"
