@@ -133,7 +133,10 @@ struct ShellXCreatorSessionTests {
         #expect(Array(args.prefix(8)) == ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--include-partial-messages", "--verbose", "--append-system-prompt"])
         #expect(args[8].hasPrefix("Use /Applications/ShellX.app/shellx now."))
         #expect(args[8].hasSuffix("Reply in the language of this locale unless the user writes in another language: vi_VN."))
-        #expect(Array(args.suffix(4)) == ["--allowedTools", "Read,Glob,Grep", "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch"])
+        #expect(Array(args.suffix(7)) == [
+            "--allowedTools", "Read,Glob,Grep", "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch",
+            "--permission-mode", "default", "--strict-mcp-config",
+        ])
     }
 
     @Test func seedFirstMessageContainsFiles() async throws {

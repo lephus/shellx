@@ -82,7 +82,11 @@ final class ShellXAutomationsSidebarButton: NSButton {
 
     /// - Parameter environment: Where the button learns whether it can be seen and whether
     ///   motion is reduced. The system environment by default; tests pass their own.
-    init(environment: any TitleEffectEnvironment = SystemTitleEffectEnvironment()) {
+    init(
+        environment: any TitleEffectEnvironment = SystemTitleEffectEnvironment(),
+        notificationCenter: NotificationCenter = .default,
+        isApplicationActive: @escaping @MainActor () -> Bool = { NSApplication.shared.isActive }
+    ) {
         self.environment = environment
         reduceMotion = environment.reducesMotion
         super.init(frame: .zero)

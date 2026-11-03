@@ -128,6 +128,24 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertTrue(fixture.log.all.contains { $0.contains("creator.send") && $0.contains("Fix:") })
     }
 
+    /// A workflow with no steps is not saved; its issue names the steps field so the page shows it there.
+    func testSaveRejectsAWorkflowWithoutSteps() async throws {
+        var draft = fixture.cronDraft("empty-flow")
+        draft.kind = .workflow
+        draft.schedule = nil
+        draft.steps = []
+        try await startCreatorWithDraft(draft)
+
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let issues = try XCTUnwrap(result(reply)?["issues"] as? [[String: Any]])
+        let steps = try XCTUnwrap(issues.first { $0["field"] as? String == "steps" })
+        XCTAssertEqual(steps["code"] as? String, "missing")
+        XCTAssertEqual(steps["message"] as? String, "A workflow needs at least one step.")
+        let list = try await fixture.store.list()
+        XCTAssertTrue(list.isEmpty)
+    }
+
     func testSaveInstallsSchedule() async throws {
         try await startCreatorWithDraft(fixture.cronDraft())
 

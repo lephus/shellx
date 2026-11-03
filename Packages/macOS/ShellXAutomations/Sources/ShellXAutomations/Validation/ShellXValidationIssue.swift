@@ -2,7 +2,7 @@
 public struct ShellXValidationIssue: Sendable, Equatable {
     /// The draft field an issue refers to.
     public enum Field: String, Sendable, Equatable {
-        case name, description, schedule, workingDirectory, skillMarkdown, claude
+        case name, description, schedule, workingDirectory, skillMarkdown, claude, steps
     }
 
     /// Field with the problem.

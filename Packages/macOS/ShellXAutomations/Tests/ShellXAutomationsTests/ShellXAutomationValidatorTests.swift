@@ -12,11 +12,14 @@ struct ShellXAutomationValidatorTests {
         description: String = "Does things",
         schedule: ShellXSchedule? = nil,
         workingDirectory: String? = nil,
-        markdownName: String? = nil
+        markdownName: String? = nil,
+        steps: [ShellXWorkflowStep]? = nil
     ) -> ShellXAutomationDraft {
         ShellXAutomationDraft(
             kind: kind, name: name, description: description, schedule: schedule,
-            workingDirectory: workingDirectory, skillMarkdown: markdown(markdownName ?? name)
+            workingDirectory: workingDirectory,
+            steps: steps ?? (kind == .workflow ? [ShellXWorkflowStep(title: "Check", prompt: "Check the build")] : []),
+            skillMarkdown: markdown(markdownName ?? name)
         )
     }
 
@@ -49,6 +52,18 @@ struct ShellXAutomationValidatorTests {
     @Test func workflowScheduleIsOptional() {
         let issues = validator().validate(draft(kind: .workflow, workingDirectory: "/work"), replacingName: nil)
         #expect(issues.isEmpty)
+    }
+
+    /// A workflow with nothing to run would only ever fail with "This workflow has no steps."
+    @Test func workflowNeedsSteps() {
+        let issues = validator().validate(draft(kind: .workflow, workingDirectory: "/work", steps: []), replacingName: nil)
+        #expect(issues == [ShellXValidationIssue(field: .steps, code: "missing", message: "A workflow needs at least one step.")])
+    }
+
+    @Test func workflowStepNeedsAPrompt() {
+        let steps = [ShellXWorkflowStep(title: "One", prompt: "Do it"), ShellXWorkflowStep(title: "Two", prompt: " \n ")]
+        let issues = validator().validate(draft(kind: .workflow, workingDirectory: "/work", steps: steps), replacingName: nil)
+        #expect(issues == [ShellXValidationIssue(field: .steps, code: "emptyPrompt", message: "Every step needs a prompt.")])
     }
 
     @Test func missingDirectoryIsNotFound() {

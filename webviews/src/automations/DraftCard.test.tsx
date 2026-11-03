@@ -54,6 +54,15 @@ test("issues render under their field and model text stays text", () => {
   expect(html).toContain("Claude Code not found");
 });
 
+test("a steps issue shows under the steps field even with no steps", () => {
+  const html = render({ ...empty, kind: "workflow", name: "x" }, [
+    { field: "steps", code: "missing", message: "A workflow needs at least one step." },
+  ]);
+  const stepsRow = html.indexOf('data-field="steps"');
+  expect(stepsRow).toBeGreaterThan(-1);
+  expect(html.indexOf("A workflow needs at least one step.")).toBeGreaterThan(stepsRow);
+});
+
 test("the iPhone target shows the pending label", () => {
   const html = render({ ...empty, name: "x", notify: { on: ["done"], targets: ["mac", "iphone"] } });
   expect(html).toContain("When done");

@@ -8,7 +8,7 @@ public struct ShellXClaudeProcess: ShellXClaudeLaunching {
     private let environment: [String: String]
 
     /// Creates a launcher for the binary at `executable` using `environment` (usually the current one).
-    public init(executable: String, environment: [String: String]) {
+    public init(executable: String, environment: [String: String], timeLimit: Duration = .seconds(2 * 60 * 60)) {
         self.executable = executable
         self.environment = environment
     }

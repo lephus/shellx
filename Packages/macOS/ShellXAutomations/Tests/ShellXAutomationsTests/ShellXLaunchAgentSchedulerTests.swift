@@ -61,7 +61,9 @@ private struct Fixture {
         let log = a.directory.appending(path: "launchd.log").path
         #expect(dict["StandardOutPath"] as? String == log)
         #expect(dict["StandardErrorPath"] as? String == log)
-        #expect(dict["WorkingDirectory"] as? String == "/work")
+        // launchd's chdir into a TCC-protected or deleted project folder would stop the job from ever starting;
+        // the runner gives claude the project folder itself.
+        #expect(dict["WorkingDirectory"] as? String == a.directory.path)
         #expect(dict["ProcessType"] as? String == "Background")
         #expect(dict["RunAtLoad"] == nil)
     }

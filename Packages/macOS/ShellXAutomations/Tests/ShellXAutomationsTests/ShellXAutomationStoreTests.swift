@@ -314,6 +314,42 @@ private struct Fixture {
         }
     }
 
+    /// A run whose CLI was killed after `beginRun` (logout, reboot) leaves `running` on disk with nobody holding
+    /// `run.lock`; readers report it as failed instead of running forever.
+    @Test func interruptedRunReadsAsFailed() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        _ = try #require(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: 7))
+        let reader = ShellXAutomationStore(environment: f.environment, trasher: f.trasher, now: { Date() })
+        #expect(try await reader.runs(id: cron.id, limit: 5).first?.status == .running, "a held lock means the run is live")
+        #expect(try await f.store.runs(id: cron.id, limit: 5).first?.status == .running, "the store's own held lock is never free")
+
+        // The holder dies without finishing: the kernel drops its lock.
+        close(try #require(await f.store.heldLockDescriptor(for: cron.id)))
+
+        let runs = try await reader.runs(id: cron.id, limit: 5)
+        #expect(runs.first?.status == .failed)
+        #expect(runs.first?.reason == "The run was interrupted.")
+        let last = try await reader.automation(id: cron.id)?.lastRun
+        #expect(last?.status == .failed && last?.reason == "The run was interrupted.")
+        #expect(try await reader.list().first { $0.id == cron.id }?.lastRun?.status == .failed)
+    }
+
+    /// Only the newest run can still be going; an older `running` record was interrupted even while a newer run holds the lock.
+    @Test func olderRunningRecordReadsAsFailedWhileNewerRunHoldsTheLock() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        _ = try #require(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: 7))
+        close(try #require(await f.store.heldLockDescriptor(for: cron.id)))
+        let second = ShellXAutomationStore(environment: f.environment, trasher: f.trasher, now: { Date(timeIntervalSince1970: 1_900_000_000) })
+        _ = try #require(try await second.beginRun(id: cron.id, trigger: .manual, pid: 8))
+
+        let reader = ShellXAutomationStore(environment: f.environment, trasher: f.trasher, now: { Date() })
+        let runs = try await reader.runs(id: cron.id, limit: 5)
+        #expect(runs.map(\.status) == [.running, .failed])
+        #expect(runs.last?.reason == "The run was interrupted.")
+    }
+
     @Test func skipsWhileLocked() async throws {
         let f = Fixture()
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)

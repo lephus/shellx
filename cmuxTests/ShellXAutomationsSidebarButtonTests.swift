@@ -56,6 +56,34 @@ final class ShellXAutomationsSidebarButtonTests: XCTestCase {
         XCTAssertFalse(button.isRingAnimating)
     }
 
+    /// The ring and the ✦ rest while ShellX is in the background and resume when it is active again.
+    func testRingStopsWhileTheAppIsInactive() {
+        let environment = MotionEnvironment(reducesMotion: false)
+        let (button, window) = Self.makeButton(environment: environment)
+        defer { window.close() }
+        XCTAssertTrue(button.isRingAnimating)
+
+        environment.isAppActive = false
+        environment.notificationCenter.post(name: NSApplication.didResignActiveNotification, object: nil)
+        XCTAssertFalse(button.isRingAnimating)
+        XCTAssertFalse(button.isTwinkling)
+
+        environment.isAppActive = true
+        environment.notificationCenter.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        XCTAssertTrue(button.isRingAnimating)
+        XCTAssertTrue(button.isTwinkling)
+    }
+
+    func testRingStaysStillWhenAddedWhileTheAppIsInactive() {
+        let environment = MotionEnvironment(reducesMotion: false)
+        environment.isAppActive = false
+        let (button, window) = Self.makeButton(environment: environment)
+        defer { window.close() }
+
+        XCTAssertFalse(button.isRingAnimating)
+        XCTAssertFalse(button.isTwinkling)
+    }
+
     func testCountPillHiddenAtZero() {
         let (button, window) = Self.makeButton(environment: MotionEnvironment(reducesMotion: true))
         defer { window.close() }
@@ -104,10 +132,13 @@ final class ShellXAutomationsSidebarButtonTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// An environment whose Reduce Motion a test can flip; the view can be seen while in a window.
+    /// An environment whose Reduce Motion and app activity a test can flip; the view can be seen while in a window.
+    /// App activity notifications go through its own center so the host app never sees them.
     @MainActor
     private final class MotionEnvironment: TitleEffectEnvironment {
         var reducesMotion: Bool
+        var isAppActive = true
+        let notificationCenter = NotificationCenter()
 
         init(reducesMotion: Bool) {
             self.reducesMotion = reducesMotion
@@ -128,7 +159,11 @@ final class ShellXAutomationsSidebarButtonTests: XCTestCase {
         window.isReleasedWhenClosed = false
         let host = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 40))
         window.contentView = host
-        let button = ShellXAutomationsSidebarButton(environment: environment)
+        let button = ShellXAutomationsSidebarButton(
+            environment: environment,
+            notificationCenter: environment.notificationCenter,
+            isApplicationActive: { [environment] in environment.isAppActive }
+        )
         button.frame = NSRect(x: 6, y: 6, width: 248, height: 28)
         host.addSubview(button)
         host.layoutSubtreeIfNeeded()
