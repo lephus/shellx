@@ -66,11 +66,13 @@ public actor ShellXAutomationStore {
             guard let location = try locate(id: id), let old = try automation(id: id) else {
                 throw ShellXAutomationStoreError.notFound(id)
             }
-            if old.origin == .external { throw ShellXAutomationStoreError.unsupported(id) }
+            // A skill ShellX did not create stays a skill and stays theirs: only its SKILL.md changes.
+            if old.origin == .external, draft.kind != .skill { throw ShellXAutomationStoreError.unsupported(id) }
             return (location, old)
         }
+        let isExternal = existing?.1.origin == .external
         let stamp = now()
-        let newID = existing?.1.id ?? UUID().uuidString
+        let newID = isExternal ? Self.externalPrefix + draft.name : existing?.1.id ?? UUID().uuidString
         let createdAt = existing?.1.createdAt ?? stamp
         let enabled = existing?.1.enabled ?? true
 
@@ -88,7 +90,7 @@ public actor ShellXAutomationStore {
 
         try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         if isSameFolder {
-            try writeFiles(of: draft, into: target, id: newID, createdAt: createdAt, updatedAt: stamp, enabled: enabled)
+            try writeFiles(of: draft, into: target, id: newID, createdAt: createdAt, updatedAt: stamp, enabled: enabled, external: isExternal)
         } else {
             // The new content is complete in a hidden staging folder before anything old is touched;
             // on any failure the staging folder goes and the old folder stays as it was.
@@ -102,7 +104,9 @@ public actor ShellXAutomationStore {
                 } else {
                     try fileManager.createDirectory(at: staging, withIntermediateDirectories: false)
                 }
-                try writeFiles(of: draft, into: staging, id: newID, createdAt: createdAt, updatedAt: stamp, enabled: enabled)
+                try writeFiles(
+                    of: draft, into: staging, id: newID, createdAt: createdAt, updatedAt: stamp, enabled: enabled, external: isExternal
+                )
                 try fileManager.moveItem(at: staging, to: target)
             } catch {
                 try? fileManager.removeItem(at: staging)
@@ -327,16 +331,19 @@ private extension ShellXAutomationStore {
     }
 
     /// Writes `SKILL.md` and the marker or `automation.json` for `draft` into `folder`.
+    /// A skill ShellX did not create (`external`) gets only its `SKILL.md`, so it is not adopted.
     func writeFiles(
         of draft: ShellXAutomationDraft,
         into folder: URL,
         id: String,
         createdAt: Date,
         updatedAt: Date,
-        enabled: Bool
+        enabled: Bool,
+        external: Bool = false
     ) throws {
         try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         try Data(draft.skillMarkdown.utf8).write(to: folder.appending(path: "SKILL.md"), options: .atomic)
+        if external { return }
         if draft.kind == .skill {
             let marker = ShellXSkillMarker(
                 id: id, notify: draft.notify, createdAt: createdAt, updatedAt: updatedAt,

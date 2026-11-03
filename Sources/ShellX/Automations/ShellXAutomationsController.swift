@@ -195,10 +195,6 @@ final class ShellXAutomationsController {
     // MARK: Creator
 
     private func startCreator(editId: String?) async throws {
-        if let editId, editId.hasPrefix(Self.externalPrefix) {
-            // Skills ShellX did not create may hold more than SKILL.md; only Edit file changes them.
-            throw Failure.externalEditNotAllowed
-        }
         endSession()
         let generation = creatorGeneration
         var seed: ShellXCreatorSeed?
@@ -208,7 +204,6 @@ final class ShellXAutomationsController {
             guard let automation = try await store.automation(id: editId) else {
                 throw Failure.notFound
             }
-            guard automation.origin == .shellx else { throw Failure.externalEditNotAllowed }
             let markdown = await Self.readText(automation.directory.appending(path: "SKILL.md")) ?? ""
             seed = ShellXCreatorSeed(automation: automation, skillMarkdown: markdown)
             editedAutomation = automation
@@ -254,7 +249,14 @@ final class ShellXAutomationsController {
         }
         let editingName = editing?.name
         let validator = await makeValidator(editingName)
-        let issues = validator.validate(draft, replacingName: editingName)
+        var issues = validator.validate(draft, replacingName: editingName)
+        if editing?.origin == .external, draft.kind != .skill {
+            // Skills ShellX did not create are saved in place, so they stay skills.
+            issues.append(.init(
+                field: .kind, code: "mustStaySkill",
+                message: "ShellX did not create this skill, so it must stay a skill. Set kind to skill."
+            ))
+        }
         guard issues.isEmpty else {
             let payload = encoder.issues(issues, draft: draft)
             send(creatorEvent(["type": "validation", "issues": payload]))

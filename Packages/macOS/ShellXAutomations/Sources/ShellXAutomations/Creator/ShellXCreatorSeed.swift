@@ -21,9 +21,12 @@ public struct ShellXCreatorSeed: Sendable {
         let json = (try? encoder.encode(automation)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         let jsonFence = fence(around: json)
         let markdownFence = fence(around: skillMarkdown)
+        let externalNote = automation.origin == .external
+            ? "\nShellX did not create this skill: it must stay a skill, and the other files in its folder are kept as they are.\n"
+            : ""
         return """
         Edit this existing \(automation.kind.rawValue) named \(automation.name).
-
+        \(externalNote)
         automation.json:
         \(jsonFence)json
         \(json)

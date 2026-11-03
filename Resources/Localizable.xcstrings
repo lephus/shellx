@@ -651,71 +651,6 @@
         }
       }
     },
-    "automations.error.externalEdit": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ShellX did not create this skill, so it can only be changed with Edit file."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ShellX hat diese Fähigkeit nicht erstellt. Ändere sie daher nur mit „Datei bearbeiten“."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ShellX n’a pas créé cette compétence : modifiez-la uniquement avec Modifier le fichier."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يُنشئ ShellX هذه المهارة، لذا لا يمكن تغييرها إلا عبر تعديل الملف."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ShellX no creó esta habilidad, así que solo se puede cambiar con Editar archivo."
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "這個技能不是 ShellX 建立的，只能用「編輯檔案」修改。"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这个技能不是 ShellX 创建的，只能用“编辑文件”修改。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ShellX가 만든 스킬이 아니므로 파일 편집으로만 바꿀 수 있습니다."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このスキルは ShellX が作成したものではないため、「ファイルを編集」でのみ変更できます。"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ShellX không tạo kỹ năng này nên chỉ có thể sửa bằng Sửa tệp."
-          }
-        }
-      }
-    },
     "automations.error.noLog": {
       "extractionState": "manual",
       "localizations": {
@@ -6887,6 +6822,71 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tên chỉ được dùng chữ thường, chữ số và dấu gạch ngang đơn."
+          }
+        }
+      }
+    },
+    "automations.issue.kind.mustStaySkill": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX did not create this skill, so it must stay a skill."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX hat diese Fähigkeit nicht erstellt, daher muss sie eine Fähigkeit bleiben."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX n’a pas créé cette compétence : elle doit rester une compétence."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يُنشئ ShellX هذه المهارة، لذا يجب أن تبقى مهارة."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX no creó esta habilidad, así que debe seguir siendo una habilidad."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個技能不是 ShellX 建立的，必須維持為技能。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个技能不是 ShellX 创建的，必须保持为技能。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX가 만든 스킬이 아니므로 스킬로 유지해야 합니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このスキルは ShellX が作成したものではないため、スキルのままにする必要があります。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX không tạo kỹ năng này nên nó phải vẫn là kỹ năng."
           }
         }
       }

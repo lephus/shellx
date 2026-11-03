@@ -42,7 +42,7 @@ export function DraftCard({ label, draft, issues, ready }: Props) {
   const schedule = scheduleText(draft.schedule);
   const directory = draft.workingDirectory ?? "";
   const hasNotify = draft.notify.on.length > 0 || draft.notify.targets.length > 0;
-  const general = issues.filter((i) => i.field === "claude");
+  const general = issues.filter((i) => i.field === "claude" || i.field === "kind");
   const targets = draft.notify.targets.map((t) =>
     t === "iphone" ? `${label("targetIphone")} (${label("iphonePending")})` : label("targetMac"),
   );

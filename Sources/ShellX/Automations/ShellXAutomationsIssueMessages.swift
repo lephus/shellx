@@ -57,6 +57,11 @@ struct ShellXAutomationsIssueMessages {
             return String(localized: "automations.issue.steps.missing", defaultValue: "A workflow needs at least one step.")
         case (.steps, "emptyPrompt"):
             return String(localized: "automations.issue.steps.emptyPrompt", defaultValue: "Every step needs a prompt.")
+        case (.kind, "mustStaySkill"):
+            return String(
+                localized: "automations.issue.kind.mustStaySkill",
+                defaultValue: "ShellX did not create this skill, so it must stay a skill."
+            )
         case (.claude, "unavailable"):
             return String(localized: "automations.issue.claude.unavailable", defaultValue: "Claude Code was not found on this Mac.")
         default:

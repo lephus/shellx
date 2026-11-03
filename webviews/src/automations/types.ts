@@ -49,7 +49,8 @@ export type ValidationField =
   | "workingDirectory"
   | "skillMarkdown"
   | "steps"
-  | "claude";
+  | "claude"
+  | "kind";
 export type ValidationIssueDTO = { field: ValidationField; code: string; message: string };
 
 /** Mirrors the Swift `ShellXAutomationDraft`. Fields may be empty early on. */

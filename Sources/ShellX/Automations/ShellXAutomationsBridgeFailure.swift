@@ -103,13 +103,6 @@ struct ShellXAutomationsBridgeFailure: Error, Equatable {
         ))
     }
 
-    static var externalEditNotAllowed: Self {
-        Self(.notAllowed, String(
-            localized: "automations.error.externalEdit",
-            defaultValue: "ShellX did not create this skill, so it can only be changed with Edit file."
-        ))
-    }
-
     static var noLog: Self {
         Self(.notFound, String(localized: "automations.error.noLog", defaultValue: "This automation has no log yet."))
     }

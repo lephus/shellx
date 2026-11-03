@@ -2,9 +2,9 @@
 public struct ShellXValidationIssue: Sendable, Equatable {
     /// The draft field an issue refers to.
     ///
-    /// `steps` refers to a workflow's steps as a whole.
+    /// `steps` refers to a workflow's steps as a whole; `kind` to the draft's kind.
     public enum Field: String, Sendable, Equatable {
-        case name, description, schedule, workingDirectory, skillMarkdown, claude, steps
+        case name, description, schedule, workingDirectory, skillMarkdown, claude, steps, kind
     }
 
     /// Field with the problem.
