@@ -51,13 +51,32 @@ write_git_graph_html() {
   } > "$out_dir/git-graph.html"
 }
 
+# The Automations page gets its data from the `shellxAutomations` bridge.
+write_automations_html() {
+  out_dir="$1"
+  {
+    printf '<!doctype html>\n'
+    printf '<html lang="en" data-cmux-webview-kind="automations">\n'
+    printf '  <head>\n'
+    printf '    <meta charset="UTF-8" />\n'
+    printf '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n'
+    printf '    <title>Automations</title>\n'
+    printf '  </head>\n'
+    printf '  <body data-cmux-webview-kind="automations">\n'
+    printf '    <main id="root"></main>\n'
+    printf '    <script type="module" src="./main.mjs"></script>\n'
+    printf '  </body>\n'
+    printf '</html>\n'
+  } > "$out_dir/automations.html"
+}
+
 strip_trailing_line_whitespace() {
   /usr/bin/perl -0pi -e 's/[ \t]+(?=\r?\n)//g; s/[ \t]+\z//' "$@"
 }
 
 normalize_webviews_output() {
   out_dir="$1"
-  strip_trailing_line_whitespace "$out_dir/main.mjs" "$out_dir/agent-session.html" "$out_dir/git-graph.html"
+  strip_trailing_line_whitespace "$out_dir/main.mjs" "$out_dir/agent-session.html" "$out_dir/git-graph.html" "$out_dir/automations.html"
 }
 
 if [ "${1:-}" = "--check" ]; then
@@ -69,6 +88,7 @@ if [ "${1:-}" = "--check" ]; then
     CMUX_WEBVIEWS_OUT_DIR="$tmp_dir" bun run build
     write_agent_session_html "$tmp_dir"
     write_git_graph_html "$tmp_dir"
+    write_automations_html "$tmp_dir"
     normalize_webviews_output "$tmp_dir"
   )
   diff_output="$(mktemp)"
@@ -97,4 +117,5 @@ fi
 )
 write_agent_session_html "$OUT_DIR"
 write_git_graph_html "$OUT_DIR"
+write_automations_html "$OUT_DIR"
 normalize_webviews_output "$OUT_DIR"
