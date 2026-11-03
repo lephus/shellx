@@ -724050,61 +724050,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usage: shellx routine <run|notify|list> [args]\n\nRuns and reports ShellX automations (cronjobs and workflows) without the app.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "Usage: shellx routine <run|notify|list> [args]\n\nRuns and reports ShellX automations (cronjobs and workflows) without the app.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify reports only that ShellX Notifier was launched; macOS shows the banner."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "使い方: shellx routine <run|notify|list> [args]\n\nアプリなしで ShellX の自動化（cron ジョブとワークフロー）を実行し、結果を報告します。\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "使い方: shellx routine <run|notify|list> [args]\n\nアプリなしで ShellX の自動化（cron ジョブとワークフロー）を実行し、結果を報告します。\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify が報告するのは ShellX Notifier を起動したことだけです。バナーは macOS が表示します。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法: shellx routine <run|notify|list> [args]\n\n在不打开 App 的情况下运行并报告 ShellX 自动化（定时任务和工作流）。\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "用法: shellx routine <run|notify|list> [args]\n\n在不打开 App 的情况下运行并报告 ShellX 自动化（定时任务和工作流）。\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify 只报告 ShellX Notifier 已启动；横幅由 macOS 显示。"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwendung: shellx routine <run|notify|list> [args]\n\nFührt ShellX-Automationen (Cronjobs und Workflows) ohne die App aus und meldet sie.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "Verwendung: shellx routine <run|notify|list> [args]\n\nFührt ShellX-Automationen (Cronjobs und Workflows) ohne die App aus und meldet sie.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify meldet nur, dass ShellX Notifier gestartet wurde; das Banner zeigt macOS an."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utilisation: shellx routine <run|notify|list> [args]\n\nExécute les automatisations ShellX (tâches cron et workflows) sans l’app et en rend compte.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "Utilisation: shellx routine <run|notify|list> [args]\n\nExécute les automatisations ShellX (tâches cron et workflows) sans l’app et en rend compte.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify indique seulement que ShellX Notifier a été lancé ; c’est macOS qui affiche la bannière."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الاستخدام: shellx routine <run|notify|list> [args]\n\nيشغّل أتمتة ShellX (مهام cron ومسارات العمل) دون التطبيق ويبلّغ عنها.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "الاستخدام: shellx routine <run|notify|list> [args]\n\nيشغّل أتمتة ShellX (مهام cron ومسارات العمل) دون التطبيق ويبلّغ عنها.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nيُبلغ notify فقط بأنه تم تشغيل ShellX Notifier؛ ويعرض macOS الإشعار."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uso: shellx routine <run|notify|list> [args]\n\nEjecuta las automatizaciones de ShellX (tareas cron y flujos de trabajo) sin la app e informa de ellas.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "Uso: shellx routine <run|notify|list> [args]\n\nEjecuta las automatizaciones de ShellX (tareas cron y flujos de trabajo) sin la app e informa de ellas.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify solo indica que se abrió ShellX Notifier; macOS muestra el aviso."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法: shellx routine <run|notify|list> [args]\n\n在不開啟 App 的情況下執行並回報 ShellX 自動化（排程工作與工作流程）。\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "用法: shellx routine <run|notify|list> [args]\n\n在不開啟 App 的情況下執行並回報 ShellX 自動化（排程工作與工作流程）。\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify 只回報 ShellX Notifier 已啟動；橫幅由 macOS 顯示。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사용법: shellx routine <run|notify|list> [args]\n\n앱 없이 ShellX 자동화(크론 작업 및 워크플로)를 실행하고 결과를 알립니다.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "사용법: shellx routine <run|notify|list> [args]\n\n앱 없이 ShellX 자동화(크론 작업 및 워크플로)를 실행하고 결과를 알립니다.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify는 ShellX Notifier가 실행되었다는 것만 알립니다. 배너는 macOS가 표시합니다."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx routine <run|notify|list> [args]\n\nChạy và báo cáo các tự động hóa ShellX (cronjob và workflow) mà không cần mở app.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]"
+            "value": "Cách dùng: shellx routine <run|notify|list> [args]\n\nChạy và báo cáo các tự động hóa ShellX (cronjob và workflow) mà không cần mở app.\n  shellx routine run <id> [--trigger schedule|manual]\n  shellx routine notify --name <name> --status done|failed|needs-you --body <text>\n  shellx routine list [--json]\n\nnotify chỉ báo rằng ShellX Notifier đã được mở; macOS sẽ hiện thông báo."
           }
         }
       }

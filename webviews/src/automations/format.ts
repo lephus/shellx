@@ -35,3 +35,18 @@ export function scheduleText(schedule: AutomationDraft["schedule"]): { human: st
 export function notifyOnLabel(label: AutomationLabelResolver, on: string): string {
   return on === "done" ? label("notifyDone") : on === "failed" ? label("notifyFailed") : label("notifyNeedsYou");
 }
+
+/** Run length as "42 s", "3 min 5 s" or "2 h 10 min"; the unit patterns come from the host's labels. */
+export function formatDuration(ms: number, label: AutomationLabelResolver): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  if (total < 60) return label("durationSeconds", { seconds: total });
+  if (total < 3600) return label("durationMinutes", { minutes: Math.floor(total / 60), seconds: total % 60 });
+  return label("durationHours", { hours: Math.floor(total / 3600), minutes: Math.floor((total % 3600) / 60) });
+}
+
+/** Milliseconds between two ISO timestamps, or null when either is missing or invalid. */
+export function runDurationMs(startedAt: string, finishedAt: string | undefined): number | null {
+  if (!finishedAt) return null;
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}

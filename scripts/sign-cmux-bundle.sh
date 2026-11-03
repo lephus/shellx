@@ -365,4 +365,13 @@ if [[ -d "$COMPUTER_USE_HELPER" ]] \
   exit 1
 fi
 
+if [[ -d "$SHELLX_NOTIFIER_HELPER" ]]; then
+  /usr/bin/codesign --verify --strict --verbose=2 "$SHELLX_NOTIFIER_HELPER"
+  if /usr/bin/codesign -d --entitlements :- "$SHELLX_NOTIFIER_HELPER" 2>&1 \
+       | grep -q "application-identifier"; then
+    echo "error: nested ShellX Notifier helper unexpectedly carries application-identifier" >&2
+    exit 1
+  fi
+fi
+
 echo "==> signing OK: $APP_PATH"

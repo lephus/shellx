@@ -18,6 +18,8 @@ export type AutomationRunDTO = {
   summary?: string;
   reason?: string;
   failedStep?: number | string;
+  currentStep?: number;
+  totalSteps?: number;
   unread: boolean;
 };
 

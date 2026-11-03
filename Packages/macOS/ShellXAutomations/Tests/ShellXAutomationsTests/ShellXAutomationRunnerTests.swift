@@ -17,6 +17,20 @@ private actor FakeClaude: ShellXClaudeLaunching {
     }
 }
 
+/// Records the progress the store shows on disk at the moment each step starts.
+private actor ProgressWatchingClaude: ShellXClaudeLaunching {
+    private(set) var seen: [String] = []
+    func run(prompt: String, workingDirectory: URL, allowedTools: [String], resumeSessionId: String?, transcript: URL) async throws -> ShellXClaudeResult {
+        let file = transcript.deletingLastPathComponent().appending(path: "result.json")
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let data = try? Data(contentsOf: file), let record = try? decoder.decode(ShellXRunRecord.self, from: data) {
+            seen.append("\(record.currentStep ?? -1)/\(record.totalSteps ?? -1)")
+        }
+        return ShellXClaudeResult(sessionId: "s1", resultText: "ok")
+    }
+}
+
 private actor VanishingRunClaude: ShellXClaudeLaunching {
     func run(prompt: String, workingDirectory: URL, allowedTools: [String], resumeSessionId: String?, transcript: URL) async throws -> ShellXClaudeResult {
         try FileManager.default.removeItem(at: transcript.deletingLastPathComponent())
@@ -158,6 +172,24 @@ private struct Fixture {
         #expect(calls[0].prompt.hasPrefix("first") && calls[1].prompt.hasPrefix("second"))
         #expect(calls[0].transcript == calls[1].transcript)
         #expect(record.status == .failed && record.failedStep == 2 && record.reason == "bad")
+    }
+
+    @Test func workflowReportsStepProgressInOrder() async throws {
+        let f = Fixture()
+        let a = try await f.workflow()
+        let claude = ProgressWatchingClaude()
+        let record = await f.runner(claude).run(id: a.id, trigger: .manual)
+        #expect(await claude.seen == ["1/3", "2/3", "3/3"])
+        #expect(record.totalSteps == 3 && record.currentStep == 3)
+        let stored = try #require(try await f.store.automation(id: a.id)?.lastRun)
+        #expect(stored.totalSteps == 3 && stored.currentStep == 3)
+    }
+
+    @Test func cronjobLeavesProgressUnset() async throws {
+        let f = Fixture()
+        let a = try await f.cron()
+        let record = await f.runner(FakeClaude([ok("fine")])).run(id: a.id, trigger: .manual)
+        #expect(record.currentStep == nil && record.totalSteps == nil)
     }
 
     @Test func workflowDoneUsesLastSummary() async throws {

@@ -15,6 +15,8 @@ extension CMUXCLI {
           shellx routine run <id> [--trigger schedule|manual]
           shellx routine notify --name <name> --status done|failed|needs-you --body <text>
           shellx routine list [--json]
+
+        notify reports only that ShellX Notifier was launched; macOS shows the banner.
         """
         )
     }
@@ -69,7 +71,7 @@ extension CMUXCLI {
                     Int(status)
                 ))
             }
-            if jsonOutput { print(jsonString(["ok": true])) }
+            if jsonOutput { print(jsonString(["launched": true])) }
         case .list(let json):
             try await printRoutineList(store: store, jsonOutput: json || jsonOutput)
         }
@@ -90,9 +92,15 @@ extension CMUXCLI {
             isExecutable: { FileManager.default.isExecutableFile(atPath: $0) },
             loginShellLookup: { ShellXLoginShellClaudeLookup()() }
         )
-        let claude = resolver.resolve().map { path in
-            ShellXClaudeProcess(executable: path, environment: Self.routineClaudeEnvironment(processEnvironment, claudePath: path))
+        let claudeEnvironment = ShellXRoutineClaudeEnvironment.live(inherited: processEnvironment, home: home)
+        // Both lookups may block on a login shell for seconds; keep them off the cooperative pool.
+        let launch: (path: String, environment: [String: String])? = await withCheckedContinuation { continuation in
+            Thread.detachNewThread {
+                let found = resolver.resolve().map { path in (path, claudeEnvironment.environment(forClaudeAt: path)) }
+                continuation.resume(returning: found)
+            }
         }
+        let claude = launch.map { ShellXClaudeProcess(executable: $0.path, environment: $0.environment) }
         let runner = ShellXAutomationRunner(store: store, claude: claude, notifier: notifier, pid: getpid(), now: { Date() })
         let record = await runner.run(id: id, trigger: trigger)
         let status = Self.routineStatusToken(record.status)
@@ -109,20 +117,6 @@ extension CMUXCLI {
             print(status)
         }
         if record.status == .failed { Darwin.exit(1) }
-    }
-
-    /// launchd starts jobs with a minimal PATH; an npm-installed `claude` is a `#!/usr/bin/env node`
-    /// script whose `node` sits beside it, so the binary's own folder goes first.
-    private static func routineClaudeEnvironment(_ environment: [String: String], claudePath: String) -> [String: String] {
-        var result = environment
-        let folder = URL(filePath: claudePath).resolvingSymlinksInPath().deletingLastPathComponent().path
-        let linkFolder = URL(filePath: claudePath).deletingLastPathComponent().path
-        var entries = (environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(separator: ":").map(String.init)
-        for candidate in [folder, linkFolder].reversed() where !entries.contains(candidate) {
-            entries.insert(candidate, at: 0)
-        }
-        result["PATH"] = entries.joined(separator: ":")
-        return result
     }
 
     private func printRoutineList(store: ShellXAutomationStore, jsonOutput: Bool) async throws {
