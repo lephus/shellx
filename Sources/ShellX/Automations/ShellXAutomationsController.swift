@@ -15,13 +15,13 @@ final class ShellXAutomationsController {
 
     let library: ShellXAutomationsLibrary
     /// Delivers `automations.changed`, `creator.event` and `focus` to the page.
-    var emit: (([String: Any]) -> Void)?
+    var emit: (@MainActor ([String: Any]) -> Void)?
     /// The appearance `app.context` reports; the web view points it at itself.
-    var effectiveAppearance: () -> NSAppearance = { NSApplication.shared.effectiveAppearance }
+    var effectiveAppearance: @MainActor () -> NSAppearance = { NSApplication.shared.effectiveAppearance }
     /// Whether the page should keep still.
-    var reduceMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    var reduceMotion: @MainActor () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     /// Shows a file or folder in Finder.
-    var revealInFinder: (URL) -> Void = { NSWorkspace.shared.activateFileViewerSelecting([$0]) }
+    var revealInFinder: @MainActor (URL) -> Void = { NSWorkspace.shared.activateFileViewerSelecting([$0]) }
 
     private let store: ShellXAutomationStore
     private let scheduler: ShellXLaunchAgentScheduler
