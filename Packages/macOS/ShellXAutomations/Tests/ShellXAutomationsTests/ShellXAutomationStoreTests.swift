@@ -111,7 +111,7 @@ private struct Fixture {
 
     @Test func savesNeverEscapeRoots() async throws {
         let f = Fixture()
-        for name in ["../evil", "a/b", "My Skill", "a--b", "", String(repeating: "a", count: 65)] {
+        for name in ["../evil", "a/b", "My Skill", "caf\u{E9}", "cafe\u{301}", "a--b", "", String(repeating: "a", count: 65)] {
             for kind in [ShellXAutomationKind.skill, .cronjob] {
                 var draft = f.skillDraft(name)
                 draft.kind = kind
@@ -177,7 +177,7 @@ private struct Fixture {
         for _ in 0..<31 {
             let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: getpid(), isProcessAlive: { _ in false }))
             if first == nil { first = dir }
-            try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record())
+            try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: getpid())
         }
         let runsDir = f.environment.automationsRoot.appending(path: "\(cron.id)/runs")
         let names = try FileManager.default.contentsOfDirectory(atPath: runsDir.path)
@@ -209,7 +209,7 @@ private struct Fixture {
         let dir = try #require(next)
         let lock = try String(contentsOf: cron.directory.appending(path: "run.lock"), encoding: .utf8)
         #expect(lock.trimmingCharacters(in: .whitespacesAndNewlines) == "\(getpid())")
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record())
+        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: getpid())
         #expect(!FileManager.default.fileExists(atPath: cron.directory.appending(path: "run.lock").path))
     }
 
@@ -217,7 +217,7 @@ private struct Fixture {
         let f = Fixture()
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)
         let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242, isProcessAlive: { _ in false }))
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record())
+        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 9999)
         #expect(FileManager.default.fileExists(atPath: cron.directory.appending(path: "run.lock").path))
     }
 
@@ -227,7 +227,7 @@ private struct Fixture {
         let store = ShellXAutomationStore(environment: f.environment, trasher: f.trasher, now: { fixed })
         let cron = try await store.save(f.cronDraft(), replacing: nil)
         let a = try #require(try await store.beginRun(id: cron.id, trigger: .manual, pid: getpid(), isProcessAlive: { _ in false }))
-        try await store.finishRun(id: cron.id, runDirectory: a, record: f.record())
+        try await store.finishRun(id: cron.id, runDirectory: a, record: f.record(), pid: getpid())
         let b = try #require(try await store.beginRun(id: cron.id, trigger: .manual, pid: getpid(), isProcessAlive: { _ in false }))
         #expect(a.lastPathComponent == "20270115-080000")
         #expect(b.lastPathComponent == "20270115-080000-2")
@@ -237,7 +237,7 @@ private struct Fixture {
         let f = Fixture()
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)
         let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: getpid(), isProcessAlive: { _ in false }))
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record())
+        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: getpid())
         #expect(try await f.store.automation(id: cron.id)?.lastRun?.unread == true)
         try await f.store.markRead(id: cron.id)
         let after = try await f.store.automation(id: cron.id)?.lastRun
@@ -256,5 +256,44 @@ private struct Fixture {
         #expect(try fileNumber() != before, "an atomic replace swaps the directory entry")
         _ = try await f.store.save(f.cronDraft(), replacing: nil)
         #expect(try Data(contentsOf: url).isEmpty == false)
+    }
+
+    @Test func emptyFreshLockIsHeldAndOldOneTakenOver() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let lock = cron.directory.appending(path: "run.lock")
+        try Data().write(to: lock)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_800_000_000)], ofItemAtPath: lock.path)
+        let held = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 7, isProcessAlive: { _ in false })
+        #expect(held == nil)
+        let old = Date(timeIntervalSince1970: 1_800_000_000 - 3600)
+        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: lock.path)
+        let dir = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 7, isProcessAlive: { _ in false })
+        #expect(dir != nil)
+        #expect(try String(contentsOf: lock, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) == "7")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: cron.directory.path).filter { $0.hasPrefix(".run.lock.") }
+        #expect(leftovers.isEmpty)
+    }
+
+    @Test func finishRunRemovesLockOnlyForMatchingPid() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242, isProcessAlive: { _ in false }))
+        let lock = cron.directory.appending(path: "run.lock")
+        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 1)
+        #expect(FileManager.default.fileExists(atPath: lock.path))
+        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 4242)
+        #expect(!FileManager.default.fileExists(atPath: lock.path))
+    }
+
+    @Test func finishRunRejectsNonRunDirectories() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let runs = cron.directory.appending(path: "runs", directoryHint: .isDirectory)
+        for bad in [runs.appending(path: ".."), runs.appending(path: "x/.."), runs.appending(path: "notes")] {
+            await #expect(throws: ShellXAutomationStoreError.self) {
+                try await f.store.finishRun(id: cron.id, runDirectory: bad, record: f.record(), pid: 1)
+            }
+        }
     }
 }

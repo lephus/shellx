@@ -19,4 +19,11 @@ import Testing
         #expect(dev.skillsRoot == release.skillsRoot)
         #expect(dev.cliPath == "/cli" && dev.notifierAppPath == "/n.app")
     }
+
+    @Test func unsafeBundleIdentifierStaysOneComponent() {
+        let env = ShellXAutomationEnvironment(bundleIdentifier: "../../x/y", home: home, cliPath: "/cli", notifierAppPath: "/n.app")
+        #expect(env.automationsRoot.deletingLastPathComponent().path == "/tmp/shellx-env-home/.shellx/automations-dev")
+        #expect(!env.automationsRoot.lastPathComponent.contains("/"))
+        #expect(env.automationsRoot.lastPathComponent == "____x_y" || !env.automationsRoot.path.contains(".."))
+    }
 }

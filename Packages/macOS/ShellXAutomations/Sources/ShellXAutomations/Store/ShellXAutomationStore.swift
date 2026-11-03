@@ -149,13 +149,7 @@ public actor ShellXAutomationStore {
     ) throws -> URL? {
         let dir = try automationDirectory(id: id)
         let lockPath = dir.appending(path: "run.lock").path
-        if !createLock(at: lockPath, pid: pid) {
-            let holder = (try? String(contentsOfFile: lockPath, encoding: .utf8))
-                .flatMap { Int32($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-            if let holder, isProcessAlive(holder) { return nil }
-            unlink(lockPath)
-            guard createLock(at: lockPath, pid: pid) else { return nil }
-        }
+        guard try acquireLock(in: dir, at: lockPath, pid: pid, isProcessAlive: isProcessAlive) else { return nil }
         let started = now()
         let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
         let runDirectory: URL
@@ -171,17 +165,18 @@ public actor ShellXAutomationStore {
         return runDirectory
     }
 
-    /// Records the final `record` for a run, releases the lock if this process holds it and prunes old runs.
-    public func finishRun(id: String, runDirectory: URL, record: ShellXRunRecord) throws {
+    /// Records the final `record` for a run, releases the lock if it holds `pid` and prunes old runs.
+    public func finishRun(id: String, runDirectory: URL, record: ShellXRunRecord, pid: Int32) throws {
         let dir = try automationDirectory(id: id)
         let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
-        guard runDirectory.deletingLastPathComponent().standardizedFileURL == runs.standardizedFileURL else {
+        guard Self.isPlainRunName(runDirectory.lastPathComponent),
+              runDirectory.deletingLastPathComponent().standardizedFileURL == runs.standardizedFileURL else {
             throw ShellXAutomationStoreError.foreignRunDirectory
         }
         try encoder().encode(record).write(to: runDirectory.appending(path: "result.json"), options: .atomic)
         let lockPath = dir.appending(path: "run.lock").path
         if let held = try? String(contentsOfFile: lockPath, encoding: .utf8),
-           Int32(held.trimmingCharacters(in: .whitespacesAndNewlines)) == getpid() {
+           Int32(held.trimmingCharacters(in: .whitespacesAndNewlines)) == pid {
             unlink(lockPath)
         }
         let names = runDirectoryNames(in: runs)
@@ -225,13 +220,18 @@ private extension ShellXAutomationStore {
         case skill(URL, external: Bool)
     }
 
+    static let unparseableLockGrace: TimeInterval = 60
     static let externalPrefix = "external:"
 
     static func isSafeName(_ name: String) -> Bool {
         guard !name.isEmpty, name.count <= 64 else { return false }
         return name.split(separator: "-", omittingEmptySubsequences: false).allSatisfy { part in
-            !part.isEmpty && part.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) }
+            !part.isEmpty && part.unicodeScalars.allSatisfy { ($0.value >= 0x61 && $0.value <= 0x7A) || ($0.value >= 0x30 && $0.value <= 0x39) }
         }
+    }
+
+    static func isPlainRunName(_ name: String) -> Bool {
+        !name.isEmpty && name.unicodeScalars.allSatisfy { ($0.value >= 0x30 && $0.value <= 0x39) || $0 == "-" }
     }
 
     static func isSafeID(_ id: String) -> Bool {
@@ -335,13 +335,56 @@ private extension ShellXAutomationStore {
         return records
     }
 
-    func createLock(at path: String, pid: Int32) -> Bool {
-        let fd = open(path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
-        guard fd >= 0 else { return false }
+    /// Links a fully written temp file to `run.lock` (atomic, never empty). Returns false when a live holder owns it.
+    func acquireLock(
+        in dir: URL,
+        at lockPath: String,
+        pid: Int32,
+        isProcessAlive: @Sendable (Int32) -> Bool
+    ) throws -> Bool {
+        for _ in 0..<4 {
+            if try linkLock(in: dir, at: lockPath, pid: pid) { return true }
+            guard let contents = try? String(contentsOfFile: lockPath, encoding: .utf8) else {
+                if access(lockPath, F_OK) != 0 { continue }
+                return false
+            }
+            let holder = Int32(contents.trimmingCharacters(in: .whitespacesAndNewlines))
+            if let holder {
+                if isProcessAlive(holder) { return false }
+            } else {
+                let modified = (try? fileManager.attributesOfItem(atPath: lockPath)[.modificationDate]) as? Date
+                if let modified, now().timeIntervalSince(modified) < Self.unparseableLockGrace { return false }
+            }
+            // Stale: move it aside; only the process whose rename succeeds may continue.
+            let aside = dir.appending(path: ".run.lock.stale.\(UUID().uuidString)").path
+            guard rename(lockPath, aside) == 0 else { continue }
+            let moved = try? String(contentsOfFile: aside, encoding: .utf8)
+            if moved != contents {
+                // We displaced a lock someone else just took; put it back if the slot is still free.
+                _ = link(aside, lockPath)
+                unlink(aside)
+                return false
+            }
+            unlink(aside)
+        }
+        return false
+    }
+
+    func linkLock(in dir: URL, at lockPath: String, pid: Int32) throws -> Bool {
+        let temp = dir.appending(path: ".run.lock.\(UUID().uuidString)").path
+        let fd = open(temp, O_CREAT | O_EXCL | O_WRONLY, 0o644)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
         let bytes = Array("\(pid)\n".utf8)
-        _ = bytes.withUnsafeBufferPointer { write(fd, $0.baseAddress, $0.count) }
-        close(fd)
-        return true
+        let written = bytes.withUnsafeBufferPointer { write(fd, $0.baseAddress, $0.count) }
+        let closed = close(fd)
+        guard written == bytes.count, closed == 0 else {
+            unlink(temp)
+            throw CocoaError(.fileWriteUnknown)
+        }
+        defer { unlink(temp) }
+        if link(temp, lockPath) == 0 { return true }
+        if errno == EEXIST { return false }
+        throw CocoaError(.fileWriteUnknown)
     }
 
     func makeRunDirectory(in runs: URL, at date: Date) throws -> URL {

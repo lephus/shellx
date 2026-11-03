@@ -24,7 +24,8 @@ public struct ShellXAutomationEnvironment: Sendable {
     public var changeStampURL: URL { automationsRoot.appending(path: ".changed") }
 
     /// Creates the environment for `bundleIdentifier`; any bundle other than the release one gets its own dev root and label prefix.
-    public init(bundleIdentifier: String, home: URL, cliPath: String, notifierAppPath: String) {
+    public init(bundleIdentifier rawBundleIdentifier: String, home: URL, cliPath: String, notifierAppPath: String) {
+        let bundleIdentifier = Self.sanitized(rawBundleIdentifier)
         self.bundleIdentifier = bundleIdentifier
         skillsRoot = home.appending(path: ".claude/skills", directoryHint: .isDirectory)
         launchAgentsDirectory = home.appending(path: "Library/LaunchAgents", directoryHint: .isDirectory)
@@ -37,5 +38,17 @@ public struct ShellXAutomationEnvironment: Sendable {
         }
         self.cliPath = cliPath
         self.notifierAppPath = notifierAppPath
+    }
+
+    /// Keeps ASCII letters, digits, `.`, `-` and `_`; everything else, and any `..`, becomes `_`, so the id is one safe path component.
+    private static func sanitized(_ identifier: String) -> String {
+        let allowed = identifier.unicodeScalars.map { scalar -> Character in
+            let v = scalar.value
+            let ok = (v >= 0x30 && v <= 0x39) || (v >= 0x41 && v <= 0x5A) || (v >= 0x61 && v <= 0x7A) || scalar == "." || scalar == "-" || scalar == "_"
+            return ok ? Character(scalar) : "_"
+        }
+        var result = String(allowed).replacingOccurrences(of: "..", with: "__")
+        if result.hasPrefix(".") { result = "_" + result.dropFirst() }
+        return result.isEmpty ? "_" : result
     }
 }
