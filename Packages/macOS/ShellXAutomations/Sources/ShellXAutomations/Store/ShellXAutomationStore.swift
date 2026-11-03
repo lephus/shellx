@@ -72,16 +72,20 @@ public actor ShellXAutomationStore {
         }
         let isExternal = existing?.1.origin == .external
         let stamp = now()
-        let newID = isExternal ? Self.externalPrefix + draft.name : existing?.1.id ?? UUID().uuidString
         let createdAt = existing?.1.createdAt ?? stamp
         let enabled = existing?.1.enabled ?? true
+        let ownID = existing?.1.id ?? UUID().uuidString
 
         let target: URL
-        if draft.kind == .skill {
+        if isExternal, let old = existing?.1, draft.name == old.name {
+            // Its folder may be named apart from its frontmatter name; only a new name moves it.
+            target = old.directory
+        } else if draft.kind == .skill {
             target = environment.skillsRoot.appending(path: draft.name, directoryHint: .isDirectory)
         } else {
-            target = environment.automationsRoot.appending(path: newID, directoryHint: .isDirectory)
+            target = environment.automationsRoot.appending(path: ownID, directoryHint: .isDirectory)
         }
+        let newID = isExternal ? Self.externalPrefix + target.lastPathComponent : ownID
         let oldDirectory = existing?.1.directory
         let isSameFolder = oldDirectory?.standardizedFileURL == target.standardizedFileURL
         if !isSameFolder, fileManager.fileExists(atPath: target.path) {

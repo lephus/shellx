@@ -330,8 +330,10 @@ export class AutomationsStore {
   /** Stops Claude and drops the draft in progress, then opens the creator that asked for it, if any. */
   async confirmDiscard(): Promise<void> {
     const then = this.state.pendingDiscard?.then ?? null;
-    this.set({ pendingDiscard: null, view: "list", creator: initialCreator() });
+    this.set({ pendingDiscard: null, view: "list" });
+    // Events the session sent before it stopped arrive before this reply; reset only after them.
     await this.bridge.request("creator.cancel");
+    this.set({ creator: initialCreator() });
     if (then) await this.openCreator(then.editId);
   }
 
