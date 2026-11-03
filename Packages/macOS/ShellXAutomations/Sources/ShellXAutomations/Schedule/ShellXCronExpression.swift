@@ -87,7 +87,6 @@ public struct ShellXCronExpression: Sendable, Equatable {
             let low: Int
             let high: Int
             if base == "*" {
-                if step > 1, key == "Minute" || key == "Hour", range.count % step != 0 { throw .unevenStep(field: key) }
                 (low, high) = (range.lowerBound, range.upperBound)
             } else if halves.count == 2 && !base.contains("-") {
                 throw .malformed
@@ -106,7 +105,6 @@ public struct ShellXCronExpression: Sendable, Equatable {
                 v += step
             }
         }
-        let normalizedCount = key == "Weekday" ? 7 : range.count
-        return Field(key: key, values: values.sorted(), isWildcard: values.count == normalizedCount)
+        return Field(key: key, values: values.sorted(), isWildcard: text == "*")
     }
 }

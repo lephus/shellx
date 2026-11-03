@@ -57,7 +57,7 @@ struct ShellXAutomationValidatorTests {
     }
 
     @Test func unschedulableCronIsRejected() {
-        let d = draft(kind: .cronjob, schedule: ShellXSchedule(cron: "*/7 * * * *", human: "x"), workingDirectory: "/work")
+        let d = draft(kind: .cronjob, schedule: ShellXSchedule(cron: "*/7 */1 * * *", human: "x"), workingDirectory: "/work")
         #expect(validator().validate(d, replacingName: nil).contains { $0.field == .schedule && $0.code == "invalid" })
     }
 

@@ -25,13 +25,23 @@ struct ShellXCronExpressionTests {
         #expect(try ShellXCronExpression("*/15 * * * *").launchdCalendarIntervals().count == 4)
     }
 
-    @Test(arguments: ["@daily", "0 8 * * MON", "61 * * * *", "0 9 1 * 1", "* * *", "*/7 * * * *"])
+    @Test(arguments: ["@daily", "0 8 * * MON", "61 * * * *", "0 9 1 * 1", "* * *", "*/7 */1 * * *"])
     func rejected(_ text: String) {
         #expect(throws: ShellXCronError.self) { try ShellXCronExpression(text).launchdCalendarIntervals() }
     }
 
-    @Test func unevenStepIsSpecific() {
-        #expect(throws: ShellXCronError.unevenStep(field: "Minute")) { try ShellXCronExpression("*/7 * * * *") }
+    @Test func everySevenMinutesIsValid() throws {
+        let entries = try ShellXCronExpression("*/7 * * * *").launchdCalendarIntervals()
+        #expect(entries == [0, 7, 14, 21, 28, 35, 42, 49, 56].map { ["Minute": $0] })
+    }
+
+    @Test func everyFiveHoursIsValid() throws {
+        #expect(try ShellXCronExpression("0 */5 * * *").launchdCalendarIntervals().count == 5)
+    }
+
+    @Test func explicitFullRangeIsNotWildcard() {
+        #expect(throws: ShellXCronError.tooManyEntries) { try ShellXCronExpression("*/7 */1 * * *").launchdCalendarIntervals() }
+        #expect(throws: ShellXCronError.bothDayFields) { try ShellXCronExpression("0 9 1 * 0-6") }
     }
 
     @Test func tooManyEntriesIsSpecific() {
