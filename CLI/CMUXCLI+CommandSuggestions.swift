@@ -185,6 +185,7 @@ extension CMUXCLI {
         "restore-session",
         "restore",
         "right-sidebar",
+        "routine",
         "rpc",
         "screenshot",
         "select-workspace",

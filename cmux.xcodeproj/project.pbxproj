@@ -1343,6 +1343,7 @@
 		925800000000000000000003 /* CMUXCLI+RestorePreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925800000000000000000004 /* CMUXCLI+RestorePreflight.swift */; };
 		925800000000000000000007 /* CMUXCLI+RestoreRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925800000000000000000008 /* CMUXCLI+RestoreRecord.swift */; };
 		925800000000000000000005 /* CMUXCLI+RestoreSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925800000000000000000006 /* CMUXCLI+RestoreSelector.swift */; };
+		A7BCAA63C294DAE4A31E3FCB /* CMUXCLI+Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB18D0C89A3C90E4A1AD10D9 /* CMUXCLI+Routine.swift */; };
 		888222D96880953F33F554F1 /* CMUXCLI+RovoDevHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF43B7BD28A755A6280428D6 /* CMUXCLI+RovoDevHooks.swift */; };
 		37708E13930225D14409F461 /* CMUXCLI+Screenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50748DE10A0E397E5C77A025 /* CMUXCLI+Screenshot.swift */; };
 		A24420164F7D1D02F89B3E69 /* CMUXCLI+SemanticNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11AE8B73B8979F37F85EB754 /* CMUXCLI+SemanticNotifications.swift */; };
@@ -3356,6 +3357,9 @@
 		96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157337FA38DA052318228A89 /* ShellXAboutTests.swift */; };
 		96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */; };
 		8D37189E2E5CD35178CB98A6 /* ShellXAgentActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */; };
+		5E1A7A000000000000000003 /* ShellXAutomations in Frameworks */ = {isa = PBXBuildFile; productRef = 5E1A7A000000000000000002 /* ShellXAutomations */; };
+		5E1A7A000000000000000004 /* ShellXAutomations in Frameworks */ = {isa = PBXBuildFile; productRef = 5E1A7A000000000000000002 /* ShellXAutomations */; };
+		5E1A7A000000000000000005 /* ShellXAutomations in Frameworks */ = {isa = PBXBuildFile; productRef = 5E1A7A000000000000000002 /* ShellXAutomations */; };
 		642F735E1D470D3C1F4B8DAB /* ShellXBonsplitStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2279385AFDBFDAEE17F61EA3 /* ShellXBonsplitStyles.swift */; };
 		9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */; };
 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
@@ -6128,6 +6132,7 @@
 		925800000000000000000004 /* CMUXCLI+RestorePreflight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+RestorePreflight.swift"; sourceTree = "<group>"; };
 		925800000000000000000008 /* CMUXCLI+RestoreRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+RestoreRecord.swift"; sourceTree = "<group>"; };
 		925800000000000000000006 /* CMUXCLI+RestoreSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+RestoreSelector.swift"; sourceTree = "<group>"; };
+		EB18D0C89A3C90E4A1AD10D9 /* CMUXCLI+Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+Routine.swift"; sourceTree = "<group>"; };
 		DF43B7BD28A755A6280428D6 /* CMUXCLI+RovoDevHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+RovoDevHooks.swift"; sourceTree = "<group>"; };
 		50748DE10A0E397E5C77A025 /* CMUXCLI+Screenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+Screenshot.swift"; sourceTree = "<group>"; };
 		11AE8B73B8979F37F85EB754 /* CMUXCLI+SemanticNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CMUXCLI+SemanticNotifications.swift"; sourceTree = "<group>"; };
@@ -9479,6 +9484,7 @@
 				A5001006 /* GhosttyKit.xcframework in Frameworks */,
 				1A0B0C0D0E0F101112132213 /* IrohLib in Frameworks */,
 				A5001290 /* MarkdownUI in Frameworks */,
+				5E1A7A000000000000000003 /* ShellXAutomations in Frameworks */,
 				5E11A00000000000000000A2 /* ShellXBrand in Frameworks */,
 				5E11A00000000000000000B2 /* ShellXIcons in Frameworks */,
 				5E11A10000000000000000B1 /* ShellXLinkCore in Frameworks */,
@@ -9520,6 +9526,7 @@
 				5CA7A1060000000000000006 /* CmuxSurfaceCatalogModel in Frameworks */,
 				C85390090000000000000001 /* CmuxTerminalCore in Frameworks */,
 				7E1A1A0000000000000000A3 /* CmuxTerminalImport in Frameworks */,
+				5E1A7A000000000000000004 /* ShellXAutomations in Frameworks */,
 				5E11A00000000000000000A3 /* ShellXBrand in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -9577,6 +9584,7 @@
 				730600040000000000000001 /* CmuxWindowing in Frameworks */,
 				A13296000000000000000103 /* CmuxWorkspacePresence in Frameworks */,
 				1A0B0C0D0E0F101112132214 /* IrohLib in Frameworks */,
+				5E1A7A000000000000000005 /* ShellXAutomations in Frameworks */,
 				5E11A10000000000000000C1 /* ShellXLinkCore in Frameworks */,
 				5E11A10000000000000000C3 /* ShellXLinkSession in Frameworks */,
 			);
@@ -12904,6 +12912,7 @@
 				5B85EF1F8C40AF5C89F442A8 /* CMUXCLI+AgentMessageSettings.swift */,
 				6EA23FD5F4147585610132E4 /* CMUXCLI+BrowserRepl.swift */,
 				F0226FF4BE571A2BA5B5AB16 /* CMUXCLI+VPN.swift */,
+				EB18D0C89A3C90E4A1AD10D9 /* CMUXCLI+Routine.swift */,
 			);
 			path = CLI;
 			sourceTree = "<group>";
@@ -14396,6 +14405,7 @@
 				C5A1FED000000000000000C3 /* CmuxSwiftRender */,
 				C5A1FED100000000000000D3 /* CmuxSwiftRenderUI */,
 				D96973000000000000000001 /* CmuxSudoBroker */,
+				5E1A7A000000000000000002 /* ShellXAutomations */,
 				D96973000000000000000002 /* CmuxSudoBrokerUI */,
 				C5A1FED200000000000000E3 /* CmuxSidebarInterpreterClient */,
 				C5A1FED200000000000000E6 /* CmuxSidebarRemoteRender */,
@@ -14472,6 +14482,7 @@
 				A500D013A1B2C3D4E5F60718 /* CMUXDebugLog */,
 				CC0DE00000000000000000A2 /* CmuxCore */,
 				D96973000000000000000001 /* CmuxSudoBroker */,
+				5E1A7A000000000000000002 /* ShellXAutomations */,
 				C51A700000000000000000A2 /* CmuxSimulator */,
 				CD0CFE5200000000CD0CFE52 /* CmuxSettings */,
 				CF00F00000000000000000A2 /* CmuxFoundation */,
@@ -14575,6 +14586,7 @@
 				D0F4A0000000000000000002 /* CmuxCloudTunnelCore */,
 				A5001262 /* Bonsplit */,
 				D96973000000000000000001 /* CmuxSudoBroker */,
+				5E1A7A000000000000000002 /* ShellXAutomations */,
 				D96973000000000000000002 /* CmuxSudoBrokerUI */,
 				A500D013A1B2C3D4E5F60718 /* CMUXDebugLog */,
 				CC0033E15A1B2C3D4E5F0011 /* CmuxDiffComments */,
@@ -14683,6 +14695,7 @@
 				C5A1FED200000000000000E4 /* XCLocalSwiftPackageReference "CmuxSidebarInterpreterService" */,
 				C51A700000000000000000A1 /* XCLocalSwiftPackageReference "CmuxSimulator" */,
 				D96972000000000000000001 /* XCLocalSwiftPackageReference "CmuxSudoBroker" */,
+				5E1A7A000000000000000001 /* XCLocalSwiftPackageReference "ShellXAutomations" */,
 				D96972000000000000000002 /* XCLocalSwiftPackageReference "CmuxSudoBrokerUI" */,
 				5E55200000000000000000B1 /* XCLocalSwiftPackageReference "CmuxWindowing" */,
 				5E55500000000000000000E1 /* XCLocalSwiftPackageReference "CmuxCommandPalette" */,
@@ -18036,6 +18049,7 @@
 				925800000000000000000003 /* CMUXCLI+RestorePreflight.swift in Sources */,
 				925800000000000000000007 /* CMUXCLI+RestoreRecord.swift in Sources */,
 				925800000000000000000005 /* CMUXCLI+RestoreSelector.swift in Sources */,
+				A7BCAA63C294DAE4A31E3FCB /* CMUXCLI+Routine.swift in Sources */,
 				888222D96880953F33F554F1 /* CMUXCLI+RovoDevHooks.swift in Sources */,
 				37708E13930225D14409F461 /* CMUXCLI+Screenshot.swift in Sources */,
 				A24420164F7D1D02F89B3E69 /* CMUXCLI+SemanticNotifications.swift in Sources */,
@@ -20217,6 +20231,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/macOS/CmuxSudoBroker;
 		};
+		5E1A7A000000000000000001 /* XCLocalSwiftPackageReference "ShellXAutomations" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/macOS/ShellXAutomations;
+		};
 		D96972000000000000000002 /* XCLocalSwiftPackageReference "CmuxSudoBrokerUI" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/macOS/CmuxSudoBrokerUI;
@@ -20556,6 +20574,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D96972000000000000000001 /* XCLocalSwiftPackageReference "CmuxSudoBroker" */;
 			productName = CmuxSudoBroker;
+		};
+		5E1A7A000000000000000002 /* ShellXAutomations */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E1A7A000000000000000001 /* XCLocalSwiftPackageReference "ShellXAutomations" */;
+			productName = ShellXAutomations;
 		};
 		D96973000000000000000002 /* CmuxSudoBrokerUI */ = {
 			isa = XCSwiftPackageProductDependency;

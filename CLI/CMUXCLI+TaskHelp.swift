@@ -317,6 +317,7 @@ extension CMUXCLI {
         return """
         events [--after <seq>] [--cursor-file <path>] [--name <event>] [--category <category>] [--reconnect] [--limit <n>] [--no-ack] [--no-heartbeat]
         automation <list|show|test|enable|disable|logs|reload> [args]
+        routine <run|notify|list> [args]
         \(executionExchangeHelp)
         todo <add|list|check|uncheck|start|rm|clear> [args] [--workspace <id|ref|index>] [--window <id|ref|index>]
         send [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>] [--paste] <text>
