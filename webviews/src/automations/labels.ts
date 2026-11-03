@@ -83,6 +83,7 @@ export const DEFAULT_AUTOMATION_LABELS = {
   keepEditing: "Keep editing",
   saving: "Saving…",
   draftEmpty: "The draft appears here as you describe your idea.",
+  draftWorking: "Claude is working on the draft…",
   creatorFailed: "Something went wrong: {message}",
   dismiss: "Dismiss",
   actionFailed: "That did not work: {message}",

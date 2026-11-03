@@ -64,6 +64,7 @@ struct ShellXAutomationsLabels {
             "typePicker": String(localized: "automations.label.typePicker", defaultValue: "Type"),
             "assistantName": String(localized: "automations.label.assistantName", defaultValue: "Claude Code"),
             "thinking": String(localized: "automations.label.thinking", defaultValue: "Thinking…"),
+            "draftWorking": String(localized: "automations.label.draftWorking", defaultValue: "Claude is working on the draft…"),
             "draftBadge": String(localized: "automations.label.draftBadge", defaultValue: "Draft"),
             "untitledDraft": String(localized: "automations.label.untitledDraft", defaultValue: "Untitled draft"),
             "editingName": String(localized: "automations.label.editingName", defaultValue: "Editing {name}"),

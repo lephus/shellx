@@ -87,9 +87,16 @@ export function CreatorView({
           </div>
         </form>
       </section>
-      <section className="au-draft-pane">
+      <section className="au-draft-pane" data-busy={creator.busy ? "true" : "false"}>
         <PerspectiveGrid busy={creator.busy} reduceMotion={reduceMotion} />
+        <div className="au-draft-glow" aria-hidden="true" />
         <div className="au-draft-wrap">
+          {creator.busy ? (
+            <div className="au-draft-working" role="status">
+              <span className="au-draft-spinner" aria-hidden="true" />
+              <span className="au-draft-working-text">{label("draftWorking")}</span>
+            </div>
+          ) : null}
           {creator.draft ? (
             <>
               <DraftCard label={label} draft={creator.draft} issues={creator.issues} ready={ready} />
@@ -107,6 +114,13 @@ export function CreatorView({
                 </button>
               </div>
             </>
+          ) : creator.busy ? (
+            <div className="au-draft-skeleton" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
           ) : (
             <p className="au-draft-empty">{label("draftEmpty")}</p>
           )}

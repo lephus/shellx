@@ -139,6 +139,33 @@ body {
 .au-grid { position: absolute; inset: 0; width: 100%; height: 100%; }
 .au-draft-wrap { position: absolute; left: 50%; top: 28px; transform: translateX(-50%); width: 82%; max-height: calc(100% - 56px); overflow: auto; display: flex; flex-direction: column; gap: 10px; }
 .au-draft-empty { margin: 0; text-align: center; color: var(--au-muted); }
+/* Claude working: a glow at the grid's vanishing point, a status pill, a skeleton or a scanning draft. */
+.au-draft-glow { position: absolute; left: 50%; top: 52%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%) scale(0.6); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--au-pri) 22%, transparent) 0%, transparent 65%); opacity: 0; pointer-events: none; transition: opacity 0.4s ease, transform 0.4s ease; }
+.au-draft-pane[data-busy="true"] .au-draft-glow { opacity: 1; transform: translate(-50%, -50%) scale(1); animation: au-glow 2.4s ease-in-out infinite; }
+@keyframes au-glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.au-draft-working { align-self: center; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--au-pri) 35%, var(--au-line)); background: color-mix(in srgb, var(--au-panel) 85%, transparent); backdrop-filter: blur(8px); font-size: 12px; }
+.au-draft-spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--au-pri) 25%, transparent); border-top-color: var(--au-pri); animation: au-spin 0.9s linear infinite; }
+@keyframes au-spin { to { transform: rotate(360deg); } }
+.au-draft-working-text { background: linear-gradient(90deg, var(--au-muted) 0%, var(--au-muted) 40%, var(--au-pri) 50%, var(--au-muted) 60%, var(--au-muted) 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: au-shimmer 2s linear infinite; }
+@keyframes au-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.au-draft-skeleton { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--au-line); background: color-mix(in srgb, var(--au-panel) 80%, transparent); backdrop-filter: blur(8px); }
+.au-draft-skeleton span { display: block; height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--au-raise) 0%, color-mix(in srgb, var(--au-pri) 18%, var(--au-raise)) 50%, var(--au-raise) 100%); background-size: 200% 100%; animation: au-shimmer 1.6s linear infinite; }
+.au-draft-skeleton span:nth-child(1) { width: 40%; height: 14px; }
+.au-draft-skeleton span:nth-child(2) { width: 90%; }
+.au-draft-skeleton span:nth-child(3) { width: 75%; }
+.au-draft-skeleton span:nth-child(4) { width: 55%; }
+.au-draft-pane[data-busy="true"] .au-draft { position: relative; overflow: hidden; }
+.au-draft-pane[data-busy="true"] .au-draft::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--au-pri) 10%, transparent) 50%, transparent 70%); background-size: 250% 100%; animation: au-shimmer 1.8s linear infinite; pointer-events: none; }
+.au-app[data-reduce-motion="true"] .au-draft-glow,
+.au-app[data-reduce-motion="true"] .au-draft-spinner,
+.au-app[data-reduce-motion="true"] .au-draft-working-text,
+.au-app[data-reduce-motion="true"] .au-draft-skeleton span,
+.au-app[data-reduce-motion="true"] .au-draft-pane .au-draft::after { animation: none; }
+.au-app[data-reduce-motion="true"] .au-draft-working-text { color: var(--au-muted); background: none; }
+@media (prefers-reduced-motion: reduce) {
+  .au-draft-glow, .au-draft-spinner, .au-draft-working-text, .au-draft-skeleton span, .au-draft-pane .au-draft::after { animation: none; }
+  .au-draft-working-text { color: var(--au-muted); background: none; }
+}
 .au-draft { background: color-mix(in srgb, var(--au-panel) 88%, transparent); backdrop-filter: blur(8px); padding: 16px 18px; }
 .au-draft-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .au-draft-head .au-kind { background: color-mix(in srgb, var(--au-run) 14%, transparent); color: var(--au-run); }
