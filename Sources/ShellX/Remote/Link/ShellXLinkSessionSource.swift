@@ -1,3 +1,4 @@
+import Bonsplit
 import CmuxAgentChat
 import CmuxMobileHost
 import Foundation
@@ -12,7 +13,9 @@ import ShellXLinkSession
 /// * Closing a terminal (its tab or workspace) ends its agent: Ghostty hangs up, then terminates and kills its
 ///   process groups. Once ended, a closed terminal's session is not listed, not even as ended. A session still
 ///   running after its terminal closed stays listed, so the phone never loses sight of a live agent. A session
-///   that names no terminal (an agent run outside ShellX) is listed like any other.
+///   that names no terminal (an agent run outside ShellX) is listed like any other. A terminal in a Dock is
+///   open like one in a workspace, and while the app launches (no window yet, restore unfinished) no terminal
+///   is taken for closed.
 /// * `revision` counts changes of that list: every published difference raises it by exactly 1
 ///   (PROTOCOL.md 4), and ``sessions()`` publishes any difference it finds before answering, so a list at
 ///   revision r includes every change up to r.
@@ -27,7 +30,8 @@ import ShellXLinkSession
 final class ShellXLinkSessionSource: AgentSessionSource {
     /// The workspace a session belongs to, or nil when no live workspace owns it.
     typealias WorkspaceLookup = @MainActor (ChatSessionDescriptor) -> (id: String, title: String)?
-    /// The surface ids of the terminals open on the Mac, or nil when that is not known.
+    /// The surface ids of the terminals open on the Mac (in a workspace or a Dock), or nil when that is not
+    /// known yet. Read at most once per refresh.
     typealias OpenTerminals = @MainActor () -> Set<UUID>?
     typealias ChangeSignal = ShellXLinkWorkspaceSource.ChangeSignal
     typealias Change = (revision: Int, upserted: [AgentSession], removed: [String])
@@ -154,18 +158,21 @@ final class ShellXLinkSessionSource: AgentSessionSource {
 
     /// The listed records, most recently active first: Claude Code agent sessions that are not ended, and the
     /// most recent listable ended ones, leaving out the ended ones whose terminal was closed.
+    ///
+    /// `openTerminals` is read once, when the first ended session naming a terminal comes up.
     static func listedRecords(
         _ service: AgentChatTranscriptService, openTerminals: OpenTerminals
     ) -> [AgentChatSessionRecord] {
         var listed: [AgentChatSessionRecord] = []
         var endedCount = 0
+        var open: Set<UUID>??
         for record in service.sessionRecords(workspaceID: nil)
         where record.agentKind == .claude && record.descriptor.kind == .agent {
             // Before the ended count, so a closed tab's sessions do not take the slots of listable ones.
             if record.state == .ended,
-               let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)),
-               let open = openTerminals(), !open.contains(terminal) {
-                continue
+               let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)) {
+                if open == nil { open = .some(openTerminals()) }
+                if let known = open ?? nil, !known.contains(terminal) { continue }
             }
             guard record.state == .ended else {
                 listed.append(record)
@@ -222,25 +229,53 @@ final class ShellXLinkSessionSource: AgentSessionSource {
         return (recorded.uuidString, workspace.title)
     }
 
-    /// The terminals open in the app's windows; nil with no app to ask, so nothing is hidden on a guess.
+    /// The terminals open in the app's main windows (including one being recovered) and its live Docks, in
+    /// one pass. Nil, so nothing is hidden on a guess, with no app to ask or while the app launches.
     static func liveOpenTerminals() -> Set<UUID>? {
         guard let app = AppDelegate.shared else { return nil }
-        let windows = app.mainWindowContexts.values.map { $0.tabManager.tabs }
-        return openTerminals(restoreFinished: true, workspacesByWindow: windows, docks: DockSplitStore.liveStores)
+        var seen: Set<ObjectIdentifier> = []
+        let managers = app.mainWindowContexts.values.map(\.tabManager)
+            + app.recoverableMainWindowRoutes().compactMap(\.tabManager)
+        let windows = managers.filter { seen.insert(ObjectIdentifier($0)).inserted }.map(\.tabs)
+        return openTerminals(
+            restoreFinished: ShellXSessionRestoreSignal.completed.value,
+            workspacesByWindow: windows,
+            docks: DockSplitStore.liveStores
+        )
     }
 
-    /// The terminals open in these windows' workspaces and Docks.
+    /// The terminals open in these windows' workspaces and in these Docks, or nil when that is not known:
+    /// before the launch's session restore has finished, or while no main window is registered, a terminal
+    /// still being restored would read as closed.
     static func openTerminals(
         restoreFinished: Bool, workspacesByWindow: [[Workspace]], docks: [DockSplitStore]
     ) -> Set<UUID>? {
-        openTerminalSurfaceIDs(workspaces: workspacesByWindow.flatMap { $0 }, docks: docks)
+        guard restoreFinished, !workspacesByWindow.isEmpty else { return nil }
+        return openTerminalSurfaceIDs(workspaces: workspacesByWindow.flatMap { $0 }, docks: docks)
     }
 
-    /// The surface ids of the terminals these workspaces and Docks hold.
+    /// Every id a hook may name one of these terminals by (`CMUX_SURFACE_ID` is the terminal panel's id), the
+    /// ids `Workspace.surfaceOwnershipTarget(for:)` and `DockSplitStore.containsPanel(_:)` resolve: panel ids,
+    /// split-tree surface ids, remote tmux pane surfaces and Dock terminal surfaces. A few non-terminal ids
+    /// may be among them; that only keeps a session listed.
     static func openTerminalSurfaceIDs(workspaces: [Workspace], docks: [DockSplitStore]) -> Set<UUID> {
         var open: Set<UUID> = []
         for workspace in workspaces {
             open.formUnion(workspace.panels.keys)
+            open.formUnion(workspace.surfaceIdToPanelId.keys.map(\.uuid))
+            if let mirror = workspace.remoteTmuxSessionMirror {
+                open.formUnion(mirror.controlPaneLocations().map(\.pane.panel.id))
+            }
+            for mirror in workspace.remoteTmuxWindowMirrors.values {
+                open.formUnion(mirror.surfaceIDsInLayoutOrder)
+            }
+        }
+        for dock in docks {
+            open.formUnion(dock.panels.keys)
+            open.formUnion(dock.surfaceIdToPanelId.keys.map(\.uuid))
+            for panel in dock.panels.values {
+                if let terminal = panel as? TerminalPanel { open.insert(terminal.surface.id) }
+            }
         }
         return open
     }
