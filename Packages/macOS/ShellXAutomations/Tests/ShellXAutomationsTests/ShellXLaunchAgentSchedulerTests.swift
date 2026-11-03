@@ -12,7 +12,7 @@ private actor FakeLaunchctl: ShellXLaunchctlRunning {
     func run(_ arguments: [String]) async throws -> (status: Int32, output: String) {
         calls.append(arguments)
         if arguments.first == "bootstrap" { return (bootstrapStatus, bootstrapStatus == 0 ? "" : "Bootstrap failed: 5") }
-        return (bootoutStatus, bootoutStatus == 0 ? "" : "Boot-out failed: 3: No such process")
+        return (bootoutStatus, bootoutStatus == 0 ? "" : (bootoutStatus == 3 ? "Boot-out failed: 3: No such process" : "Boot-out failed: \(bootoutStatus)"))
     }
 }
 
@@ -159,6 +159,56 @@ private struct Fixture {
         try await f.scheduler.sync([f.automation("S1", kind: .skill), f.automation("N1", cron: nil)])
         #expect(await f.fake.calls.isEmpty)
         #expect(!f.exists("pro.shellx.automation.S1"))
+    }
+
+    @Test func failedBootstrapDeletesNewPlistSoSyncRetries() async throws {
+        let f = Fixture()
+        await f.fake.setBootstrapStatus(5)
+        await #expect(throws: ShellXLaunchAgentSyncError.self) { try await f.scheduler.sync([f.automation()]) }
+        #expect(!f.exists("pro.shellx.automation.A1"))
+        await f.fake.setBootstrapStatus(0)
+        await f.fake.reset()
+        try await f.scheduler.sync([f.automation()])
+        #expect(await f.fake.calls.count == 2)
+        #expect(f.exists("pro.shellx.automation.A1"))
+    }
+
+    @Test func failedBootstrapRestoresPreviousPlist() async throws {
+        let f = Fixture()
+        try await f.scheduler.install(f.automation())
+        let before = try Data(contentsOf: f.plistURL("pro.shellx.automation.A1"))
+        await f.fake.setBootstrapStatus(5)
+        await #expect(throws: ShellXLaunchAgentError.self) {
+            try await f.scheduler.install(f.automation(cron: "0 1 * * *"))
+        }
+        #expect(try Data(contentsOf: f.plistURL("pro.shellx.automation.A1")) == before)
+    }
+
+    @Test func syncProcessesEveryItemAndReportsFailures() async throws {
+        let f = Fixture()
+        do {
+            try await f.scheduler.sync([f.automation("BAD", cron: "nope"), f.automation("GOOD")])
+            Issue.record("expected error")
+        } catch let error as ShellXLaunchAgentSyncError {
+            #expect(error.failures.map(\.id) == ["BAD"])
+        }
+        #expect(f.exists("pro.shellx.automation.GOOD"))
+    }
+
+    @Test func unsafeIdentifiersAreRejected() async throws {
+        let f = Fixture()
+        let bad = f.automation("../../x")
+        #expect(throws: ShellXLaunchAgentError.invalidIdentifier(id: "../../x")) { try f.scheduler.plistData(for: bad) }
+        await #expect(throws: ShellXLaunchAgentError.invalidIdentifier(id: "../../x")) { try await f.scheduler.install(bad) }
+        #expect(await f.fake.calls.isEmpty)
+    }
+
+    @Test func removeThrowsOnRealBootoutFailureAndKeepsPlist() async throws {
+        let f = Fixture()
+        try await f.scheduler.install(f.automation())
+        await f.fake.setBootoutStatus(5)
+        await #expect(throws: ShellXLaunchAgentError.bootoutFailed(status: 5, output: "Boot-out failed: 5")) { try await f.scheduler.remove(id: "A1") }
+        #expect(f.exists("pro.shellx.automation.A1"))
     }
 
     @Test func workflowsAreScheduled() async throws {
