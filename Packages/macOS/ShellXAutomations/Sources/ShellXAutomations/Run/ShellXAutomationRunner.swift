@@ -4,7 +4,6 @@ public import Foundation
 public actor ShellXAutomationRunner {
     private static let needsYouMarker = "SHELLX_NEEDS_YOU:"
     private static let promptSuffix = "\n\nYou are running unattended. If you need the user to decide or approve something, stop and end your final message with one line: SHELLX_NEEDS_YOU: <short reason>."
-    private static let notificationLimit = 180
 
     private let store: ShellXAutomationStore
     private let claude: (any ShellXClaudeLaunching)?
@@ -190,10 +189,7 @@ private extension ShellXAutomationRunner {
         case .needsYou: (event, text) = (.needsYou, record.reason)
         case .running, .skipped: return
         }
-        guard automation.notify.on.contains(event), automation.notify.targets.contains(.mac),
-              let url = URL(string: "shellx://automations/\(automation.id)") else { return }
-        let body = text ?? ""
-        let truncated = body.count > Self.notificationLimit ? String(body.prefix(Self.notificationLimit)) + "…" : body
-        try? await notifier.post(ShellXAutomationNotification(title: automation.name, body: truncated, url: url, group: automation.id))
+        guard automation.notify.on.contains(event), automation.notify.targets.contains(.mac) else { return }
+        try? await notifier.post(ShellXAutomationNotification(name: automation.name, body: text ?? "", automationId: automation.id))
     }
 }
