@@ -843,6 +843,8 @@ extension Workspace {
             return nil
         case .cloudVPNSetup:
             return nil
+        case .automations:
+            return nil
         }
         return SessionPanelSnapshot(
             id: panelId,
@@ -2394,6 +2396,8 @@ extension Workspace {
         case .accountSignIn:
             return nil
         case .cloudVPNSetup:
+            return nil
+        case .automations:
             return nil
         }
     }

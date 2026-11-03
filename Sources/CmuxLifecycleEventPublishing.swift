@@ -240,6 +240,8 @@ extension Workspace {
             return "account_sign_in"
         case .cloudVPNSetup:
             return "cloud_vpn_setup"
+        case .automations:
+            return "automations"
         }
     }
 }

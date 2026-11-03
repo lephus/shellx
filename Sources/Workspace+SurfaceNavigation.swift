@@ -222,6 +222,8 @@ extension Workspace {
             return SurfaceKind.accountSignIn.rawValue
         case .cloudVPNSetup:
             return SurfaceKind.cloudVPNSetup.rawValue
+        case .automations:
+            return SurfaceKind.automations.rawValue
         }
     }
 

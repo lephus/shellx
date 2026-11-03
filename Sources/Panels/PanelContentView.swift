@@ -246,6 +246,14 @@ struct PanelContentView: View {
                     onRequestPanelFocus: onRequestPanelFocus
                 )
             }
+        case .automations:
+            if let automationsPanel = panel as? ShellXAutomationsPanel {
+                ShellXAutomationsPanelView(
+                    panel: automationsPanel,
+                    appearance: appearance,
+                    onRequestPanelFocus: onRequestPanelFocus
+                )
+            }
 
         }
     }
@@ -264,7 +272,7 @@ struct PanelContentView: View {
     private var shouldInstallPaneDropTarget: Bool {
         guard isVisibleInUI else { return false }
         switch panel.panelType {
-        case .markdown, .filePreview, .rightSidebarTool, .customSidebar, .simulator, .agentSession, .project, .extensionBrowser, .workspaceTodo, .coderouterGuide, .notifications, .cloudVMLoading, .mobilePairing, .accountSignIn, .cloudVPNSetup:
+        case .markdown, .filePreview, .rightSidebarTool, .customSidebar, .simulator, .agentSession, .project, .extensionBrowser, .workspaceTodo, .coderouterGuide, .notifications, .cloudVMLoading, .mobilePairing, .accountSignIn, .cloudVPNSetup, .automations:
             return true
         case .terminal, .browser:
             return false

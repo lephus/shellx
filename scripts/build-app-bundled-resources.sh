@@ -44,6 +44,10 @@ SHELLX_NOTIFIER_SRC="${SRCROOT}/workers/shellx-notifier"
 SHELLX_NOTIFIER_APP="${DEST}/../Library/ShellX Notifier.app"
 SHELLX_NOTIFIER_EXEC="${SHELLX_NOTIFIER_APP}/Contents/MacOS/shellx-notifier"
 SHELLX_NOTIFIER_ICON="${DEST}/AppIcon.icns"
+# The Automations creator's system prompt and its Apache-2.0 notice (Bundle.main
+# subdirectory shellx-automations).
+SHELLX_AUTOMATIONS_SRC="${SRCROOT}/Resources/shellx-automations"
+SHELLX_AUTOMATIONS_DEST="${DEST}/shellx-automations"
 [ -f "$SHELLX_NOTIFIER_ICON" ] || SHELLX_NOTIFIER_ICON="${DEST}/AppIcon-Debug.icns"
 
 run_git() (
@@ -158,6 +162,7 @@ output_fingerprint() {
       printf 'missing:%s\n' "$CMUX_CUA_HELPER_APP"
     fi
     hash_tree "$SHELLX_NOTIFIER_APP"
+    hash_tree "$SHELLX_AUTOMATIONS_DEST"
   } | shasum | awk '{print $1}'
 }
 
@@ -240,6 +245,7 @@ fingerprint="$({
   hash_tree "$BUILD_SHELLX_NOTIFIER"
   hash_tree "$SHELLX_NOTIFIER_SRC"
   hash_tree "$SHELLX_NOTIFIER_ICON"
+  hash_tree "$SHELLX_AUTOMATIONS_SRC"
 } | shasum | awk '{print $1}')"
 output_fingerprint_value="$(output_fingerprint)"
 
@@ -308,6 +314,12 @@ if [ -d "$CMUX_SHELL_SRC" ]; then
   rsync -a --delete "$CMUX_SHELL_SRC/." "$CMUX_SHELL_DEST/"
 else
   rm -rf "$CMUX_SHELL_DEST"
+fi
+if [ -d "$SHELLX_AUTOMATIONS_SRC" ]; then
+  mkdir -p "$SHELLX_AUTOMATIONS_DEST"
+  rsync -a --delete "$SHELLX_AUTOMATIONS_SRC/" "$SHELLX_AUTOMATIONS_DEST/"
+else
+  rm -rf "$SHELLX_AUTOMATIONS_DEST"
 fi
 if [ -f "$CMUX_GHOSTTY_ZSH_SRC" ]; then
   mkdir -p "$CMUX_SHELL_DEST"

@@ -561,6 +561,8 @@ final class CmuxMainThreadTurnProfiler {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, NSMenuItemValidation, NSMenuDelegate, CmuxConfigStoreReloadEnvironment {
     nonisolated(unsafe) static var shared: AppDelegate?
+    /// ShellX: the Automations store, scheduler and library (AppDelegate+ShellXAutomations.swift).
+    var shellXAutomations: ShellXAutomationsRuntime?
     let cloudBannerDismissalStore: CloudBannerDismissalStore
     /// Composition-root owner for the persisted per-SSH-machine clipboard-write policy.
     let sshClipboardWriteTrustStore: SSHClipboardWriteTrustStore
@@ -1618,7 +1620,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return true
     }
 
-    func application(_ application: NSApplication, open urls: [URL]) {
+    func application(_ application: NSApplication, open incomingURLs: [URL]) {
+        // ShellX: automation banners open shellx://automations[/<id>]; route them before
+        // the auth callback router, which owns the rest of the shellx scheme.
+        let urls = handleShellXAutomationsURLs(incomingURLs)
+        guard !urls.isEmpty else { return }
         #if DEBUG
         AuthDebugLog().log("auth.openURLs.received count=\(urls.count) summaries=\(urls.map(Self.authURLDebugSummary).joined(separator: "|"))")
         #endif
@@ -1729,6 +1735,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ShellXRemoteService.shared.startIfEnabled() // ShellX: serves phones over ShellX Link (1.5.1); remote machines stay off (W2 Task 13)
         }
         ShellXShareController.resumeIfEnabled() // ShellX: 15 m / 1 h share links resume once signed in (§7.3)
+        startShellXAutomations() // ShellX: Automations library + launchd reconcile
         let telemetryEnabled = TelemetrySettings.enabledForCurrentLaunch
         let sentryStartupPolicy = MacSentryStartupPolicy(
             environment: env,

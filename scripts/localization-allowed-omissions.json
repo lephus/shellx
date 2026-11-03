@@ -6302,5 +6302,23 @@
       "es": "Reviewed shared native developer term, abbreviation, or borrowed technical noun. The translated entry is still required.",
       "vi": "English UI or developer term Vietnamese ShellX keeps as-is (glossary: terminal, tab, agent, prompt, commit, branch, fork, log, OK, Cloud VM); the translated entry is still required."
     }
+  },
+  "automations.label.targetMac": {
+    "class": "brand",
+    "source": "Mac"
+  },
+  "automations.label.targetIphone": {
+    "class": "brand",
+    "source": "iPhone"
+  },
+  "automations.label.assistantName": {
+    "class": "brand",
+    "source": "Claude Code"
+  },
+  "automations.label.fieldDescription": {
+    "source": "Description",
+    "identityLocales": {
+      "fr": "Description is the standard French noun for this field label; a translated entry is still required."
+    }
   }
 }
