@@ -75,7 +75,7 @@ export function ChatTranscript({
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")?.id;
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
-  }, [messages, streaming]);
+  }, [messages, streaming, busy]);
   return (
     <div className="au-msgs" aria-live="polite">
       {messages.map((m) =>
@@ -97,6 +97,19 @@ export function ChatTranscript({
         <div className="au-msg-ai">
           <div className="au-msg-who">{label("assistantName")}</div>
           <div className="au-msg-text">{streaming}</div>
+        </div>
+      ) : null}
+      {busy && (streaming === null || streaming === "") ? (
+        <div className="au-msg-ai au-thinking" data-thinking="true" role="status">
+          <div className="au-msg-who">{label("assistantName")}</div>
+          <div className="au-msg-text">
+            <span className="au-thinking-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            {label("thinking")}
+          </div>
         </div>
       ) : null}
       <div ref={endRef} />

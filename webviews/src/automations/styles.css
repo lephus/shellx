@@ -112,6 +112,13 @@ body {
 .au-msg-who { color: var(--au-muted); font-size: 11px; margin-bottom: 2px; }
 .au-msg-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .au-msg-error { color: var(--au-bad); }
+.au-thinking .au-msg-text { display: flex; align-items: center; gap: 8px; color: var(--au-muted); }
+.au-thinking-dots { display: inline-flex; gap: 4px; }
+.au-thinking-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--au-pri); opacity: 0.3; animation: au-thinking 1.2s ease-in-out infinite; }
+.au-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.au-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes au-thinking { 0%, 80%, 100% { opacity: 0.3; transform: none; } 40% { opacity: 1; transform: translateY(-2px); } }
+.au-app[data-reduce-motion="true"] .au-thinking-dots span { animation: none; opacity: 0.6; }
 .au-choices { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .au-choices-q { margin: 0; color: var(--au-muted); }
 .au-chips { display: flex; flex-wrap: wrap; gap: 6px; }

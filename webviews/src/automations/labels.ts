@@ -56,6 +56,7 @@ export const DEFAULT_AUTOMATION_LABELS = {
   typeCronjob: "Cronjob",
   typePicker: "Type",
   assistantName: "Claude Code",
+  thinking: "Thinking…",
   chooseSend: "Send",
   statusDrafting: "drafting…",
   statusReady: "✓ ready",

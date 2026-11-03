@@ -17,6 +17,10 @@ public actor ShellXCreatorSession {
     private var readerTask: Task<Void, Never>?
     private var parser = ShellXAssistantBlockParser()
     private var cancelled = false
+    /// True while ``start(seed:)`` waits for Claude Code to launch.
+    private var starting = false
+    /// Messages sent while Claude Code launches, waiting for ``start(seed:)`` to finish.
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// Creates a session.
     ///
@@ -45,6 +49,13 @@ public actor ShellXCreatorSession {
     /// A session cancelled while Claude Code starts stops the new process at once.
     public func start(seed: ShellXCreatorSeed?) async throws {
         guard writeLine == nil, !cancelled else { return }
+        starting = true
+        defer {
+            starting = false
+            let waiters = startWaiters
+            startWaiters = []
+            for waiter in waiters { waiter.resume() }
+        }
         let arguments = [
             "-p", "--input-format", "stream-json", "--output-format", "stream-json",
             "--include-partial-messages", "--verbose", "--append-system-prompt", systemPrompt,
@@ -81,10 +92,19 @@ public actor ShellXCreatorSession {
     }
 
     /// Sends a user message and marks the session busy.
+    ///
+    /// A message sent while Claude Code is still launching waits for it (after the seed, if any).
     public func send(_ text: String) async throws {
-        guard let writeLine else { throw ShellXCreatorProcess.Failure(message: "The assistant is not running.") }
         let encoded = try JSONEncoder().encode(text)
         let json = String(decoding: encoded, as: UTF8.self)
+        if writeLine == nil, starting, !cancelled {
+            continuation.yield(.busy(true))
+            await withCheckedContinuation { startWaiters.append($0) }
+        }
+        guard let writeLine else {
+            continuation.yield(.busy(false))
+            throw ShellXCreatorProcess.Failure(message: "The assistant is not running.")
+        }
         continuation.yield(.busy(true))
         do {
             try await writeLine(#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":\#(json)}]}}"#)

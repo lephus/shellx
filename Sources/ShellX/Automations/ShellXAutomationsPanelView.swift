@@ -7,7 +7,7 @@ struct ShellXAutomationsPanelView: View {
     let onRequestPanelFocus: () -> Void
 
     var body: some View {
-        ShellXAutomationsWebView(controller: panel.controller)
+        ShellXAutomationsWebView(host: panel.webHost)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: appearance.contentBackgroundColor))
             .simultaneousGesture(TapGesture().onEnded { onRequestPanelFocus() })

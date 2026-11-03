@@ -2,17 +2,19 @@ import Foundation
 
 /// Workspace tab that shows the Automations page.
 ///
-/// Owns one ``ShellXAutomationsController``; the web view is built by
-/// ``ShellXAutomationsPanelView`` and binds to it. Not restored with the session.
+/// Owns one ``ShellXAutomationsController`` and the web view showing it, so the page
+/// (and a creator chat in progress) outlives switching tabs. Not restored with the session.
 @MainActor
 final class ShellXAutomationsPanel: Panel {
     let id = UUID()
     let stableSurfaceIdentity = PanelStableSurfaceIdentity()
     let panelType: PanelType = .automations
     let controller: ShellXAutomationsController
+    let webHost: ShellXAutomationsWebHost
 
     init(controller: ShellXAutomationsController) {
         self.controller = controller
+        webHost = ShellXAutomationsWebHost(controller: controller)
     }
 
     var displayTitle: String {
@@ -23,6 +25,9 @@ final class ShellXAutomationsPanel: Panel {
 
     func focus() {}
     func unfocus() {}
-    func close() { controller.shutDown() }
+    func close() {
+        webHost.tearDown()
+        controller.shutDown()
+    }
     func triggerFlash(reason: WorkspaceAttentionFlashReason) { _ = reason }
 }

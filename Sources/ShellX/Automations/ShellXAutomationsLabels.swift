@@ -63,6 +63,7 @@ struct ShellXAutomationsLabels {
             "typeCronjob": String(localized: "automations.label.typeCronjob", defaultValue: "Cronjob"),
             "typePicker": String(localized: "automations.label.typePicker", defaultValue: "Type"),
             "assistantName": String(localized: "automations.label.assistantName", defaultValue: "Claude Code"),
+            "thinking": String(localized: "automations.label.thinking", defaultValue: "Thinking…"),
             "chooseSend": String(localized: "automations.label.chooseSend", defaultValue: "Send"),
             "statusDrafting": String(localized: "automations.label.statusDrafting", defaultValue: "drafting…"),
             "statusReady": String(localized: "automations.label.statusReady", defaultValue: "✓ ready"),
