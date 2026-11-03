@@ -200,16 +200,34 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertFalse(fixture.log.all.contains { $0.hasPrefix("launchctl") })
     }
 
-    func testExternalSkillCannotBeEditedInTheCreator() async throws {
+    func testExternalSkillIsEditedInTheCreatorInPlace() async throws {
+        try fixture.externalSkill("theirs")
+        let edited = ShellXAutomationDraft(
+            kind: .skill, name: "theirs", description: "Sharper",
+            skillMarkdown: "---\nname: theirs\ndescription: Sharper\n---\nBetter\n"
+        )
+
+        try await startCreatorWithDraft(edited, editId: "external:theirs")
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let saved = try XCTUnwrap(result(reply)?["automation"] as? [String: Any])
+        XCTAssertEqual(saved["id"] as? String, "external:theirs")
+        XCTAssertEqual(saved["origin"] as? String, "external")
+        let skill = fixture.environment.skillsRoot.appending(path: "theirs/SKILL.md")
+        XCTAssertEqual(try String(contentsOf: skill, encoding: .utf8), edited.skillMarkdown)
+    }
+
+    func testExternalSkillCannotBeEditedIntoACronjob() async throws {
         try fixture.externalSkill("theirs")
 
-        let reply = await controller.handle(method: "creator.start", params: ["editId": "external:theirs"])
+        try await startCreatorWithDraft(fixture.cronDraft("theirs"), editId: "external:theirs")
+        let reply = await controller.handle(method: "creator.save", params: [:])
 
-        XCTAssertEqual(errorCode(reply), "notAllowed")
-        let sends = await controller.handle(method: "creator.send", params: ["text": "hi"])
-        XCTAssertEqual(errorCode(sends), "unavailable")
-        let folder = fixture.environment.skillsRoot.appending(path: "theirs/SKILL.md")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path))
+        let issues = try XCTUnwrap(result(reply)?["issues"] as? [[String: Any]])
+        XCTAssertTrue(issues.contains { $0["field"] as? String == "kind" && $0["code"] as? String == "mustStaySkill" })
+        let skill = fixture.environment.skillsRoot.appending(path: "theirs/SKILL.md")
+        XCTAssertEqual(try String(contentsOf: skill, encoding: .utf8), "---\nname: theirs\ndescription: Theirs\n---\nBody\n")
+        XCTAssertFalse(fixture.log.all.contains { $0.hasPrefix("launchctl") })
     }
 
     func testCancelDuringStartLeavesNoRunningProcess() async throws {

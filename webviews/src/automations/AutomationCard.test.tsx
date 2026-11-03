@@ -48,9 +48,9 @@ function renderCard(over: Partial<AutomationDTO>): string {
   return renderToStaticMarkup(<AutomationCard store={store} automation={{ ...base, ...over }} label={label} focused={false} />);
 }
 
-test("skills ShellX did not create offer Edit file but not Edit", () => {
+test("skills ShellX did not create offer Edit in the app as well as Edit file", () => {
   const html = renderCard({ id: "external:theirs", kind: "skill", origin: "external" });
   expect(html).toContain(">Edit file<");
-  expect(html).not.toContain(">Edit<");
+  expect(html).toContain(">Edit<");
   expect(renderCard({})).toContain(">Edit<");
 });

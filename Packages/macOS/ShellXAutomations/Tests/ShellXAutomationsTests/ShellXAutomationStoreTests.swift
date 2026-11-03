@@ -109,6 +109,49 @@ private struct Fixture {
         #expect(try await f.store.automation(id: "external:other")?.name == "other")
     }
 
+    @Test func editsExternalSkillInPlaceWithoutAdoptingIt() async throws {
+        let f = Fixture()
+        let other = f.environment.skillsRoot.appending(path: "other")
+        try FileManager.default.createDirectory(at: other.appending(path: "references"), withIntermediateDirectories: true)
+        try "---\nname: other\ndescription: Old\n---\n".write(to: other.appending(path: "SKILL.md"), atomically: true, encoding: .utf8)
+        try "keep".write(to: other.appending(path: "references/notes.md"), atomically: true, encoding: .utf8)
+
+        let edited = ShellXAutomationDraft(
+            kind: .skill, name: "other", description: "New",
+            skillMarkdown: "---\nname: other\ndescription: New\n---\nBetter\n"
+        )
+        let saved = try await f.store.save(edited, replacing: "external:other")
+
+        #expect(saved.id == "external:other" && saved.origin == .external && saved.description == "New")
+        #expect(try String(contentsOf: other.appending(path: "SKILL.md"), encoding: .utf8) == edited.skillMarkdown)
+        #expect(try String(contentsOf: other.appending(path: "references/notes.md"), encoding: .utf8) == "keep")
+        #expect(!FileManager.default.fileExists(atPath: other.appending(path: ".shellx.json").path))
+
+        let renamed = ShellXAutomationDraft(
+            kind: .skill, name: "renamed", description: "New",
+            skillMarkdown: "---\nname: renamed\ndescription: New\n---\nBetter\n"
+        )
+        let moved = try await f.store.save(renamed, replacing: "external:other")
+        let newFolder = f.environment.skillsRoot.appending(path: "renamed")
+        #expect(moved.id == "external:renamed" && moved.origin == .external)
+        #expect(FileManager.default.fileExists(atPath: newFolder.appending(path: "references/notes.md").path))
+        #expect(!FileManager.default.fileExists(atPath: other.path))
+        #expect(!FileManager.default.fileExists(atPath: newFolder.appending(path: ".shellx.json").path))
+    }
+
+    @Test func externalSkillCannotBecomeAnAutomation() async throws {
+        let f = Fixture()
+        let other = f.environment.skillsRoot.appending(path: "other")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try "---\nname: other\ndescription: Old\n---\n".write(to: other.appending(path: "SKILL.md"), atomically: true, encoding: .utf8)
+
+        await #expect(throws: ShellXAutomationStoreError.self) {
+            try await f.store.save(f.cronDraft("other"), replacing: "external:other")
+        }
+        #expect(FileManager.default.fileExists(atPath: other.appending(path: "SKILL.md").path))
+        #expect(try await f.store.list().map(\.id) == ["external:other"])
+    }
+
     @Test func savesNeverEscapeRoots() async throws {
         let f = Fixture()
         for name in ["../evil", "a/b", "My Skill", "caf\u{E9}", "cafe\u{301}", "a--b", "", String(repeating: "a", count: 65)] {
