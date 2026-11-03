@@ -36,6 +36,15 @@ INFO_PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
 # ShellX team, so no cmux helper is trusted either. CMUX_CUA_HELPER_BUILD=1
 # restores the upstream helper build (tests/test_build_app_bundled_resources.sh).
 CMUX_CUA_HELPER_BUILD="${CMUX_CUA_HELPER_BUILD:-0}"
+# ShellX Notifier posts automation banners (scripts/shellx/build-shellx-notifier.sh).
+# Its bundle id is the host's plus ".notifier"; its icon is the host's, which the
+# Resources phase has already compiled into DEST.
+BUILD_SHELLX_NOTIFIER="${SRCROOT}/scripts/shellx/build-shellx-notifier.sh"
+SHELLX_NOTIFIER_SRC="${SRCROOT}/workers/shellx-notifier"
+SHELLX_NOTIFIER_APP="${DEST}/../Library/ShellX Notifier.app"
+SHELLX_NOTIFIER_EXEC="${SHELLX_NOTIFIER_APP}/Contents/MacOS/shellx-notifier"
+SHELLX_NOTIFIER_ICON="${DEST}/AppIcon.icns"
+[ -f "$SHELLX_NOTIFIER_ICON" ] || SHELLX_NOTIFIER_ICON="${DEST}/AppIcon-Debug.icns"
 
 run_git() (
   unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE
@@ -148,6 +157,7 @@ output_fingerprint() {
     else
       printf 'missing:%s\n' "$CMUX_CUA_HELPER_APP"
     fi
+    hash_tree "$SHELLX_NOTIFIER_APP"
   } | shasum | awk '{print $1}'
 }
 
@@ -227,6 +237,9 @@ fingerprint="$({
   hash_tree "${SRCROOT}/Resources/ComputerUseHelperIcon.icns"
   hash_tree "${SRCROOT}/Resources/AppIcon.icns"
   hash_tree "${SRCROOT}/Resources/AppIcon-Debug.icns"
+  hash_tree "$BUILD_SHELLX_NOTIFIER"
+  hash_tree "$SHELLX_NOTIFIER_SRC"
+  hash_tree "$SHELLX_NOTIFIER_ICON"
 } | shasum | awk '{print $1}')"
 output_fingerprint_value="$(output_fingerprint)"
 
@@ -240,6 +253,9 @@ if [ "$CMUX_CUA_HELPER_BUILD" = 1 ]; then
     helper_output_ok=false
   fi
 elif [ -e "$CMUX_CUA_HELPER_APP" ] || [ -e "$LEGACY_CMUX_CUA_CLIENT" ]; then
+  helper_output_ok=false
+fi
+if [ ! -f "$SHELLX_NOTIFIER_APP/Contents/Info.plist" ] || [ ! -x "$SHELLX_NOTIFIER_EXEC" ]; then
   helper_output_ok=false
 fi
 if [ -f "$STAMP" ] && [ -x "$GHOSTTY_HELPER_DEST" ] \
@@ -342,6 +358,19 @@ if [ "$CMUX_CUA_HELPER_BUILD" = 1 ]; then
 else
   # Drop a helper an earlier (upstream) build left in this product.
   rm -rf "$CMUX_CUA_HELPER_APP"
+fi
+if [ ! -x "$BUILD_SHELLX_NOTIFIER" ]; then
+  echo "error: missing ShellX Notifier build script at $BUILD_SHELLX_NOTIFIER" >&2
+  exit 1
+fi
+SHELLX_NOTIFIER_ICON_ARGS=()
+[ -f "$SHELLX_NOTIFIER_ICON" ] && SHELLX_NOTIFIER_ICON_ARGS=(--icon "$SHELLX_NOTIFIER_ICON")
+"$BUILD_SHELLX_NOTIFIER" --output "$SHELLX_NOTIFIER_APP" \
+  --bundle-id "${PRODUCT_BUNDLE_IDENTIFIER:-pro.shellx.desktop}.notifier" \
+  --archs "${ARCHS:-}" ${SHELLX_NOTIFIER_ICON_ARGS[@]+"${SHELLX_NOTIFIER_ICON_ARGS[@]}"}
+if [ ! -x "$SHELLX_NOTIFIER_EXEC" ]; then
+  echo "error: ShellX Notifier was not created at $SHELLX_NOTIFIER_EXEC" >&2
+  exit 1
 fi
 update_commit
 

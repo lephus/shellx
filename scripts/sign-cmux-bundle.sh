@@ -36,6 +36,8 @@
 #      The macOS cmux-tui SSH payloads under Resources/bin/cmux-tui-ssh/ are
 #      signed the same way (scripts/sign-cmux-tui-ssh-payloads.sh).
 #   2. The nested cmux Computer Use app with the Developer ID identity.
+#   2b. The nested ShellX Notifier app (Contents/Library/ShellX Notifier.app)
+#      with the Developer ID identity, hardened runtime and helper entitlements.
 #   3. Each nested plugin under Contents/PlugIns/* with --deep.
 #   4. Each nested framework under Contents/Frameworks/* with --deep
 #      (covers Sparkle's XPCServices and Updater.app).
@@ -102,6 +104,7 @@ fi
 COMMON=(--force --options runtime "${TS_FLAG[@]}" --sign "$IDENTITY")
 SYSTEM_EXTENSION_COMMON=(--force --options runtime "${TS_FLAG[@]}" --sign "$IDENTITY")
 COMPUTER_USE_HELPER="$APP_PATH/Contents/Library/cmux Computer Use.app"
+SHELLX_NOTIFIER_HELPER="$APP_PATH/Contents/Library/ShellX Notifier.app"
 SYSTEM_EXTENSIONS_DIR="$APP_PATH/Contents/Library/SystemExtensions"
 
 case "$(basename "$APP_ENTITLEMENTS")" in
@@ -168,6 +171,15 @@ if [[ "$SIGN_MODE" == "all" || "$SIGN_MODE" == "all-except-computer-use" ]]; the
       "${COMMON[@]}" \
       --entitlements "$HELPER_ENTITLEMENTS" \
       "$COMPUTER_USE_HELPER"
+  fi
+
+  # 2b. ShellX Notifier helper app (posts automation banners).
+  if [[ -d "$SHELLX_NOTIFIER_HELPER" ]]; then
+    echo "==> signing nested helper $(basename "$SHELLX_NOTIFIER_HELPER")"
+    /usr/bin/codesign \
+      "${COMMON[@]}" \
+      --entitlements "$HELPER_ENTITLEMENTS" \
+      "$SHELLX_NOTIFIER_HELPER"
   fi
 
   # 3. Plugins

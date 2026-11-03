@@ -73,7 +73,28 @@ if [[ -n "$helper_app" ]]; then
   printf 'managed\n' > "$helper_app/Contents/Resources/.cmux-cua-managed-helper"
 fi
 EOF
-chmod +x "$SRCROOT/scripts-build-helper" "$SRCROOT/scripts-build-cua"
+cat > "$SRCROOT/scripts-build-notifier" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+output=""
+bundle_id=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output) output="$2"; shift 2 ;;
+    --bundle-id) bundle_id="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+rm -rf "$output"
+mkdir -p "$output/Contents/MacOS"
+printf 'notifier\n' > "$output/Contents/MacOS/shellx-notifier"
+chmod +x "$output/Contents/MacOS/shellx-notifier"
+printf '%s\n' "$bundle_id" > "$output/Contents/Info.plist"
+EOF
+chmod +x "$SRCROOT/scripts-build-helper" "$SRCROOT/scripts-build-cua" "$SRCROOT/scripts-build-notifier"
+mkdir -p "$SRCROOT/scripts/shellx" "$SRCROOT/workers/shellx-notifier"
+printf 'notifier-source-v1\n' > "$SRCROOT/workers/shellx-notifier/main.swift"
+ln -s "$SRCROOT/scripts-build-notifier" "$SRCROOT/scripts/shellx/build-shellx-notifier.sh"
 printf 'apply-v1\n' > "$SRCROOT/scripts/apply-cmux-cua-patch.sh"
 printf 'patch-v1\n' > "$SRCROOT/scripts/cmux-cua-codex-delivery-mode.patch"
 ln -s "$SRCROOT/scripts-build-helper" "$SRCROOT/scripts/build-ghostty-cli-helper.sh"
@@ -280,3 +301,29 @@ fi
 CMUX_CUA_HELPER_BUILD=0 run_app_phase > "$TMP_DIR/shellx-no-helper-settled.log"
 grep -q 'skipping helper rebuilds' "$TMP_DIR/shellx-no-helper-settled.log"
 [[ ! -e "$HELPER_APP" ]]
+
+# ShellX Notifier: built into Contents/Library with the host id plus ".notifier",
+# rebuilt when its source changes or its executable goes missing.
+NOTIFIER_APP="$BUILD_DIR/cmux.app/Contents/Library/ShellX Notifier.app"
+run_notifier_phase() {
+  PRODUCT_BUNDLE_IDENTIFIER=pro.shellx.desktop.test CMUX_CUA_HELPER_BUILD=0 run_app_phase
+}
+run_notifier_phase > "$TMP_DIR/notifier.log"
+[[ -x "$NOTIFIER_APP/Contents/MacOS/shellx-notifier" ]]
+grep -qx 'pro.shellx.desktop.test.notifier' "$NOTIFIER_APP/Contents/Info.plist"
+run_notifier_phase > "$TMP_DIR/notifier-settled.log"
+grep -q 'skipping helper rebuilds' "$TMP_DIR/notifier-settled.log"
+rm "$NOTIFIER_APP/Contents/MacOS/shellx-notifier"
+run_notifier_phase > "$TMP_DIR/notifier-missing.log"
+if grep -q 'skipping helper rebuilds' "$TMP_DIR/notifier-missing.log"; then
+  echo 'FAIL: a missing ShellX Notifier executable did not invalidate the stamp' >&2
+  exit 1
+fi
+[[ -x "$NOTIFIER_APP/Contents/MacOS/shellx-notifier" ]]
+printf 'notifier-source-v2\n' > "$SRCROOT/workers/shellx-notifier/main.swift"
+run_notifier_phase > "$TMP_DIR/notifier-source.log"
+if grep -q 'skipping helper rebuilds' "$TMP_DIR/notifier-source.log"; then
+  echo 'FAIL: a changed ShellX Notifier source did not invalidate the stamp' >&2
+  exit 1
+fi
+echo 'PASS: the ShellX Notifier helper is built, kept and rebuilt'
