@@ -224,6 +224,33 @@ private struct Fixture {
         #expect(try Data(contentsOf: url).isEmpty == false)
     }
 
+    @Test func updateRunProgressRewritesRunningRecord() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: getpid()))
+        try await f.store.updateRunProgress(id: cron.id, runDirectory: dir, currentStep: 2, totalSteps: 3)
+        let run = try #require(try await f.store.automation(id: cron.id)?.lastRun)
+        #expect(run.status == .running && run.currentStep == 2 && run.totalSteps == 3)
+        #expect(try Data(contentsOf: f.environment.changeStampURL).isEmpty == false)
+    }
+
+    @Test func updateRunProgressRejectsNonRunDirectories() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let runs = cron.directory.appending(path: "runs", directoryHint: .isDirectory)
+        await #expect(throws: ShellXAutomationStoreError.self) {
+            try await f.store.updateRunProgress(id: cron.id, runDirectory: runs.appending(path: "notes"), currentStep: 1, totalSteps: 2)
+        }
+    }
+
+    @Test func recordWithoutProgressFieldsStillDecodes() throws {
+        let json = #"{"status":"done","trigger":"manual","startedAt":"2026-11-03T10:00:00Z","unread":true}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let record = try decoder.decode(ShellXRunRecord.self, from: Data(json.utf8))
+        #expect(record.currentStep == nil && record.totalSteps == nil)
+    }
+
     @Test func finishRunRejectsNonRunDirectories() async throws {
         let f = Fixture()
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)

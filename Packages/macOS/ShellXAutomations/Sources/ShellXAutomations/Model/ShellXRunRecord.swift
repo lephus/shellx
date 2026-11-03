@@ -20,6 +20,10 @@ public struct ShellXRunRecord: Codable, Sendable, Equatable {
     public var failedStep: Int?
     /// Whether the user has not yet seen this run.
     public var unread: Bool
+    /// One-based workflow step being (or last) run. `nil` for cronjobs, which have no steps, and for older records.
+    public var currentStep: Int?
+    /// Number of steps in the workflow. `nil` for cronjobs and older records.
+    public var totalSteps: Int?
 
     /// Creates a run record.
     public init(
@@ -31,7 +35,9 @@ public struct ShellXRunRecord: Codable, Sendable, Equatable {
         summary: String? = nil,
         reason: String? = nil,
         failedStep: Int? = nil,
-        unread: Bool = true
+        unread: Bool = true,
+        currentStep: Int? = nil,
+        totalSteps: Int? = nil
     ) {
         self.status = status
         self.trigger = trigger
@@ -42,5 +48,7 @@ public struct ShellXRunRecord: Codable, Sendable, Equatable {
         self.reason = reason
         self.failedStep = failedStep
         self.unread = unread
+        self.currentStep = currentStep
+        self.totalSteps = totalSteps
     }
 }

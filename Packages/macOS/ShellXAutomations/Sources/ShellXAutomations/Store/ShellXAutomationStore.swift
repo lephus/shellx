@@ -203,6 +203,23 @@ public actor ShellXAutomationStore {
         try touchChangeStamp()
     }
 
+    /// Rewrites a running run's `result.json` with its workflow progress; the status stays as recorded.
+    /// Uses the same run-directory validation as ``finishRun(id:runDirectory:record:pid:)``.
+    public func updateRunProgress(id: String, runDirectory: URL, currentStep: Int, totalSteps: Int) throws {
+        let dir = try automationDirectory(id: id)
+        let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
+        guard Self.isPlainRunName(runDirectory.lastPathComponent),
+              runDirectory.deletingLastPathComponent().standardizedFileURL == runs.standardizedFileURL else {
+            throw ShellXAutomationStoreError.foreignRunDirectory
+        }
+        let file = runDirectory.appending(path: "result.json")
+        var record = try decoder().decode(ShellXRunRecord.self, from: Data(contentsOf: file))
+        record.currentStep = currentStep
+        record.totalSteps = totalSteps
+        try encoder().encode(record).write(to: file, options: .atomic)
+        try touchChangeStamp()
+    }
+
     /// Recorded runs, newest first.
     public func runs(id: String, limit: Int) throws -> [ShellXRunRecord] {
         guard case .automation(let dir)? = try locate(id: id) else { return [] }

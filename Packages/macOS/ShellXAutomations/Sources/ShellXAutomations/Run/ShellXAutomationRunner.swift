@@ -100,6 +100,15 @@ private extension ShellXAutomationRunner {
         let transcript = runDirectory.appending(path: "output.jsonl")
         var sessionId: String?
         for (index, prompt) in prompts.enumerated() {
+            if automation.kind == .workflow {
+                // Cronjobs have a single prompt and leave progress nil; workflows report "step N of M".
+                record.currentStep = index + 1
+                record.totalSteps = prompts.count
+                // try? is deliberate: progress is cosmetic and must never fail the run.
+                try? await store.updateRunProgress(
+                    id: automation.id, runDirectory: runDirectory, currentStep: index + 1, totalSteps: prompts.count
+                )
+            }
             let result: ShellXClaudeResult
             do {
                 result = try await claude.run(

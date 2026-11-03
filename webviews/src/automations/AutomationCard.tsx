@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { formatTime, kindLabelKey, statusLabelKey } from "./format";
+import { formatDuration, formatTime, kindLabelKey, runDurationMs, statusLabelKey } from "./format";
 import type { AutomationLabelResolver } from "./labels";
 import type { AutomationsStore } from "./store";
 import type { AutomationDTO } from "./types";
@@ -22,6 +22,8 @@ export function AutomationCard({
   const run = a.lastRun;
   const canToggle = a.kind !== "skill";
   const targets = a.notify.targets;
+  const showSteps = run?.status === "running" && (run.totalSteps ?? 0) > 1 && run.currentStep != null;
+  const durationMs = run && run.status !== "running" ? runDurationMs(run.startedAt, run.finishedAt) : null;
   return (
     <article
       ref={ref}
@@ -67,7 +69,9 @@ export function AutomationCard({
           {run ? (
             <span className="au-run" data-status={run.status}>
               {label(statusLabelKey(run.status))}
+              {showSteps ? ` · ${label("stepProgress", { current: run.currentStep ?? 0, total: run.totalSteps ?? 0 })}` : ""}
               {run.finishedAt || run.startedAt ? ` · ${formatTime(run.finishedAt ?? run.startedAt)}` : ""}
+              {durationMs != null ? ` · ${formatDuration(durationMs, label)}` : ""}
             </span>
           ) : (
             <span className="au-muted">{label("neverRun")}</span>
