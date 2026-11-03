@@ -48,6 +48,8 @@ private actor RecordedArgv {
         let unknown = ShellXAutomationNotification(name: "my-skill", body: "hi", automationId: nil)
         #expect(unknown.url == URL(string: "shellx://automations")!)
         #expect(unknown.group == "my-skill")
+        let external = ShellXAutomationNotification(name: "x", body: "", automationId: "external:my skill/../x")
+        #expect(external.url.absoluteString == "shellx://automations/external:my%20skill%2F..%2Fx")
     }
 
     @Test func manualNotificationBodyIsTruncated() {

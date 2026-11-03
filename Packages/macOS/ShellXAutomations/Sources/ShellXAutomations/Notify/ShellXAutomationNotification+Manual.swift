@@ -2,15 +2,20 @@ public import Foundation
 
 extension ShellXAutomationNotification {
     private static let manualBodyLimit = 180
+    private static let panelLink = "shellx://automations"
 
     /// A banner asked for by `shellx routine notify`: titled `name`, linking automation `automationId` when known, else the Automations panel.
     public init(name: String, body: String, automationId: String?) {
         let truncated = body.count > Self.manualBodyLimit ? String(body.prefix(Self.manualBodyLimit)) + "…" : body
-        let link = automationId.map { "shellx://automations/\($0)" } ?? "shellx://automations"
+        var segment = CharacterSet.urlPathAllowed
+        segment.remove("/")
+        let link = automationId
+            .flatMap { $0.addingPercentEncoding(withAllowedCharacters: segment) }
+            .flatMap { URL(string: "\(Self.panelLink)/\($0)") }
         self.init(
             title: name,
             body: truncated,
-            url: URL(string: link) ?? URL(filePath: "/"),
+            url: link ?? URL(string: Self.panelLink)!,
             group: automationId ?? name
         )
     }
