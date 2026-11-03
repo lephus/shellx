@@ -10,6 +10,8 @@ struct WebviewsAppPage: Equatable, Sendable {
     let shellPath: String
 
     static let gitGraph = WebviewsAppPage(scheme: "shellx-git-graph", shellPath: "/git-graph.html")
+    /// The Automations panel.
+    static let automations = WebviewsAppPage(scheme: "shellx-automations", shellPath: "/automations.html")
     /// The React agent session renderer.
     static let agentSession = WebviewsAppPage(scheme: "shellx-agent-session", shellPath: "/agent-session.html")
 

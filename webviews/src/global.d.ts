@@ -1,5 +1,6 @@
 import type { DiffResponse } from "./diff/generated/protocol";
 import type { GitGraphEvent } from "./git-graph/types";
+import type { AutomationsEvent } from "./automations/types";
 
 export {};
 
@@ -69,10 +70,16 @@ declare global {
         shellxGitGraph?: {
           postMessage(message: unknown): Promise<unknown>;
         };
+        shellxAutomations?: {
+          postMessage(message: unknown): Promise<unknown>;
+        };
       };
     };
     shellxGitGraph?: {
       receive(event: GitGraphEvent): void;
+    };
+    shellxAutomations?: {
+      receive(event: AutomationsEvent): void;
     };
   }
 }

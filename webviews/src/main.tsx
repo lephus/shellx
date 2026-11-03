@@ -1,4 +1,4 @@
-type WebviewKind = "agent-session" | "diff" | "git-graph";
+type WebviewKind = "agent-session" | "automations" | "diff" | "git-graph";
 
 function resolveWebviewKind(): WebviewKind {
   if (
@@ -6,6 +6,12 @@ function resolveWebviewKind(): WebviewKind {
     document.body.dataset.cmuxWebviewKind === "git-graph"
   ) {
     return "git-graph";
+  }
+  if (
+    document.documentElement.dataset.cmuxWebviewKind === "automations" ||
+    document.body.dataset.cmuxWebviewKind === "automations"
+  ) {
+    return "automations";
   }
   if (
     document.documentElement.dataset.cmuxWebviewKind === "agent-session" ||
@@ -30,6 +36,10 @@ const kind = resolveWebviewKind();
 if (kind === "git-graph") {
   void import("./surfaces/gitGraphSurface").then((surface) => {
     surface.mountGitGraphSurface(rootElement);
+  });
+} else if (kind === "automations") {
+  void import("./surfaces/automationsSurface").then((surface) => {
+    surface.mountAutomationsSurface(rootElement);
   });
 } else if (kind === "agent-session") {
   void import("./surfaces/agentSessionSurface").then((surface) => {

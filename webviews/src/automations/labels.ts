@@ -1,0 +1,96 @@
+// English fallbacks. The Swift host sends localized values for these keys in
+// `app.context` (like GitGraphLabels); keep one `key: "value",` per line.
+export const DEFAULT_AUTOMATION_LABELS = {
+  title: "Automations",
+  filterAll: "All",
+  filterSkills: "Skills",
+  filterWorkflows: "Workflows",
+  filterCronjobs: "Cronjobs",
+  newAutomation: "+ New",
+  kindSkill: "Skill",
+  kindWorkflow: "Workflow",
+  kindCronjob: "Cronjob",
+  otherSkills: "Your other skills",
+  empty: "Nothing here yet. Create your first automation.",
+  loading: "Loading…",
+  loadFailed: "Could not load automations.",
+  retry: "Retry",
+  nextRun: "Next run: {time}",
+  lastRun: "Last run:",
+  neverRun: "Never run",
+  statusRunning: "Running",
+  statusDone: "Done",
+  statusFailed: "Failed",
+  statusNeedsYou: "Needs you",
+  statusSkipped: "Skipped",
+  disabled: "Disabled",
+  unread: "Unread result",
+  targetMac: "Mac",
+  targetIphone: "iPhone",
+  iphonePending: "after the next update",
+  runNow: "Run now",
+  enable: "Enable",
+  disable: "Disable",
+  edit: "Edit",
+  editFile: "Edit file",
+  delete: "Delete",
+  reveal: "Reveal in Finder",
+  openLog: "Open log",
+  continueInTerminal: "Continue in terminal",
+  deleteTitle: "Delete {name}?",
+  deleteBody: "This removes its files and any schedule.",
+  deleteExternalWarning: "ShellX did not create this skill. Deleting it removes it from your Claude Code skills.",
+  confirmDelete: "Delete",
+  cancel: "Cancel",
+  creatorTitle: "Create an automation",
+  back: "Back",
+  inputPlaceholder: "Describe what you want to automate…",
+  send: "Send",
+  typeAuto: "Auto",
+  typeSkill: "Skill",
+  typeWorkflow: "Workflow",
+  typeCronjob: "Cronjob",
+  typePicker: "Type",
+  assistantName: "Claude Code",
+  chooseSend: "Send",
+  statusDrafting: "drafting…",
+  statusReady: "✓ ready",
+  fieldType: "Type",
+  fieldName: "Name",
+  fieldDescription: "Description",
+  fieldSchedule: "Schedule",
+  fieldDirectory: "Directory",
+  fieldNotify: "Notify",
+  fieldSteps: "Steps",
+  fieldTools: "Allowed tools",
+  fieldSkill: "Skill",
+  notifyDone: "When done",
+  notifyFailed: "When failed",
+  notifyNeedsYou: "When it needs you",
+  save: "Save",
+  keepEditing: "Keep editing",
+  saving: "Saving…",
+  draftEmpty: "The draft appears here as you describe your idea.",
+  creatorFailed: "Something went wrong: {message}",
+  genericError: "Something went wrong.",
+} as const;
+
+export type AutomationLabelKey = keyof typeof DEFAULT_AUTOMATION_LABELS;
+export type AutomationLabelValues = Record<string, string | number>;
+export type AutomationLabelResolver = (key: AutomationLabelKey, values?: AutomationLabelValues) => string;
+
+/** Fills `{name}` placeholders; unknown placeholders stay as written. */
+export function formatAutomationLabel(template: string, values: AutomationLabelValues): string {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    Object.hasOwn(values, name) ? String(values[name]) : match,
+  );
+}
+
+export function createAutomationLabelResolver(labels?: Record<string, string>): AutomationLabelResolver {
+  return (key, values) => {
+    const localized = labels?.[key];
+    const template =
+      typeof localized === "string" && localized.trim() !== "" ? localized : DEFAULT_AUTOMATION_LABELS[key];
+    return values ? formatAutomationLabel(template, values) : template;
+  };
+}
