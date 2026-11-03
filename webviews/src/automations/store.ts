@@ -44,6 +44,8 @@ export type AutomationsState = {
   pendingDelete: { id: string; name: string; external: boolean } | null;
   /** Message of the last failed list action, until dismissed. */
   actionError: string | null;
+  /** Asking before a draft in progress is thrown away; `then` is the creator to open afterwards. */
+  pendingDiscard: { then: { editId: string | null } | null } | null;
   creator: CreatorState;
 };
 
@@ -62,6 +64,7 @@ function initialState(): AutomationsState {
     focusId: null,
     pendingDelete: null,
     actionError: null,
+    pendingDiscard: null,
     creator: initialCreator(),
   };
 }
@@ -78,6 +81,11 @@ export function visibleAutomations(state: AutomationsState): { own: AutomationDT
   const own = state.automations.filter((a) => a.origin !== "external" && matches(a));
   const external = state.automations.filter((a) => a.origin === "external" && matches(a));
   return { own, external };
+}
+
+/** Whether the creator holds a chat worth keeping: the user has sent at least one message. */
+export function draftInProgress(creator: CreatorState): boolean {
+  return creator.messages.some((m) => m.role === "user");
 }
 
 /** The draft is ready once it can be saved and the assistant has stopped. */
@@ -255,9 +263,20 @@ export class AutomationsStore {
 
   // Creator
 
+  /** Opens the creator; a draft in progress is only replaced after the user confirms. */
   async startCreator(editId?: string): Promise<void> {
-    this.set({ view: "creator", creator: initialCreator(editId ?? null) });
-    const reply = await this.bridge.request("creator.start", editId ? { editId } : {});
+    const current = this.state.creator;
+    if (draftInProgress(current)) {
+      if (editId !== undefined && editId === current.editId) this.resumeCreator();
+      else this.set({ pendingDiscard: { then: { editId: editId ?? null } } });
+      return;
+    }
+    await this.openCreator(editId ?? null);
+  }
+
+  private async openCreator(editId: string | null): Promise<void> {
+    this.set({ view: "creator", creator: initialCreator(editId) });
+    const reply = await this.bridge.request("creator.start", editId !== null ? { editId } : {});
     if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
 
@@ -280,9 +299,40 @@ export class AutomationsStore {
     if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
 
+  /** Back to the list. A chat the user has written in stays open as a draft in progress. */
   async leaveCreator(): Promise<void> {
+    if (draftInProgress(this.state.creator)) {
+      this.set({ view: "list" });
+      return;
+    }
     await this.bridge.request("creator.cancel");
     this.set({ view: "list", creator: initialCreator() });
+  }
+
+  /** Returns to the draft in progress; Claude kept working while the list was shown. */
+  resumeCreator(): void {
+    this.set({ view: "creator" });
+  }
+
+  requestDiscard(): void {
+    this.set({ pendingDiscard: { then: null } });
+  }
+
+  cancelDiscard(): void {
+    this.set({ pendingDiscard: null });
+  }
+
+  /** Keeps the draft in progress instead of the creator that asked to replace it. */
+  continueInsteadOfDiscard(): void {
+    this.set({ pendingDiscard: null, view: "creator" });
+  }
+
+  /** Stops Claude and drops the draft in progress, then opens the creator that asked for it, if any. */
+  async confirmDiscard(): Promise<void> {
+    const then = this.state.pendingDiscard?.then ?? null;
+    this.set({ pendingDiscard: null, view: "list", creator: initialCreator() });
+    await this.bridge.request("creator.cancel");
+    if (then) await this.openCreator(then.editId);
   }
 
   async save(): Promise<void> {

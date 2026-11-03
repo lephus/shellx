@@ -1,6 +1,7 @@
 import { AutomationCard } from "./AutomationCard";
+import { DraftInProgressCard } from "./DraftInProgressCard";
 import type { AutomationLabelResolver } from "./labels";
-import { visibleAutomations, type AutomationsState, type AutomationsStore, type ListFilter } from "./store";
+import { draftInProgress, visibleAutomations, type AutomationsState, type AutomationsStore, type ListFilter } from "./store";
 
 const FILTERS: { value: ListFilter; key: "filterAll" | "filterSkills" | "filterWorkflows" | "filterCronjobs" }[] = [
   { value: "all", key: "filterAll" },
@@ -50,6 +51,9 @@ export function ListView({
         </div>
       ) : null}
       <div className="au-list-body">
+        {draftInProgress(state.creator) ? (
+          <DraftInProgressCard store={store} creator={state.creator} label={label} automations={state.automations} />
+        ) : null}
         {state.loading ? (
           <output className="au-status">{label("loading")}</output>
         ) : state.loadFailed ? (
@@ -59,7 +63,7 @@ export function ListView({
               {label("retry")}
             </button>
           </div>
-        ) : own.length === 0 && external.length === 0 ? (
+        ) : own.length === 0 && external.length === 0 && !draftInProgress(state.creator) ? (
           <output className="au-status">{label("empty")}</output>
         ) : (
           <>

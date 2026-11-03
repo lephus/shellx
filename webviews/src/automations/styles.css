@@ -88,6 +88,10 @@ body {
 
 .au-card { background: var(--au-panel); border: 1px solid var(--au-line); border-radius: 12px; padding: 12px 14px; }
 .au-item[data-focused="true"] { border-color: var(--au-pri); }
+.au-draft-progress { border-style: dashed; border-color: color-mix(in srgb, var(--au-pri) 55%, var(--au-line)); }
+.au-draft-progress .au-item-head > .au-muted { margin-left: auto; font-size: 12px; }
+.au-draft-progress[data-busy="true"] .au-item-head > .au-muted { color: var(--au-pri); }
+.au-kind[data-kind="draft"] { color: var(--au-pri); background: color-mix(in srgb, var(--au-pri) 14%, transparent); }
 .au-item-head { display: flex; align-items: center; gap: 8px; }
 .au-item-name { margin: 0; font-size: 14px; }
 .au-item-desc { margin: 4px 0; }

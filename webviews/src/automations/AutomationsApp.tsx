@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createAutomationsBridge, type AutomationsBridge } from "./bridge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CreatorView } from "./CreatorView";
+import { DiscardDialog } from "./DiscardDialog";
 import { createAutomationLabelResolver } from "./labels";
 import { ListView } from "./ListView";
 import { AutomationsStore } from "./store";
@@ -32,6 +33,15 @@ export function AutomationsApp({ bridge }: { bridge?: AutomationsBridge }) {
       ) : (
         <ListView store={store} state={state} label={label} />
       )}
+      {state.pendingDiscard ? (
+        <DiscardDialog
+          label={label}
+          replacing={state.pendingDiscard.then !== null}
+          onDiscard={() => void store.confirmDiscard()}
+          onContinue={() => store.continueInsteadOfDiscard()}
+          onCancel={() => store.cancelDiscard()}
+        />
+      ) : null}
       {pending ? (
         <ConfirmDialog
           label={label}
