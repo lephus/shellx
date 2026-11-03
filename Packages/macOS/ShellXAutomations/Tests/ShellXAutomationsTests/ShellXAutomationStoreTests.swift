@@ -275,4 +275,12 @@ private struct Fixture {
         let running = try await f.store.automation(id: cron.id)?.lastRun
         #expect(running?.status == .running)
     }
+
+    @Test func lockDescriptorIsCloseOnExec() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        _ = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 1)
+        let fd = try #require(await f.store.heldLockDescriptor(for: cron.id))
+        #expect(fcntl(fd, F_GETFD) & FD_CLOEXEC != 0)
+    }
 }

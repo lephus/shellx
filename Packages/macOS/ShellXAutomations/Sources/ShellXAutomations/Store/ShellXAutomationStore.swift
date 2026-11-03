@@ -147,7 +147,7 @@ public actor ShellXAutomationStore {
     public func beginRun(id: String, trigger: ShellXRunTrigger, pid: Int32) throws -> URL? {
         let dir = try automationDirectory(id: id)
         let lockPath = dir.appending(path: "run.lock").path
-        let fd = open(lockPath, O_CREAT | O_RDWR, 0o644)
+        let fd = open(lockPath, O_CREAT | O_RDWR | O_CLOEXEC, 0o644)
         guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
         if flock(fd, LOCK_EX | LOCK_NB) != 0 {
             let reason = errno
@@ -176,6 +176,9 @@ public actor ShellXAutomationStore {
         heldLocks[id] = fd
         return runDirectory
     }
+
+    /// The lock descriptor held for `id`, for tests.
+    func heldLockDescriptor(for id: String) -> Int32? { heldLocks[id] }
 
     /// Records the final `record` for a run, releases the lock this store holds for `id` and prunes old runs.
     /// `pid` identifies the run for the caller; the lock itself is tied to the open file, never to the pid.
