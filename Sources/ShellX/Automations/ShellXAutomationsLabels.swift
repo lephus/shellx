@@ -3,8 +3,8 @@ import Foundation
 /// Localized copy for the Automations page, sent in `app.context.labels`.
 ///
 /// The keys are those of `DEFAULT_AUTOMATION_LABELS` in `webviews/src/automations/labels.ts`
-/// (catalog keys `automations.label.<key>`). The page fills `{name}`, `{time}` and
-/// `{message}` itself, so those placeholders stay literal in every translation.
+/// (catalog keys `automations.label.<key>`). The page fills `{name}`, `{time}`, `{message}`,
+/// `{current}`, `{total}`, `{seconds}`, `{minutes}` and `{hours}` itself, so those placeholders stay literal in every translation.
 struct ShellXAutomationsLabels {
     func localized() -> [String: String] {
         [
@@ -30,6 +30,10 @@ struct ShellXAutomationsLabels {
             "statusFailed": String(localized: "automations.label.statusFailed", defaultValue: "Failed"),
             "statusNeedsYou": String(localized: "automations.label.statusNeedsYou", defaultValue: "Needs you"),
             "statusSkipped": String(localized: "automations.label.statusSkipped", defaultValue: "Skipped"),
+            "stepProgress": String(localized: "automations.label.stepProgress", defaultValue: "Step {current}/{total}"),
+            "durationSeconds": String(localized: "automations.label.durationSeconds", defaultValue: "{seconds} s"),
+            "durationMinutes": String(localized: "automations.label.durationMinutes", defaultValue: "{minutes} min {seconds} s"),
+            "durationHours": String(localized: "automations.label.durationHours", defaultValue: "{hours} h {minutes} min"),
             "disabled": String(localized: "automations.label.disabled", defaultValue: "Disabled"),
             "unread": String(localized: "automations.label.unread", defaultValue: "Unread result"),
             "targetMac": String(localized: "automations.label.targetMac", defaultValue: "Mac"),

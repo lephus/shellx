@@ -62,6 +62,8 @@ struct ShellXAutomationsDTOEncoder {
         if let summary = run.summary { object["summary"] = summary }
         if let reason = run.reason { object["reason"] = reason }
         if let failedStep = run.failedStep { object["failedStep"] = failedStep }
+        if let currentStep = run.currentStep { object["currentStep"] = currentStep }
+        if let totalSteps = run.totalSteps { object["totalSteps"] = totalSteps }
         return object
     }
 

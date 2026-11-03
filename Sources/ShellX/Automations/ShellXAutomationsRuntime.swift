@@ -43,7 +43,10 @@ final class ShellXAutomationsRuntime {
             isExecutable: { FileManager.default.isExecutableFile(atPath: $0) },
             loginShellLookup: { ShellXLoginShellClaudeLookup()() }
         )
-        claudePath = ShellXClaudePathCache(resolve: { resolver.resolve() })
+        claudePath = ShellXClaudePathCache(
+            resolver: resolver,
+            environment: .live(inherited: processEnvironment, home: home)
+        )
     }
 
     /// A controller for one Automations panel.
@@ -56,7 +59,7 @@ final class ShellXAutomationsRuntime {
         fileOpener: @escaping (URL) -> Void
     ) -> ShellXAutomationsController {
         let cliPath = environment.cliPath
-        let launcher = ShellXResolvingCreatorLauncher(claudePath: claudePath, baseEnvironment: processEnvironment)
+        let launcher = ShellXResolvingCreatorLauncher(claude: claudePath)
         let prompt = creatorSystemPrompt()
         let scratch = environment.automationsRoot.appending(path: ".creator", directoryHint: .isDirectory)
         let localeIdentifier = Locale.current.identifier

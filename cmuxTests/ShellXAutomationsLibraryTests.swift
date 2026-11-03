@@ -52,7 +52,8 @@ final class ShellXAutomationsLibraryTests: XCTestCase {
         let fixture = ShellXAutomationsFixture()
         defer { fixture.remove() }
         let saved = try await fixture.store.save(fixture.cronDraft(), replacing: nil)
-        let run = try XCTUnwrap(try await fixture.store.beginRun(id: saved.id, trigger: .manual, pid: 1))
+        let begun = try await fixture.store.beginRun(id: saved.id, trigger: .manual, pid: 1)
+        let run = try XCTUnwrap(begun)
         let record = ShellXRunRecord(status: .done, trigger: .manual, startedAt: Date(), finishedAt: Date(), summary: "ok")
         try await fixture.store.finishRun(id: saved.id, runDirectory: run, record: record, pid: 1)
 

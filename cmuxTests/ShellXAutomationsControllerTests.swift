@@ -81,6 +81,25 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertTrue(JSONSerialization.isValidJSONObject(reply))
     }
 
+    func testListCarriesStepProgressOfARunningWorkflow() async throws {
+        let saved = try await fixture.store.save(fixture.cronDraft(), replacing: nil)
+        let begun = try await fixture.store.beginRun(id: saved.id, trigger: .manual, pid: 1)
+        let run = try XCTUnwrap(begun)
+        let record = ShellXRunRecord(
+            status: .done, trigger: .manual, startedAt: Date(), finishedAt: Date(),
+            summary: "ok", currentStep: 2, totalSteps: 3
+        )
+        try await fixture.store.finishRun(id: saved.id, runDirectory: run, record: record, pid: 1)
+
+        let reply = await controller.handle(method: "automations.list", params: [:])
+
+        let list = try XCTUnwrap(result(reply)?["automations"] as? [[String: Any]])
+        let lastRun = try XCTUnwrap(list.first?["lastRun"] as? [String: Any])
+        XCTAssertEqual(lastRun["currentStep"] as? Int, 2)
+        XCTAssertEqual(lastRun["totalSteps"] as? Int, 3)
+        XCTAssertEqual(lastRun["status"] as? String, "done")
+    }
+
     func testSaveRejectsInvalidDraftWithIssues() async throws {
         var draft = fixture.cronDraft("Not Valid")
         draft.skillMarkdown = "---\nname: Not Valid\ndescription: d\n---\n"
