@@ -32,8 +32,21 @@ public struct ShellXAutomationValidator: Sendable {
                 issues.append(.init(field: .claude, code: "unavailable", message: "Claude Code was not found on this Mac."))
             }
         }
+        issues += stepIssues(draft)
         issues += markdownIssues(draft)
         return issues
+    }
+
+    /// A workflow runs its steps in order, so it needs at least one, each with a prompt.
+    private func stepIssues(_ draft: ShellXAutomationDraft) -> [ShellXValidationIssue] {
+        guard draft.kind == .workflow else { return [] }
+        if draft.steps.isEmpty {
+            return [.init(field: .steps, code: "missing", message: "A workflow needs at least one step.")]
+        }
+        if draft.steps.contains(where: { $0.prompt.allSatisfy(\.isWhitespace) }) {
+            return [.init(field: .steps, code: "emptyPrompt", message: "Every step needs a prompt.")]
+        }
+        return []
     }
 
     private func nameIssues(_ draft: ShellXAutomationDraft, replacingName: String?) -> [ShellXValidationIssue] {

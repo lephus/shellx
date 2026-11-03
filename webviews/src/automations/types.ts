@@ -48,6 +48,7 @@ export type ValidationField =
   | "schedule"
   | "workingDirectory"
   | "skillMarkdown"
+  | "steps"
   | "claude";
 export type ValidationIssueDTO = { field: ValidationField; code: string; message: string };
 

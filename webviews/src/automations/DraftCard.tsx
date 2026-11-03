@@ -85,13 +85,15 @@ export function DraftCard({ label, draft, issues, ready }: Props) {
           <span>{[...draft.notify.on.map((o) => notifyOnLabel(label, o)), ...targets].join(" · ")}</span>
         </Field>
       ) : null}
-      {draft.steps.length > 0 ? (
-        <Field name="steps" title={label("fieldSteps")} issues={[]}>
-          <ol className="au-steps">
-            {draft.steps.map((step, index) => (
-              <li key={`${index}:${step.title}`}>{step.title}</li>
-            ))}
-          </ol>
+      {draft.steps.length > 0 || forField("steps").length > 0 ? (
+        <Field name="steps" title={label("fieldSteps")} issues={forField("steps")}>
+          {draft.steps.length > 0 ? (
+            <ol className="au-steps">
+              {draft.steps.map((step, index) => (
+                <li key={`${index}:${step.title}`}>{step.title}</li>
+              ))}
+            </ol>
+          ) : null}
         </Field>
       ) : null}
       {draft.allowedTools.length > 0 ? (

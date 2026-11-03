@@ -7,6 +7,8 @@ public import Foundation
 public actor ShellXAutomationStore {
     /// Runs kept per automation.
     public static let retainedRuns = 30
+    /// Reason reported for a `running` run whose process is gone.
+    public static let interruptedReason = "The run was interrupted."
 
     private let environment: ShellXAutomationEnvironment
     private let fileManager: FileManager
@@ -392,17 +394,40 @@ private extension ShellXAutomationStore {
             .sorted(by: >)
     }
 
+    /// Recorded runs in `dir`, newest first.
+    ///
+    /// A `running` record is reported as failed with ``interruptedReason`` when its run cannot still be going:
+    /// it is not the newest run, or nobody holds `run.lock` (the CLI was killed after `beginRun`, for example by a
+    /// logout or reboot). The record on disk is left as it is.
     func recordedRuns(in dir: URL, limit: Int) -> [ShellXRunRecord] {
         let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
         var records: [ShellXRunRecord] = []
-        for name in runDirectoryNames(in: runs) {
+        for (index, name) in runDirectoryNames(in: runs).enumerated() {
             guard records.count < limit else { break }
             let file = runs.appending(path: name).appending(path: "result.json")
-            if let data = try? Data(contentsOf: file), let record = try? decoder().decode(ShellXRunRecord.self, from: data) {
+            if let data = try? Data(contentsOf: file), var record = try? decoder().decode(ShellXRunRecord.self, from: data) {
+                if record.status == .running, index > 0 || !isRunLockHeld(in: dir) {
+                    record.status = .failed
+                    record.reason = Self.interruptedReason
+                }
                 records.append(record)
             }
         }
         return records
+    }
+
+    /// Whether a live run holds `dir/run.lock`: this store does, or another open file does.
+    ///
+    /// `flock` has no query, so the probe takes the lock without waiting and releases it at once. A run starting
+    /// in that instant finds the lock taken and is skipped as if one were already going.
+    func isRunLockHeld(in dir: URL) -> Bool {
+        if heldLocks[dir.lastPathComponent] != nil { return true }
+        let fd = open(dir.appending(path: "run.lock").path, O_RDONLY | O_CLOEXEC)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { return true }
+        flock(fd, LOCK_UN)
+        return false
     }
 
     func makeRunDirectory(in runs: URL, at date: Date) throws -> URL {

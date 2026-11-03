@@ -28,7 +28,6 @@ import Testing
         let dir = try Self.scratch()
         let pidFile = dir.appending(path: "bg.pid")
         let script = try Self.script(in: dir, """
-        #!/bin/sh
         sleep 30 &
         echo $! > '\(pidFile.path)'
         printf '{"type":"result","is_error":false,"result":"hi","session_id":"s"}\n'
@@ -52,7 +51,7 @@ import Testing
     /// A run that outlives its time limit is stopped and fails with the time-limit reason.
     @Test func runPastTheTimeLimitFails() async throws {
         let dir = try Self.scratch()
-        let script = try Self.script(in: dir, "#!/bin/sh\nexec sleep 30\n")
+        let script = try Self.script(in: dir, "exec sleep 30\n")
         let clock = ContinuousClock()
         let started = clock.now
         await #expect {
@@ -67,7 +66,7 @@ import Testing
     /// A claude that ignores SIGTERM is killed 5 s after the time limit.
     @Test func runIgnoringTerminateIsKilled() async throws {
         let dir = try Self.scratch()
-        let script = try Self.script(in: dir, "#!/bin/sh\ntrap '' TERM\nexec sleep 30\n")
+        let script = try Self.script(in: dir, "trap '' TERM\nexec sleep 30\n")
         let clock = ContinuousClock()
         let started = clock.now
         await #expect {
@@ -86,10 +85,17 @@ import Testing
         return dir
     }
 
-    private static func script(in dir: URL, _ text: String) throws -> URL {
+    /// A `/bin/sh` fake claude running `body`. It is run once with `warm` first: macOS scans a new executable
+    /// before its first start, which would otherwise eat into the short time limits these tests use.
+    private static func script(in dir: URL, _ body: String) throws -> URL {
         let script = dir.appending(path: "fake-claude")
-        try text.write(to: script, atomically: true, encoding: .utf8)
+        try ("#!/bin/sh\n[ \"$1\" = warm ] && exit 0\n" + body).write(to: script, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let warm = Process()
+        warm.executableURL = script
+        warm.arguments = ["warm"]
+        try warm.run()
+        warm.waitUntilExit()
         return script
     }
 

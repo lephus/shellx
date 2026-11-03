@@ -53,6 +53,10 @@ struct ShellXAutomationsIssueMessages {
                 localized: "automations.issue.skill.invalid",
                 defaultValue: "SKILL.md needs frontmatter with a name and description."
             )
+        case (.steps, "missing"):
+            return String(localized: "automations.issue.steps.missing", defaultValue: "A workflow needs at least one step.")
+        case (.steps, "emptyPrompt"):
+            return String(localized: "automations.issue.steps.emptyPrompt", defaultValue: "Every step needs a prompt.")
         case (.claude, "unavailable"):
             return String(localized: "automations.issue.claude.unavailable", defaultValue: "Claude Code was not found on this Mac.")
         default:

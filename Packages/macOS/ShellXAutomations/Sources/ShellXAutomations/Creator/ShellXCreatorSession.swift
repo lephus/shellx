@@ -50,6 +50,8 @@ public actor ShellXCreatorSession {
             "--include-partial-messages", "--verbose", "--append-system-prompt", systemPrompt,
             "--allowedTools", "Read,Glob,Grep",
             "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch",
+            // A user's `permissions.defaultMode` must not widen the creator, and it needs no MCP servers.
+            "--permission-mode", "default", "--strict-mcp-config",
         ]
         let process = try await launcher.start(arguments: arguments, workingDirectory: workingDirectory)
         // `cancel()` may have run while Claude Code was starting; it found nothing to stop.

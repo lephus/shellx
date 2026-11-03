@@ -42,7 +42,9 @@ public struct ShellXLaunchAgentScheduler: Sendable {
             "StartCalendarInterval": intervals,
             "StandardOutPath": log,
             "StandardErrorPath": log,
-            "WorkingDirectory": automation.workingDirectory ?? automation.directory.path,
+            // Never the project folder: launchd's chdir into a TCC-protected or deleted folder fails and the job never
+            // starts. The runner gives claude the project folder as its working directory.
+            "WorkingDirectory": automation.directory.path,
             "ProcessType": "Background",
         ]
         return try PropertyListSerialization.data(fromPropertyList: dictionary, format: .xml, options: 0)

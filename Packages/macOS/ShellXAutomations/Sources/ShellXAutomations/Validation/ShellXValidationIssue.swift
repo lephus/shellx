@@ -1,13 +1,15 @@
 /// One problem found in a draft. The host localizes by `code`; `message` is plain English.
 public struct ShellXValidationIssue: Sendable, Equatable {
     /// The draft field an issue refers to.
+    ///
+    /// `steps` refers to a workflow's steps as a whole.
     public enum Field: String, Sendable, Equatable {
         case name, description, schedule, workingDirectory, skillMarkdown, claude, steps
     }
 
     /// Field with the problem.
     public let field: Field
-    /// Short camelCase code such as `invalid`, `duplicate`, `tooLong`, `missing`, `mismatch`, `notFound`, `unavailable`.
+    /// Short camelCase code such as `invalid`, `duplicate`, `tooLong`, `missing`, `mismatch`, `notFound`, `unavailable`, `emptyPrompt`.
     public let code: String
     /// English description.
     public let message: String

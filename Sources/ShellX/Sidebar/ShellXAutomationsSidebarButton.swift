@@ -79,15 +79,20 @@ final class ShellXAutomationsSidebarButton: NSButton {
     private let countField = NSTextField(labelWithString: "")
     private let unreadDot = NSView()
     private let environment: any TitleEffectEnvironment
+    private let isApplicationActive: @MainActor () -> Bool
 
-    /// - Parameter environment: Where the button learns whether it can be seen and whether
-    ///   motion is reduced. The system environment by default; tests pass their own.
+    /// - Parameters:
+    ///   - environment: Where the button learns whether it can be seen and whether
+    ///     motion is reduced. The system environment by default; tests pass their own.
+    ///   - notificationCenter: Where the app's did-become-active and did-resign-active notifications arrive.
+    ///   - isApplicationActive: Whether ShellX is the active app; the ring and the ✦ rest while it is not.
     init(
         environment: any TitleEffectEnvironment = SystemTitleEffectEnvironment(),
         notificationCenter: NotificationCenter = .default,
         isApplicationActive: @escaping @MainActor () -> Bool = { NSApplication.shared.isActive }
     ) {
         self.environment = environment
+        self.isApplicationActive = isApplicationActive
         reduceMotion = environment.reducesMotion
         super.init(frame: .zero)
         title = ""
@@ -161,6 +166,9 @@ final class ShellXAutomationsSidebarButton: NSButton {
             name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
             object: nil
         )
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+            notificationCenter.addObserver(self, selector: #selector(applicationActivityDidChange), name: name, object: nil)
+        }
     }
 
     @available(*, unavailable)
@@ -310,9 +318,13 @@ final class ShellXAutomationsSidebarButton: NSButton {
         updateAnimations()
     }
 
-    /// Whether the ring and the ✦ may move now.
+    @objc private func applicationActivityDidChange() {
+        updateAnimations()
+    }
+
+    /// Whether the ring and the ✦ may move now: only while ShellX is active and the button can be seen.
     private var mayAnimate: Bool {
-        guard !reduceMotion, window != nil, !bounds.isEmpty else { return false }
+        guard !reduceMotion, isApplicationActive(), window != nil, !bounds.isEmpty else { return false }
         return environment.isVisible(self)
     }
 
