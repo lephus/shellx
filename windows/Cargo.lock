@@ -4925,7 +4925,7 @@ checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
 
 [[package]]
 name = "shellx-app"
-version = "1.5.3"
+version = "1.5.4"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
@@ -4975,7 +4975,7 @@ dependencies = [
 
 [[package]]
 name = "shellx-model"
-version = "1.5.3"
+version = "1.5.4"
 dependencies = [
  "serde",
  "serde_json",
@@ -4983,7 +4983,7 @@ dependencies = [
 
 [[package]]
 name = "shellx-remote"
-version = "1.5.3"
+version = "1.5.4"
 dependencies = [
  "anyhow",
  "async-trait",

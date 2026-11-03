@@ -1,7 +1,7 @@
 # ShellX for Windows (native MVP)
 
 A native Windows terminal for ShellX: GPUI window (Direct3D 11 + DirectWrite), libghostty-vt
-grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.5.3
+grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.5.4
 (unsigned). Dark theme only; the UI language follows the Windows display language
 (Vietnamese on a Vietnamese Windows, English otherwise; `SHELLX_LANG` overrides it, see
 [Command line](#command-line)).
@@ -28,7 +28,7 @@ for 14 days; after that, re-run the workflow for the branch.
 
 ```
 gh run download <run-id> -R lephus/shellx -n shellx-desktop            # shellx-desktop.exe (portable)
-gh run download <run-id> -R lephus/shellx -n ShellX-Setup-1.5.3 # ShellX-Setup-1.5.3.exe
+gh run download <run-id> -R lephus/shellx -n ShellX-Setup-1.5.4 # ShellX-Setup-1.5.4.exe
 ```
 
 The installer is unsigned and per-user (no UAC). SmartScreen shows "Unknown publisher":
