@@ -16,7 +16,16 @@ const winUrl = `${config.downloadBaseUrl}/${config.desktopVersion}/ShellX-Setup-
 // /en/… with 301) and the Vietnamese pages were removed.
 const homePages = [{ path: '/', lang: 'en', privacy: '/privacy/', terms: '/terms/' }];
 
-const guideSlugs = ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn', 'shellx-vs-termius', 'shellx-vs-tailscale'];
+const guideSlugs = [
+  'claude-code-on-phone',
+  'ssh-from-phone',
+  'remote-terminal-without-vpn',
+  'shellx-vs-termius',
+  'shellx-vs-tailscale',
+  'ai-coding-agent-on-phone',
+  'claude-code-remote-control-vs-shellx',
+  'best-ssh-app-iphone-android',
+];
 const guidePages = ['/guides/', ...guideSlugs.map((s) => `/guides/${s}/`)];
 const videoPages = [{ path: '/videos/', lang: 'en', home: '/' }];
 const indexablePages = ['/', '/privacy/', '/terms/', ...videoPages.map((v) => v.path), ...guidePages];
