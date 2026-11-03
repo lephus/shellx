@@ -49,9 +49,13 @@ enum ShellXSidebarHeaderRow: Equatable {
 }
 
 enum ShellXSidebarHeaderMetrics {
-    /// Brand line (logo + name) plus the "YOUR MACHINES" line.
-    static let brandHeight: CGFloat = 62
+    /// Brand line (logo + name), the Automations button row, then the "YOUR MACHINES" line.
+    static let brandHeight: CGFloat = brandLineHeight + automationsRowHeight + sectionLineHeight
     static let brandLineHeight: CGFloat = 36
+    /// The row holding the "✦ Automations" button.
+    static let automationsRowHeight: CGFloat = 36
+    /// The "YOUR MACHINES" line.
+    static let sectionLineHeight: CGFloat = 26
     static let logoSide: CGFloat = 22
     static let iconSide: CGFloat = 14
     static let onlineDotSide: CGFloat = 6

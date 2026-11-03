@@ -3372,6 +3372,8 @@
 		B902E1D34AEAE165944D5DCA /* ShellXAutomationsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67BC26C5F41914CE741844A /* ShellXAutomationsPanel.swift */; };
 		6277AC07193126EA755331FD /* ShellXAutomationsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64960E497BAA7CDF83530263 /* ShellXAutomationsPanelView.swift */; };
 		DA5E9ECB489EC085F4D46338 /* ShellXAutomationsRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7254A60133D0108BB8F355E2 /* ShellXAutomationsRuntime.swift */; };
+		545998127D99D35A8C40C061 /* ShellXAutomationsSidebarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC5CB04F001A724D98C8B5E /* ShellXAutomationsSidebarButton.swift */; };
+		8BA50348EB9C9D5B5B24526B /* ShellXAutomationsSidebarButtonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294FBBF5AA1F61BEDD47C75F /* ShellXAutomationsSidebarButtonTests.swift */; };
 		5CF62481552546896DB6C12D /* ShellXAutomationsTestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF68CBED9F84A9F62EEC46D1 /* ShellXAutomationsTestFixture.swift */; };
 		0DE620168A6985F50B4FA073 /* ShellXAutomationsURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19E61FE51CA9C149AFE7897 /* ShellXAutomationsURL.swift */; };
 		3F1CA9B02E22912EB544C620 /* ShellXAutomationsURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6978F138AB5B5C72FE08E7A /* ShellXAutomationsURLTests.swift */; };
@@ -8045,6 +8047,8 @@
 		C67BC26C5F41914CE741844A /* ShellXAutomationsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsPanel.swift; sourceTree = "<group>"; };
 		64960E497BAA7CDF83530263 /* ShellXAutomationsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsPanelView.swift; sourceTree = "<group>"; };
 		7254A60133D0108BB8F355E2 /* ShellXAutomationsRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsRuntime.swift; sourceTree = "<group>"; };
+		5CC5CB04F001A724D98C8B5E /* ShellXAutomationsSidebarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXAutomationsSidebarButton.swift; sourceTree = "<group>"; };
+		294FBBF5AA1F61BEDD47C75F /* ShellXAutomationsSidebarButtonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAutomationsSidebarButtonTests.swift"; sourceTree = "<group>"; };
 		CF68CBED9F84A9F62EEC46D1 /* ShellXAutomationsTestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAutomationsTestFixture.swift"; sourceTree = "<group>"; };
 		E19E61FE51CA9C149AFE7897 /* ShellXAutomationsURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsURL.swift; sourceTree = "<group>"; };
 		A6978F138AB5B5C72FE08E7A /* ShellXAutomationsURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAutomationsURLTests.swift"; sourceTree = "<group>"; };
@@ -12684,6 +12688,7 @@
 				41EFC821343F281BFD935A86 /* ShellXClaudePathCache.swift */,
 				B86A24DEE89E4FD7DEEC64AB /* ShellXResolvingCreatorLauncher.swift */,
 				F440E4E863A867418B8738B9 /* Workspace+ShellXAutomations.swift */,
+				5CC5CB04F001A724D98C8B5E /* ShellXAutomationsSidebarButton.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14299,6 +14304,7 @@
 				61CD3F10C03B10E678F595CF /* ShellXAutomationsLibraryTests.swift */,
 				CF68CBED9F84A9F62EEC46D1 /* ShellXAutomationsTestFixture.swift */,
 				A6978F138AB5B5C72FE08E7A /* ShellXAutomationsURLTests.swift */,
+				294FBBF5AA1F61BEDD47C75F /* ShellXAutomationsSidebarButtonTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16969,6 +16975,7 @@
 				B902E1D34AEAE165944D5DCA /* ShellXAutomationsPanel.swift in Sources */,
 				6277AC07193126EA755331FD /* ShellXAutomationsPanelView.swift in Sources */,
 				DA5E9ECB489EC085F4D46338 /* ShellXAutomationsRuntime.swift in Sources */,
+				545998127D99D35A8C40C061 /* ShellXAutomationsSidebarButton.swift in Sources */,
 				0DE620168A6985F50B4FA073 /* ShellXAutomationsURL.swift in Sources */,
 				10E951D0840C767961FD9761 /* ShellXAutomationsWebView.swift in Sources */,
 				642F735E1D470D3C1F4B8DAB /* ShellXBonsplitStyles.swift in Sources */,
@@ -19353,6 +19360,7 @@
 				8D37189E2E5CD35178CB98A6 /* ShellXAgentActivityTests.swift in Sources */,
 				F552C989595B76DC8F29F0A2 /* ShellXAutomationsControllerTests.swift in Sources */,
 				56F8D73E72406CB422FA9007 /* ShellXAutomationsLibraryTests.swift in Sources */,
+				8BA50348EB9C9D5B5B24526B /* ShellXAutomationsSidebarButtonTests.swift in Sources */,
 				5CF62481552546896DB6C12D /* ShellXAutomationsTestFixture.swift in Sources */,
 				3F1CA9B02E22912EB544C620 /* ShellXAutomationsURLTests.swift in Sources */,
 				9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */,

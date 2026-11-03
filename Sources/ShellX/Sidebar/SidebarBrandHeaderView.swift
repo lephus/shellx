@@ -1,16 +1,21 @@
 import AppKit
+import Observation
 import ShellXBrand
 
-/// First sidebar row: the ShellX logo and name, then the "YOUR MACHINES"
-/// section label with an Add_Plus button that adds a machine over SSH.
+/// First sidebar row: the ShellX logo and name, the animated "✦ Automations"
+/// button, then the "YOUR MACHINES" section label with an Add_Plus button that
+/// adds a machine over SSH.
 @MainActor
 final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell {
     static let reuseIdentifier = NSUserInterfaceItemIdentifier("SidebarBrandHeaderCellView")
 
     private let logoImageView = NSImageView()
     private let nameField = NSTextField(labelWithString: "")
+    let automationsButton = ShellXAutomationsSidebarButton()
     private let sectionField = NSTextField(labelWithString: "")
     private let addButton = SidebarHeaderGlyphButton()
+    /// The library whose counts the button shows; observation re-arms only for it.
+    private weak var observedLibrary: ShellXAutomationsLibrary?
 
     override var isFlipped: Bool { true }
 
@@ -32,6 +37,11 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
         nameField.maximumNumberOfLines = 1
         nameField.isSelectable = false
         addSubview(nameField)
+
+        automationsButton.onClick = {
+            AppDelegate.shared?.openShellXAutomations(focusId: nil)
+        }
+        addSubview(automationsButton)
 
         let truncating = NSMutableParagraphStyle()
         truncating.lineBreakMode = .byTruncatingTail
@@ -80,6 +90,34 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
     func configure(header: ShellXSidebarHeaderRow) {
         // Static content; the logo follows the live app icon.
         logoImageView.image = NSApp.applicationIconImage
+        observeAutomations(AppDelegate.shared?.shellXAutomationsLibrary)
+    }
+
+    /// Shows `library`'s counts on the button and follows them. Only the button updates;
+    /// the table row is never reloaded for a count change.
+    func observeAutomations(_ library: ShellXAutomationsLibrary?) {
+        guard let library else {
+            observedLibrary = nil
+            automationsButton.count = 0
+            automationsButton.unreadCount = 0
+            return
+        }
+        guard library !== observedLibrary else { return }
+        observedLibrary = library
+        trackAutomationCounts(library)
+    }
+
+    private func trackAutomationCounts(_ library: ShellXAutomationsLibrary) {
+        let counts = withObservationTracking {
+            (library.count, library.unreadCount)
+        } onChange: { [weak self, weak library] in
+            Task { @MainActor [weak self, weak library] in
+                guard let self, let library, library === self.observedLibrary else { return }
+                self.trackAutomationCounts(library)
+            }
+        }
+        automationsButton.count = counts.0
+        automationsButton.unreadCount = counts.1
     }
 
     override func layout() {
@@ -101,7 +139,18 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
             height: ceil(nameSize.height)
         )
 
-        let sectionMidY = lineHeight + (bounds.height - lineHeight) / 2
+        let automationsRowHeight = ShellXSidebarHeaderMetrics.automationsRowHeight
+        let buttonInset = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding
+        let buttonHeight = ShellXAutomationsSidebarButton.height
+        automationsButton.frame = NSRect(
+            x: buttonInset,
+            y: lineHeight + (automationsRowHeight - buttonHeight) / 2,
+            width: max(0, bounds.width - 2 * buttonInset),
+            height: buttonHeight
+        )
+
+        let sectionTop = lineHeight + automationsRowHeight
+        let sectionMidY = sectionTop + (bounds.height - sectionTop) / 2
         let buttonSide = ShellXSidebarHeaderMetrics.addButtonSide
         addButton.frame = NSRect(
             x: trailing - buttonSide,
