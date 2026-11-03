@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","cwd":"/tmp/work","session_id":"11111111-2222-3333-4444-555555555555"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Working on it"}]},"session_id":"11111111-2222-3333-4444-555555555555"}

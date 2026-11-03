@@ -27,6 +27,9 @@ let package = Package(
             dependencies: [
                 "ShellXAutomations",
             ],
+            resources: [
+                .copy("Fixtures"),
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableUpcomingFeature("ExistentialAny"),
