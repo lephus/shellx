@@ -1,6 +1,9 @@
 public import Foundation
 
 /// Asks the user's login shell where `claude` lives (`/bin/zsh -lc 'command -v claude'`).
+///
+/// Blocks for up to about 9 s (timeout, kill grace and drain join). Call it off the main actor and off the
+/// cooperative pool: from the CLI's top level before async work starts, or inside `Task.detached` in the app.
 public struct ShellXLoginShellClaudeLookup: Sendable {
     private let timeout: Duration
 
@@ -19,32 +22,38 @@ public struct ShellXLoginShellClaudeLookup: Sendable {
         let err = Pipe()
         process.standardOutput = out
         process.standardError = err
-        let finished = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in finished.signal() }
-        do { try process.run() } catch { return nil }
+        // Bounded wait with deadline for a synchronous Process API; signalled once.
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        do {
+            try process.run()
+        } catch {
+            try? out.fileHandleForWriting.close()
+            try? err.fileHandleForWriting.close()
+            return nil
+        }
         let outHandle = out.fileHandleForReading
         let errHandle = err.fileHandleForReading
-        let outTask = Task.detached { outHandle.readDataToEndOfFile() }
-        let errTask = Task.detached { errHandle.readDataToEndOfFile() }
+        let captured = ResultBox()
+        // Bounded wait with deadline for a synchronous Process API; signalled once.
+        let drained = DispatchSemaphore(value: 0)
+        Task.detached {
+            let data = outHandle.readDataToEndOfFile()
+            _ = errHandle.readDataToEndOfFile()
+            captured.data = data
+            drained.signal()
+        }
         let seconds = Double(timeout.components.seconds) + Double(timeout.components.attoseconds) / 1e18
-        if finished.wait(timeout: .now() + seconds) == .timedOut {
+        if exited.wait(timeout: .now() + seconds) == .timedOut {
             process.terminate()
-            if finished.wait(timeout: .now() + 1) == .timedOut {
+            if exited.wait(timeout: .now() + 1) == .timedOut, process.isRunning {
                 kill(process.processIdentifier, SIGKILL)
-                _ = finished.wait(timeout: .now() + 1)
+                _ = exited.wait(timeout: .now() + 1)
             }
         }
-        // Drain via semaphore-free blocking waits on detached tasks.
-        let box = ResultBox()
-        let done = DispatchSemaphore(value: 0)
-        Task.detached {
-            box.data = await outTask.value
-            _ = await errTask.value
-            done.signal()
-        }
-        _ = done.wait(timeout: .now() + 2)
-        guard !process.isRunning, process.terminationStatus == 0 else { return nil }
-        return Self.absolutePath(fromOutput: String(decoding: box.data, as: UTF8.self))
+        guard !process.isRunning, drained.wait(timeout: .now() + 2) == .success else { return nil }
+        guard process.terminationStatus == 0 else { return nil }
+        return Self.absolutePath(fromOutput: String(decoding: captured.data, as: UTF8.self))
     }
 
     /// The last non-empty line of `output`, if it is an absolute path.
@@ -57,6 +66,7 @@ public struct ShellXLoginShellClaudeLookup: Sendable {
     }
 }
 
+/// `@unchecked Sendable` is safe: `data` is written once before the `drained` signal and read only after a successful join.
 private final class ResultBox: @unchecked Sendable {
     var data = Data()
 }

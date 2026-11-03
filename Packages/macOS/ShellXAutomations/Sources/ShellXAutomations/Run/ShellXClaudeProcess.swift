@@ -98,6 +98,7 @@ public struct ShellXClaudeProcess: ShellXClaudeLaunching {
             guard unsafeProcess.isRunning else { return }
             unsafeProcess.terminate()
             let target = unsafeProcess.processIdentifier
+            // Bounded (2 s) and deliberately uncancellable: the kill must still happen after the caller is cancelled.
             Task.detached {
                 try? await Task.sleep(for: .seconds(2))
                 if unsafeProcess.isRunning { kill(target, SIGKILL) }

@@ -21,6 +21,8 @@ public struct ShellXClaudeExecutableResolver: Sendable {
     }
 
     /// Absolute path of `claude`, or `nil` when none is found.
+    ///
+    /// May block for up to about 9 s in `loginShellLookup`; call it off the main actor and off the cooperative pool.
     public func resolve() -> String? {
         var candidates: [String] = []
         if let override = environment["SHELLX_CLAUDE_PATH"], !override.isEmpty { candidates.append(override) }
