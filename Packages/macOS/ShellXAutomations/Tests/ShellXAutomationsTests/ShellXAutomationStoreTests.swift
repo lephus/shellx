@@ -175,7 +175,7 @@ private struct Fixture {
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)
         var first: URL?
         for _ in 0..<31 {
-            let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: getpid(), isProcessAlive: { _ in false }))
+            let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: getpid()))
             if first == nil { first = dir }
             try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: getpid())
         }
@@ -185,40 +185,6 @@ private struct Fixture {
         #expect(!FileManager.default.fileExists(atPath: try #require(first).path))
         #expect(try await f.store.runs(id: cron.id, limit: 100).count == 30)
         #expect(try await f.store.runs(id: cron.id, limit: 5).count == 5)
-        #expect(!FileManager.default.fileExists(atPath: runsDir.deletingLastPathComponent().appending(path: "run.lock").path))
-    }
-
-    @Test func skipsWhileLocked() async throws {
-        let f = Fixture()
-        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
-        let first = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242, isProcessAlive: { _ in true })
-        #expect(first != nil)
-        let second = try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: 4343, isProcessAlive: { $0 == 4242 })
-        #expect(second == nil)
-        let lock = try String(contentsOf: cron.directory.appending(path: "run.lock"), encoding: .utf8)
-        #expect(lock.trimmingCharacters(in: .whitespacesAndNewlines) == "4242")
-        let running = try await f.store.automation(id: cron.id)?.lastRun
-        #expect(running?.status == .running)
-    }
-
-    @Test func takesOverStaleLock() async throws {
-        let f = Fixture()
-        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
-        _ = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242, isProcessAlive: { _ in true })
-        let next = try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: getpid(), isProcessAlive: { _ in false })
-        let dir = try #require(next)
-        let lock = try String(contentsOf: cron.directory.appending(path: "run.lock"), encoding: .utf8)
-        #expect(lock.trimmingCharacters(in: .whitespacesAndNewlines) == "\(getpid())")
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: getpid())
-        #expect(!FileManager.default.fileExists(atPath: cron.directory.appending(path: "run.lock").path))
-    }
-
-    @Test func finishRunLeavesForeignLockAlone() async throws {
-        let f = Fixture()
-        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
-        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242, isProcessAlive: { _ in false }))
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 9999)
-        #expect(FileManager.default.fileExists(atPath: cron.directory.appending(path: "run.lock").path))
     }
 
     @Test func runDirectoryGetsSuffixOnCollision() async throws {
@@ -226,9 +192,9 @@ private struct Fixture {
         let f = Fixture()
         let store = ShellXAutomationStore(environment: f.environment, trasher: f.trasher, now: { fixed })
         let cron = try await store.save(f.cronDraft(), replacing: nil)
-        let a = try #require(try await store.beginRun(id: cron.id, trigger: .manual, pid: getpid(), isProcessAlive: { _ in false }))
+        let a = try #require(try await store.beginRun(id: cron.id, trigger: .manual, pid: getpid()))
         try await store.finishRun(id: cron.id, runDirectory: a, record: f.record(), pid: getpid())
-        let b = try #require(try await store.beginRun(id: cron.id, trigger: .manual, pid: getpid(), isProcessAlive: { _ in false }))
+        let b = try #require(try await store.beginRun(id: cron.id, trigger: .manual, pid: getpid()))
         #expect(a.lastPathComponent == "20270115-080000")
         #expect(b.lastPathComponent == "20270115-080000-2")
     }
@@ -236,7 +202,7 @@ private struct Fixture {
     @Test func lastRunAndMarkRead() async throws {
         let f = Fixture()
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)
-        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: getpid(), isProcessAlive: { _ in false }))
+        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: getpid()))
         try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: getpid())
         #expect(try await f.store.automation(id: cron.id)?.lastRun?.unread == true)
         try await f.store.markRead(id: cron.id)
@@ -258,34 +224,6 @@ private struct Fixture {
         #expect(try Data(contentsOf: url).isEmpty == false)
     }
 
-    @Test func emptyFreshLockIsHeldAndOldOneTakenOver() async throws {
-        let f = Fixture()
-        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
-        let lock = cron.directory.appending(path: "run.lock")
-        try Data().write(to: lock)
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_800_000_000)], ofItemAtPath: lock.path)
-        let held = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 7, isProcessAlive: { _ in false })
-        #expect(held == nil)
-        let old = Date(timeIntervalSince1970: 1_800_000_000 - 3600)
-        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: lock.path)
-        let dir = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 7, isProcessAlive: { _ in false })
-        #expect(dir != nil)
-        #expect(try String(contentsOf: lock, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) == "7")
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: cron.directory.path).filter { $0.hasPrefix(".run.lock.") }
-        #expect(leftovers.isEmpty)
-    }
-
-    @Test func finishRunRemovesLockOnlyForMatchingPid() async throws {
-        let f = Fixture()
-        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
-        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242, isProcessAlive: { _ in false }))
-        let lock = cron.directory.appending(path: "run.lock")
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 1)
-        #expect(FileManager.default.fileExists(atPath: lock.path))
-        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 4242)
-        #expect(!FileManager.default.fileExists(atPath: lock.path))
-    }
-
     @Test func finishRunRejectsNonRunDirectories() async throws {
         let f = Fixture()
         let cron = try await f.store.save(f.cronDraft(), replacing: nil)
@@ -295,5 +233,46 @@ private struct Fixture {
                 try await f.store.finishRun(id: cron.id, runDirectory: bad, record: f.record(), pid: 1)
             }
         }
+    }
+
+    @Test func skipsWhileLocked() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let fd = open(cron.directory.appending(path: "run.lock").path, O_CREAT | O_RDWR, 0o644)
+        #expect(fd >= 0)
+        #expect(flock(fd, LOCK_EX | LOCK_NB) == 0)
+        defer { close(fd) }
+        #expect(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: 1) == nil)
+        #expect(try await f.store.runs(id: cron.id, limit: 5).isEmpty)
+    }
+
+    @Test func lockReleasedWhenHolderClosesFd() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let fd = open(cron.directory.appending(path: "run.lock").path, O_CREAT | O_RDWR, 0o644)
+        #expect(flock(fd, LOCK_EX | LOCK_NB) == 0)
+        #expect(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 1) == nil)
+        close(fd)
+        #expect(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 1) != nil)
+    }
+
+    @Test func lockHeldUntilFinishRunThenReleased() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let dir = try #require(try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 11))
+        #expect(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: 12) == nil)
+        try await f.store.finishRun(id: cron.id, runDirectory: dir, record: f.record(), pid: 11)
+        #expect(FileManager.default.fileExists(atPath: cron.directory.appending(path: "run.lock").path), "the lock file is never unlinked")
+        #expect(try await f.store.beginRun(id: cron.id, trigger: .schedule, pid: 12) != nil)
+    }
+
+    @Test func pidWrittenToLockFile() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        _ = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 4242)
+        let text = try String(contentsOf: cron.directory.appending(path: "run.lock"), encoding: .utf8)
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines) == "4242")
+        let running = try await f.store.automation(id: cron.id)?.lastRun
+        #expect(running?.status == .running)
     }
 }

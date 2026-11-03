@@ -12,6 +12,7 @@ public actor ShellXAutomationStore {
     private let fileManager: FileManager
     private let trasher: any ShellXTrashing
     private let now: @Sendable () -> Date
+    private var heldLocks: [String: Int32] = [:]
 
     /// Creates a store over `environment`'s folders.
     public init(
@@ -140,32 +141,44 @@ public actor ShellXAutomationStore {
 
     // MARK: - Runs
 
-    /// Starts a run: takes `run.lock` and creates a `running` run directory. Returns `nil` when a live process holds the lock.
-    public func beginRun(
-        id: String,
-        trigger: ShellXRunTrigger,
-        pid: Int32,
-        isProcessAlive: @Sendable (Int32) -> Bool
-    ) throws -> URL? {
+    /// Starts a run: takes an exclusive `flock` on `run.lock` and creates a `running` run directory.
+    /// Returns `nil` when another open file description (this or another process) holds the lock.
+    /// The kernel drops the lock when the holder exits, so a crashed run never blocks the next one.
+    public func beginRun(id: String, trigger: ShellXRunTrigger, pid: Int32) throws -> URL? {
         let dir = try automationDirectory(id: id)
         let lockPath = dir.appending(path: "run.lock").path
-        guard try acquireLock(in: dir, at: lockPath, pid: pid, isProcessAlive: isProcessAlive) else { return nil }
-        let started = now()
-        let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
+        let fd = open(lockPath, O_CREAT | O_RDWR, 0o644)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+            let reason = errno
+            close(fd)
+            if reason == EWOULDBLOCK { return nil }
+            throw CocoaError(.fileLocking)
+        }
         let runDirectory: URL
         do {
+            let bytes = Array("\(pid)\n".utf8)
+            guard ftruncate(fd, 0) == 0,
+                  bytes.withUnsafeBufferPointer({ write(fd, $0.baseAddress, $0.count) }) == bytes.count else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            let started = now()
+            let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
             try fileManager.createDirectory(at: runs, withIntermediateDirectories: true)
             runDirectory = try makeRunDirectory(in: runs, at: started)
             let record = ShellXRunRecord(status: .running, trigger: trigger, startedAt: started, unread: false)
             try encoder().encode(record).write(to: runDirectory.appending(path: "result.json"), options: .atomic)
         } catch {
-            unlink(lockPath)
+            flock(fd, LOCK_UN)
+            close(fd)
             throw error
         }
+        heldLocks[id] = fd
         return runDirectory
     }
 
-    /// Records the final `record` for a run, releases the lock if it holds `pid` and prunes old runs.
+    /// Records the final `record` for a run, releases the lock this store holds for `id` and prunes old runs.
+    /// `pid` identifies the run for the caller; the lock itself is tied to the open file, never to the pid.
     public func finishRun(id: String, runDirectory: URL, record: ShellXRunRecord, pid: Int32) throws {
         let dir = try automationDirectory(id: id)
         let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
@@ -174,10 +187,9 @@ public actor ShellXAutomationStore {
             throw ShellXAutomationStoreError.foreignRunDirectory
         }
         try encoder().encode(record).write(to: runDirectory.appending(path: "result.json"), options: .atomic)
-        let lockPath = dir.appending(path: "run.lock").path
-        if let held = try? String(contentsOfFile: lockPath, encoding: .utf8),
-           Int32(held.trimmingCharacters(in: .whitespacesAndNewlines)) == pid {
-            unlink(lockPath)
+        if let fd = heldLocks.removeValue(forKey: id) {
+            flock(fd, LOCK_UN)
+            close(fd)
         }
         let names = runDirectoryNames(in: runs)
         for name in names.dropFirst(Self.retainedRuns) {
@@ -220,7 +232,6 @@ private extension ShellXAutomationStore {
         case skill(URL, external: Bool)
     }
 
-    static let unparseableLockGrace: TimeInterval = 60
     static let externalPrefix = "external:"
 
     static func isSafeName(_ name: String) -> Bool {
@@ -333,58 +344,6 @@ private extension ShellXAutomationStore {
             }
         }
         return records
-    }
-
-    /// Links a fully written temp file to `run.lock` (atomic, never empty). Returns false when a live holder owns it.
-    func acquireLock(
-        in dir: URL,
-        at lockPath: String,
-        pid: Int32,
-        isProcessAlive: @Sendable (Int32) -> Bool
-    ) throws -> Bool {
-        for _ in 0..<4 {
-            if try linkLock(in: dir, at: lockPath, pid: pid) { return true }
-            guard let contents = try? String(contentsOfFile: lockPath, encoding: .utf8) else {
-                if access(lockPath, F_OK) != 0 { continue }
-                return false
-            }
-            let holder = Int32(contents.trimmingCharacters(in: .whitespacesAndNewlines))
-            if let holder {
-                if isProcessAlive(holder) { return false }
-            } else {
-                let modified = (try? fileManager.attributesOfItem(atPath: lockPath)[.modificationDate]) as? Date
-                if let modified, now().timeIntervalSince(modified) < Self.unparseableLockGrace { return false }
-            }
-            // Stale: move it aside; only the process whose rename succeeds may continue.
-            let aside = dir.appending(path: ".run.lock.stale.\(UUID().uuidString)").path
-            guard rename(lockPath, aside) == 0 else { continue }
-            let moved = try? String(contentsOfFile: aside, encoding: .utf8)
-            if moved != contents {
-                // We displaced a lock someone else just took; put it back if the slot is still free.
-                _ = link(aside, lockPath)
-                unlink(aside)
-                return false
-            }
-            unlink(aside)
-        }
-        return false
-    }
-
-    func linkLock(in dir: URL, at lockPath: String, pid: Int32) throws -> Bool {
-        let temp = dir.appending(path: ".run.lock.\(UUID().uuidString)").path
-        let fd = open(temp, O_CREAT | O_EXCL | O_WRONLY, 0o644)
-        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
-        let bytes = Array("\(pid)\n".utf8)
-        let written = bytes.withUnsafeBufferPointer { write(fd, $0.baseAddress, $0.count) }
-        let closed = close(fd)
-        guard written == bytes.count, closed == 0 else {
-            unlink(temp)
-            throw CocoaError(.fileWriteUnknown)
-        }
-        defer { unlink(temp) }
-        if link(temp, lockPath) == 0 { return true }
-        if errno == EEXIST { return false }
-        throw CocoaError(.fileWriteUnknown)
     }
 
     func makeRunDirectory(in runs: URL, at date: Date) throws -> URL {
