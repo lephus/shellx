@@ -572,7 +572,10 @@ extension ShellXLinkFeedSourceTests {
             )
             let previous = TerminalController.shared.agentChatTranscriptService
             TerminalController.shared.agentChatTranscriptService = service
-            let sessions = ShellXLinkSessionSource(service: { service }, workspaceLookup: { _ in Self.workspace })
+            let sessions = ShellXLinkSessionSource(
+                service: { service }, workspaceLookup: { _ in Self.workspace },
+                openTerminals: { nil }, changeSignal: { _ in {} }
+            )
             return (service, sessions, previous)
         }
         defer {

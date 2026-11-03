@@ -429,6 +429,7 @@ private final class LiveWorkspaceChangeObserver {
     private var managers: [ObjectIdentifier: Watch] = [:]
     private var workspaces: [ObjectIdentifier: Watch] = [:]
     private var sessions: (service: AgentChatTranscriptService, token: UUID)?
+    private var restore: AnyCancellable?
 
     init(onChange: @escaping @MainActor () -> Void) {
         output = pulses
@@ -443,6 +444,10 @@ private final class LiveWorkspaceChangeObserver {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.pulses.send() }
         }
+        // The launch's restore finishing makes the open terminals known (`ShellXLinkSessionSource`).
+        restore = ShellXSessionRestoreSignal.completed.dropFirst().filter { $0 }.sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.pulses.send() }
+        }
         attach()
     }
 
@@ -450,6 +455,7 @@ private final class LiveWorkspaceChangeObserver {
         output = nil
         if let windowsObserver { NotificationCenter.default.removeObserver(windowsObserver) }
         windowsObserver = nil
+        restore = nil
         managers.removeAll()
         workspaces.removeAll()
         if let sessions { sessions.service.removeFrameObserver(sessions.token) }

@@ -20,17 +20,47 @@ struct ShellXLinkSessionSourceTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     /// A service over an empty, private hook store (no mobile client subscribed) and a source on it whose
-    /// workspace lookup needs no live window.
+    /// workspace lookup needs no live window. Without `terminals` or `openTerminals`, whether a terminal is
+    /// open is not known, so none is taken for closed.
     @MainActor
-    private static func makeSource(home: URL) -> (AgentChatTranscriptService, ShellXLinkSessionSource) {
+    private static func makeSource(
+        home: URL,
+        terminals: OpenTerminals? = nil,
+        openTerminals: ShellXLinkSessionSource.OpenTerminals? = nil,
+        signal: ManualChangeSignal? = nil
+    ) -> (AgentChatTranscriptService, ShellXLinkSessionSource) {
+        let signal = signal ?? ManualChangeSignal()
         let service = AgentChatTranscriptService(
             registry: AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home)),
             resolver: AgentChatTranscriptResolver(homeDirectory: home, environment: [:]),
             hasEventSubscribers: { false },
             emitEventPayload: { _ in }
         )
-        let source = ShellXLinkSessionSource(service: { service }, workspaceLookup: { _ in workspace })
+        let source = ShellXLinkSessionSource(
+            service: { service },
+            workspaceLookup: { _ in workspace },
+            openTerminals: openTerminals ?? { terminals?.open },
+            changeSignal: signal.start
+        )
         return (service, source)
+    }
+
+    /// The terminals open on the Mac, as the tests set them.
+    @MainActor
+    final class OpenTerminals {
+        var open: Set<UUID>
+        init(_ open: Set<UUID> = []) { self.open = open }
+    }
+
+    /// A change signal the tests fire by hand, like a tab closing.
+    @MainActor
+    final class ManualChangeSignal {
+        private var onChange: (@MainActor () -> Void)?
+        func start(_ onChange: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
+            self.onChange = onChange
+            return { [weak self] in self?.onChange = nil }
+        }
+        func fire() { onChange?() }
     }
 
     private static func makeHome() throws -> URL {
@@ -135,6 +165,207 @@ struct ShellXLinkSessionSourceTests {
         #expect(list.allSatisfy { $0.agent == "claude" })
         #expect(list.allSatisfy { $0.workspaceId == Self.workspace.id && $0.workspaceTitle == Self.workspace.title })
         #expect(byID[busy]?.lastActivityMs == Self.ms(5))
+    }
+
+    /// A tab or workspace closed on the Mac ends its agent; the ended session then leaves the phone, not even
+    /// listed as ended. A session still running after its tab closed stays: the phone never loses sight of a
+    /// live agent. A session that names no terminal (an agent run outside ShellX) stays.
+    @Test func testEndedSessionsOfAClosedTabAreNotListed() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let openTab = UUID(), closedTab = UUID()
+        let inOpenTab = UUID().uuidString, inClosedTab = UUID().uuidString
+        let endedInClosedTab = UUID().uuidString, outside = UUID().uuidString
+        let endedPath = try Self.transcript(in: home)
+        let (service, source) = await MainActor.run {
+            Self.makeSource(home: home, terminals: OpenTerminals([openTab]))
+        }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(inOpenTab, .sessionStart, surface: openTab.uuidString))
+            service.noteHookEvent(Self.event(inClosedTab, .sessionStart, surface: closedTab.uuidString))
+            service.noteHookEvent(Self.event(
+                endedInClosedTab, .sessionStart, surface: closedTab.uuidString, transcriptPath: endedPath))
+            service.noteHookEvent(Self.event(
+                endedInClosedTab, .sessionEnd, surface: closedTab.uuidString, transcriptPath: endedPath, at: 2))
+            service.noteHookEvent(Self.event(outside, .sessionStart))
+        }
+
+        let listed = Set(await source.sessions().sessions.map(\.sessionId))
+
+        #expect(listed == [inOpenTab, inClosedTab, outside])
+    }
+
+    /// Closing a tab while a phone listens: its session stays while the agent shuts down, and the phone is sent
+    /// its removal once it ended.
+    @Test func testClosedTabSessionIsRemovedOnceEnded() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let tab = UUID()
+        let session = UUID().uuidString
+        let path = try Self.transcript(in: home)
+        let terminals = await MainActor.run { OpenTerminals([tab]) }
+        let signal = await MainActor.run { ManualChangeSignal() }
+        let (service, source) = await MainActor.run {
+            Self.makeSource(home: home, terminals: terminals, signal: signal)
+        }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(session, .sessionStart, surface: tab.uuidString, transcriptPath: path))
+        }
+        let changes = SessionChanges()
+        let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; this call orders it before the tab closes.
+        let base = await source.sessions()
+        #expect(base.sessions.map(\.sessionId) == [session])
+
+        await MainActor.run {
+            terminals.open.remove(tab)
+            signal.fire()
+        }
+
+        // The agent is still shutting down: nothing changes for the phone.
+        let closing = await source.sessions()
+        #expect(closing.revision == base.revision)
+        #expect(closing.sessions.map(\.sessionId) == [session])
+        #expect(changes.all.isEmpty)
+
+        await MainActor.run {
+            service.noteHookEvent(Self.event(
+                session, .sessionEnd, surface: tab.uuidString, transcriptPath: path, at: 2))
+        }
+
+        #expect(await Self.waitUntil { !changes.all.isEmpty })
+        let ended = try #require(changes.all.first)
+        #expect(ended.revision == base.revision + 1)
+        #expect(ended.removed == [session])
+        #expect(ended.upserted.isEmpty)
+        #expect(await source.sessions().sessions.isEmpty)
+    }
+
+    /// An agent that ended in a tab still open stays listed as ended; closing that tab later removes it.
+    @Test func testClosingTheTabOfAnEndedSessionEmitsRemoved() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let tab = UUID()
+        let session = UUID().uuidString
+        let path = try Self.transcript(in: home)
+        let terminals = await MainActor.run { OpenTerminals([tab]) }
+        let signal = await MainActor.run { ManualChangeSignal() }
+        let (service, source) = await MainActor.run {
+            Self.makeSource(home: home, terminals: terminals, signal: signal)
+        }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(session, .sessionStart, surface: tab.uuidString, transcriptPath: path))
+            service.noteHookEvent(Self.event(
+                session, .sessionEnd, surface: tab.uuidString, transcriptPath: path, at: 2))
+        }
+        let changes = SessionChanges()
+        let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        let base = await source.sessions()
+        #expect(base.sessions.first { $0.sessionId == session }?.state == .ended)
+
+        await MainActor.run {
+            terminals.open.remove(tab)
+            signal.fire()
+        }
+
+        #expect(await Self.waitUntil { !changes.all.isEmpty })
+        let closed = try #require(changes.all.first)
+        #expect(closed.revision == base.revision + 1)
+        #expect(closed.removed == [session])
+        #expect(closed.upserted.isEmpty)
+    }
+
+    /// A terminal in a Dock (a workspace's or a window's) is open like one in a workspace's split tree: an
+    /// agent that ended there stays listed as ended. An ended session whose terminal is in neither leaves.
+    @MainActor
+    @Test func testEndedSessionInADockTerminalStaysListed() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let dock = workspace.requiredDockSplitForTesting
+        let pane = try #require(dock.bonsplitController.allPaneIds.first)
+        let dockTerminal = try #require(dock.newSurface(kind: .terminal, inPane: pane, focus: false))
+        let tabTerminal = try #require(workspace.panels.keys.first)
+        let closed = UUID()
+        let inDock = UUID().uuidString, inTab = UUID().uuidString, inClosed = UUID().uuidString
+        let (service, source) = Self.makeSource(home: home, openTerminals: {
+            ShellXLinkSessionSource.openTerminals(
+                restoreFinished: true, workspacesByWindow: [[workspace]], docks: [dock])
+        })
+        for (session, terminal) in [(inDock, dockTerminal), (inTab, tabTerminal), (inClosed, closed)] {
+            let path = try Self.transcript(in: home)
+            service.noteHookEvent(Self.event(session, .sessionStart, surface: terminal.uuidString, transcriptPath: path))
+            service.noteHookEvent(Self.event(
+                session, .sessionEnd, surface: terminal.uuidString, transcriptPath: path, at: 1))
+        }
+
+        let listed = Set(await source.sessions().sessions.map(\.sessionId))
+
+        #expect(listed == [inDock, inTab])
+    }
+
+    /// While the app launches, its windows are not registered yet and the last session is still being
+    /// restored: no terminal can be taken for closed then, so every ended session stays listed.
+    @MainActor
+    @Test func testEndedSessionsStayListedUntilWindowsAreRestored() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let restoring = UUID().uuidString, noWindows = UUID().uuidString
+        var state: (restoreFinished: Bool, windows: [[Workspace]]) = (false, [[workspace]])
+        let (service, source) = Self.makeSource(home: home, openTerminals: {
+            ShellXLinkSessionSource.openTerminals(
+                restoreFinished: state.restoreFinished, workspacesByWindow: state.windows, docks: [])
+        })
+        for session in [restoring, noWindows] {
+            let path = try Self.transcript(in: home)
+            let terminal = UUID().uuidString   // restored later, or never: not in any window yet
+            service.noteHookEvent(Self.event(session, .sessionStart, surface: terminal, transcriptPath: path))
+            service.noteHookEvent(Self.event(session, .sessionEnd, surface: terminal, transcriptPath: path, at: 1))
+        }
+
+        // The windows exist but the launch's restore has not finished.
+        #expect(Set(await source.sessions().sessions.map(\.sessionId)) == [restoring, noWindows])
+
+        // The restore finished, but no main window is registered yet.
+        state = (true, [])
+        #expect(Set(await source.sessions().sessions.map(\.sessionId)) == [restoring, noWindows])
+
+        // A window holds neither terminal: both were closed.
+        state = (true, [[workspace]])
+        #expect(await source.sessions().sessions.isEmpty)
+    }
+
+    /// One refresh reads the open terminals once, however many ended sessions name a terminal: the read
+    /// walks every window, workspace and Dock, and runs up to four times a second while a phone listens.
+    @MainActor
+    @Test func testOpenTerminalsAreReadOncePerRefresh() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let open = UUID()
+        var reads = 0
+        let (service, source) = Self.makeSource(home: home, openTerminals: {
+            reads += 1
+            return [open]
+        })
+        for index in 0..<6 {
+            let session = UUID().uuidString
+            let terminal = index.isMultiple(of: 2) ? open.uuidString : UUID().uuidString
+            let path = try Self.transcript(in: home)
+            service.noteHookEvent(Self.event(
+                session, .sessionStart, surface: terminal, transcriptPath: path, at: Double(index)))
+            service.noteHookEvent(Self.event(
+                session, .sessionEnd, surface: terminal, transcriptPath: path, at: Double(index) + 0.5))
+        }
+
+        #expect(await source.sessions().sessions.count == 3)
+        #expect(reads == 1)
+        _ = await source.sessions()
+        #expect(reads == 2)
     }
 
     @Test func testStateChangeEmitsUpsertWithNextRevision() async throws {
