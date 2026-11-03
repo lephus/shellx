@@ -183,6 +183,12 @@ public actor ShellXAutomationStore {
     /// Records the final `record` for a run, releases the lock this store holds for `id` and prunes old runs.
     /// `pid` identifies the run for the caller; the lock itself is tied to the open file, never to the pid.
     public func finishRun(id: String, runDirectory: URL, record: ShellXRunRecord, pid: Int32) throws {
+        defer {
+            if let fd = heldLocks.removeValue(forKey: id) {
+                flock(fd, LOCK_UN)
+                close(fd)
+            }
+        }
         let dir = try automationDirectory(id: id)
         let runs = dir.appending(path: "runs", directoryHint: .isDirectory)
         guard Self.isPlainRunName(runDirectory.lastPathComponent),
@@ -190,10 +196,6 @@ public actor ShellXAutomationStore {
             throw ShellXAutomationStoreError.foreignRunDirectory
         }
         try encoder().encode(record).write(to: runDirectory.appending(path: "result.json"), options: .atomic)
-        if let fd = heldLocks.removeValue(forKey: id) {
-            flock(fd, LOCK_UN)
-            close(fd)
-        }
         let names = runDirectoryNames(in: runs)
         for name in names.dropFirst(Self.retainedRuns) {
             try? fileManager.removeItem(at: runs.appending(path: name))

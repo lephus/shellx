@@ -35,4 +35,20 @@ import Testing
         let wrapper = "/Applications/ShellX.app/Contents/Resources/bin/shellx-claude-wrapper"
         #expect(resolver(executable: [wrapper], login: wrapper).resolve() == nil)
     }
+
+    @Test func rejectsSymlinkToTheWrapper() throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "resolver-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let wrapper = dir.appending(path: "shellx-claude-wrapper")
+        FileManager.default.createFile(atPath: wrapper.path, contents: Data())
+        let link = dir.appending(path: "claude")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: wrapper)
+        #expect(resolver(env: ["SHELLX_CLAUDE_PATH": link.path], executable: [link.path]).resolve() == nil)
+    }
+
+    @Test func loginShellOutputKeepsLastAbsoluteLine() {
+        #expect(ShellXLoginShellClaudeLookup.absolutePath(fromOutput: "noise\n/x/claude\n\n") == "/x/claude")
+        #expect(ShellXLoginShellClaudeLookup.absolutePath(fromOutput: "/x/claude\nclaude: aliased\n") == nil)
+        #expect(ShellXLoginShellClaudeLookup.absolutePath(fromOutput: "") == nil)
+    }
 }

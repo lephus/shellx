@@ -28,6 +28,7 @@ public struct ShellXClaudeProcess: ShellXClaudeLaunching {
         resumeSessionId: String?,
         transcript: URL
     ) async throws -> ShellXClaudeResult {
+        try Task.checkCancellation()
         let fileManager = FileManager.default
         if !fileManager.fileExists(atPath: transcript.path) {
             fileManager.createFile(atPath: transcript.path, contents: nil)
@@ -94,7 +95,13 @@ public struct ShellXClaudeProcess: ShellXClaudeLaunching {
                 }
             }
         } onCancel: {
-            if unsafeProcess.isRunning { unsafeProcess.terminate() }
+            guard unsafeProcess.isRunning else { return }
+            unsafeProcess.terminate()
+            let target = unsafeProcess.processIdentifier
+            Task.detached {
+                try? await Task.sleep(for: .seconds(2))
+                if unsafeProcess.isRunning { kill(target, SIGKILL) }
+            }
         }
 
         var result = await outTask.value

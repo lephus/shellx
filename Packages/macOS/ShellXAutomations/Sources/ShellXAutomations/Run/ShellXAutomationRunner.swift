@@ -55,7 +55,14 @@ public actor ShellXAutomationRunner {
         var record = await execute(automation, trigger: trigger, started: started, runDirectory: runDirectory)
         record.finishedAt = now()
         record.unread = true
-        try? await store.finishRun(id: id, runDirectory: runDirectory, record: record, pid: pid)
+        do {
+            try await store.finishRun(id: id, runDirectory: runDirectory, record: record, pid: pid)
+        } catch {
+            record = ShellXRunRecord(
+                status: .failed, trigger: trigger, startedAt: started, finishedAt: now(),
+                sessionId: record.sessionId, reason: "ShellX could not save this run: \(error.localizedDescription)"
+            )
+        }
         await notify(automation, record: record)
         return record
     }

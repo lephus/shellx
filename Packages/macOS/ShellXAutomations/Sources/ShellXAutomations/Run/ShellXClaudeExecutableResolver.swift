@@ -28,9 +28,15 @@ public struct ShellXClaudeExecutableResolver: Sendable {
         candidates.append(home.appending(path: ".local/bin/claude").path)
         candidates.append("/opt/homebrew/bin/claude")
         candidates.append("/usr/local/bin/claude")
-        for path in candidates where isExecutable(path) { return path }
+        for path in candidates where accepts(path) { return path }
         guard let found = loginShellLookup()?.trimmingCharacters(in: .whitespacesAndNewlines),
-              found.hasPrefix("/"), !found.hasSuffix("shellx-claude-wrapper"), isExecutable(found) else { return nil }
+              found.hasPrefix("/"), accepts(found) else { return nil }
         return found
+    }
+
+    private func accepts(_ path: String) -> Bool {
+        guard isExecutable(path) else { return false }
+        let real = URL(filePath: path).resolvingSymlinksInPath().lastPathComponent
+        return real != "shellx-claude-wrapper"
     }
 }

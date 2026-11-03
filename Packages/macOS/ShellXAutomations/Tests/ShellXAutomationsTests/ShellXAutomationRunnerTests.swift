@@ -17,6 +17,13 @@ private actor FakeClaude: ShellXClaudeLaunching {
     }
 }
 
+private actor VanishingRunClaude: ShellXClaudeLaunching {
+    func run(prompt: String, workingDirectory: URL, allowedTools: [String], resumeSessionId: String?, transcript: URL) async throws -> ShellXClaudeResult {
+        try FileManager.default.removeItem(at: transcript.deletingLastPathComponent())
+        return ShellXClaudeResult(sessionId: "s1", resultText: "fine")
+    }
+}
+
 private actor FakeNotifier: ShellXNotifying {
     private(set) var posted: [ShellXAutomationNotification] = []
     func post(_ n: ShellXAutomationNotification) async throws { posted.append(n) }
@@ -209,6 +216,18 @@ private struct Fixture {
         #expect(stored[0].status == .done && stored[0].trigger == .schedule && stored[0].finishedAt != nil)
         #expect(FileManager.default.fileExists(atPath: stamp.path))
         // lock released: a second run can start
+        let again = await f.runner(FakeClaude([ok("again")])).run(id: a.id, trigger: .manual)
+        #expect(again.status == .done)
+    }
+
+    @Test func failedSaveReleasesLockAndReportsFailure() async throws {
+        let f = Fixture()
+        let a = try await f.cron()
+        let record = await f.runner(VanishingRunClaude()).run(id: a.id, trigger: .manual)
+        #expect(record.status == .failed)
+        #expect(record.reason?.hasPrefix("ShellX could not save this run: ") == true)
+        let posted = await f.notifier.posted
+        #expect(posted.count == 1 && posted[0].body.hasPrefix("ShellX could not save this run"))
         let again = await f.runner(FakeClaude([ok("again")])).run(id: a.id, trigger: .manual)
         #expect(again.status == .done)
     }
