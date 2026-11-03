@@ -85,31 +85,35 @@ public actor ShellXAutomationStore {
         }
 
         try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let oldDirectory, !isSameFolder {
-            let sameKindOfStore = (existing?.1.kind == .skill) == (draft.kind == .skill)
-            if sameKindOfStore {
-                try fileManager.moveItem(at: oldDirectory, to: target)
-            } else {
-                try trasher.trash(oldDirectory)
-            }
-        }
-        try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
-        try Data(draft.skillMarkdown.utf8).write(to: target.appending(path: "SKILL.md"), options: .atomic)
-
-        if draft.kind == .skill {
-            let marker = ShellXSkillMarker(
-                id: newID, notify: draft.notify, createdAt: createdAt, updatedAt: stamp,
-                bundleIdentifier: environment.bundleIdentifier
-            )
-            try encoder().encode(marker).write(to: target.appending(path: ".shellx.json"), options: .atomic)
+        if isSameFolder {
+            try writeFiles(of: draft, into: target, id: newID, createdAt: createdAt, updatedAt: stamp, enabled: enabled)
         } else {
-            let automation = ShellXAutomation(
-                id: newID, kind: draft.kind, name: draft.name, description: draft.description,
-                schedule: draft.schedule, workingDirectory: draft.workingDirectory, notify: draft.notify,
-                allowedTools: draft.allowedTools, steps: draft.steps, enabled: enabled, origin: .shellx,
-                createdAt: createdAt, updatedAt: stamp, directory: target
-            )
-            try encoder().encode(automation).write(to: target.appending(path: "automation.json"), options: .atomic)
+            // The new content is complete in a hidden staging folder before anything old is touched;
+            // on any failure the staging folder goes and the old folder stays as it was.
+            let staging = target.deletingLastPathComponent()
+                .appending(path: ".\(target.lastPathComponent).saving-\(UUID().uuidString)", directoryHint: .isDirectory)
+            let sameStore = (existing?.1.kind == .skill) == (draft.kind == .skill)
+            do {
+                if let oldDirectory, sameStore {
+                    // Same store: keep the folder's other files (references/, scripts/, assets/).
+                    try fileManager.copyItem(at: oldDirectory, to: staging)
+                } else {
+                    try fileManager.createDirectory(at: staging, withIntermediateDirectories: false)
+                }
+                try writeFiles(of: draft, into: staging, id: newID, createdAt: createdAt, updatedAt: stamp, enabled: enabled)
+                try fileManager.moveItem(at: staging, to: target)
+            } catch {
+                try? fileManager.removeItem(at: staging)
+                throw error
+            }
+            if let oldDirectory {
+                // A renamed folder was copied whole, so the old one goes; a folder of the other store is trashed.
+                if sameStore {
+                    try fileManager.removeItem(at: oldDirectory)
+                } else {
+                    try trasher.trash(oldDirectory)
+                }
+            }
         }
         try touchChangeStamp()
         guard let saved = try automation(id: newID) else { throw ShellXAutomationStoreError.notFound(newID) }
@@ -174,6 +178,8 @@ public actor ShellXAutomationStore {
             throw error
         }
         heldLocks[id] = fd
+        // Watchers show the run as running right away.
+        try? touchChangeStamp()
         return runDirectory
     }
 
@@ -316,6 +322,37 @@ private extension ShellXAutomationStore {
         guard let location = try locate(id: id) else { throw ShellXAutomationStoreError.notFound(id) }
         guard case .automation(let dir) = location else { throw ShellXAutomationStoreError.unsupported(id) }
         return dir
+    }
+
+    /// Writes `SKILL.md` and the marker or `automation.json` for `draft` into `folder`.
+    func writeFiles(
+        of draft: ShellXAutomationDraft,
+        into folder: URL,
+        id: String,
+        createdAt: Date,
+        updatedAt: Date,
+        enabled: Bool
+    ) throws {
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(draft.skillMarkdown.utf8).write(to: folder.appending(path: "SKILL.md"), options: .atomic)
+        if draft.kind == .skill {
+            let marker = ShellXSkillMarker(
+                id: id, notify: draft.notify, createdAt: createdAt, updatedAt: updatedAt,
+                bundleIdentifier: environment.bundleIdentifier
+            )
+            try encoder().encode(marker).write(to: folder.appending(path: ".shellx.json"), options: .atomic)
+            try? fileManager.removeItem(at: folder.appending(path: "automation.json"))
+        } else {
+            // `directory` is never encoded; the store assigns it when it reads the file.
+            let automation = ShellXAutomation(
+                id: id, kind: draft.kind, name: draft.name, description: draft.description,
+                schedule: draft.schedule, workingDirectory: draft.workingDirectory, notify: draft.notify,
+                allowedTools: draft.allowedTools, steps: draft.steps, enabled: enabled, origin: .shellx,
+                createdAt: createdAt, updatedAt: updatedAt, directory: folder
+            )
+            try encoder().encode(automation).write(to: folder.appending(path: "automation.json"), options: .atomic)
+            try? fileManager.removeItem(at: folder.appending(path: ".shellx.json"))
+        }
     }
 
     func readMarker(in dir: URL) -> ShellXSkillMarker? {

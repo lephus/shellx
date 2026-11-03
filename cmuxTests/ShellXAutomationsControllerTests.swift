@@ -15,13 +15,21 @@ final class ShellXAutomationsControllerTests: XCTestCase {
     private var controller: ShellXAutomationsController!
     private var events: [[String: Any]] = []
 
+    /// What "Run now" reports; nil means the run started.
+    private var runFailure: String?
+
     override func setUp() async throws {
         fixture = ShellXAutomationsFixture()
-        let log = fixture.log
-        let launcher = ShellXAutomationsFakeCreatorLauncher(log: log)
+        let launcher = ShellXAutomationsFakeCreatorLauncher(log: fixture.log)
         self.launcher = launcher
+        controller = makeController(launcher: launcher)
+    }
+
+    /// A controller over the fixture whose creator sessions start through `launcher`.
+    private func makeController(launcher: any ShellXCreatorProcessLaunching) -> ShellXAutomationsController {
+        let log = fixture.log
         let store = fixture.store
-        controller = ShellXAutomationsController(
+        let controller = ShellXAutomationsController(
             library: fixture.library,
             store: store,
             scheduler: fixture.scheduler,
@@ -34,7 +42,10 @@ final class ShellXAutomationsControllerTests: XCTestCase {
                     cliPath: "/cli"
                 )
             },
-            runLauncher: { id in log.append("run " + id) },
+            runLauncher: { [weak self] id in
+                log.append("run " + id)
+                return await self?.runFailure
+            },
             terminalOpener: { automation in log.append("terminal " + automation.id) },
             fileOpener: { url in log.append("open " + url.lastPathComponent) },
             makeValidator: { _ in
@@ -43,6 +54,7 @@ final class ShellXAutomationsControllerTests: XCTestCase {
             }
         )
         controller.emit = { [weak self] event in self?.events.append(event) }
+        return controller
     }
 
     override func tearDown() async throws {
@@ -170,6 +182,99 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertFalse(fixture.log.all.contains { $0.hasPrefix("launchctl") })
     }
 
+    func testExternalSkillCannotBeEditedInTheCreator() async throws {
+        try fixture.externalSkill("theirs")
+
+        let reply = await controller.handle(method: "creator.start", params: ["editId": "external:theirs"])
+
+        XCTAssertEqual(errorCode(reply), "notAllowed")
+        let sends = await controller.handle(method: "creator.send", params: ["text": "hi"])
+        XCTAssertEqual(errorCode(sends), "unavailable")
+        let folder = fixture.environment.skillsRoot.appending(path: "theirs/SKILL.md")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.path))
+    }
+
+    func testCancelDuringStartLeavesNoRunningProcess() async throws {
+        let gated = ShellXAutomationsGatedCreatorLauncher(log: fixture.log)
+        controller = makeController(launcher: gated)
+        let controller = controller!
+
+        let starting = Task { await controller.handle(method: "creator.start", params: [:]) }
+        await waitUntil { gated.startCount == 1 }
+        _ = await controller.handle(method: "creator.cancel", params: [:])
+        await gated.open()
+        _ = await starting.value
+
+        await waitUntil { self.fixture.log.all.contains("creator.stop#1") }
+        XCTAssertTrue(fixture.log.all.contains("creator.stop#1"))
+    }
+
+    func testSecondStartKeepsOnlyTheLatestSession() async throws {
+        let gated = ShellXAutomationsGatedCreatorLauncher(log: fixture.log)
+        controller = makeController(launcher: gated)
+        let controller = controller!
+
+        let first = Task { await controller.handle(method: "creator.start", params: [:]) }
+        await waitUntil { gated.startCount == 1 }
+        let second = Task { await controller.handle(method: "creator.start", params: [:]) }
+        await waitUntil { gated.startCount == 2 }
+        await gated.open()
+        _ = await first.value
+        let secondReply = await second.value
+        XCTAssertEqual(secondReply["ok"] as? Bool, true)
+
+        await waitUntil { self.fixture.log.all.contains("creator.stop#1") }
+        let sent = await controller.handle(method: "creator.send", params: ["text": "hello"])
+        XCTAssertEqual(sent["ok"] as? Bool, true)
+        let log = fixture.log.all
+        XCTAssertTrue(log.contains("creator.stop#1"))
+        XCTAssertFalse(log.contains("creator.stop#2"))
+        XCTAssertTrue(log.contains { $0.hasPrefix("creator.send#2 ") && $0.contains("hello") })
+        XCTAssertFalse(log.contains { $0.hasPrefix("creator.send#1 ") })
+    }
+
+    func testRunNowReportsALaunchFailure() async throws {
+        let saved = try await fixture.store.save(fixture.cronDraft(), replacing: nil)
+        runFailure = "shellx stopped with status 2."
+
+        let reply = await controller.handle(method: "automations.runNow", params: ["id": saved.id])
+
+        XCTAssertEqual(errorCode(reply), "failed")
+        let message = (reply["error"] as? [String: Any])?["message"] as? String
+        XCTAssertTrue(message?.contains("status 2") == true)
+    }
+
+    func testEditingACronjobIntoASkillRemovesItsLaunchAgent() async throws {
+        let cron = try await fixture.store.save(fixture.cronDraft("nightly"), replacing: nil)
+        try await fixture.scheduler.install(cron)
+        let skill = ShellXAutomationDraft(
+            kind: .skill, name: "nightly", description: "Nightly job",
+            skillMarkdown: "---\nname: nightly\ndescription: Nightly job\n---\nDo it\n"
+        )
+
+        try await startCreatorWithDraft(skill, editId: cron.id)
+        let mark = fixture.log.all.count
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        XCTAssertEqual((result(reply)?["automation"] as? [String: Any])?["kind"] as? String, "skill")
+        let after = fixture.log.all.dropFirst(mark)
+        XCTAssertTrue(after.contains { $0.hasPrefix("launchctl bootout") && $0.hasSuffix(cron.id) })
+        let plist = fixture.environment.launchAgentsDirectory
+            .appending(path: fixture.scheduler.label(for: cron.id) + ".plist")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plist.path))
+    }
+
+    func testErrorsReachingThePageAreReadable() async {
+        let missing = await controller.handle(method: "automations.reveal", params: ["id": "no-such-id"])
+        XCTAssertEqual(errorCode(missing), "notFound")
+        let message = (missing["error"] as? [String: Any])?["message"] as? String ?? ""
+        XCTAssertFalse(message.isEmpty)
+        XCTAssertFalse(message.contains("ShellXAutomationStoreError"))
+        let invalid = await controller.handle(method: "automations.reveal", params: ["id": "../x"])
+        let invalidMessage = (invalid["error"] as? [String: Any])?["message"] as? String ?? ""
+        XCTAssertFalse(invalidMessage.contains("invalidID"))
+    }
+
     func testAppContextCarriesLabelsAndPendingFocus() async throws {
         controller.focus(id: "abc")
 
@@ -190,16 +295,23 @@ final class ShellXAutomationsControllerTests: XCTestCase {
     // MARK: Helpers
 
     /// Starts the creator and makes the fake assistant propose `draft`.
-    private func startCreatorWithDraft(_ draft: ShellXAutomationDraft) async throws {
-        let started = await controller.handle(method: "creator.start", params: [:])
+    private func startCreatorWithDraft(_ draft: ShellXAutomationDraft, editId: String? = nil) async throws {
+        let params: [String: Any] = editId.map { ["editId": $0] } ?? [:]
+        let started = await controller.handle(method: "creator.start", params: params)
         XCTAssertEqual(started["ok"] as? Bool, true)
         let draftObject = ShellXAutomationsDTOEncoder().draft(draft)
         let draftJSON = String(decoding: try JSONSerialization.data(withJSONObject: draftObject), as: UTF8.self)
         let text = "Here is the draft.\n```shellx-draft\n\(draftJSON)\n```\n"
         let line: [String: Any] = ["type": "assistant", "message": ["content": [["type": "text", "text": text]]]]
         launcher.continuation.yield(String(decoding: try JSONSerialization.data(withJSONObject: line), as: UTF8.self))
-        await waitUntil { self.events.contains { self.creatorEventType($0) == "draft" } }
-        XCTAssertTrue(events.contains { creatorEventType($0) == "draft" })
+        let proposed = { (event: [String: Any]) -> Bool in
+            guard self.creatorEventType(event) == "draft",
+                  let draftEvent = (event["event"] as? [String: Any])?["draft"] as? [String: Any] else { return false }
+            return draftEvent["kind"] as? String == draft.kind.rawValue && draftEvent["name"] as? String == draft.name
+                && draftEvent["skillMarkdown"] as? String == draft.skillMarkdown
+        }
+        await waitUntil { self.events.contains(where: proposed) }
+        XCTAssertTrue(events.contains(where: proposed))
     }
 
     private func creatorEventType(_ event: [String: Any]) -> String? {

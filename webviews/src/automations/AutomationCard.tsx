@@ -90,9 +90,12 @@ export function AutomationCard({
             {a.enabled ? label("disable") : label("enable")}
           </button>
         ) : null}
-        <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.startCreator(a.id))}>
-          {label("edit")}
-        </button>
+        {a.origin !== "external" ? (
+          // Skills ShellX did not create are changed only through Edit file.
+          <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.startCreator(a.id))}>
+            {label("edit")}
+          </button>
+        ) : null}
         <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.editFile(a.id))}>
           {label("editFile")}
         </button>

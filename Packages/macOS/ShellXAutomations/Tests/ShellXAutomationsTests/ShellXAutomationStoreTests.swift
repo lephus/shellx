@@ -134,6 +134,58 @@ private struct Fixture {
         #expect(second.createdAt == first.createdAt)
     }
 
+    @Test func crossKindEditKeepsOldFolderWhenWriteFails() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft("nightly"), replacing: nil)
+        let skills = f.environment.skillsRoot
+        try FileManager.default.createDirectory(at: skills, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: skills.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: skills.path) }
+
+        await #expect(throws: (any Error).self) { try await f.store.save(f.skillDraft("nightly"), replacing: cron.id) }
+
+        #expect(f.trasher.trashed.isEmpty)
+        let kept = try await f.store.automation(id: cron.id)
+        #expect(kept?.kind == .cronjob)
+        #expect(FileManager.default.fileExists(atPath: cron.directory.appending(path: "SKILL.md").path))
+    }
+
+    @Test func crossKindEditWritesNewBeforeTrashingOld() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft("nightly"), replacing: nil)
+
+        _ = try await f.store.save(f.skillDraft("nightly"), replacing: cron.id)
+
+        // The fake trasher only records, so the new folder is checked on disk.
+        #expect(FileManager.default.fileExists(atPath: f.environment.skillsRoot.appending(path: "nightly/SKILL.md").path))
+        #expect(f.trasher.trashed.map(\.lastPathComponent) == [cron.id])
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: f.environment.skillsRoot.path)
+        #expect(leftovers == ["nightly"])
+    }
+
+    @Test func renameKeepsExtraFilesOfTheSkill() async throws {
+        let f = Fixture()
+        let first = try await f.store.save(f.skillDraft("old-name"), replacing: nil)
+        let references = first.directory.appending(path: "references", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: references, withIntermediateDirectories: true)
+        try Data("notes".utf8).write(to: references.appending(path: "notes.md"))
+
+        let second = try await f.store.save(f.skillDraft("new-name"), replacing: first.id)
+
+        #expect(FileManager.default.fileExists(atPath: second.directory.appending(path: "references/notes.md").path))
+        #expect(!FileManager.default.fileExists(atPath: first.directory.path))
+    }
+
+    @Test func beginRunTouchesChangeStamp() async throws {
+        let f = Fixture()
+        let cron = try await f.store.save(f.cronDraft(), replacing: nil)
+        let before = try Data(contentsOf: f.environment.changeStampURL)
+
+        _ = try await f.store.beginRun(id: cron.id, trigger: .manual, pid: 1)
+
+        #expect(try Data(contentsOf: f.environment.changeStampURL) != before)
+    }
+
     @Test func editKeepsCronjobEnabledState() async throws {
         let f = Fixture()
         let first = try await f.store.save(f.cronDraft(), replacing: nil)

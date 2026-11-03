@@ -113,3 +113,51 @@ struct ShellXAutomationsFixture {
         try Data("---\nname: \(name)\ndescription: Theirs\n---\nBody\n".utf8).write(to: folder.appending(path: "SKILL.md"))
     }
 }
+
+/// A creator launcher whose `start` waits until the test opens the gate; it numbers each start and
+/// logs `creator.send#n …` and `creator.stop#n` per process.
+final class ShellXAutomationsGatedCreatorLauncher: ShellXCreatorProcessLaunching, @unchecked Sendable {
+    // Test-only: the counter and waiters are touched from the session actors and the test.
+    private let lock = NSLock()
+    private var starts = 0
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    let log: ShellXAutomationsCallLog
+
+    init(log: ShellXAutomationsCallLog) {
+        self.log = log
+    }
+
+    var startCount: Int { lock.withLock { starts } }
+
+    func open() async {
+        let ready = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            isOpen = true
+            defer { waiters = [] }
+            return waiters
+        }
+        for waiter in ready { waiter.resume() }
+    }
+
+    func start(arguments: [String], workingDirectory: URL) async throws -> (
+        lines: AsyncThrowingStream<String, any Error>,
+        send: @Sendable (String) async throws -> Void,
+        stop: @Sendable () async -> Void
+    ) {
+        let number = lock.withLock { () -> Int in
+            starts += 1
+            return starts
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumeNow = lock.withLock { () -> Bool in
+                if isOpen { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
+        let log = log
+        let (lines, _) = AsyncThrowingStream<String, any Error>.makeStream()
+        return (lines, { log.append("creator.send#\(number) " + $0) }, { log.append("creator.stop#\(number)") })
+    }
+}

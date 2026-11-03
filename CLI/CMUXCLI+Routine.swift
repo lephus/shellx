@@ -43,6 +43,7 @@ extension CMUXCLI {
                 layout.infoPlistPath
             ))
         }
+        let urlScheme = ShellXAppURLScheme(infoDictionary: Bundle(path: layout.appPath)?.infoDictionary).scheme
         let home = FileManager.default.homeDirectoryForCurrentUser
         let environment = ShellXAutomationEnvironment(
             bundleIdentifier: bundleIdentifier,
@@ -57,11 +58,16 @@ extension CMUXCLI {
 
         switch command {
         case .run(let id, let trigger):
-            try await runRoutine(id: id, trigger: trigger, store: store, notifier: notifier, home: home, jsonOutput: jsonOutput)
+            try await runRoutine(
+                id: id, trigger: trigger, store: store, notifier: notifier, home: home,
+                urlScheme: urlScheme, jsonOutput: jsonOutput
+            )
         case .notify(let name, _, let body):
             let automationId = (try? await store.automation(named: name))?.id
             do {
-                try await notifier.post(ShellXAutomationNotification(name: name, body: body, automationId: automationId))
+                try await notifier.post(ShellXAutomationNotification(
+                    name: name, body: body, automationId: automationId, urlScheme: urlScheme
+                ))
             } catch ShellXNotifierError.openFailed(let status) {
                 throw CLIError(message: String(
                     format: String(
@@ -83,6 +89,7 @@ extension CMUXCLI {
         store: ShellXAutomationStore,
         notifier: ShellXNotifierClient,
         home: URL,
+        urlScheme: String,
         jsonOutput: Bool
     ) async throws {
         let processEnvironment = ProcessInfo.processInfo.environment
@@ -101,7 +108,9 @@ extension CMUXCLI {
             }
         }
         let claude = launch.map { ShellXClaudeProcess(executable: $0.path, environment: $0.environment) }
-        let runner = ShellXAutomationRunner(store: store, claude: claude, notifier: notifier, pid: getpid(), now: { Date() })
+        let runner = ShellXAutomationRunner(
+            store: store, claude: claude, notifier: notifier, pid: getpid(), now: { Date() }, urlScheme: urlScheme
+        )
         let record = await runner.run(id: id, trigger: trigger)
         let status = Self.routineStatusToken(record.status)
         if jsonOutput {

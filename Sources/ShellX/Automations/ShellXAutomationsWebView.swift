@@ -89,12 +89,13 @@ struct ShellXAutomationsWebView: NSViewRepresentable {
             let controller = controller
             guard message.frameInfo.isMainFrame,
                   Self.page.isShellDocument(message.frameInfo.request.url) else {
-                let text = "Requests are accepted only from the Automations page."
-                replyHandler(controller.errorReply(code: .notAllowed, message: text), nil)
+                let failure = ShellXAutomationsBridgeFailure.untrustedFrame
+                replyHandler(controller.errorReply(code: failure.code, message: failure.message), nil)
                 return
             }
             guard let body = message.body as? [String: Any], let method = body["method"] as? String else {
-                replyHandler(controller.errorReply(code: .invalidArgument, message: "Malformed request."), nil)
+                let failure = ShellXAutomationsBridgeFailure.malformedRequest
+                replyHandler(controller.errorReply(code: failure.code, message: failure.message), nil)
                 return
             }
             let params = body["params"] as? [String: Any] ?? [:]

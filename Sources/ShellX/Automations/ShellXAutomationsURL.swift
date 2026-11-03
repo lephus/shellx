@@ -1,21 +1,23 @@
 import Foundation
+import ShellXAutomations
 
 /// A `shellx://automations` link, as an automation banner opens it.
 ///
-/// Accepts exactly `shellx://automations` and `shellx://automations/<id>`, where the id
+/// Accepts exactly `<scheme>://automations` and `<scheme>://automations/<id>` for the app's own
+/// scheme (`shellx`, or `shellx-dev` for dev builds; see ``ShellXAppURLScheme``), where the id
 /// is one path segment of letters, digits, `-`, `_` or `:` (so `external:<name>` works).
 /// Anything else, such as `shellx://auth/...`, a `..` segment, a query or another scheme,
 /// is not an Automations link.
 struct ShellXAutomationsURL: Equatable {
-    static let scheme = "shellx"
     static let host = "automations"
 
     /// The automation to show, or nil for the list.
     let focusId: String?
 
-    init?(_ url: URL) {
+    /// - Parameter scheme: The app's own URL scheme.
+    init?(_ url: URL, scheme: String = ShellXAppURLScheme.release) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.scheme?.lowercased() == Self.scheme,
+              components.scheme?.lowercased() == scheme.lowercased(),
               components.host?.lowercased() == Self.host,
               components.user == nil, components.password == nil, components.port == nil,
               components.query == nil, components.fragment == nil else {

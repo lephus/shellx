@@ -13,6 +13,8 @@ final class ShellXAutomationsRuntime {
     let scheduler: ShellXLaunchAgentScheduler
     let library: ShellXAutomationsLibrary
     let claudePath: ShellXClaudePathCache
+    /// The scheme this bundle registered for its links (`shellx`, or `shellx-dev` for dev builds).
+    let urlScheme: String
     private let bundle: Bundle
     private let processEnvironment: [String: String]
 
@@ -22,6 +24,7 @@ final class ShellXAutomationsRuntime {
     ///   - processEnvironment: The app's environment, for `SHELLX_CLAUDE_PATH` and `PATH`.
     init(bundle: Bundle, home: URL, processEnvironment: [String: String]) {
         self.bundle = bundle
+        urlScheme = ShellXAppURLScheme(infoDictionary: bundle.infoDictionary).scheme
         self.processEnvironment = processEnvironment
         let bundleURL = bundle.bundleURL
         environment = ShellXAutomationEnvironment(
@@ -79,10 +82,8 @@ final class ShellXAutomationsRuntime {
                 )
             },
             runLauncher: { id in
-                // One run path: the same command launchd calls, detached from the app.
-                Task.detached(priority: .utility) {
-                    _ = try? await ShellXArgvProcess().run([cliPath, "routine", "run", id, "--trigger", "manual"])
-                }
+                // One run path: the same command launchd calls; it keeps running after the grace.
+                await ShellXRoutineRunLauncher(cliPath: cliPath).start(id)
             },
             terminalOpener: terminalOpener,
             fileOpener: fileOpener,

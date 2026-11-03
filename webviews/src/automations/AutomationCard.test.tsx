@@ -42,3 +42,15 @@ test("finished run shows its duration", () => {
   const html = render({ ...run, status: "done", finishedAt: "2026-11-03T10:00:42Z" });
   expect(html).toContain("42 s");
 });
+
+function renderCard(over: Partial<AutomationDTO>): string {
+  const store = {} as never;
+  return renderToStaticMarkup(<AutomationCard store={store} automation={{ ...base, ...over }} label={label} focused={false} />);
+}
+
+test("skills ShellX did not create offer Edit file but not Edit", () => {
+  const html = renderCard({ id: "external:theirs", kind: "skill", origin: "external" });
+  expect(html).toContain(">Edit file<");
+  expect(html).not.toContain(">Edit<");
+  expect(renderCard({})).toContain(">Edit<");
+});
