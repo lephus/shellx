@@ -27,8 +27,8 @@ import ShellXLinkSession
 final class ShellXLinkSessionSource: AgentSessionSource {
     /// The workspace a session belongs to, or nil when no live workspace owns it.
     typealias WorkspaceLookup = @MainActor (ChatSessionDescriptor) -> (id: String, title: String)?
-    /// Whether the terminal with this surface id is open in a window.
-    typealias TerminalIsOpen = @MainActor (UUID) -> Bool
+    /// The surface ids of the terminals open on the Mac, or nil when that is not known.
+    typealias OpenTerminals = @MainActor () -> Set<UUID>?
     typealias ChangeSignal = ShellXLinkWorkspaceSource.ChangeSignal
     typealias Change = (revision: Int, upserted: [AgentSession], removed: [String])
 
@@ -38,7 +38,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
 
     private let serviceProvider: @MainActor () -> AgentChatTranscriptService?
     private let workspaceLookup: WorkspaceLookup
-    private let terminalIsOpen: TerminalIsOpen
+    private let openTerminals: OpenTerminals
     private let changeSignal: ChangeSignal
     private var subscribers: [UUID: AsyncStream<Change>.Continuation] = [:]
     /// Streams that ended before their subscription ran; never subscribed afterwards.
@@ -53,18 +53,18 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     ///   - service: The app's transcript service; nil until the app wires it.
     ///   - workspaceLookup: Finds a session's workspace; the default asks the open windows for the workspace
     ///     that owns the session's terminal. Tests pass a fixed answer.
-    ///   - terminalIsOpen: Whether a session's terminal is still open; the default asks the open windows.
+    ///   - openTerminals: The terminals still open; the default asks the open windows and Docks.
     ///   - changeSignal: Tells the source when to look again for closed terminals (an ended session's tab
     ///     closing); the default watches the windows, their workspaces and panels.
     init(
         service: @escaping @MainActor () -> AgentChatTranscriptService? = { TerminalController.shared.agentChatTranscriptService },
         workspaceLookup: @escaping WorkspaceLookup = ShellXLinkSessionSource.liveWorkspace,
-        terminalIsOpen: @escaping TerminalIsOpen = ShellXLinkSessionSource.liveTerminalIsOpen,
+        openTerminals: @escaping OpenTerminals = ShellXLinkSessionSource.liveOpenTerminals,
         changeSignal: @escaping ChangeSignal = ShellXLinkWorkspaceSource.liveChangeSignal
     ) {
         self.serviceProvider = service
         self.workspaceLookup = workspaceLookup
-        self.terminalIsOpen = terminalIsOpen
+        self.openTerminals = openTerminals
         self.changeSignal = changeSignal
     }
 
@@ -137,7 +137,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     private func refresh() {
         guard let service = serviceProvider() else { return }
         if !subscribers.isEmpty { startObserving() }
-        let current = Self.listedRecords(service, terminalIsOpen: terminalIsOpen).map(makeSession)
+        let current = Self.listedRecords(service, openTerminals: openTerminals).map(makeSession)
         let known = Dictionary(published.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
         let upserted = current.filter { known[$0.sessionId] != $0 }
         let currentIDs = Set(current.map(\.sessionId))
@@ -155,7 +155,7 @@ final class ShellXLinkSessionSource: AgentSessionSource {
     /// The listed records, most recently active first: Claude Code agent sessions that are not ended, and the
     /// most recent listable ended ones, leaving out the ended ones whose terminal was closed.
     static func listedRecords(
-        _ service: AgentChatTranscriptService, terminalIsOpen: TerminalIsOpen
+        _ service: AgentChatTranscriptService, openTerminals: OpenTerminals
     ) -> [AgentChatSessionRecord] {
         var listed: [AgentChatSessionRecord] = []
         var endedCount = 0
@@ -163,7 +163,8 @@ final class ShellXLinkSessionSource: AgentSessionSource {
         where record.agentKind == .claude && record.descriptor.kind == .agent {
             // Before the ended count, so a closed tab's sessions do not take the slots of listable ones.
             if record.state == .ended,
-               let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)), !terminalIsOpen(terminal) {
+               let terminal = record.descriptor.terminalID.flatMap(UUID.init(uuidString:)),
+               let open = openTerminals(), !open.contains(terminal) {
                 continue
             }
             guard record.state == .ended else {
@@ -221,9 +222,26 @@ final class ShellXLinkSessionSource: AgentSessionSource {
         return (recorded.uuidString, workspace.title)
     }
 
-    /// Whether a window holds the terminal. True with no app to ask, so nothing is hidden on a guess.
-    static func liveTerminalIsOpen(_ terminal: UUID) -> Bool {
-        guard let app = AppDelegate.shared else { return true }
-        return app.workspaceContainingPanel(panelId: terminal) != nil
+    /// The terminals open in the app's windows; nil with no app to ask, so nothing is hidden on a guess.
+    static func liveOpenTerminals() -> Set<UUID>? {
+        guard let app = AppDelegate.shared else { return nil }
+        let windows = app.mainWindowContexts.values.map { $0.tabManager.tabs }
+        return openTerminals(restoreFinished: true, workspacesByWindow: windows, docks: DockSplitStore.liveStores)
+    }
+
+    /// The terminals open in these windows' workspaces and Docks.
+    static func openTerminals(
+        restoreFinished: Bool, workspacesByWindow: [[Workspace]], docks: [DockSplitStore]
+    ) -> Set<UUID>? {
+        openTerminalSurfaceIDs(workspaces: workspacesByWindow.flatMap { $0 }, docks: docks)
+    }
+
+    /// The surface ids of the terminals these workspaces and Docks hold.
+    static func openTerminalSurfaceIDs(workspaces: [Workspace], docks: [DockSplitStore]) -> Set<UUID> {
+        var open: Set<UUID> = []
+        for workspace in workspaces {
+            open.formUnion(workspace.panels.keys)
+        }
+        return open
     }
 }

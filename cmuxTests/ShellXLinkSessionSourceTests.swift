@@ -20,11 +20,13 @@ struct ShellXLinkSessionSourceTests {
     private static let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     /// A service over an empty, private hook store (no mobile client subscribed) and a source on it whose
-    /// workspace lookup needs no live window. Without `terminals`, every terminal is open.
+    /// workspace lookup needs no live window. Without `terminals` or `openTerminals`, whether a terminal is
+    /// open is not known, so none is taken for closed.
     @MainActor
     private static func makeSource(
         home: URL,
         terminals: OpenTerminals? = nil,
+        openTerminals: ShellXLinkSessionSource.OpenTerminals? = nil,
         signal: ManualChangeSignal? = nil
     ) -> (AgentChatTranscriptService, ShellXLinkSessionSource) {
         let signal = signal ?? ManualChangeSignal()
@@ -37,7 +39,7 @@ struct ShellXLinkSessionSourceTests {
         let source = ShellXLinkSessionSource(
             service: { service },
             workspaceLookup: { _ in workspace },
-            terminalIsOpen: { terminals?.open.contains($0) ?? true },
+            openTerminals: openTerminals ?? { terminals?.open },
             changeSignal: signal.start
         )
         return (service, source)
@@ -241,6 +243,97 @@ struct ShellXLinkSessionSourceTests {
         #expect(closed.revision == base.revision + 1)
         #expect(closed.removed == [session])
         #expect(closed.upserted.isEmpty)
+    }
+
+    /// A terminal in a Dock (a workspace's or a window's) is open like one in a workspace's split tree: an
+    /// agent that ended there stays listed as ended. An ended session whose terminal is in neither leaves.
+    @MainActor
+    @Test func testEndedSessionInADockTerminalStaysListed() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let dock = workspace.requiredDockSplitForTesting
+        let pane = try #require(dock.bonsplitController.allPaneIds.first)
+        let dockTerminal = try #require(dock.newSurface(kind: .terminal, inPane: pane, focus: false))
+        let tabTerminal = try #require(workspace.panels.keys.first)
+        let closed = UUID()
+        let inDock = UUID().uuidString, inTab = UUID().uuidString, inClosed = UUID().uuidString
+        let (service, source) = Self.makeSource(home: home, openTerminals: {
+            ShellXLinkSessionSource.openTerminals(
+                restoreFinished: true, workspacesByWindow: [[workspace]], docks: [dock])
+        })
+        for (session, terminal) in [(inDock, dockTerminal), (inTab, tabTerminal), (inClosed, closed)] {
+            let path = try Self.transcript(in: home)
+            service.noteHookEvent(Self.event(session, .sessionStart, surface: terminal.uuidString, transcriptPath: path))
+            service.noteHookEvent(Self.event(
+                session, .sessionEnd, surface: terminal.uuidString, transcriptPath: path, at: 1))
+        }
+
+        let listed = Set(await source.sessions().sessions.map(\.sessionId))
+
+        #expect(listed == [inDock, inTab])
+    }
+
+    /// While the app launches, its windows are not registered yet and the last session is still being
+    /// restored: no terminal can be taken for closed then, so every ended session stays listed.
+    @MainActor
+    @Test func testEndedSessionsStayListedUntilWindowsAreRestored() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let restoring = UUID().uuidString, noWindows = UUID().uuidString
+        var state: (restoreFinished: Bool, windows: [[Workspace]]) = (false, [[workspace]])
+        let (service, source) = Self.makeSource(home: home, openTerminals: {
+            ShellXLinkSessionSource.openTerminals(
+                restoreFinished: state.restoreFinished, workspacesByWindow: state.windows, docks: [])
+        })
+        for session in [restoring, noWindows] {
+            let path = try Self.transcript(in: home)
+            let terminal = UUID().uuidString   // restored later, or never: not in any window yet
+            service.noteHookEvent(Self.event(session, .sessionStart, surface: terminal, transcriptPath: path))
+            service.noteHookEvent(Self.event(session, .sessionEnd, surface: terminal, transcriptPath: path, at: 1))
+        }
+
+        // The windows exist but the launch's restore has not finished.
+        #expect(Set(await source.sessions().sessions.map(\.sessionId)) == [restoring, noWindows])
+
+        // The restore finished, but no main window is registered yet.
+        state = (true, [])
+        #expect(Set(await source.sessions().sessions.map(\.sessionId)) == [restoring, noWindows])
+
+        // A window holds neither terminal: both were closed.
+        state = (true, [[workspace]])
+        #expect(await source.sessions().sessions.isEmpty)
+    }
+
+    /// One refresh reads the open terminals once, however many ended sessions name a terminal: the read
+    /// walks every window, workspace and Dock, and runs up to four times a second while a phone listens.
+    @MainActor
+    @Test func testOpenTerminalsAreReadOncePerRefresh() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let open = UUID()
+        var reads = 0
+        let (service, source) = Self.makeSource(home: home, openTerminals: {
+            reads += 1
+            return [open]
+        })
+        for index in 0..<6 {
+            let session = UUID().uuidString
+            let terminal = index.isMultiple(of: 2) ? open.uuidString : UUID().uuidString
+            let path = try Self.transcript(in: home)
+            service.noteHookEvent(Self.event(
+                session, .sessionStart, surface: terminal, transcriptPath: path, at: Double(index)))
+            service.noteHookEvent(Self.event(
+                session, .sessionEnd, surface: terminal, transcriptPath: path, at: Double(index) + 0.5))
+        }
+
+        #expect(await source.sessions().sessions.count == 3)
+        #expect(reads == 1)
+        _ = await source.sessions()
+        #expect(reads == 2)
     }
 
     @Test func testStateChangeEmitsUpsertWithNextRevision() async throws {
