@@ -3380,6 +3380,7 @@
 		5CF62481552546896DB6C12D /* ShellXAutomationsTestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF68CBED9F84A9F62EEC46D1 /* ShellXAutomationsTestFixture.swift */; };
 		0DE620168A6985F50B4FA073 /* ShellXAutomationsURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19E61FE51CA9C149AFE7897 /* ShellXAutomationsURL.swift */; };
 		3F1CA9B02E22912EB544C620 /* ShellXAutomationsURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6978F138AB5B5C72FE08E7A /* ShellXAutomationsURLTests.swift */; };
+		0A9B7A460745C26B337AA40D /* ShellXAutomationsWebHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4686D5E954A2598CCA6CB56 /* ShellXAutomationsWebHostTests.swift */; };
 		10E951D0840C767961FD9761 /* ShellXAutomationsWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA821DB7E38F1103C1FAE91 /* ShellXAutomationsWebView.swift */; };
 		642F735E1D470D3C1F4B8DAB /* ShellXBonsplitStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2279385AFDBFDAEE17F61EA3 /* ShellXBonsplitStyles.swift */; };
 		9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */; };
@@ -8060,6 +8061,7 @@
 		CF68CBED9F84A9F62EEC46D1 /* ShellXAutomationsTestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAutomationsTestFixture.swift"; sourceTree = "<group>"; };
 		E19E61FE51CA9C149AFE7897 /* ShellXAutomationsURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsURL.swift; sourceTree = "<group>"; };
 		A6978F138AB5B5C72FE08E7A /* ShellXAutomationsURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAutomationsURLTests.swift"; sourceTree = "<group>"; };
+		B4686D5E954A2598CCA6CB56 /* ShellXAutomationsWebHostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAutomationsWebHostTests.swift"; sourceTree = "<group>"; };
 		BFA821DB7E38F1103C1FAE91 /* ShellXAutomationsWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsWebView.swift; sourceTree = "<group>"; };
 		2279385AFDBFDAEE17F61EA3 /* ShellXBonsplitStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Tabs/ShellXBonsplitStyles.swift; sourceTree = "<group>"; };
 		28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXBonsplitStylesTests.swift"; sourceTree = "<group>"; };
@@ -14320,6 +14322,7 @@
 				294FBBF5AA1F61BEDD47C75F /* ShellXAutomationsSidebarButtonTests.swift */,
 				405DEE2125C3F6CB4C4504C7 /* ShellXAutomationsOpenQueueTests.swift */,
 				884A8E5586F9A760EF0CA377 /* ShellXRoutineRunLauncherTests.swift */,
+				B4686D5E954A2598CCA6CB56 /* ShellXAutomationsWebHostTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19382,6 +19385,7 @@
 				8BA50348EB9C9D5B5B24526B /* ShellXAutomationsSidebarButtonTests.swift in Sources */,
 				5CF62481552546896DB6C12D /* ShellXAutomationsTestFixture.swift in Sources */,
 				3F1CA9B02E22912EB544C620 /* ShellXAutomationsURLTests.swift in Sources */,
+				0A9B7A460745C26B337AA40D /* ShellXAutomationsWebHostTests.swift in Sources */,
 				9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */,
 				1A8C19D1252050EBAB35B5D1 /* ShellXCloudOffTests.swift in Sources */,
 				E42EC94C29109FA8A189FE34 /* ShellXCoreFFITests.swift in Sources */,

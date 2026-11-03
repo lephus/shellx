@@ -72,6 +72,44 @@ struct ShellXCreatorSessionTests {
         await #expect(throws: (any Error).self) { try await session.send("hi") }
     }
 
+    @Test func messageSentWhileClaudeStartsWaitsForIt() async throws {
+        let launcher = GatedLauncher()
+        let session = ShellXCreatorSession(
+            launcher: launcher, systemPrompt: "p", workingDirectory: URL(filePath: "/tmp"),
+            localeIdentifier: "en", cliPath: "/cli"
+        )
+        let starting = Task { try await session.start(seed: nil) }
+        while await launcher.started.lines.isEmpty { await Task.yield() }
+
+        let sending = Task { try await session.send("hi") }
+        var events = session.events.makeAsyncIterator()
+        #expect(await events.next() == .busy(true), "the page shows Claude working while it starts")
+        #expect(await launcher.sent.lines.isEmpty)
+
+        launcher.open.finish()
+        try await starting.value
+        try await sending.value
+        #expect(await launcher.sent.lines.count == 1)
+    }
+
+    @Test func messageWaitingForAStartThatFailsFails() async throws {
+        let launcher = GatedLauncher()
+        let session = ShellXCreatorSession(
+            launcher: launcher, systemPrompt: "p", workingDirectory: URL(filePath: "/tmp"),
+            localeIdentifier: "en", cliPath: "/cli"
+        )
+        let starting = Task { try await session.start(seed: nil) }
+        while await launcher.started.lines.isEmpty { await Task.yield() }
+        let sending = Task { try await session.send("hi") }
+        var events = session.events.makeAsyncIterator()
+        _ = await events.next()
+
+        await session.cancel()
+        launcher.open.finish()
+        try await starting.value
+        await #expect(throws: (any Error).self) { try await sending.value }
+    }
+
     private func makeSession(_ launcher: FakeLauncher) -> ShellXCreatorSession {
         ShellXCreatorSession(
             launcher: launcher,
