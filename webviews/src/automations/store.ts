@@ -42,6 +42,8 @@ export type AutomationsState = {
   filter: ListFilter;
   focusId: string | null;
   pendingDelete: { id: string; name: string; external: boolean } | null;
+  /** Message of the last failed list action, until dismissed. */
+  actionError: string | null;
   creator: CreatorState;
 };
 
@@ -59,6 +61,7 @@ function initialState(): AutomationsState {
     filter: "all",
     focusId: null,
     pendingDelete: null,
+    actionError: null,
     creator: initialCreator(),
   };
 }
@@ -140,7 +143,7 @@ export class AutomationsStore {
     if (reply.ok && Array.isArray(reply.result?.automations)) {
       this.set({ automations: reply.result.automations, loading: false, loadFailed: false });
     } else {
-      this.set({ loading: false, loadFailed: !reply.ok });
+      this.set({ loading: false, loadFailed: true });
     }
   }
 
@@ -203,8 +206,18 @@ export class AutomationsStore {
     this.set({ focusId: id });
   }
 
-  private act(method: Parameters<AutomationsBridge["request"]>[0], params: object): Promise<unknown> {
-    return this.bridge.request(method, params);
+  /** Sends a list action; a failed reply becomes `actionError`. Returns whether it succeeded. */
+  private async act(method: Parameters<AutomationsBridge["request"]>[0], params: object): Promise<boolean> {
+    const reply = await this.bridge.request(method, params);
+    if (!reply.ok) {
+      this.set({ actionError: reply.error.message || reply.error.code });
+      return false;
+    }
+    return true;
+  }
+
+  dismissActionError(): void {
+    this.set({ actionError: null });
   }
 
   runNow = (id: string) => this.act("automations.runNow", { id });
@@ -213,12 +226,10 @@ export class AutomationsStore {
   openLog = (id: string) => this.act("automations.openLog", { id });
   continueInTerminal = (id: string) => this.act("automations.continueInTerminal", { id });
   async setEnabled(id: string, enabled: boolean): Promise<void> {
-    await this.act("automations.setEnabled", { id, enabled });
-    await this.reload();
+    if (await this.act("automations.setEnabled", { id, enabled })) await this.reload();
   }
   async markRead(id: string): Promise<void> {
-    await this.act("automations.markRead", { id });
-    await this.reload();
+    if (await this.act("automations.markRead", { id })) await this.reload();
   }
 
   requestDelete(a: AutomationDTO): void {
@@ -233,15 +244,16 @@ export class AutomationsStore {
     const pending = this.state.pendingDelete;
     if (!pending) return;
     this.set({ pendingDelete: null });
-    await this.act("automations.delete", pending.external ? { id: pending.id, confirmedExternal: true } : { id: pending.id });
-    await this.reload();
+    const params = pending.external ? { id: pending.id, confirmedExternal: true } : { id: pending.id };
+    if (await this.act("automations.delete", params)) await this.reload();
   }
 
   // Creator
 
   async startCreator(editId?: string): Promise<void> {
     this.set({ view: "creator", creator: initialCreator(editId ?? null) });
-    await this.bridge.request("creator.start", editId ? { editId } : {});
+    const reply = await this.bridge.request("creator.start", editId ? { editId } : {});
+    if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
 
   setCreatorType(type: CreatorType): void {

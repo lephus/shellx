@@ -151,3 +151,4 @@ body {
 .au-dialog p { margin: 6px 0; }
 .au-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .au-name-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.au-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 18px 0; padding: 8px 12px; border: 1px solid var(--au-bad); border-radius: 10px; color: var(--au-bad); }

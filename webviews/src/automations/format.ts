@@ -28,9 +28,8 @@ export function formatTime(iso: string | undefined): string {
 
 export function scheduleText(schedule: AutomationDraft["schedule"]): { human: string; cron: string } | null {
   if (!schedule) return null;
-  if (typeof schedule === "string") return schedule.trim() === "" ? null : { human: "", cron: schedule };
   if (!schedule.cron && !schedule.human) return null;
-  return { human: schedule.human ?? "", cron: schedule.cron ?? "" };
+  return { human: schedule.human, cron: schedule.cron };
 }
 
 export function notifyOnLabel(label: AutomationLabelResolver, on: string): string {

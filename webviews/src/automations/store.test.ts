@@ -187,3 +187,32 @@ test("external delete needs confirmation and sends confirmedExternal", async () 
   await store.confirmDelete();
   expect(calls.filter((c) => c.method === "automations.delete")[1]?.params).toEqual({ id: "own" });
 });
+
+const FAIL = () => ({ __error: true });
+
+test("a failed list action sets actionError, keeps the card, and can be dismissed", async () => {
+  const f = fakeBridge({ "automations.delete": FAIL, "automations.runNow": FAIL });
+  const store = new AutomationsStore(f.bridge);
+  await store.start();
+  store.requestDelete(dto({ id: "own" }));
+  await store.confirmDelete();
+  expect(store.getState().actionError).toBe("bad");
+  expect(f.calls.filter((c) => c.method === "automations.list")).toHaveLength(1);
+  store.dismissActionError();
+  expect(store.getState().actionError).toBeNull();
+  await store.runNow("own");
+  expect(store.getState().actionError).toBe("bad");
+});
+
+test("a failed creator.start surfaces as a failed message", async () => {
+  const { store } = await started({ "creator.start": FAIL });
+  await store.startCreator();
+  expect(store.getState().creator.messages.map((m) => m.role)).toEqual(["error"]);
+});
+
+test("a list reply without an automations array is a load failure", async () => {
+  const f = fakeBridge({ "automations.list": () => ({ nope: 1 }) });
+  const store = new AutomationsStore(f.bridge);
+  await store.start();
+  expect(store.getState().loadFailed).toBe(true);
+});

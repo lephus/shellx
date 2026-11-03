@@ -54,7 +54,7 @@ export type AutomationDraft = {
   kind: AutomationKind | "";
   name: string;
   description: string;
-  schedule?: string | { cron: string; human?: string } | null;
+  schedule?: AutomationSchedule | null;
   workingDirectory?: string | null;
   notify: AutomationNotify;
   allowedTools: string[];

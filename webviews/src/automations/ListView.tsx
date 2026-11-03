@@ -41,6 +41,14 @@ export function ListView({
           {label("newAutomation")}
         </button>
       </header>
+      {state.actionError !== null ? (
+        <div className="au-banner" role="alert">
+          <span>{label("actionFailed", { message: state.actionError })}</span>
+          <button type="button" className="au-button" onClick={() => store.dismissActionError()}>
+            {label("dismiss")}
+          </button>
+        </div>
+      ) : null}
       <div className="au-list-body">
         {state.loading ? (
           <output className="au-status">{label("loading")}</output>

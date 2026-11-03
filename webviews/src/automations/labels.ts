@@ -72,6 +72,8 @@ export const DEFAULT_AUTOMATION_LABELS = {
   saving: "Saving…",
   draftEmpty: "The draft appears here as you describe your idea.",
   creatorFailed: "Something went wrong: {message}",
+  dismiss: "Dismiss",
+  actionFailed: "That did not work: {message}",
   genericError: "Something went wrong.",
 } as const;
 
