@@ -563,6 +563,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     nonisolated(unsafe) static var shared: AppDelegate?
     /// ShellX: the Automations store, scheduler and library (AppDelegate+ShellXAutomations.swift).
     var shellXAutomations: ShellXAutomationsRuntime?
+    /// ShellX: an Automations link that arrived before Automations started or the session was restored.
+    let shellXAutomationsOpenQueue = ShellXAutomationsOpenQueue()
     let cloudBannerDismissalStore: CloudBannerDismissalStore
     /// Composition-root owner for the persisted per-SSH-machine clipboard-write policy.
     let sshClipboardWriteTrustStore: SSHClipboardWriteTrustStore

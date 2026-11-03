@@ -19,21 +19,40 @@ extension AppDelegate {
         )
         shellXAutomations = runtime
         runtime.library.startWatching()
+        flushShellXAutomationsOpenQueue()
     }
 
-    /// Opens every `shellx://automations[/<id>]` link and returns the other URLs.
+    /// Opens every `<scheme>://automations[/<id>]` link for this app's own scheme and returns the
+    /// other URLs. A link that arrives during launch waits until Automations started and the
+    /// session was restored.
     func handleShellXAutomationsURLs(_ urls: [URL]) -> [URL] {
+        let scheme = ShellXAppURLScheme(infoDictionary: Bundle.main.infoDictionary).scheme
         var others: [URL] = []
         var focus: ShellXAutomationsURL?
         for url in urls {
-            if let link = ShellXAutomationsURL(url) {
+            if let link = ShellXAutomationsURL(url, scheme: scheme) {
                 focus = link
             } else {
                 others.append(url)
             }
         }
-        if let focus { openShellXAutomations(focusId: focus.focusId) }
+        if let focus {
+            shellXAutomationsOpenQueue.submit(focus, isReady: isReadyToOpenShellXAutomations) { [weak self] id in
+                self?.openShellXAutomations(focusId: id)
+            }
+        }
         return others
+    }
+
+    /// Opens a link that waited for launch, once Automations started and no restore is pending.
+    func flushShellXAutomationsOpenQueue() {
+        shellXAutomationsOpenQueue.flush(isReady: isReadyToOpenShellXAutomations) { [weak self] id in
+            self?.openShellXAutomations(focusId: id)
+        }
+    }
+
+    private var isReadyToOpenShellXAutomations: Bool {
+        shellXAutomations != nil && !shouldDeferNavigationURLRequestsForStartupRestore
     }
 
     /// Shows the Automations tab in the active window's selected workspace, reusing an open

@@ -131,6 +131,11 @@ export class AutomationsStore {
       this.set({ context: { labels: {}, reduceMotion: false } });
     }
     await this.reload();
+    // Nothing to manage yet: open straight into the creator (spec §1), unless a banner asked for a card.
+    const s = this.state;
+    if (!s.loadFailed && s.automations.length === 0 && !s.focusId && s.view === "list") {
+      await this.startCreator();
+    }
   }
 
   dispose(): void {

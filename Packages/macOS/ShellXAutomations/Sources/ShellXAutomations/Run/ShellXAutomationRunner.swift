@@ -10,15 +10,20 @@ public actor ShellXAutomationRunner {
     private let notifier: any ShellXNotifying
     private let pid: Int32
     private let now: @Sendable () -> Date
+    private let urlScheme: String
 
     /// Creates a runner. `claude` is `nil` when no Claude Code binary was found.
+    ///
+    /// - Parameter urlScheme: The app's own URL scheme for banner links (``ShellXAppURLScheme``).
     public init(
         store: ShellXAutomationStore,
         claude: (any ShellXClaudeLaunching)?,
         notifier: any ShellXNotifying,
         pid: Int32,
-        now: @escaping @Sendable () -> Date
+        now: @escaping @Sendable () -> Date,
+        urlScheme: String = ShellXAppURLScheme.release
     ) {
+        self.urlScheme = urlScheme
         self.store = store
         self.claude = claude
         self.notifier = notifier
@@ -199,6 +204,6 @@ private extension ShellXAutomationRunner {
         case .running, .skipped: return
         }
         guard automation.notify.on.contains(event), automation.notify.targets.contains(.mac) else { return }
-        try? await notifier.post(ShellXAutomationNotification(name: automation.name, body: text ?? "", automationId: automation.id))
+        try? await notifier.post(ShellXAutomationNotification(name: automation.name, body: text ?? "", automationId: automation.id, urlScheme: urlScheme))
     }
 }

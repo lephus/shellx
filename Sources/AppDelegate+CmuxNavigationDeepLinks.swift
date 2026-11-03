@@ -202,6 +202,7 @@ extension AppDelegate {
     }
 
     func flushPendingStartupNavigationURLRequests() {
+        flushShellXAutomationsOpenQueue() // ShellX: banner links wait for the restore too
         guard !pendingStartupNavigationURLRequests.isEmpty else { return }
         let requests = pendingStartupNavigationURLRequests
         pendingStartupNavigationURLRequests.removeAll()

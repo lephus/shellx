@@ -216,3 +216,17 @@ test("a list reply without an automations array is a load failure", async () => 
   await store.start();
   expect(store.getState().loadFailed).toBe(true);
 });
+
+test("emptyListOpensTheCreator", async () => {
+  const { store, calls } = await started();
+  expect(store.getState().view).toBe("creator");
+  expect(calls.map((c) => c.method)).toContain("creator.start");
+});
+
+test("listWithAutomationsOrAFocusStaysOnTheList", async () => {
+  const withItems = await started({ "automations.list": () => ({ automations: [dto({})] }) });
+  expect(withItems.store.getState().view).toBe("list");
+  expect(withItems.calls.map((c) => c.method)).not.toContain("creator.start");
+  const focused = await started({ "app.context": () => ({ labels: {}, reduceMotion: false, focusId: "x" }) });
+  expect(focused.store.getState().view).toBe("list");
+});

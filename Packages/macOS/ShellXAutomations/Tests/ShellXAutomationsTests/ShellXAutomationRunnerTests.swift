@@ -105,6 +105,17 @@ private struct Fixture {
         #expect(call.transcript.lastPathComponent == "output.jsonl")
     }
 
+    @Test func bannerLinkUsesTheAppScheme() async throws {
+        let f = Fixture()
+        let a = try await f.cron()
+        let runner = ShellXAutomationRunner(
+            store: f.store, claude: FakeClaude([ok("done")]), notifier: f.notifier, pid: 4242, now: { Date() },
+            urlScheme: "shellx-dev"
+        )
+        _ = await runner.run(id: a.id, trigger: .manual)
+        #expect(await f.notifier.posted.first?.url.absoluteString == "shellx-dev://automations/\(a.id)")
+    }
+
     @Test func failedWhenClaudeMissing() async throws {
         let f = Fixture()
         let a = try await f.cron()

@@ -12,6 +12,7 @@ import ShellXAutomations
 @MainActor
 final class ShellXAutomationsController {
     private typealias Contract = ShellXAutomationsBridgeContract
+    private typealias Failure = ShellXAutomationsBridgeFailure
 
     let library: ShellXAutomationsLibrary
     /// Delivers `automations.changed`, `creator.event` and `focus` to the page.
@@ -26,7 +27,7 @@ final class ShellXAutomationsController {
     private let store: ShellXAutomationStore
     private let scheduler: ShellXLaunchAgentScheduler
     private let creatorFactory: (ShellXCreatorSeed?) -> ShellXCreatorSession
-    private let runLauncher: @Sendable (String) -> Void
+    private let runLauncher: @Sendable (String) async -> String?
     private let terminalOpener: (ShellXAutomation) -> Void
     private let fileOpener: (URL) -> Void
     private let makeValidator: (_ replacingName: String?) async -> ShellXAutomationValidator
@@ -39,13 +40,16 @@ final class ShellXAutomationsController {
     private var editing: ShellXAutomation?
     /// The last valid draft the assistant proposed.
     private var latestDraft: ShellXAutomationDraft?
+    /// Bumped by every `creator.start` and every end of a session, so a start that is still
+    /// awaiting finds out it was replaced or cancelled.
+    private var creatorGeneration: UInt64 = 0
 
     init(
         library: ShellXAutomationsLibrary,
         store: ShellXAutomationStore,
         scheduler: ShellXLaunchAgentScheduler,
         creatorFactory: @escaping (ShellXCreatorSeed?) -> ShellXCreatorSession,
-        runLauncher: @escaping @Sendable (String) -> Void,
+        runLauncher: @escaping @Sendable (String) async -> String?,
         terminalOpener: @escaping (ShellXAutomation) -> Void,
         fileOpener: @escaping (URL) -> Void,
         makeValidator: @escaping (_ replacingName: String?) async -> ShellXAutomationValidator
@@ -77,11 +81,9 @@ final class ShellXAutomationsController {
     func handle(method name: String, params: [String: Any]) async -> [String: Any] {
         do {
             guard let method = Contract.Method(rawValue: name) else {
-                throw Failure(.invalidArgument, "Unknown method: \(name).")
+                throw Failure.unknownMethod(name)
             }
             return ["ok": true, "result": try await perform(method, params: params)]
-        } catch let failure as Failure {
-            return errorReply(code: failure.code, message: failure.message)
         } catch {
             let failure = Failure(error)
             return errorReply(code: failure.code, message: failure.message)
@@ -105,9 +107,11 @@ final class ShellXAutomationsController {
         case .runNow:
             let automation = try await existing(params)
             guard automation.kind != .skill else {
-                throw Failure(.notAllowed, "Skills run inside Claude Code, not on their own.")
+                throw Failure.skillCannotRun
             }
-            runLauncher(automation.id)
+            if let problem = await runLauncher(automation.id) {
+                throw Failure.runFailed(problem)
+            }
             return [:]
         case .setEnabled:
             let id = try string(params, "id")
@@ -123,7 +127,7 @@ final class ShellXAutomationsController {
         case .delete:
             let id = try string(params, "id")
             if id.hasPrefix(Self.externalPrefix), params["confirmedExternal"] as? Bool != true {
-                throw Failure(.notAllowed, "ShellX did not create this skill; confirm before deleting it.")
+                throw Failure.externalDeleteNeedsConfirmation
             }
             let automation = try await existing(params)
             if automation.kind != .skill {
@@ -144,14 +148,14 @@ final class ShellXAutomationsController {
         case .openLog:
             let automation = try await existing(params)
             guard let log = await Self.newestLog(in: automation.directory) else {
-                throw Failure(.notFound, "This automation has no log yet.")
+                throw Failure.noLog
             }
             fileOpener(log)
             return [:]
         case .continueInTerminal:
             let automation = try await existing(params)
             guard automation.lastRun?.sessionId?.isEmpty == false else {
-                throw Failure(.notFound, "The last run has no Claude Code session to continue.")
+                throw Failure.noSession
             }
             terminalOpener(automation)
             return [:]
@@ -165,7 +169,7 @@ final class ShellXAutomationsController {
             return [:]
         case .creatorSend:
             let text = try string(params, "text")
-            guard let session else { throw Failure(.unavailable, "The assistant is not running.") }
+            guard let session else { throw Failure.assistantNotRunning }
             try await session.send(text)
             return [:]
         case .creatorCancel:
@@ -191,17 +195,29 @@ final class ShellXAutomationsController {
     // MARK: Creator
 
     private func startCreator(editId: String?) async throws {
+        if let editId, editId.hasPrefix(Self.externalPrefix) {
+            // Skills ShellX did not create may hold more than SKILL.md; only Edit file changes them.
+            throw Failure.externalEditNotAllowed
+        }
         endSession()
+        let generation = creatorGeneration
         var seed: ShellXCreatorSeed?
+        var editedAutomation: ShellXAutomation?
+        var seededDraft: ShellXAutomationDraft?
         if let editId {
             guard let automation = try await store.automation(id: editId) else {
-                throw Failure(.notFound, "No automation has this id.")
+                throw Failure.notFound
             }
+            guard automation.origin == .shellx else { throw Failure.externalEditNotAllowed }
             let markdown = await Self.readText(automation.directory.appending(path: "SKILL.md")) ?? ""
             seed = ShellXCreatorSeed(automation: automation, skillMarkdown: markdown)
-            editing = automation
-            latestDraft = encoder.draft(from: automation, skillMarkdown: markdown)
+            editedAutomation = automation
+            seededDraft = encoder.draft(from: automation, skillMarkdown: markdown)
         }
+        // A later `creator.start` or `creator.cancel` ran while this one read the files.
+        guard generation == creatorGeneration else { return }
+        editing = editedAutomation
+        latestDraft = seededDraft
         let session = creatorFactory(seed)
         self.session = session
         let events = session.events
@@ -211,14 +227,19 @@ final class ShellXAutomationsController {
                 self.creatorDidEmit(event)
             }
         }
-        if let latestDraft {
-            send(creatorEvent(["type": "draft", "draft": encoder.draft(latestDraft)]))
+        if let seededDraft {
+            send(creatorEvent(["type": "draft", "draft": encoder.draft(seededDraft)]))
         }
         do {
             try await session.start(seed: seed)
         } catch {
-            if self.session === session { endSession() }
-            throw Failure(.unavailable, error.localizedDescription)
+            guard self.session === session else { return }
+            endSession()
+            throw Failure.assistantFailedToStart(error.localizedDescription)
+        }
+        if self.session !== session {
+            // Replaced while Claude Code started; the session stops its own process once cancelled.
+            await session.cancel()
         }
     }
 
@@ -229,7 +250,7 @@ final class ShellXAutomationsController {
 
     private func saveDraft() async throws -> [String: Any] {
         guard let draft = latestDraft else {
-            throw Failure(.invalidArgument, "There is no draft to save yet.")
+            throw Failure.noDraft
         }
         let editingName = editing?.name
         let validator = await makeValidator(editingName)
@@ -244,21 +265,22 @@ final class ShellXAutomationsController {
             return ["issues": payload]
         }
 
-        var replacing = editing?.origin == .shellx ? editing?.id : nil
-        if let editing, editing.origin == .external {
-            // A skill ShellX did not create cannot be replaced in place: it goes to the
-            // Trash (recoverable) and the edited version is saved as ShellX's own.
-            try await store.delete(id: editing.id)
-            replacing = nil
-        }
-        let saved = try await store.save(draft, replacing: replacing)
+        let previous = editing
+        let saved = try await store.save(draft, replacing: previous?.id)
         editing = saved
-        if saved.kind != .skill {
-            if saved.enabled, saved.schedule != nil {
-                try await scheduler.install(saved)
-            } else {
-                try await scheduler.remove(id: saved.id)
+        do {
+            if saved.kind != .skill {
+                if saved.enabled, saved.schedule != nil {
+                    try await scheduler.install(saved)
+                } else {
+                    try await scheduler.remove(id: saved.id)
+                }
+            } else if let previous, previous.kind != .skill {
+                // A cronjob or workflow edited into a skill leaves no launchd job behind.
+                try await scheduler.remove(id: previous.id)
             }
+        } catch {
+            throw Failure.scheduleFailed
         }
         endSession()
         await library.reload()
@@ -266,6 +288,7 @@ final class ShellXAutomationsController {
     }
 
     private func endSession() {
+        creatorGeneration &+= 1
         sessionEvents?.cancel()
         sessionEvents = nil
         if let session {
@@ -305,7 +328,7 @@ final class ShellXAutomationsController {
     private func existing(_ params: [String: Any]) async throws -> ShellXAutomation {
         let id = try string(params, "id")
         guard let automation = try await store.automation(id: id) else {
-            throw Failure(.notFound, "No automation has this id.")
+            throw Failure.notFound
         }
         return automation
     }
@@ -340,37 +363,5 @@ final class ShellXAutomationsController {
 
     private static func readText(_ url: URL) async -> String? {
         await Task.detached(priority: .userInitiated) { try? String(contentsOf: url, encoding: .utf8) }.value
-    }
-
-    /// A request failure with its wire code.
-    private struct Failure: Error {
-        let code: ShellXAutomationsBridgeContract.ErrorCode
-        let message: String
-
-        init(_ code: ShellXAutomationsBridgeContract.ErrorCode, _ message: String) {
-            self.code = code
-            self.message = message
-        }
-
-        init(_ error: any Error) {
-            switch error as? ShellXAutomationStoreError {
-            case .notFound?:
-                self.init(.notFound, "No automation has this id.")
-            case .invalidID?, .invalidName?:
-                self.init(.invalidArgument, String(describing: error))
-            case .unsupported?:
-                self.init(.notAllowed, "This does not apply to this automation.")
-            case .alreadyExists(let name)?:
-                self.init(.failed, "A folder named \(name) already exists.")
-            case .foreignRunDirectory?:
-                self.init(.failed, String(describing: error))
-            case nil:
-                self.init(.failed, error.localizedDescription)
-            }
-        }
-
-        static func invalidParameter(_ name: String) -> Failure {
-            Failure(.invalidArgument, "Missing or invalid parameter: \(name).")
-        }
     }
 }

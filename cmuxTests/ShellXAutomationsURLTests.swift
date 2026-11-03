@@ -9,7 +9,7 @@ import XCTest
 
 final class ShellXAutomationsURLTests: XCTestCase {
     private func link(_ string: String) -> ShellXAutomationsURL? {
-        URL(string: string).flatMap(ShellXAutomationsURL.init)
+        URL(string: string).flatMap { ShellXAutomationsURL($0) }
     }
 
     func testAcceptsTheListLink() {
@@ -34,5 +34,12 @@ final class ShellXAutomationsURLTests: XCTestCase {
         XCTAssertNil(link("https://automations/abc"))
         XCTAssertNil(link("shellx-dev-other://automations/abc"))
         XCTAssertNil(link("file:///automations/abc"))
+    }
+
+    func testAcceptsOnlyTheAppsOwnScheme() {
+        let dev = URL(string: "shellx-dev://automations/abc")!
+        XCTAssertEqual(ShellXAutomationsURL(dev, scheme: "shellx-dev")?.focusId, "abc")
+        XCTAssertNil(ShellXAutomationsURL(dev, scheme: "shellx"))
+        XCTAssertNil(ShellXAutomationsURL(URL(string: "shellx://automations/abc")!, scheme: "shellx-dev"))
     }
 }

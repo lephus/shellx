@@ -59,4 +59,22 @@ private actor RecordedArgv {
         let exact = String(repeating: "y", count: 180)
         #expect(ShellXAutomationNotification(name: "a", body: exact, automationId: nil).body == exact)
     }
+
+    @Test func bannerLinksUseTheAppScheme() {
+        let dev = ShellXAutomationNotification(name: "a", body: "b", automationId: "abc", urlScheme: "shellx-dev")
+        #expect(dev.url.absoluteString == "shellx-dev://automations/abc")
+        let panel = ShellXAutomationNotification(name: "a", body: "b", automationId: nil, urlScheme: "shellx-dev")
+        #expect(panel.url.absoluteString == "shellx-dev://automations")
+    }
+
+    @Test func appSchemeComesFromTheRegisteredURLTypes() {
+        let info: [String: Any] = ["CFBundleURLTypes": [
+            ["CFBundleURLSchemes": ["http", "https"]],
+            ["CFBundleURLSchemes": ["shellx-dev"]],
+            ["CFBundleURLSchemes": ["ssh"]],
+        ]]
+        #expect(ShellXAppURLScheme(infoDictionary: info).scheme == "shellx-dev")
+        #expect(ShellXAppURLScheme(infoDictionary: nil).scheme == "shellx")
+        #expect(ShellXAppURLScheme(infoDictionary: ["CFBundleURLTypes": [["CFBundleURLSchemes": ["https"]]]]).scheme == "shellx")
+    }
 }

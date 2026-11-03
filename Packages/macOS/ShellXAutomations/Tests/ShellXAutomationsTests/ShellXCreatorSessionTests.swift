@@ -30,7 +30,48 @@ private final class FakeLauncher: ShellXCreatorProcessLaunching {
     }
 }
 
+/// A launcher whose `start` waits until the test opens the gate.
+private final class GatedLauncher: ShellXCreatorProcessLaunching {
+    let sent = FakeSentLines()
+    private let gate: AsyncStream<Void>
+    let open: AsyncStream<Void>.Continuation
+    let started = FakeSentLines()
+
+    init() {
+        (gate, open) = AsyncStream<Void>.makeStream()
+    }
+
+    func start(arguments: [String], workingDirectory: URL) async throws -> (
+        lines: AsyncThrowingStream<String, any Error>,
+        send: @Sendable (String) async throws -> Void,
+        stop: @Sendable () async -> Void
+    ) {
+        await started.add("start")
+        for await _ in gate {}
+        let sent = self.sent
+        let (lines, _) = AsyncThrowingStream<String, any Error>.makeStream()
+        return (lines, { line in await sent.add(line) }, { await sent.markStopped() })
+    }
+}
+
 struct ShellXCreatorSessionTests {
+    @Test func cancelDuringStartStopsTheProcess() async throws {
+        let launcher = GatedLauncher()
+        let session = ShellXCreatorSession(
+            launcher: launcher, systemPrompt: "p", workingDirectory: URL(filePath: "/tmp"),
+            localeIdentifier: "en", cliPath: "/cli"
+        )
+        let starting = Task { try await session.start(seed: nil) }
+        while await launcher.started.lines.isEmpty { await Task.yield() }
+
+        await session.cancel()
+        launcher.open.finish()
+        try await starting.value
+
+        #expect(await launcher.sent.stopped)
+        await #expect(throws: (any Error).self) { try await session.send("hi") }
+    }
+
     private func makeSession(_ launcher: FakeLauncher) -> ShellXCreatorSession {
         ShellXCreatorSession(
             launcher: launcher,

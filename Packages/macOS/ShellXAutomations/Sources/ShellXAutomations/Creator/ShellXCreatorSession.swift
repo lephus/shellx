@@ -41,6 +41,8 @@ public actor ShellXCreatorSession {
     }
 
     /// Starts Claude Code and, when `seed` is given, sends it as the first message.
+    ///
+    /// A session cancelled while Claude Code starts stops the new process at once.
     public func start(seed: ShellXCreatorSeed?) async throws {
         guard writeLine == nil, !cancelled else { return }
         let arguments = [
@@ -50,6 +52,11 @@ public actor ShellXCreatorSession {
             "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch",
         ]
         let process = try await launcher.start(arguments: arguments, workingDirectory: workingDirectory)
+        // `cancel()` may have run while Claude Code was starting; it found nothing to stop.
+        guard !cancelled else {
+            await process.stop()
+            return
+        }
         writeLine = process.send
         stopProcess = process.stop
         let lines = process.lines
