@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { AutomationsBridge } from "./bridge";
-import { AutomationsStore, visibleAutomations } from "./store";
+import { AutomationsStore, draftInProgress, visibleAutomations } from "./store";
 import type { AutomationDTO, AutomationDraft, AutomationsEvent, AutomationsMethod } from "./types";
 
 function dto(over: Partial<AutomationDTO>): AutomationDTO {
@@ -229,4 +229,79 @@ test("listWithAutomationsOrAFocusStaysOnTheList", async () => {
   expect(withItems.calls.map((c) => c.method)).not.toContain("creator.start");
   const focused = await started({ "app.context": () => ({ labels: {}, reduceMotion: false, focusId: "x" }) });
   expect(focused.store.getState().view).toBe("list");
+});
+
+/** A store over one saved automation, so it does not open the creator on its own. */
+const withOne = () => started({ "automations.list": () => ({ automations: [dto({})] }) });
+
+test("Back after a message keeps the chat as a draft in progress that Continue reopens", async () => {
+  const { store, calls } = await withOne();
+  await store.startCreator();
+  await store.sendMessage("hi");
+  await store.leaveCreator();
+  expect(store.getState().view).toBe("list");
+  expect(calls.some((c) => c.method === "creator.cancel")).toBe(false);
+  expect(draftInProgress(store.getState().creator)).toBe(true);
+
+  store.resumeCreator();
+  expect(store.getState().view).toBe("creator");
+  expect(store.getState().creator.messages.map((m) => m.text)).toEqual(["hi"]);
+  expect(calls.filter((c) => c.method === "creator.start")).toHaveLength(1);
+});
+
+test("Back before any message discards the creator as before", async () => {
+  const { store, calls } = await withOne();
+  await store.startCreator();
+  await store.leaveCreator();
+  expect(calls.some((c) => c.method === "creator.cancel")).toBe(true);
+  expect(draftInProgress(store.getState().creator)).toBe(false);
+});
+
+test("discarding a draft in progress asks first, then stops Claude", async () => {
+  const { store, calls } = await withOne();
+  await store.startCreator();
+  await store.sendMessage("hi");
+  await store.leaveCreator();
+
+  store.requestDiscard();
+  expect(store.getState().pendingDiscard).not.toBeNull();
+  store.cancelDiscard();
+  expect(draftInProgress(store.getState().creator)).toBe(true);
+
+  store.requestDiscard();
+  await store.confirmDiscard();
+  expect(calls.some((c) => c.method === "creator.cancel")).toBe(true);
+  expect(draftInProgress(store.getState().creator)).toBe(false);
+  expect(store.getState().pendingDiscard).toBeNull();
+  expect(store.getState().view).toBe("list");
+});
+
+test("starting another creator while a draft is in progress asks before replacing it", async () => {
+  const { store, calls } = await withOne();
+  await store.startCreator();
+  await store.sendMessage("hi");
+  await store.leaveCreator();
+
+  await store.startCreator("other");
+  expect(store.getState().view).toBe("list");
+  expect(calls.filter((c) => c.method === "creator.start")).toHaveLength(1);
+
+  await store.confirmDiscard();
+  const starts = calls.filter((c) => c.method === "creator.start");
+  expect(starts).toHaveLength(2);
+  expect(starts[1].params).toEqual({ editId: "other" });
+  expect(store.getState().view).toBe("creator");
+  expect(store.getState().creator.messages).toHaveLength(0);
+});
+
+test("Edit on the automation already being edited goes back to its draft without asking", async () => {
+  const { store, calls } = await withOne();
+  await store.startCreator("same");
+  await store.sendMessage("tweak it");
+  await store.leaveCreator();
+
+  await store.startCreator("same");
+  expect(store.getState().pendingDiscard).toBeNull();
+  expect(store.getState().view).toBe("creator");
+  expect(calls.filter((c) => c.method === "creator.start")).toHaveLength(1);
 });
