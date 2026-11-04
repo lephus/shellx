@@ -69,3 +69,14 @@ test("the iPhone target shows the pending label", () => {
   expect(html).toContain("iPhone (after the next update)");
   expect(render({ ...empty, name: "x", notify: { on: ["done"], targets: ["mac"] } })).not.toContain("after the next update");
 });
+
+test("with onEdit, name, description and SKILL.md are editable fields", () => {
+  const draft = { ...empty, kind: "skill" as const, name: "n", description: "d", skillMarkdown: "---\nname: n\n---\n" };
+  const html = renderToStaticMarkup(
+    <DraftCard label={label} draft={draft} issues={[]} ready onEdit={() => {}} locked />,
+  );
+  expect(html).toContain('<input class="au-edit"');
+  expect((html.match(/<textarea/g) ?? []).length).toBe(2);
+  expect((html.match(/readOnly=""|readonly=""/g) ?? []).length).toBe(3);
+  expect(render(draft)).not.toContain("<textarea");
+});

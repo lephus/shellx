@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { kindLabelKey, notifyOnLabel, scheduleText } from "./format";
 import type { AutomationLabelResolver } from "./labels";
+import type { DraftEdit } from "./store";
 import type { AutomationDraft, ValidationField, ValidationIssueDTO } from "./types";
 
 type Props = {
@@ -8,7 +9,53 @@ type Props = {
   draft: AutomationDraft;
   issues: ValidationIssueDTO[];
   ready: boolean;
+  /** Set when the user may change name, description and SKILL.md on the card. */
+  onEdit?: (edit: DraftEdit) => void;
+  /** Called when an edited field loses focus. */
+  onCommit?: () => void;
+  /** Keeps the fields read-only, e.g. while Claude rewrites the draft. */
+  locked?: boolean;
 };
+
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** A text area that grows with its text, up to its CSS max-height. */
+function GrowingText({
+  value,
+  className,
+  ariaLabel,
+  readOnly,
+  onChange,
+  onBlur,
+}: {
+  value: string;
+  className: string;
+  ariaLabel: string;
+  readOnly: boolean;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useIsoLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      className={className}
+      value={value}
+      rows={1}
+      spellCheck={false}
+      readOnly={readOnly}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+    />
+  );
+}
 
 function Field({
   name,
@@ -37,7 +84,8 @@ function Field({
 }
 
 /** Shows each draft field only once it is non-empty (or has a validation issue). */
-export function DraftCard({ label, draft, issues, ready }: Props) {
+export function DraftCard({ label, draft, issues, ready, onEdit, onCommit, locked = false }: Props) {
+  const editable = onEdit !== undefined;
   const forField = (field: ValidationField) => issues.filter((i) => i.field === field);
   const schedule = scheduleText(draft.schedule);
   const directory = draft.workingDirectory ?? "";
@@ -56,12 +104,35 @@ export function DraftCard({ label, draft, issues, ready }: Props) {
       </div>
       {draft.name !== "" || forField("name").length > 0 ? (
         <Field name="name" title={label("fieldName")} issues={forField("name")}>
-          <span>{draft.name}</span>
+          {editable ? (
+            <input
+              className="au-edit"
+              value={draft.name}
+              spellCheck={false}
+              readOnly={locked}
+              aria-label={label("fieldName")}
+              onChange={(e) => onEdit({ name: e.target.value })}
+              onBlur={onCommit}
+            />
+          ) : (
+            <span>{draft.name}</span>
+          )}
         </Field>
       ) : null}
       {draft.description !== "" || forField("description").length > 0 ? (
         <Field name="description" title={label("fieldDescription")} issues={forField("description")}>
-          <span>{draft.description}</span>
+          {editable ? (
+            <GrowingText
+              className="au-edit"
+              value={draft.description}
+              ariaLabel={label("fieldDescription")}
+              readOnly={locked}
+              onChange={(description) => onEdit({ description })}
+              onBlur={onCommit}
+            />
+          ) : (
+            <span>{draft.description}</span>
+          )}
         </Field>
       ) : null}
       {schedule !== null || forField("schedule").length > 0 ? (
@@ -103,7 +174,18 @@ export function DraftCard({ label, draft, issues, ready }: Props) {
       ) : null}
       {draft.skillMarkdown !== "" || forField("skillMarkdown").length > 0 ? (
         <Field name="skillMarkdown" title={label("fieldSkill")} issues={forField("skillMarkdown")}>
-          <pre className="au-pre">{draft.skillMarkdown}</pre>
+          {editable ? (
+            <GrowingText
+              className="au-edit au-pre"
+              value={draft.skillMarkdown}
+              ariaLabel={label("fieldSkill")}
+              readOnly={locked}
+              onChange={(skillMarkdown) => onEdit({ skillMarkdown })}
+              onBlur={onCommit}
+            />
+          ) : (
+            <pre className="au-pre">{draft.skillMarkdown}</pre>
+          )}
         </Field>
       ) : null}
       {general.map((issue) => (

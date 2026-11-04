@@ -95,7 +95,8 @@ export type AutomationsMethod =
   | "creator.start"
   | "creator.send"
   | "creator.cancel"
-  | "creator.save";
+  | "creator.save"
+  | "creator.edit";
 
 export type AutomationsReply<T> =
   | { ok: true; result: T }

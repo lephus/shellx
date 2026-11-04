@@ -146,6 +146,49 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertTrue(list.isEmpty)
     }
 
+    /// The user's own edits on the card are what gets saved.
+    func testEditedDraftIsSaved() async throws {
+        try await startCreatorWithDraft(fixture.cronDraft())
+
+        let markdown = "---\nname: morning\ndescription: Morning job\n---\nDo it early\n"
+        let edited = await controller.handle(
+            method: "creator.edit",
+            params: ["name": "morning", "description": "Morning job", "skillMarkdown": markdown]
+        )
+        XCTAssertEqual(edited["ok"] as? Bool, true)
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let automation = try XCTUnwrap(result(reply)?["automation"] as? [String: Any])
+        XCTAssertEqual(automation["name"] as? String, "morning")
+        XCTAssertEqual(automation["description"] as? String, "Morning job")
+        let id = try XCTUnwrap(automation["id"] as? String)
+        let found = try await fixture.store.automation(id: id)
+        let saved = try XCTUnwrap(found)
+        XCTAssertEqual(try String(contentsOf: saved.directory.appending(path: "SKILL.md"), encoding: .utf8), markdown)
+    }
+
+    /// Claude hears about the user's edits once, with the next message.
+    func testEditedDraftIsToldToClaudeOnce() async throws {
+        try await startCreatorWithDraft(fixture.cronDraft())
+
+        _ = await controller.handle(method: "creator.edit", params: ["description": "Sharper words"])
+        _ = await controller.handle(method: "creator.send", params: ["text": "first"])
+        _ = await controller.handle(method: "creator.send", params: ["text": "second"])
+
+        let sends = fixture.log.all.filter { $0.contains("creator.send") }
+        let first = try XCTUnwrap(sends.first { $0.contains("first") })
+        XCTAssertTrue(first.contains("I edited the draft myself"))
+        XCTAssertTrue(first.contains("Sharper words"))
+        let second = try XCTUnwrap(sends.first { $0.contains("second") })
+        XCTAssertFalse(second.contains("I edited the draft myself"))
+    }
+
+    func testEditWithoutADraftIsRejected() async throws {
+        _ = await controller.handle(method: "creator.start", params: [:])
+        let reply = await controller.handle(method: "creator.edit", params: ["name": "x"])
+        XCTAssertEqual(reply["ok"] as? Bool, false)
+    }
+
     func testSaveInstallsSchedule() async throws {
         try await startCreatorWithDraft(fixture.cronDraft())
 

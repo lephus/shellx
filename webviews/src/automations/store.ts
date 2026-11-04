@@ -1,4 +1,5 @@
 import type { AutomationsBridge } from "./bridge";
+import { readFrontmatter, writeFrontmatter } from "./frontmatter";
 import type {
   AutomationDraft,
   AutomationDTO,
@@ -31,7 +32,12 @@ export type CreatorState = {
   type: CreatorType;
   saving: boolean;
   editId: string | null;
+  /** The user changed the draft on the card and the host has not been told yet. */
+  draftDirty: boolean;
 };
+
+/** The draft fields the user can change on the card. */
+export type DraftEdit = Partial<Pick<AutomationDraft, "name" | "description" | "skillMarkdown">>;
 
 export type AutomationsState = {
   context: AutomationsContext | null;
@@ -50,7 +56,17 @@ export type AutomationsState = {
 };
 
 function initialCreator(editId: string | null = null): CreatorState {
-  return { messages: [], streaming: null, draft: null, issues: [], busy: false, type: "auto", saving: false, editId };
+  return {
+    messages: [],
+    streaming: null,
+    draft: null,
+    issues: [],
+    busy: false,
+    type: "auto",
+    saving: false,
+    editId,
+    draftDirty: false,
+  };
 }
 
 function initialState(): AutomationsState {
@@ -99,6 +115,7 @@ export class AutomationsStore {
   private listeners = new Set<() => void>();
   private nextId = 1;
   private off: (() => void) | null = null;
+  private editInFlight: Promise<string | null> | null = null;
 
   constructor(private readonly bridge: AutomationsBridge) {}
 
@@ -191,7 +208,7 @@ export class AutomationsStore {
         break;
       case "draft":
         // A malformed or partial draft keeps the last good one.
-        if (isDraft(event.draft)) this.setCreator({ draft: event.draft, issues: [] });
+        if (isDraft(event.draft)) this.setCreator({ draft: event.draft, issues: [], draftDirty: false });
         break;
       case "busy":
         this.setCreator({ busy: event.busy === true });
@@ -280,6 +297,51 @@ export class AutomationsStore {
     if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
 
+  /**
+   * Changes the draft on the card. Name and description stay in step with the SKILL.md
+   * frontmatter, both ways. The host hears about it on `flushDraftEdit`.
+   */
+  editDraft(edit: DraftEdit): void {
+    const c = this.state.creator;
+    if (!c.draft || c.busy) return;
+    let draft = { ...c.draft, ...edit };
+    if (edit.skillMarkdown !== undefined) {
+      const front = readFrontmatter(edit.skillMarkdown);
+      if (front.name !== undefined) draft.name = front.name;
+      if (front.description !== undefined) draft.description = front.description;
+    } else if (edit.name !== undefined || edit.description !== undefined) {
+      draft = { ...draft, skillMarkdown: writeFrontmatter(draft.skillMarkdown, edit) };
+    }
+    const touched = new Set(["name", "description", "skillMarkdown"]);
+    this.setCreator({ draft, draftDirty: true, issues: c.issues.filter((i) => !touched.has(i.field)) });
+  }
+
+  /**
+   * Sends the card's unsent edits to the host, so a save or the next message sees them.
+   * Waits for an edit already on its way. Returns the error, if any.
+   */
+  async flushDraftEdit(): Promise<string | null> {
+    while (this.editInFlight) {
+      const error = await this.editInFlight;
+      if (error !== null) return error;
+    }
+    const { draft, draftDirty } = this.state.creator;
+    if (!draft || !draftDirty) return null;
+    this.setCreator({ draftDirty: false });
+    const sending = this.bridge
+      .request("creator.edit", { name: draft.name, description: draft.description, skillMarkdown: draft.skillMarkdown })
+      .then((reply) => {
+        if (reply.ok) return null;
+        this.setCreator({ draftDirty: true });
+        return reply.error.message;
+      })
+      .finally(() => {
+        if (this.editInFlight === sending) this.editInFlight = null;
+      });
+    this.editInFlight = sending;
+    return sending;
+  }
+
   setCreatorType(type: CreatorType): void {
     this.setCreator({ type });
   }
@@ -295,6 +357,8 @@ export class AutomationsStore {
       busy: true,
       issues: [],
     });
+    // Claude hears about the card's edits ahead of this message; a failed edit still sends it.
+    await this.flushDraftEdit();
     const reply = await this.bridge.request("creator.send", { text: outgoing });
     if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
@@ -340,6 +404,12 @@ export class AutomationsStore {
   async save(): Promise<void> {
     if (this.state.creator.saving) return;
     this.setCreator({ saving: true });
+    const editError = await this.flushDraftEdit();
+    if (editError !== null) {
+      this.setCreator({ saving: false });
+      this.handleCreatorEvent({ type: "failed", message: editError });
+      return;
+    }
     const reply = await this.bridge.request<SaveResult>("creator.save");
     if (reply.ok && reply.result && "automation" in reply.result) {
       this.set({ view: "list", focusId: reply.result.automation.id, filter: "all", creator: initialCreator() });

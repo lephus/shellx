@@ -25,6 +25,7 @@ enum ShellXAutomationsBridgeContract {
         case creatorSend = "creator.send"
         case creatorCancel = "creator.cancel"
         case creatorSave = "creator.save"
+        case creatorEdit = "creator.edit"
     }
 
     /// `AutomationsEvent.type` in `types.ts`.

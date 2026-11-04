@@ -40,6 +40,8 @@ final class ShellXAutomationsController {
     private var editing: ShellXAutomation?
     /// The last valid draft the assistant proposed.
     private var latestDraft: ShellXAutomationDraft?
+    /// Whether the user changed `latestDraft` on the card since Claude last heard about it.
+    private var userEditedDraft = false
     /// Bumped by every `creator.start` and every end of a session, so a start that is still
     /// awaiting finds out it was replaced or cancelled.
     private var creatorGeneration: UInt64 = 0
@@ -170,13 +172,16 @@ final class ShellXAutomationsController {
         case .creatorSend:
             let text = try string(params, "text")
             guard let session else { throw Failure.assistantNotRunning }
-            try await session.send(text)
+            try await session.send(outgoing(text))
             return [:]
         case .creatorCancel:
             endSession()
             return [:]
         case .creatorSave:
             return try await saveDraft()
+        case .creatorEdit:
+            try editDraft(params)
+            return [:]
         }
     }
 
@@ -239,7 +244,10 @@ final class ShellXAutomationsController {
     }
 
     private func creatorDidEmit(_ event: ShellXCreatorEvent) {
-        if case .draft(let draft) = event { latestDraft = draft }
+        if case .draft(let draft) = event {
+            latestDraft = draft
+            userEditedDraft = false
+        }
         send(creatorEvent(encoder.creatorEvent(event)))
     }
 
@@ -261,7 +269,7 @@ final class ShellXAutomationsController {
             let payload = encoder.issues(issues, draft: draft)
             send(creatorEvent(["type": "validation", "issues": payload]))
             if let session {
-                let fix = "Fix: " + issues.map { "\($0.field.rawValue): \($0.message)" }.joined(separator: " ")
+                let fix = outgoing("Fix: " + issues.map { "\($0.field.rawValue): \($0.message)" }.joined(separator: " "))
                 Task { try? await session.send(fix) }
             }
             return ["issues": payload]
@@ -289,6 +297,52 @@ final class ShellXAutomationsController {
         return ["automation": encoder.automation(saved)]
     }
 
+    /// Applies the user's own changes to the draft's name, description and `SKILL.md`.
+    /// Claude hears about them with the next message it gets.
+    private func editDraft(_ params: [String: Any]) throws {
+        guard var draft = latestDraft else { throw Failure.noDraft }
+        for (key, path) in [
+            ("name", \ShellXAutomationDraft.name),
+            ("description", \ShellXAutomationDraft.description),
+            ("skillMarkdown", \ShellXAutomationDraft.skillMarkdown),
+        ] as [(String, WritableKeyPath<ShellXAutomationDraft, String>)] {
+            guard let raw = params[key] else { continue }
+            guard let value = raw as? String else { throw Failure.invalidParameter(key) }
+            draft[keyPath: path] = value
+        }
+        guard draft != latestDraft else { return }
+        latestDraft = draft
+        userEditedDraft = true
+    }
+
+    /// `text` for Claude, led by the user's own edits to the draft when there are new ones.
+    private func outgoing(_ text: String) -> String {
+        guard userEditedDraft, let draft = latestDraft else { return text }
+        userEditedDraft = false
+        let fence = String(repeating: "`", count: max(3, Self.longestBacktickRun(in: draft.skillMarkdown) + 1))
+        return """
+        I edited the draft myself. Keep these values unless I ask you to change them.
+        name: \(draft.name)
+        description: \(draft.description)
+        SKILL.md:
+        \(fence)
+        \(draft.skillMarkdown)
+        \(fence)
+
+        \(text)
+        """
+    }
+
+    private static func longestBacktickRun(in text: String) -> Int {
+        var longest = 0
+        var run = 0
+        for character in text {
+            run = character == "`" ? run + 1 : 0
+            longest = max(longest, run)
+        }
+        return longest
+    }
+
     private func endSession() {
         creatorGeneration &+= 1
         sessionEvents?.cancel()
@@ -299,6 +353,7 @@ final class ShellXAutomationsController {
         session = nil
         editing = nil
         latestDraft = nil
+        userEditedDraft = false
     }
 
     // MARK: Events

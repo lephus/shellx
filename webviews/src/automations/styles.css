@@ -68,7 +68,7 @@ body {
 }
 .au-button:hover:not(:disabled) { background: var(--au-raise); }
 .au-button:disabled { opacity: 0.5; cursor: default; }
-.au-button:focus-visible, .au-chip:focus-visible, .au-tab:focus-visible, .au-textarea:focus-visible {
+.au-button:focus-visible, .au-chip:focus-visible, .au-tab:focus-visible {
   outline: 2px solid var(--au-pri); outline-offset: 1px;
 }
 .au-primary { background: var(--au-pri); border-color: var(--au-pri); color: var(--au-on-pri); }
@@ -128,7 +128,8 @@ body {
 .au-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .au-chip { font: inherit; border: 1px solid var(--au-line); background: transparent; color: var(--au-text); padding: 4px 10px; border-radius: 14px; cursor: pointer; }
 .au-chip[data-selected="true"] { border-color: var(--au-pri); color: var(--au-pri); background: color-mix(in srgb, var(--au-pri) 10%, transparent); }
-.au-input { margin: 12px; border: 1px solid var(--au-line); border-radius: 14px; padding: 10px 12px; background: var(--au-panel); }
+.au-input { margin: 12px; border: 1px solid var(--au-line); border-radius: 14px; padding: 10px 12px; background: var(--au-panel); transition: border-color 0.15s ease; }
+.au-input:focus-within { border-color: color-mix(in srgb, var(--au-text) 22%, var(--au-line)); }
 .au-textarea { width: 100%; resize: none; border: 0; background: transparent; color: var(--au-text); font: inherit; outline: none; }
 .au-input-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--au-muted); font-size: 12px; }
 .au-type { display: flex; align-items: center; gap: 6px; }
@@ -176,6 +177,16 @@ body {
 .au-field-k { width: 110px; flex: none; color: var(--au-muted); }
 .au-field-v { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .au-steps { margin: 0; padding-left: 18px; }
+/* Draft fields edited in place: plain text until hovered or focused, never a blue ring. */
+.au-edit {
+  display: block; width: calc(100% + 12px); margin: -3px -6px; padding: 2px 5px;
+  font: inherit; color: var(--au-text); background: transparent;
+  border: 1px solid transparent; border-radius: 6px; outline: none; resize: none; overflow: hidden;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+textarea.au-edit.au-pre { font: 11.5px/1.5 ui-monospace, "SF Mono", monospace; max-height: 360px; overflow: auto; white-space: pre-wrap; }
+.au-edit:not([readonly]):hover { border-color: var(--au-line); }
+.au-edit:not([readonly]):focus { background: var(--au-raise); border-color: color-mix(in srgb, var(--au-text) 22%, var(--au-line)); }
 .au-issue { margin: 2px 0 0; color: var(--au-bad); font-size: 12px; }
 .au-draft-actions { display: flex; gap: 8px; }
 @keyframes au-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

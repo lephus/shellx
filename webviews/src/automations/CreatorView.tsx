@@ -99,7 +99,15 @@ export function CreatorView({
           ) : null}
           {creator.draft ? (
             <>
-              <DraftCard label={label} draft={creator.draft} issues={creator.issues} ready={ready} />
+              <DraftCard
+                label={label}
+                draft={creator.draft}
+                issues={creator.issues}
+                ready={ready}
+                locked={creator.busy}
+                onEdit={(edit) => store.editDraft(edit)}
+                onCommit={() => void store.flushDraftEdit()}
+              />
               <div className="au-draft-actions">
                 <button
                   type="button"

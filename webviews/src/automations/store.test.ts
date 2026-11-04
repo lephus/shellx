@@ -42,7 +42,7 @@ function fakeBridge(handlers: Partial<Record<AutomationsMethod, (p: object) => u
       calls.push({ method, params });
       const h = handlers[method];
       if (h) {
-        const r = h(params);
+        const r = await h(params);
         if (r && typeof r === "object" && "__error" in r) return { ok: false, error: { code: "x", message: "bad" } } as never;
         return { ok: true, result: r } as never;
       }
@@ -324,4 +324,58 @@ test("an event the discarded session sent while it was being stopped does not re
 
   expect(store.getState().creator.streaming).toBeNull();
   expect(store.getState().creator.busy).toBe(false);
+});
+
+test("card edits keep the frontmatter in step and reach the host before save and send", async () => {
+  const { store, emit, calls } = await started({ "creator.save": () => ({ automation: dto({ id: "new" }) }) });
+  await store.startCreator();
+  emit(creator({ type: "draft", draft: draft({ name: "a", description: "d", skillMarkdown: "---\nname: a\ndescription: d\n---\nBody\n" }) }));
+  store.editDraft({ name: "b" });
+  expect(store.getState().creator.draft?.skillMarkdown).toBe("---\nname: b\ndescription: d\n---\nBody\n");
+  store.editDraft({ skillMarkdown: "---\nname: c\ndescription: New words\n---\nBody\n" });
+  expect(store.getState().creator.draft?.name).toBe("c");
+  expect(store.getState().creator.draft?.description).toBe("New words");
+  await store.sendMessage("hi");
+  const methods = calls.map((c) => c.method);
+  expect(methods.indexOf("creator.edit")).toBeLessThan(methods.indexOf("creator.send"));
+  expect(calls.find((c) => c.method === "creator.edit")?.params).toEqual({
+    name: "c",
+    description: "New words",
+    skillMarkdown: "---\nname: c\ndescription: New words\n---\nBody\n",
+  });
+  // Unchanged since the last flush: save does not send the edit again.
+  await store.save();
+  expect(calls.filter((c) => c.method === "creator.edit")).toHaveLength(1);
+});
+
+test("the card cannot be edited while Claude is busy, and a new draft from Claude wins", async () => {
+  const { store, emit } = await started();
+  await store.startCreator();
+  emit(creator({ type: "draft", draft: draft({ name: "a" }) }));
+  emit(creator({ type: "busy", busy: true }));
+  store.editDraft({ name: "b" });
+  expect(store.getState().creator.draft?.name).toBe("a");
+  emit(creator({ type: "busy", busy: false }));
+  store.editDraft({ name: "b" });
+  expect(store.getState().creator.draftDirty).toBe(true);
+  emit(creator({ type: "draft", draft: draft({ name: "z" }) }));
+  expect(store.getState().creator.draftDirty).toBe(false);
+});
+
+test("save waits for an edit a blur already sent", async () => {
+  let release: () => void = () => {};
+  const order: string[] = [];
+  const { store, emit } = await started({
+    "creator.edit": () => new Promise((resolve) => { release = () => { order.push("edit"); resolve({}); }; }),
+    "creator.save": () => { order.push("save"); return { automation: dto({ id: "new" }) }; },
+  });
+  await store.startCreator();
+  emit(creator({ type: "draft", draft: draft({ name: "a" }) }));
+  store.editDraft({ name: "b" });
+  void store.flushDraftEdit();
+  const saving = store.save();
+  await Promise.resolve();
+  release();
+  await saving;
+  expect(order).toEqual(["edit", "save"]);
 });

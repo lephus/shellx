@@ -17,6 +17,7 @@ function creator(over: Partial<CreatorState>): CreatorState {
     type: "auto",
     saving: false,
     editId: null,
+    draftDirty: false,
     ...over,
   };
 }
