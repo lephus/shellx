@@ -7,7 +7,8 @@ import SwiftUI
 /// its shortcut key cap, the settings button and the right sidebar toggle.
 /// The left sidebar toggle and the notifications bell stay in the existing left
 /// accessory (`TitlebarControlsView`), whose bell badge draws `ShellXTitlebarModel`.
-/// Flat colors only (`ShellXPalette`), no gradients or shadows.
+/// Flat colors only, no gradients or shadows; everything but the lit right sidebar
+/// toggle follows the terminal theme.
 struct ShellXTitlebarView: View {
     let shortcutText: String
     let onSearch: () -> Void
@@ -20,6 +21,8 @@ struct ShellXTitlebarView: View {
     var onToggleRightSidebar: () -> Void = {}
 
     @State private var searchHover = false
+    /// The terminal theme the search field and the icons take their colors from.
+    @State private var themeObserver = GhosttyDialogThemeObserver.shared
     @State private var settingsHover = false
     @State private var shareHover = false
     @State private var rightSidebarHover = false
@@ -27,35 +30,38 @@ struct ShellXTitlebarView: View {
     var body: some View {
         HStack(spacing: 8) {
             Button(action: onSearch) {
+                let theme = themeObserver.theme
+                let muted = Color(nsColor: theme.secondaryForeground)
                 HStack(spacing: 6) {
                     ShellXIcon.image("magnifyingglass")
                         .font(.system(size: 12))
-                        .foregroundColor(ShellXPalette.muted.color)
+                        .foregroundColor(muted)
                     Text(ShellXTitlebarModel(unreadCount: 0).localizedSearchPlaceholder)
                         .font(.system(size: 12))
-                        .foregroundColor(ShellXPalette.muted.color)
+                        .foregroundColor(muted)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Spacer(minLength: 4)
                     Text(shortcutText)
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(ShellXPalette.muted.color)
+                        .foregroundColor(muted)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .overlay(
                             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .stroke(ShellXPalette.border.color, lineWidth: 1)
+                                .stroke(Color(nsColor: theme.separator), lineWidth: 1)
                         )
                 }
                 .padding(.horizontal, 8)
                 .frame(width: 280, height: 24)
+                // Tints of the terminal theme's foreground, so the field sits on any theme.
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(searchHover ? ShellXPalette.raise.color : ShellXPalette.panel.color)
+                        .fill(Color(nsColor: theme.foreground.withAlphaComponent(searchHover ? 0.1 : 0.05)))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(searchHover ? ShellXPalette.primaryLine.color : ShellXPalette.border.color, lineWidth: 1)
+                        .stroke(Color(nsColor: searchHover ? theme.border : theme.separator), lineWidth: 1)
                 )
                 .contentShape(Rectangle())
             }
@@ -69,11 +75,11 @@ struct ShellXTitlebarView: View {
                 Button(action: onShare) {
                     ShellXIcon.image("link")
                         .font(.system(size: 14))
-                        .foregroundColor(shareHover ? ShellXPalette.textHi.color : ShellXPalette.text.color)
+                        .foregroundColor(iconColor(hover: shareHover))
                         .frame(width: 24, height: 24)
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(shareHover ? ShellXPalette.raise.color : Color.clear)
+                                .fill(iconFill(hover: shareHover))
                         )
                         .background(ShellXShareAnchor())
                         .contentShape(Rectangle())
@@ -88,11 +94,11 @@ struct ShellXTitlebarView: View {
             Button(action: onSettings) {
                 ShellXIcon.image("gearshape")
                     .font(.system(size: 14))
-                    .foregroundColor(settingsHover ? ShellXPalette.textHi.color : ShellXPalette.text.color)
+                    .foregroundColor(iconColor(hover: settingsHover))
                     .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(settingsHover ? ShellXPalette.raise.color : Color.clear)
+                            .fill(iconFill(hover: settingsHover))
                     )
                     .contentShape(Rectangle())
             }
@@ -126,12 +132,22 @@ struct ShellXTitlebarView: View {
 
     private var rightSidebarIconColor: Color {
         if rightSidebarToggle.isOn { return ShellXPalette.primaryText.color }
-        return rightSidebarHover ? ShellXPalette.textHi.color : ShellXPalette.text.color
+        return iconColor(hover: rightSidebarHover)
     }
 
     private var rightSidebarFill: Color {
         if rightSidebarToggle.isOn { return ShellXPalette.primarySoft.color }
-        return rightSidebarHover ? ShellXPalette.raise.color : Color.clear
+        return iconFill(hover: rightSidebarHover)
+    }
+
+    /// Icon tint from the terminal theme's foreground: softer at rest, full on hover.
+    private func iconColor(hover: Bool) -> Color {
+        let foreground = themeObserver.theme.foreground
+        return Color(nsColor: hover ? foreground : foreground.withAlphaComponent(0.72))
+    }
+
+    private func iconFill(hover: Bool) -> Color {
+        hover ? Color(nsColor: themeObserver.theme.foreground.withAlphaComponent(0.1)) : Color.clear
     }
 }
 
