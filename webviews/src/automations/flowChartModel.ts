@@ -26,7 +26,15 @@ export type ChartSource = {
 };
 
 export type PlacedNode = ChartNode & { x: number; y: number; w: number; h: number; lines: string[] };
-export type PlacedEdge = { from: string; to: string; label?: string; points: [number, number][]; back: boolean };
+/** `labelAt` is the start of the label's baseline, set when the edge has a label. */
+export type PlacedEdge = {
+  from: string;
+  to: string;
+  label?: string;
+  points: [number, number][];
+  back: boolean;
+  labelAt?: [number, number];
+};
 export type ChartLayout = { width: number; height: number; nodes: PlacedNode[]; edges: PlacedEdge[] };
 
 const NODE_TYPES: readonly FlowNodeType[] = ["step", "decision", "askUser", "end"];
@@ -297,6 +305,49 @@ function assignColumns(model: ChartModel, out: Map<string, number[]>, ranked: Ra
   return columns;
 }
 
+type Point = [number, number];
+
+/** True when the axis-aligned segment a–b passes through the inside of the node's box. */
+function segmentHitsBox(a: Point, b: Point, n: PlacedNode): boolean {
+  return (
+    Math.max(a[0], b[0]) > n.x &&
+    Math.min(a[0], b[0]) < n.x + n.w &&
+    Math.max(a[1], b[1]) > n.y &&
+    Math.min(a[1], b[1]) < n.y + n.h
+  );
+}
+
+/** Drops repeated points and the middle point of three in a line. */
+function simplify(points: Point[]): Point[] {
+  const unique = points.filter((p, i) => i === 0 || p[0] !== points[i - 1]?.[0] || p[1] !== points[i - 1]?.[1]);
+  return unique.filter((p, i) => {
+    const prev = unique[i - 1];
+    const next = unique[i + 1];
+    if (!prev || !next) return true;
+    return !((prev[0] === p[0] && p[0] === next[0]) || (prev[1] === p[1] && p[1] === next[1]));
+  });
+}
+
+const direction = (points: Point[]): Point => {
+  const [a, b] = points;
+  return a && b ? [Math.sign(b[0] - a[0]), Math.sign(b[1] - a[1])] : [0, 0];
+};
+
+/** True when two routes leave from the same point in the same direction. */
+function sameStart(a: Point[], b: Point[]): boolean {
+  const [da, db] = [direction(a), direction(b)];
+  return a[0]?.[0] === b[0]?.[0] && a[0]?.[1] === b[0]?.[1] && da[0] === db[0] && da[1] === db[1];
+}
+
+/** Where an edge label goes: beside segment `index` (or the last one), near its start. */
+function labelPoint(points: Point[], index: number): Point {
+  const i = Math.min(index, points.length - 2);
+  const [ax, ay] = points[i] ?? [0, 0];
+  const [bx, by] = points[i + 1] ?? [ax, ay];
+  if (ay === by) return [Math.min(ax, bx) + 6, ay - 6];
+  return [ax + 8, by > ay ? ay + 14 : ay - 6];
+}
+
 /** Places the chart top to bottom, branches to the right, loops through a lane right of every node. */
 export function layoutChart(model: ChartModel): ChartLayout {
   const ids = new Set(model.nodes.map((n) => n.id));
@@ -349,36 +400,79 @@ export function layoutChart(model: ChartModel): ChartLayout {
   const maxRight = Math.max(...nodes.map((n) => n.x + n.w));
   const maxBottom = Math.max(...nodes.map((n) => n.y + n.h));
 
+  const columnChannel = (column: number) =>
+    (columnLeft[column] ?? PAD) + (columnWidths[column] ?? 0) + COLUMN_GAP / 2;
+  const gapBelow = (rank: number) => (rowTop[rank] ?? PAD) + (rowHeights[rank] ?? 0) + RANK_GAP / 2;
+  const gapAbove = (rank: number) => Math.max(PAD / 2, (rowTop[rank] ?? PAD) - RANK_GAP / 2);
+  const blocked = (points: Point[], s: PlacedNode, t: PlacedNode) =>
+    points.some((p, i) => i > 0 && nodes.some((n) => n !== s && n !== t && segmentHitsBox(points[i - 1] as Point, p, n)));
+
+  /**
+   * A route through the gaps between rows and columns, where no box sits. It leaves the source by its
+   * right edge or its bottom, runs along `via` between the rows, and enters the target by its right edge or top.
+   */
+  const gapRoute = (s: PlacedNode, t: PlacedNode, exitRight: boolean, enterRight: boolean, via: number): Point[] => {
+    const below = gapBelow(rankOf(s.id));
+    const above = gapAbove(rankOf(t.id));
+    const sChannel = columnChannel(columnOf(s.id));
+    const tChannel = columnChannel(columnOf(t.id));
+    const exit: Point[] = exitRight
+      ? [[s.x + s.w, s.y + s.h / 2], [sChannel, s.y + s.h / 2], [sChannel, below]]
+      : [[s.x + s.w / 2, s.y + s.h], [s.x + s.w / 2, below]];
+    const entry: Point[] = enterRight
+      ? [[tChannel, above], [tChannel, t.y + t.h / 2], [t.x + t.w, t.y + t.h / 2]]
+      : [[t.x + t.w / 2, above], [t.x + t.w / 2, t.y]];
+    const between: Point[] = below === above ? [] : [[via, below], [via, above]];
+    return simplify([...exit, ...between, ...entry]);
+  };
+
   let lanes = 0;
-  const placedEdges: PlacedEdge[] = edges.map((edge) => {
+  const routed = edges.map((edge) => {
     const s = placed.get(edge.from) as PlacedNode;
     const t = placed.get(edge.to) as PlacedNode;
     const back = rankOf(edge.to) <= rankOf(edge.from);
-    const sRight: [number, number] = [s.x + s.w, s.y + s.h / 2];
-    const tRight: [number, number] = [t.x + t.w, t.y + t.h / 2];
+    const sRight: Point = [s.x + s.w, s.y + s.h / 2];
+    const tRight: Point = [t.x + t.w, t.y + t.h / 2];
     const sCenter = s.x + s.w / 2;
     const tCenter = t.x + t.w / 2;
-    let points: [number, number][];
+    const from = columnOf(edge.from);
+    const to = columnOf(edge.to);
+    let direct: Point[];
+    let fallback: () => Point[];
     if (back) {
       const lane = maxRight + LANE_OFFSET + LANE_STEP * lanes++;
-      points = [sRight, [lane, sRight[1]], [lane, tRight[1]], tRight];
-    } else if (columnOf(edge.to) > columnOf(edge.from)) {
-      points = [sRight, [tCenter, sRight[1]], [tCenter, t.y]];
-    } else if (columnOf(edge.to) < columnOf(edge.from)) {
-      points = [[sCenter, s.y + s.h], [sCenter, tRight[1]], tRight];
-    } else if (nodes.some((n) => n !== s && n !== t && columnOf(n.id) === columnOf(s.id) && rankOf(n.id) > rankOf(s.id) && rankOf(n.id) < rankOf(t.id))) {
-      // Skips over boxes in its own column: go round them on the right.
-      const column = columnOf(s.id);
-      const lane = (columnLeft[column] ?? PAD) + (columnWidths[column] ?? 0) + LANE_OFFSET;
-      points = [sRight, [lane, sRight[1]], [lane, tRight[1]], tRight];
+      direct =
+        s === t
+          ? [[sRight[0], sRight[1] - 8], [lane, sRight[1] - 8], [lane, sRight[1] + 8], [sRight[0], sRight[1] + 8]]
+          : [sRight, [lane, sRight[1]], [lane, tRight[1]], tRight];
+      fallback = () => gapRoute(s, t, true, true, lane);
+    } else if (to > from) {
+      direct = [sRight, [tCenter, sRight[1]], [tCenter, t.y]];
+      fallback = () => gapRoute(s, t, true, false, columnChannel(from));
+    } else if (to < from) {
+      direct = [[sCenter, s.y + s.h], [sCenter, tRight[1]], tRight];
+      fallback = () => gapRoute(s, t, false, true, columnChannel(to));
     } else {
-      points = [[sCenter, s.y + s.h], [sCenter, t.y]];
+      direct = [[sCenter, s.y + s.h], [sCenter, t.y]];
+      fallback = () => gapRoute(s, t, true, true, columnChannel(from));
     }
-    return { from: edge.from, to: edge.to, ...(edge.label !== undefined ? { label: edge.label } : {}), points, back };
+    // Any box in the way would read as a step the edge runs through: go round it through the gaps.
+    const points = blocked(direct, s, t) ? fallback() : direct;
+    return { edge, points, back };
+  });
+
+  const placedEdges: PlacedEdge[] = routed.map(({ edge, points, back }) => {
+    if (edge.label === undefined) return { from: edge.from, to: edge.to, points, back };
+    // Branches that leave by the same point and way share their first segment: label the next one instead.
+    const shared = routed.some(
+      (other) => other.edge !== edge && other.edge.from === edge.from && sameStart(other.points, points),
+    );
+    return { from: edge.from, to: edge.to, label: edge.label, points, back, labelAt: labelPoint(points, shared ? 1 : 0) };
   });
 
   const right = Math.max(maxRight, ...placedEdges.flatMap((e) => e.points.map(([x]) => x)));
+  const bottom = Math.max(maxBottom, ...placedEdges.flatMap((e) => e.points.map(([, y]) => y)));
   // Reading order for the text alternative: rank, then column.
   nodes.sort((a, b) => rankOf(a.id) - rankOf(b.id) || columnOf(a.id) - columnOf(b.id));
-  return { width: Math.ceil(right + PAD), height: Math.ceil(maxBottom + PAD), nodes, edges: placedEdges };
+  return { width: Math.ceil(right + PAD), height: Math.ceil(bottom + PAD), nodes, edges: placedEdges };
 }

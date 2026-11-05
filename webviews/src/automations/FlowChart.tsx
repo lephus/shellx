@@ -73,14 +73,12 @@ function ChartNodeShape({ node, running, runningText }: { node: PlacedNode; runn
 }
 
 function EdgeLine({ edge, marker }: { edge: PlacedEdge; marker: string }) {
-  const [first, second] = edge.points;
   const d = edge.points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x} ${y}`).join(" ");
-  const horizontal = first !== undefined && second !== undefined && first[1] === second[1];
   return (
     <g className="au-flow-link" data-back={edge.back ? "true" : undefined}>
       <path className="au-flow-edge" d={d} markerEnd={`url(#${marker})`} />
-      {edge.label && first ? (
-        <text className="au-flow-edge-label" x={first[0] + (horizontal ? 6 : 8)} y={first[1] + (horizontal ? -6 : 14)}>
+      {edge.label && edge.labelAt ? (
+        <text className="au-flow-edge-label" x={edge.labelAt[0]} y={edge.labelAt[1]}>
           {edge.label}
         </text>
       ) : null}
