@@ -71,18 +71,43 @@ import Testing
         )
     }
 
-    @Test func unsetAndUnknownModesFollowSystemAppearance() {
+    /// A missing or unrecognized mode is the app's default (Dark), the same
+    /// as `AppearanceSettings.mode(for:)`, not the system appearance: a new
+    /// install on a light Mac gets a dark terminal in its dark chrome.
+    @Test func unsetAndUnknownModesResolveToTheDefaultDark() {
         #expect(
             TerminalColorSchemePreference.resolve(
                 appearanceModeRawValue: nil,
-                systemAppearance: darkSystem
+                systemAppearance: lightSystem
             ) == .dark
         )
         #expect(
             TerminalColorSchemePreference.resolve(
                 appearanceModeRawValue: "totally-unknown",
                 systemAppearance: lightSystem
+            ) == .dark
+        )
+    }
+
+    @Test func autoModeFollowsSystemAppearance() {
+        #expect(
+            TerminalColorSchemePreference.resolve(
+                appearanceModeRawValue: "auto",
+                systemAppearance: lightSystem
             ) == .light
+        )
+    }
+
+    @Test func missingStoredModeOnALightSystemIsDark() {
+        let suiteName = "TerminalColorSchemePreference.missing.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(
+            GhosttyConfig.currentColorSchemePreference(
+                defaults: defaults,
+                systemAppearance: lightSystem
+            ) == .dark
         )
     }
 

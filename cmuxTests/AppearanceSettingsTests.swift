@@ -234,7 +234,58 @@ final class AppearanceSettingsTests: XCTestCase {
 
         let resolved = AppearanceSettings.resolvedMode(defaults: defaults)
         XCTAssertEqual(resolved, .dark)
-        XCTAssertNil(defaults.string(forKey: AppearanceSettings.appearanceModeKey))
+        // Nothing is written (the app registers the default, which is not stored).
+        XCTAssertNil(defaults.persistentDomain(forName: suiteName)?[AppearanceSettings.appearanceModeKey])
+    }
+
+    /// A fresh install on a light Mac: the chrome defaults to Dark, so every
+    /// reader of `appearanceMode` (terminal theme, appearance sync, observers)
+    /// must see Dark too, without the default being persisted.
+    func testRegisteredDefaultModeMakesEveryReaderSeeDarkWithoutPersisting() {
+        let suiteName = "AppearanceSettingsTests.Registered.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.removeObject(forKey: AppearanceSettings.appearanceModeKey)
+
+        AppearanceSettings.registerDefaultMode(defaults: defaults)
+
+        let lightSystem = AppearanceSettings.SystemAppearance(interfaceStyle: nil)
+        XCTAssertEqual(defaults.string(forKey: AppearanceSettings.appearanceModeKey), AppearanceMode.dark.rawValue)
+        XCTAssertNil(defaults.persistentDomain(forName: suiteName)?[AppearanceSettings.appearanceModeKey])
+        XCTAssertEqual(
+            GhosttyConfig.currentColorSchemePreference(defaults: defaults, systemAppearance: lightSystem),
+            .dark
+        )
+        XCTAssertEqual(
+            GhosttyConfig.appearanceSyncColorSchemePreference(
+                passedAppearance: NSAppearance(named: .aqua),
+                defaults: defaults,
+                isApplicationFinishedLaunching: { true },
+                liveEffectiveAppearance: { NSAppearance(named: .aqua) }
+            ).preference,
+            .dark
+        )
+    }
+
+    /// An unrecognized stored mode is Dark for the chrome and the terminal alike.
+    func testInvalidStoredModeIsDarkForChromeAndTerminal() {
+        let suiteName = "AppearanceSettingsTests.Invalid.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("not-a-mode", forKey: AppearanceSettings.appearanceModeKey)
+
+        let lightSystem = AppearanceSettings.SystemAppearance(interfaceStyle: nil)
+        XCTAssertEqual(AppearanceSettings.mode(for: "not-a-mode"), .dark)
+        XCTAssertEqual(
+            GhosttyConfig.currentColorSchemePreference(defaults: defaults, systemAppearance: lightSystem),
+            .dark
+        )
     }
 
     func testStoredDarkStaysDark() {
