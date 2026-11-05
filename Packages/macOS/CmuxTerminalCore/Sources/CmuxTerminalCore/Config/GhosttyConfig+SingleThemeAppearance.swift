@@ -17,9 +17,27 @@ extension GhosttyConfig {
         environment: [String: String],
         bundleResourceURL: URL?
     ) -> String? {
+        singleThemeAppearanceSubstitute(
+            rawThemeValue: rawThemeValue,
+            preferredColorScheme: preferredColorScheme,
+            environment: environment,
+            bundleResourceURL: bundleResourceURL,
+            defaultPair: CmuxTerminalThemePair(light: cmuxDefaultLightThemeName, dark: cmuxDefaultDarkThemeName)
+        )
+    }
+
+    /// ``singleThemeAppearanceSubstitute(rawThemeValue:preferredColorScheme:environment:bundleResourceURL:)``
+    /// with the default light and dark themes given by `defaultPair`.
+    static func singleThemeAppearanceSubstitute(
+        rawThemeValue: String,
+        preferredColorScheme: ColorSchemePreference,
+        environment: [String: String],
+        bundleResourceURL: URL?,
+        defaultPair: CmuxTerminalThemePair
+    ) -> String? {
         let pair = CmuxManagedThemeBlock().themePair(fromRawValue: rawThemeValue)
         let fitted = pair.fillingUnsuitedSide(
-            from: CmuxTerminalThemePair(light: cmuxDefaultLightThemeName, dark: cmuxDefaultDarkThemeName),
+            from: defaultPair,
             isDark: { themeIsDark(named: $0, environment: environment, bundleResourceURL: bundleResourceURL) }
         )
         let (shown, configured) = preferredColorScheme == .light
