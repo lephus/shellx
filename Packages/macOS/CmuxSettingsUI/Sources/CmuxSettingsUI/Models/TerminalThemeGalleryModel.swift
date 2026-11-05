@@ -6,7 +6,8 @@ import SwiftUI
 /// Drives the Settings terminal theme gallery.
 ///
 /// Picking a card writes the managed `# cmux themes` block through the same
-/// ``CmuxManagedThemeConfigFile`` writer `cmux themes` uses, then asks the host
+/// ``CmuxManagedThemeConfigFile`` writer `cmux themes` uses, replacing only the
+/// side of the light/dark pair its section stands for, then asks the host
 /// to reload so terminals preview it live. The first pick remembers the
 /// block's previous theme value; ``revert()`` writes only that value back, so
 /// other edits to the file made in the meantime survive.
@@ -53,16 +54,18 @@ final class TerminalThemeGalleryModel {
         }
     }
 
-    /// The cards shown for a query, split by appearance: themes that suit
-    /// the appearance in use first, then the rest.
+    /// The cards shown for a query, one list per section.
     struct Results: Equatable {
-        /// Themes whose background matches the appearance in use (unknown counts as matching).
-        let matchingSlot: [Theme]
-        /// Themes built for the other appearance.
-        let otherAppearance: [Theme]
+        /// Themes with a dark background (unknown counts as dark).
+        let dark: [Theme]
+        /// Themes with a light background.
+        let light: [Theme]
 
-        /// Every card, in display order.
-        var themes: [Theme] { matchingSlot + otherAppearance }
+        /// Every card of a section.
+        func themes(for slot: Slot) -> [Theme] { slot == .dark ? dark : light }
+
+        /// Whether no card matched.
+        var isEmpty: Bool { dark.isEmpty && light.isEmpty }
     }
 
     /// The managed block's theme before the first pick (`nil`: no block).
@@ -92,8 +95,9 @@ final class TerminalThemeGalleryModel {
     ) {
         self.context = context
         self.reload = reload
-        selection = CmuxManagedThemeBlock().themePair(fromRawValue: context.readCurrentThemeValue())
+        selection = context.defaultPair
         slotInUse = context.prefersDarkAppearance ? .dark : .light
+        selection = currentPair()
     }
 
     /// Last successful parse per search directories. A new model shows it
@@ -135,7 +139,8 @@ final class TerminalThemeGalleryModel {
 
     /// The cards for the current query.
     var results: Results {
-        Self.results(in: themes, query: query, slot: slotInUse)
+        let inUse = [selection.light, selection.dark].compactMap { $0 }
+        return Self.results(in: themes, query: query, inUse: inUse)
     }
 
     /// The theme the terminal shows now: the highlighted card.
@@ -154,26 +159,25 @@ final class TerminalThemeGalleryModel {
         selection = currentPair()
     }
 
-    /// Uses `name` for both appearances and live-previews it.
-    ///
-    /// The gallery owns one theme, so the highlighted card is always the
-    /// theme the terminal shows. Writing only one side of a light/dark pair
-    /// let a pick land on the appearance not in use and look like it did
-    /// nothing; pairs stay available through `cmux themes set --light/--dark`.
-    func select(_ name: String) {
+    /// Uses `name` for `slot`'s appearance only, keeps the other side as it
+    /// is, and live-previews the result. With no theme set anywhere, the
+    /// other side is filled with the default it currently resolves to.
+    func select(_ name: String, slot: Slot) {
         let current: CmuxTerminalThemePair
         let managedValue: String?
         do {
             managedValue = try context.configFile.managedThemeValue()
-            current = managedValue.map { block.themePair(fromRawValue: $0) } ?? currentPair()
+            current = effectivePair(rawValue: managedValue ?? context.readCurrentThemeValue())
         } catch {
             writeFailed = true
             return
         }
         selection = current
         var next = current
-        next.light = name
-        next.dark = name
+        switch slot {
+        case .light: next.light = name
+        case .dark: next.dark = name
+        }
         guard next != current,
               let rawValue = block.encodedThemeValue(light: next.light, dark: next.dark) else {
             return
@@ -210,13 +214,18 @@ final class TerminalThemeGalleryModel {
         reload(.final)
     }
 
-    /// The effective theme: the managed block when present, otherwise
-    /// whatever the loaded Ghostty config sets.
+    /// The effective pair: the managed block when present, otherwise the
+    /// loaded Ghostty config's theme, otherwise the defaults.
     private func currentPair() -> CmuxTerminalThemePair {
-        if let managedValue = try? context.configFile.managedThemeValue() {
-            return block.themePair(fromRawValue: managedValue)
-        }
-        return block.themePair(fromRawValue: context.readCurrentThemeValue())
+        let managedValue = try? context.configFile.managedThemeValue()
+        return effectivePair(rawValue: managedValue ?? context.readCurrentThemeValue())
+    }
+
+    /// Reads a raw `theme` value. A plain name fills both sides; a side the
+    /// value leaves unnamed takes the default.
+    private func effectivePair(rawValue: String?) -> CmuxTerminalThemePair {
+        let pair = block.themePair(fromRawValue: rawValue)
+        return CmuxTerminalThemePair(light: pair.light ?? context.defaultPair.light, dark: pair.dark ?? context.defaultPair.dark)
     }
 
     nonisolated static func loadThemes(in directories: [URL]) -> [Theme] {
@@ -226,21 +235,25 @@ final class TerminalThemeGalleryModel {
         }
     }
 
-    /// Every theme whose name contains the query (all themes when the query
-    /// is empty), in catalog order, those matching the slot's appearance first.
-    nonisolated static func results(in themes: [Theme], query: String, slot: Slot) -> Results {
+    /// The cards per section. With an empty query each section lists its
+    /// curated themes in order, then any theme in use that the list lacks.
+    /// With a query, every matching theme in catalog order. A theme goes to
+    /// the dark section unless its background is light.
+    nonisolated static func results(in themes: [Theme], query: String, inUse: [String]) -> Results {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matches = query.isEmpty ? themes : themes.filter { $0.name.localizedCaseInsensitiveContains(query) }
-        let wantsDark = slot == .dark
-        var matchingSlot: [Theme] = []
-        var otherAppearance: [Theme] = []
-        for theme in matches {
-            if (theme.colors.isDark ?? wantsDark) == wantsDark {
-                matchingSlot.append(theme)
-            } else {
-                otherAppearance.append(theme)
-            }
+        func isDark(_ theme: Theme) -> Bool { theme.colors.isDark ?? true }
+        if !query.isEmpty {
+            let matches = themes.filter { $0.name.localizedCaseInsensitiveContains(query) }
+            return Results(dark: matches.filter(isDark), light: matches.filter { !isDark($0) })
         }
-        return Results(matchingSlot: matchingSlot, otherAppearance: otherAppearance)
+        let byName = Dictionary(themes.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        var dark = TerminalThemeCuration.dark.compactMap { byName[$0] }
+        var light = TerminalThemeCuration.light.compactMap { byName[$0] }
+        for name in inUse {
+            guard let theme = themes.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }),
+                  !dark.contains(theme), !light.contains(theme) else { continue }
+            if isDark(theme) { dark.append(theme) } else { light.append(theme) }
+        }
+        return Results(dark: dark, light: light)
     }
 }

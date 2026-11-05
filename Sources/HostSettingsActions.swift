@@ -217,7 +217,11 @@ final class HostSettingsActions: SettingsHostActions {
             configFile: CmuxManagedThemeConfigFile(url: configURL),
             themeDirectories: themeDirectories,
             readCurrentThemeValue: { GhosttyApp.userAppearanceConfigSummary().lastThemeDirective },
-            prefersDarkAppearance: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            prefersDarkAppearance: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua,
+            defaultPair: CmuxTerminalThemePair(
+                light: GhosttyConfig.cmuxDefaultLightThemeName,
+                dark: GhosttyConfig.cmuxDefaultDarkThemeName
+            )
         )
     }
 

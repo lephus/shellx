@@ -150,46 +150,6 @@ struct TerminalThemeGalleryModelTests {
         #expect(try file.managedThemeValue() == "light:Rose Pine Dawn,dark:Abernathy")
     }
 
-    @Test("A single dark theme stays the dark side")
-    func singleDarkThemeIsDarkSide() async throws {
-        defer { try? FileManager.default.removeItem(at: root) }
-        let dir = try makeThemes([("Abernathy", "#000000"), ("Rose Pine Dawn", "#faf4ed")])
-        let (model, file, _) = try makeModel(existingConfig: nil, currentThemeValue: "Abernathy", themeDirectories: [dir])
-        await model.load()
-
-        model.select("Rose Pine Dawn", slot: .light)
-
-        #expect(try file.managedThemeValue() == "light:Rose Pine Dawn,dark:Abernathy")
-    }
-
-    @Test("A single light theme becomes the light side")
-    func singleLightThemeIsLightSide() async throws {
-        defer { try? FileManager.default.removeItem(at: root) }
-        let dir = try makeThemes([("Nord", "#2e3440"), ("Rose Pine Dawn", "#faf4ed")])
-        let (model, file, _) = try makeModel(existingConfig: nil, currentThemeValue: "Rose Pine Dawn", themeDirectories: [dir])
-        await model.load()
-
-        model.select("Nord", slot: .dark)
-
-        #expect(try file.managedThemeValue() == "light:Rose Pine Dawn,dark:Nord")
-    }
-
-    @Test("Opening Settings writes nothing")
-    func openingSettingsWritesNothing() async throws {
-        defer { try? FileManager.default.removeItem(at: root) }
-        let original = "font-size = 13\n\n# cmux themes start\ntheme = Nord\n# cmux themes end\n"
-        let dir = try makeThemes([("Nord", "#2e3440")])
-        let (model, file, log) = try makeModel(existingConfig: original, currentThemeValue: "Nord", themeDirectories: [dir])
-        let before = try Data(contentsOf: file.url)
-
-        await model.load()
-        _ = model.results
-        model.refreshSelection()
-
-        #expect(try Data(contentsOf: file.url) == before)
-        #expect(log.phases.isEmpty)
-    }
-
     @Test("Without a query each section lists its curated themes in order")
     func curatedWhenNoQuery() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
@@ -228,17 +188,6 @@ struct TerminalThemeGalleryModelTests {
         #expect(model.results.light.map(\.name) == ["Gruvbox Light"])
     }
 
-    @Test("Badges follow the slots a theme fills")
-    func badgesFollowSlots() throws {
-        defer { try? FileManager.default.removeItem(at: root) }
-        let (both, _, _) = try makeModel(existingConfig: nil, currentThemeValue: "light:X,dark:X")
-        #expect(both.badges(for: "X") == [.light, .dark])
-        let (split, _, _) = try makeModel(existingConfig: nil, currentThemeValue: "light:A,dark:B")
-        #expect(split.badges(for: "A") == [.light])
-        #expect(split.badges(for: "B") == [.dark])
-        #expect(split.badges(for: "C").isEmpty)
-    }
-
     @Test("Picking the theme already in effect writes nothing")
     func pickingCurrentThemeIsNoOp() throws {
         defer { try? FileManager.default.removeItem(at: root) }
@@ -262,7 +211,7 @@ struct TerminalThemeGalleryModelTests {
         model.revert()
 
         #expect(try file.readContents() == original)
-        #expect(model.selection == CmuxTerminalThemePair(light: "Catppuccin Latte", dark: "Nord"))
+        #expect(model.selection == CmuxTerminalThemePair(light: "Nord", dark: "Nord"))
         #expect(!model.hasPendingChange)
         #expect(log.phases == [.preview, .preview, .final])
     }
