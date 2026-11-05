@@ -150,7 +150,47 @@ public actor ShellXAutomationStore {
         switch location {
         case .automation(let dir), .skill(let dir, _): try trasher.trash(dir)
         }
+        try removeFlow(id: id)
         try touchChangeStamp()
+    }
+
+    // MARK: - Flows
+
+    /// The cached flow for an automation or skill, or `nil` when none is stored or the file is unreadable.
+    public func flowRecord(id: String) throws -> ShellXFlowRecord? {
+        let url = flowURL(id: id)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? decoder().decode(ShellXFlowRecord.self, from: data)
+    }
+
+    /// Stores a flow under `automationsRoot/.flows`, never inside a skill folder.
+    public func saveFlow(_ record: ShellXFlowRecord, id: String) throws {
+        let url = flowURL(id: id)
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoder().encode(record).write(to: url, options: .atomic)
+    }
+
+    /// Removes a stored flow; a missing file is not an error.
+    public func removeFlow(id: String) throws {
+        let url = flowURL(id: id)
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        try fileManager.removeItem(at: url)
+    }
+
+    /// Classifies a stored flow against the current `SKILL.md`; the flow is returned only when current.
+    public nonisolated static func flowStatus(
+        kind: ShellXAutomationKind, record: ShellXFlowRecord?, skillMarkdown: String
+    ) -> (status: ShellXFlowStatus, flow: ShellXAutomationFlow?) {
+        if kind == .workflow { return (.derived, nil) }
+        guard let record, record.flow.isUsable else { return (.missing, nil) }
+        guard record.sourceHash == ShellXFlowFingerprint.of(skillMarkdown) else { return (.stale, nil) }
+        return (.current, record.flow)
+    }
+
+    /// `<id>.json` for a safe id, otherwise `_` plus the hex of the id's UTF-8 bytes (`_` is never in a safe id).
+    func flowURL(id: String) -> URL {
+        let name = Self.isSafeID(id) ? id : "_" + id.utf8.map { String(format: "%02x", $0) }.joined()
+        return environment.automationsRoot.appending(path: ".flows/\(name).json")
     }
 
     // MARK: - Runs
