@@ -54,6 +54,11 @@ The user's diagnosis is that dark and light themes have different names. "Aberna
 
 - The menu is the appearance switch, and the whole window follows it.
 - Gallery assignment works by section (option A).
+- **A smaller, balanced gallery.**
+  - The gallery shows a curated set of **12 dark and 12 light themes**, as matching pairs where they exist: Catppuccin Mocha/Latte, Solarized Dark/Light, GitHub Dark/Light, Tokyo Night/Day, Rosé Pine/Dawn, Gruvbox Dark/Light, Everforest Dark/Light, One Dark/Light, Nord/Nord Light, Ayu Mirage/Light, Kanagawa Wave/Lotus, plus ShellX's default dark and the default light.
+  - Use the exact names that Ghostty ships. When a listed theme does not exist, substitute the closest shipped one and say so in the PR.
+  - **"Search all themes"** still searches every theme.
+  - The themes currently in use always appear in their section, even when they are outside the curated set. For example, Abernathy appears under Dark Themes, so the selection stays visible.
 - **Ship in one go.** Light and System ship only when every native ShellX surface reached in normal use is readable in Light. That covers the window chrome, sidebar, title bar, Settings, popovers, menus, dialogs, sheets, the command palette, the notification and agent UI, and images that exist only in a dark version. There is no hidden or "Beta" Light option and no staged release. The plan lists the full audit, and every item in it is a task.
 
 ## Claude's calls (the user agreed to the playback; check these while reading)
