@@ -109,11 +109,7 @@ final class ShellXAutomationsRuntime {
                 }
                 try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
                 let drawer = ShellXFlowDrawer(
-                    launcher: ShellXClaudeProcess(
-                        executable: launch.path,
-                        environment: launch.environment,
-                        timeLimit: .seconds(120)
-                    ),
+                    launcher: ShellXFlowDrawer.claudeProcess(executable: launch.path, environment: launch.environment),
                     rules: flowRules,
                     workingDirectory: scratch
                 )

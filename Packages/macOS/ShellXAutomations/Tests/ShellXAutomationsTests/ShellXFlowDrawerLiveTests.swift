@@ -26,7 +26,7 @@ import Testing
             }
         }
         let resolved = try #require(launch, "claude was not found")
-        let claude = ShellXClaudeProcess(executable: resolved.path, environment: resolved.environment, timeLimit: .seconds(120))
+        let claude = ShellXFlowDrawer.claudeProcess(executable: resolved.path, environment: resolved.environment)
 
         let fixtures = try #require(Bundle.module.url(forResource: "Fixtures", withExtension: nil))
         let skill = try String(contentsOf: fixtures.appending(path: "disk-cleanup-SKILL.md"), encoding: .utf8)

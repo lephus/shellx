@@ -60,7 +60,7 @@ public actor ShellXCreatorSession {
             "-p", "--input-format", "stream-json", "--output-format", "stream-json",
             "--include-partial-messages", "--verbose", "--append-system-prompt", systemPrompt,
             "--allowedTools", "Read,Glob,Grep",
-            "--disallowedTools", "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch",
+            "--disallowedTools", ShellXClaudeToolAccess.writingAndNetworkTools,
             // A user's `permissions.defaultMode` must not widen the creator, and it needs no MCP servers.
             "--permission-mode", "default", "--strict-mcp-config",
         ]

@@ -15,24 +15,43 @@ public struct ShellXClaudeProcess: ShellXClaudeLaunching {
 
     private let executable: String
     private let environment: [String: String]
-    private let timeLimit: Duration
+    /// How long one invocation may run before it is stopped and fails.
+    let timeLimit: Duration
+    private let toolAccess: ShellXClaudeToolAccess
 
     /// Creates a launcher for the binary at `executable` using `environment` (usually the current one).
     ///
-    /// - Parameter timeLimit: How long one invocation may run before it is stopped and fails.
-    public init(executable: String, environment: [String: String], timeLimit: Duration = Self.defaultTimeLimit) {
+    /// - Parameters:
+    ///   - timeLimit: How long one invocation may run before it is stopped and fails.
+    ///   - toolAccess: Which tools Claude may use; automation runs keep the default, ``ShellXClaudeToolAccess/granted``.
+    public init(
+        executable: String,
+        environment: [String: String],
+        timeLimit: Duration = Self.defaultTimeLimit,
+        toolAccess: ShellXClaudeToolAccess = .granted
+    ) {
         self.executable = executable
         self.environment = environment
         self.timeLimit = timeLimit
+        self.toolAccess = toolAccess
     }
 
     /// The argument vector after the executable.
     ///
     /// `--permission-mode default` keeps a user's `permissions.defaultMode` (such as `bypassPermissions` or
-    /// `acceptEdits`) from widening an unattended run. `--` ends the options, so a prompt that starts with `-`
-    /// stays the prompt.
+    /// `acceptEdits`) from widening an unattended run. With ``ShellXClaudeToolAccess/none``, `--tools ""` turns
+    /// every tool off, `--strict-mcp-config` skips the user's MCP servers, `--disallowedTools` stays as a
+    /// fallback and `--no-session-persistence` keeps the call out of the user's sessions. `--` ends the
+    /// options, so a prompt that starts with `-` stays the prompt.
     func arguments(prompt: String, allowedTools: [String], resumeSessionId: String?) -> [String] {
         var args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "default"]
+        if toolAccess == .none {
+            args += [
+                "--tools", "", "--strict-mcp-config",
+                "--disallowedTools", ShellXClaudeToolAccess.writingAndNetworkTools,
+                "--no-session-persistence",
+            ]
+        }
         if !allowedTools.isEmpty { args += ["--allowedTools", allowedTools.joined(separator: ",")] }
         if let resumeSessionId { args += ["--resume", resumeSessionId] }
         return args + ["--", prompt]
