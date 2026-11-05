@@ -84,7 +84,8 @@ final class ShellXAutomationsWebHostTests: XCTestCase {
             fileOpener: { _ in },
             makeValidator: { _ in
                 ShellXAutomationValidator(existingNames: [], directoryExists: { _ in true }, claudeAvailable: true)
-            }
+            },
+            flowDrawer: { _ in throw ShellXFlowDrawError.invalidFlow }
         )
     }
 }

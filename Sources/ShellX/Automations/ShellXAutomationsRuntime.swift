@@ -63,7 +63,8 @@ final class ShellXAutomationsRuntime {
     ) -> ShellXAutomationsController {
         let cliPath = environment.cliPath
         let launcher = ShellXResolvingCreatorLauncher(claude: claudePath)
-        let prompt = creatorSystemPrompt()
+        let prompt = Self.creatorSystemPrompt(bundle: bundle)
+        let flowRules = Self.bundledText("flow-rules", bundle: bundle) ?? ""
         let scratch = environment.automationsRoot.appending(path: ".creator", directoryHint: .isDirectory)
         let localeIdentifier = Locale.current.identifier
         let store = store
@@ -101,17 +102,45 @@ final class ShellXAutomationsRuntime {
                     },
                     claudeAvailable: claudeAvailable
                 )
+            },
+            flowDrawer: { markdown in
+                guard let launch = await claudePath.launch() else {
+                    throw ShellXFlowDrawError.failed(ShellXResolvingCreatorLauncher.ClaudeMissing().errorDescription ?? "")
+                }
+                try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+                let drawer = ShellXFlowDrawer(
+                    launcher: ShellXClaudeProcess(
+                        executable: launch.path,
+                        environment: launch.environment,
+                        timeLimit: .seconds(120)
+                    ),
+                    rules: flowRules,
+                    workingDirectory: scratch
+                )
+                return try await drawer.draw(skillMarkdown: markdown)
             }
         )
     }
 
     /// The bundled creator prompt (adapted from Anthropic's skill-creator, Apache-2.0; the
-    /// license ships beside it in `shellx-automations/`).
-    private func creatorSystemPrompt() -> String {
-        guard let url = bundle.url(forResource: "creator-system-prompt", withExtension: "md", subdirectory: "shellx-automations"),
-              let text = try? String(contentsOf: url, encoding: .utf8) else {
+    /// license ships beside it in `shellx-automations/`), with the flowchart rules filled in.
+    static func creatorSystemPrompt(bundle: Bundle) -> String {
+        guard let template = bundledText("creator-system-prompt", bundle: bundle) else {
             return "You help the user create a Claude Code skill, workflow or cronjob for ShellX."
         }
-        return text
+        return composeCreatorPrompt(template: template, flowRules: bundledText("flow-rules", bundle: bundle) ?? "")
+    }
+
+    /// `template` with `{{SHELLX_FLOW_RULES}}` replaced by the text of `flow-rules.md`.
+    nonisolated static func composeCreatorPrompt(template: String, flowRules: String) -> String {
+        template.replacingOccurrences(of: "{{SHELLX_FLOW_RULES}}", with: flowRules)
+    }
+
+    /// A Markdown file of the bundle's `shellx-automations` folder.
+    private static func bundledText(_ name: String, bundle: Bundle) -> String? {
+        guard let url = bundle.url(forResource: name, withExtension: "md", subdirectory: "shellx-automations") else {
+            return nil
+        }
+        return try? String(contentsOf: url, encoding: .utf8)
     }
 }

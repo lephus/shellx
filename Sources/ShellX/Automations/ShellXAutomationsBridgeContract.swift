@@ -21,6 +21,8 @@ enum ShellXAutomationsBridgeContract {
         case openLog = "automations.openLog"
         case continueInTerminal = "automations.continueInTerminal"
         case markRead = "automations.markRead"
+        case detail = "automations.detail"
+        case drawFlow = "automations.drawFlow"
         case creatorStart = "creator.start"
         case creatorSend = "creator.send"
         case creatorCancel = "creator.cancel"
