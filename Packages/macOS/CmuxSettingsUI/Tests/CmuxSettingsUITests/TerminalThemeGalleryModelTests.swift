@@ -146,6 +146,40 @@ struct TerminalThemeGalleryModelTests {
         #expect(model.results.dark.first?.name == "ShellX")
     }
 
+    @Test("An older gallery's dark light:X,dark:X shows Catppuccin Latte for Light without writing, and a dark pick keeps it")
+    func singleDarkThemeGetsDefaultLight() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundledThemes = Self.repoRoot.appendingPathComponent("Resources/ghostty/themes", isDirectory: true)
+        let original = "font-size = 13\n\n# cmux themes start\ntheme = light:Abernathy,dark:Abernathy\n# cmux themes end\n"
+        let (model, file, log) = try makeModel(
+            existingConfig: original,
+            currentThemeValue: "light:Abernathy,dark:Abernathy",
+            themeDirectories: [bundledThemes]
+        )
+
+        #expect(model.selection == CmuxTerminalThemePair(light: "Catppuccin Latte", dark: "Abernathy"))
+        #expect(model.themeInUse == "Catppuccin Latte")
+        #expect(try file.readContents() == original)
+        #expect(log.phases.isEmpty)
+
+        model.select("Nord", slot: .dark)
+
+        #expect(try file.managedThemeValue() == "light:Catppuccin Latte,dark:Nord")
+    }
+
+    @Test("A light theme on both sides shows ShellX for Dark")
+    func singleLightThemeGetsDefaultDark() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundledThemes = Self.repoRoot.appendingPathComponent("Resources/ghostty/themes", isDirectory: true)
+        let (model, _, _) = try makeModel(
+            existingConfig: nil,
+            currentThemeValue: "Rose Pine Dawn",
+            themeDirectories: [bundledThemes]
+        )
+
+        #expect(model.selection == CmuxTerminalThemePair(light: "Rose Pine Dawn", dark: "ShellX"))
+    }
+
     @Test("A dark pick keeps the light side")
     func selectDarkKeepsLight() throws {
         defer { try? FileManager.default.removeItem(at: root) }
