@@ -3,6 +3,7 @@ import Testing
 @testable import ShellXAutomations
 
 @Suite struct ShellXClaudeProcessTests {
+    /// An automation run keeps the tools the user granted: none of the flowchart drawer's limits apply.
     @Test func argumentsOmitEmptyAllowedTools() {
         let p = ShellXClaudeProcess(executable: "/x", environment: [:])
         #expect(p.arguments(prompt: "hi", allowedTools: [], resumeSessionId: nil)
