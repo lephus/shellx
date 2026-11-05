@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { kindLabelKey, notifyOnLabel, scheduleText } from "./format";
+import { kindLabelKey, notifyOnLabel, notifyTargetLabel, scheduleText } from "./format";
 import type { AutomationLabelResolver } from "./labels";
 import type { DraftEdit } from "./store";
 import type { AutomationDraft, ValidationField, ValidationIssueDTO } from "./types";
@@ -91,9 +91,7 @@ export function DraftCard({ label, draft, issues, ready, onEdit, onCommit, locke
   const directory = draft.workingDirectory ?? "";
   const hasNotify = draft.notify.on.length > 0 || draft.notify.targets.length > 0;
   const general = issues.filter((i) => i.field === "claude" || i.field === "kind");
-  const targets = draft.notify.targets.map((t) =>
-    t === "iphone" ? `${label("targetIphone")} (${label("iphonePending")})` : label("targetMac"),
-  );
+  const targets = draft.notify.targets.map((t) => notifyTargetLabel(label, t));
 
   return (
     <div className="au-card au-draft" data-ready={ready ? "true" : "false"}>

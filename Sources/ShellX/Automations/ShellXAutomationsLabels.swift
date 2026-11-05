@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The keys are those of `DEFAULT_AUTOMATION_LABELS` in `webviews/src/automations/labels.ts`
 /// (catalog keys `automations.label.<key>`). The page fills `{name}`, `{time}`, `{message}`,
-/// `{current}`, `{total}`, `{seconds}`, `{minutes}` and `{hours}` itself, so those placeholders stay literal in every translation.
+/// `{current}`, `{total}`, `{seconds}`, `{minutes}`, `{hours}`, `{targets}` and `{events}` itself, so those placeholders stay literal in every translation.
 struct ShellXAutomationsLabels {
     func localized() -> [String: String] {
         [
@@ -95,6 +95,10 @@ struct ShellXAutomationsLabels {
             "dismiss": String(localized: "automations.label.dismiss", defaultValue: "Dismiss"),
             "actionFailed": String(localized: "automations.label.actionFailed", defaultValue: "That did not work: {message}"),
             "genericError": String(localized: "automations.label.genericError", defaultValue: "Something went wrong."),
+            "flowStartManual": String(localized: "automations.label.flowStartManual", defaultValue: "Runs when you press Run now"),
+            "flowNotify": String(localized: "automations.label.flowNotify", defaultValue: "Notify {targets} · {events}"),
+            "flowDone": String(localized: "automations.label.flowDone", defaultValue: "Done"),
+            "flowRunning": String(localized: "automations.label.flowRunning", defaultValue: "● running"),
         ]
     }
 }

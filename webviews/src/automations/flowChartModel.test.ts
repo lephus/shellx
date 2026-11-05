@@ -130,6 +130,23 @@ test("skillWithoutFlowIsNull", () => {
   expect(buildChart({ ...skill, flow: broken }, label)).toBeNull();
 });
 
+test("flowIdsThatClashWithChartIdsAreRenamed", () => {
+  const flow: AutomationFlow = {
+    nodes: [
+      { id: "start", type: "step", label: "Begin" },
+      { id: "notify", type: "step", label: "Tell the team" },
+    ],
+    edges: [{ from: "start", to: "notify" }],
+  };
+  const model = chart({ ...skill, kind: "cronjob", notify: { on: ["done"], targets: ["mac"] }, flow });
+  expect(model.nodes.map((n) => n.id)).toEqual(["start", "flow-start", "flow-notify", "notify"]);
+  expect(model.edges).toEqual([
+    { from: "start", to: "flow-start" },
+    { from: "flow-start", to: "flow-notify" },
+    { from: "flow-notify", to: "notify" },
+  ]);
+});
+
 test("layoutBranchGoesRight", () => {
   const layout = layoutChart(chart(skill));
   const ask = placed(layout.nodes, "approve");

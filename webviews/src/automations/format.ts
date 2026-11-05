@@ -1,5 +1,5 @@
 import type { AutomationLabelResolver } from "./labels";
-import type { AutomationDraft, AutomationKind, RunStatus } from "./types";
+import type { AutomationDraft, AutomationKind, NotifyTarget, RunStatus } from "./types";
 
 export function kindLabelKey(kind: AutomationKind) {
   return kind === "skill" ? "kindSkill" : kind === "workflow" ? "kindWorkflow" : "kindCronjob";
@@ -34,6 +34,11 @@ export function scheduleText(schedule: AutomationDraft["schedule"]): { human: st
 
 export function notifyOnLabel(label: AutomationLabelResolver, on: string): string {
   return on === "done" ? label("notifyDone") : on === "failed" ? label("notifyFailed") : label("notifyNeedsYou");
+}
+
+/** "Mac", or "iPhone (after the next update)" while iPhone delivery is pending. */
+export function notifyTargetLabel(label: AutomationLabelResolver, target: NotifyTarget): string {
+  return target === "iphone" ? `${label("targetIphone")} (${label("iphonePending")})` : label("targetMac");
 }
 
 /** Run length as "42 s", "3 min 5 s" or "2 h 10 min"; the unit patterns come from the host's labels. */

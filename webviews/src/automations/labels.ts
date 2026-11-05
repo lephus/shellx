@@ -88,6 +88,10 @@ export const DEFAULT_AUTOMATION_LABELS = {
   dismiss: "Dismiss",
   actionFailed: "That did not work: {message}",
   genericError: "Something went wrong.",
+  flowStartManual: "Runs when you press Run now",
+  flowNotify: "Notify {targets} · {events}",
+  flowDone: "Done",
+  flowRunning: "● running",
 } as const;
 
 export type AutomationLabelKey = keyof typeof DEFAULT_AUTOMATION_LABELS;
