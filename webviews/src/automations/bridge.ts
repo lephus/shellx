@@ -28,7 +28,7 @@ function isReply(value: unknown): value is AutomationsReply<unknown> {
   return typeof error === "object" && error !== null && typeof error.code === "string";
 }
 
-const EVENT_TYPES = ["automations.changed", "creator.event", "focus"];
+const EVENT_TYPES = ["automations.changed", "creator.event", "focus", "appearance"];
 
 function isEvent(value: unknown): value is AutomationsEvent {
   if (typeof value !== "object" || value === null) return false;

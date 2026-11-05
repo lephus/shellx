@@ -15,7 +15,7 @@ final class ShellXAutomationsController {
     private typealias Failure = ShellXAutomationsBridgeFailure
 
     let library: ShellXAutomationsLibrary
-    /// Delivers `automations.changed`, `creator.event` and `focus` to the page.
+    /// Delivers `automations.changed`, `creator.event`, `focus` and `appearance` to the page.
     var emit: (@MainActor ([String: Any]) -> Void)?
     /// The appearance `app.context` reports; the web view points it at itself.
     var effectiveAppearance: @MainActor () -> NSAppearance = { NSApplication.shared.effectiveAppearance }
@@ -34,6 +34,8 @@ final class ShellXAutomationsController {
     private let encoder = ShellXAutomationsDTOEncoder()
 
     private var pendingFocusId: String?
+    /// The appearance the page was last told about, in `app.context` or an `appearance` event.
+    private var reportedAppearance: String?
     private var session: ShellXCreatorSession?
     private var sessionEvents: Task<Void, Never>?
     /// The automation the creator edits, or nil for a new one.
@@ -72,6 +74,15 @@ final class ShellXAutomationsController {
     func focus(id: String?) {
         pendingFocusId = id
         if let id { send(["type": Contract.Event.focus.rawValue, "id": id]) }
+    }
+
+    /// Tells the page when the effective appearance differs from what it last heard.
+    /// The web view calls it whenever its effective appearance changes.
+    func appearanceDidChange() {
+        let current = currentAppearance()
+        guard current != reportedAppearance else { return }
+        reportedAppearance = current
+        send(["type": Contract.Event.appearance.rawValue, "appearance": current])
     }
 
     /// Stops the creator session, if any. Called when the panel closes.
@@ -186,15 +197,20 @@ final class ShellXAutomationsController {
     }
 
     private func appContext() -> [String: Any] {
-        let isDark = effectiveAppearance().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let appearance = currentAppearance()
+        reportedAppearance = appearance
         var context: [String: Any] = [
             "labels": ShellXAutomationsLabels().localized(),
             "reduceMotion": reduceMotion(),
-            "appearance": isDark ? "dark" : "light",
+            "appearance": appearance,
         ]
         if let pendingFocusId { context["focusId"] = pendingFocusId }
         pendingFocusId = nil
         return context
+    }
+
+    private func currentAppearance() -> String {
+        effectiveAppearance().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
     }
 
     // MARK: Creator
