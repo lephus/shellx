@@ -157,3 +157,30 @@ public struct CmuxTerminalThemePair: Equatable, Sendable {
         self.dark = dark
     }
 }
+
+extension CmuxTerminalThemePair {
+    /// A pair naming one theme for both appearances (a plain `theme = X`, or
+    /// the `light:X,dark:X` older galleries wrote) only suits one of them.
+    /// Returns the pair with the other appearance's side taken from
+    /// `defaults`: a dark theme gets the default light theme, a light theme
+    /// the default dark theme. Any other pair, or a theme whose background is
+    /// unknown, comes back unchanged. Nothing is written; this is how the
+    /// pair is shown and applied until the user picks that side.
+    /// - Parameters:
+    ///   - defaults: The built-in light and dark themes.
+    ///   - isDark: Whether a theme's background is dark (`nil`: unknown),
+    ///     the same classification the gallery sections use.
+    public func fillingUnsuitedSide(
+        from defaults: CmuxTerminalThemePair,
+        isDark: (String) -> Bool?
+    ) -> CmuxTerminalThemePair {
+        guard let light, let dark,
+              light.caseInsensitiveCompare(dark) == .orderedSame,
+              let themeIsDark = isDark(dark) else {
+            return self
+        }
+        return themeIsDark
+            ? CmuxTerminalThemePair(light: defaults.light, dark: dark)
+            : CmuxTerminalThemePair(light: light, dark: defaults.dark)
+    }
+}

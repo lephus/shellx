@@ -222,10 +222,26 @@ final class TerminalThemeGalleryModel {
     }
 
     /// Reads a raw `theme` value. A plain name fills both sides; a side the
-    /// value leaves unnamed takes the default.
+    /// value leaves unnamed takes the default. One theme on both sides fills
+    /// only the appearance it suits, the other side shows the default (the
+    /// same rule the terminal applies), without writing anything.
     private func effectivePair(rawValue: String?) -> CmuxTerminalThemePair {
         let pair = block.themePair(fromRawValue: rawValue)
+        let directories = context.themeDirectories
         return CmuxTerminalThemePair(light: pair.light ?? context.defaultPair.light, dark: pair.dark ?? context.defaultPair.dark)
+            .fillingUnsuitedSide(from: context.defaultPair) { Self.isDarkTheme(named: $0, in: directories) }
+    }
+
+    /// Whether the theme file `name` has a dark background, from the first
+    /// directory that holds it; `nil` when none does or it sets no background.
+    nonisolated static func isDarkTheme(named name: String, in directories: [URL]) -> Bool? {
+        for directory in directories {
+            let url = directory.appendingPathComponent(name, isDirectory: false)
+            if let contents = try? String(contentsOf: url, encoding: .utf8) {
+                return GhosttyThemeColors(parsing: contents).isDark
+            }
+        }
+        return nil
     }
 
     nonisolated static func loadThemes(in directories: [URL]) -> [Theme] {

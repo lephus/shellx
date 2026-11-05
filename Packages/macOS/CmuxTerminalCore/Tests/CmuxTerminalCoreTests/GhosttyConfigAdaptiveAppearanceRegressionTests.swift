@@ -42,14 +42,24 @@ import Testing
         }
     }
 
-    @Test(arguments: ["background = #123456", "theme = Deliberate Dark"])
-    func authoredAppearanceStillOwnsColors(setting: String) throws {
-        try withFixture(setting) { path, resources in
+    @Test func authoredBackgroundStillOwnsColors() throws {
+        try withFixture("background = #123456") { path, resources in
             let light = load(path, resources: resources, scheme: .light)
             let dark = load(path, resources: resources, scheme: .dark)
             #expect(light.backgroundColor == dark.backgroundColor)
             #expect(light.foregroundColor == dark.foregroundColor)
-            #expect(light.backgroundColor.hexString() == (setting.hasPrefix("theme") ? "#334455" : "#123456"))
+            #expect(light.backgroundColor.hexString() == "#123456")
+        }
+    }
+
+    /// An authored dark theme owns Dark; Light shows the default light theme
+    /// (one theme on both sides only suits one appearance).
+    @Test func authoredDarkThemeOwnsDarkOnly() throws {
+        try withFixture("theme = Deliberate Dark") { path, resources in
+            let light = load(path, resources: resources, scheme: .light)
+            let dark = load(path, resources: resources, scheme: .dark)
+            #expect(dark.backgroundColor.hexString() == "#334455")
+            #expect(light.backgroundColor.hexString() != "#334455")
         }
     }
 

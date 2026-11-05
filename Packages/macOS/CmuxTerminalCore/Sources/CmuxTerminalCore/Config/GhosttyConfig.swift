@@ -1061,10 +1061,17 @@ public struct GhosttyConfig {
         bundleResourceURL: URL?,
         preferredColorScheme: ColorSchemePreference? = nil
     ) {
-        guard let resolvedThemeName = Self.appliedThemeName(
+        let colorScheme = preferredColorScheme ?? Self.currentColorSchemePreference()
+        guard let appliedThemeName = Self.appliedThemeName(
             from: name,
-            preferredColorScheme: preferredColorScheme ?? Self.currentColorSchemePreference()
+            preferredColorScheme: colorScheme
         ) else { return }
+        let resolvedThemeName = Self.singleThemeAppearanceSubstitute(
+            rawThemeValue: name,
+            preferredColorScheme: colorScheme,
+            environment: environment,
+            bundleResourceURL: bundleResourceURL
+        ) ?? appliedThemeName
         let expandedThemePath = NSString(string: resolvedThemeName).expandingTildeInPath
         if (expandedThemePath as NSString).isAbsolutePath,
            let contents = try? String(contentsOfFile: expandedThemePath, encoding: .utf8) {
