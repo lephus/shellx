@@ -1,4 +1,5 @@
 import AppKit
+import CmuxFoundation
 import CoreText
 import Foundation
 import Testing
@@ -73,6 +74,31 @@ private struct NoFonts: GhosttyFontProbing {
     @Test func aRealPairIsUntouched() {
         #expect(override("theme = light:Rose Pine Dawn,dark:Abernathy", .light) == "theme = Rose Pine Dawn")
         #expect(override("theme = light:Rose Pine Dawn,dark:Abernathy", .dark) == "theme = Abernathy")
+    }
+
+    /// A default theme with no file must not replace a theme that works, or
+    /// the terminal falls back to Ghostty's built-in colors (#282C34 on
+    /// white text) instead of the configured theme.
+    @Test func aDefaultThatCannotBeFoundKeepsTheConfiguredTheme() {
+        let missing = CmuxTerminalThemePair(
+            light: "No Such Light Theme \(UUID().uuidString)",
+            dark: "No Such Dark Theme \(UUID().uuidString)"
+        )
+        func substitute(_ raw: String, _ scheme: GhosttyConfig.ColorSchemePreference, _ defaults: CmuxTerminalThemePair) -> String? {
+            GhosttyConfig.singleThemeAppearanceSubstitute(
+                rawThemeValue: raw,
+                preferredColorScheme: scheme,
+                environment: Self.environment,
+                bundleResourceURL: nil,
+                defaultPair: defaults
+            )
+        }
+        #expect(substitute("light:Abernathy,dark:Abernathy", .light, missing) == nil)
+        #expect(substitute("Rose Pine Dawn", .dark, missing) == nil)
+        // A default that has a file is still used.
+        let shipped = CmuxTerminalThemePair(light: "Catppuccin Latte", dark: "ShellX")
+        #expect(substitute("light:Abernathy,dark:Abernathy", .light, shipped) == "Catppuccin Latte")
+        #expect(substitute("Rose Pine Dawn", .dark, shipped) == "ShellX")
     }
 
     /// The Swift config (the chrome's colors) follows the same rule.
