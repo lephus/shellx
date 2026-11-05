@@ -9,8 +9,8 @@ extension GhosttyConfig {
     /// (see ``CmuxTerminalThemePair/fillingUnsuitedSide(from:isDark:)``): a
     /// dark theme shows ``cmuxDefaultLightThemeName`` in light appearance, a
     /// light theme shows ``cmuxDefaultDarkThemeName`` in dark appearance.
-    /// `environment` and `bundleResourceURL` locate the theme file that
-    /// decides whether it is dark.
+    /// A default with no theme file is never shown. `environment` and
+    /// `bundleResourceURL` locate the theme files.
     public static func singleThemeAppearanceSubstitute(
         rawThemeValue: String,
         preferredColorScheme: ColorSchemePreference,
@@ -43,7 +43,28 @@ extension GhosttyConfig {
         let (shown, configured) = preferredColorScheme == .light
             ? (fitted.light, pair.light)
             : (fitted.dark, pair.dark)
-        return shown == configured ? nil : shown
+        // A default with no theme file would leave Ghostty's built-in colors,
+        // which is worse than the configured theme.
+        guard let shown, shown != configured,
+              themeFileExists(named: shown, environment: environment, bundleResourceURL: bundleResourceURL) else {
+            return nil
+        }
+        return shown
+    }
+
+    /// Whether a theme file named `name` exists in any theme search path.
+    static func themeFileExists(
+        named name: String,
+        environment: [String: String],
+        bundleResourceURL: URL?
+    ) -> Bool {
+        themeNameCandidates(from: name).contains { candidateName in
+            themeSearchPaths(
+                forThemeName: candidateName,
+                environment: environment,
+                bundleResourceURL: bundleResourceURL
+            ).contains { FileManager.default.isReadableFile(atPath: $0) }
+        }
     }
 
     /// Whether the named theme's background is dark, from the first theme
