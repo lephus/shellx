@@ -40,7 +40,7 @@ GRADIENT_ALLOW = [
     ("Sources/ProBadgeStyle.swift", "logo gradient (logo is the spec's one exception)"),
     ("Sources/Cloud/CloudWelcomeMedia.swift", "cloud welcome artwork (cloud UI hidden in ShellX)"),
     ("Sources/App/ComputerUseCursorOverlayController.swift", "agent cursor overlay art"),
-    ("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Rows/ThemeWindowThumbnail.swift", "wallpaper art in the hidden appearance picker"),
+    ("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Rows/ThemeWindowThumbnail.swift", "wallpaper art in the appearance picker"),
     ("Packages/macOS/CmuxComputerUse/Sources/CmuxComputerUse/AgentCursorPointerView.swift", "agent cursor art"),
     ("Packages/macOS/CmuxSwiftRender/Sources/CmuxSwiftRender/SwiftViewInterpreter.swift", "user-authored view interpreter"),
     ("Packages/macOS/CmuxSwiftRender/Sources/CmuxSwiftRender/RenderNode.swift", "user-authored view model"),

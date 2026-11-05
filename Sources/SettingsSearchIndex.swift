@@ -19,7 +19,7 @@ enum SettingsSearchIndex {
         setting(.account, "account", String(localized: "settings.section.account", defaultValue: "Account"), "sign in login team sync user profile"),
         setting(.account, "pro", String(localized: "settings.account.pro.title", defaultValue: "ShellX Pro"), "pro upgrade subscription billing plan pricing cloud"),
         setting(.app, "language", String(localized: "settings.app.language", defaultValue: "Language"), "locale translation japanese english restart"),
-        // ShellX is dark-only: no Appearance (light/dark/system) row to find.
+        setting(.themes, "appearance", String(localized: "settings.app.appearance", defaultValue: "Appearance"), "theme light dark system"),
         setting(.themes, "accent-color", String(localized: "settings.app.accentColor", defaultValue: "Accent Color"), "accent highlight tint blue system"),
         setting(.app, "app-icon", String(localized: "settings.app.appIcon", defaultValue: "App Icon"), "dock icon alternate"),
         setting(.app, "new-workspace-placement", String(localized: "settings.app.newWorkspacePlacement", defaultValue: "New Workspace Placement"), "workspace order position"),
@@ -98,15 +98,6 @@ enum SettingsSearchIndex {
         setting(.app, "canvas-pane-gap", String(localized: "settings.app.canvasPaneGap", defaultValue: "Canvas Pane Gap"), "canvas.paneGap canvas pane gap spacing freeform layout panes snapping tidy distribute align"),
         setting(.app, "canvas-snapping", String(localized: "settings.app.canvasSnapping", defaultValue: "Canvas Snapping"), "canvas.snappingEnabled canvas snap snapping enabled edges drag resize align panes freeform layout"),
         setting(.themes, "terminal-theme", String(localized: "settings.terminal.theme", defaultValue: "Terminal Theme"), "ghostty theme themes color scheme palette colors light dark catppuccin gruvbox nord dracula solarized tokyonight rose pine github cmux themes"),
-        setting(
-            .themes,
-            "adaptive-default-theme",
-            String(localized: "settings.terminal.adaptiveDefaultTheme", defaultValue: "Adapt Default Theme to Appearance"),
-            String(
-                localized: "settings.search.alias.setting.terminal.adaptive-default-theme",
-                defaultValue: "terminal.adaptiveDefaultTheme adaptive default theme appearance light dark palette Ghostty managed colors empty untouched config preserve settings"
-            )
-        ),
         setting(.terminal, "scrollbar", String(localized: "settings.terminal.scrollBar", defaultValue: "Show Terminal Scroll Bar"), "terminal shell scrollback"),
         setting(.terminal, "session-content-width", String(localized: "settings.terminal.sessionContentWidth", defaultValue: "Session Content Width"), "terminal.sessionContentMaxWidth terminal agent chat max width readable line length narrow wide"),
         setting(.terminal, "session-content-alignment", String(localized: "settings.terminal.sessionContentAlignment", defaultValue: "Session Content Alignment"), "terminal.sessionContentAlignment left center right align terminal agent chat"),
@@ -204,7 +195,6 @@ enum SettingsSearchIndex {
         setting(.browser, "search-engine", String(localized: "settings.browser.searchEngine", defaultValue: "Default Search Engine"), "address bar query google duckduckgo bing kagi brave startpage perplexity exa yahoo ecosia qwant mojeek wikipedia github baidu yandex custom search provider"),
         setting(.browser, "enable-browser", String(localized: "settings.browser.enabled", defaultValue: "Enable ShellX Browser"), "webview tabs links"),
         setting(.browser, "search-suggestions", String(localized: "settings.browser.searchSuggestions", defaultValue: "Show Search Suggestions"), "browser address bar suggestions"),
-        setting(.themes, "browser-theme", String(localized: "settings.browser.theme", defaultValue: "Browser Theme"), "web appearance light dark system"),
         setting(.browser, "default-zoom-level", String(localized: "settings.browser.defaultZoomLevel", defaultValue: "Default Page Zoom"), "default browser zoom level page magnification percent scale actual size"),
         setting(.browser, "hidden-webview-discard", String(localized: "settings.browser.hiddenWebViewDiscard", defaultValue: "Browser Memory Saver"), "memory hidden tabs webview discard unload"),
         setting(.browser, "hidden-webview-discard-mode", String(localized: "settings.browser.hiddenWebViewDiscardMode", defaultValue: "Memory Saver Mode"), "memory budget timer hidden tabs discard"),
@@ -333,7 +323,6 @@ enum SettingsSearchIndex {
         "sidebar.rightMaxWidth": settingID(for: .sidebarAppearance, idSuffix: "right-max-width"),
         "sidebar-font-size": settingID(for: .sidebarAppearance, idSuffix: "font-size"),
         "surface-tab-bar-font-size": settingID(for: .terminal, idSuffix: "tab-bar-font-size"),
-        "terminal.adaptiveDefaultTheme": settingID(for: .themes, idSuffix: "adaptive-default-theme"),
         "terminal.showScrollBar": settingID(for: .terminal, idSuffix: "scrollbar"),
         "terminal.showTextBoxOnNewTerminals": settingID(for: .textBox, idSuffix: "show-textbox-new-terminals"),
         "terminal.focusTextBoxOnNewTerminals": settingID(for: .textBox, idSuffix: "focus-textbox-new-terminals"),
@@ -387,7 +376,7 @@ enum SettingsSearchIndex {
         "browser.customSearchEngineName": settingID(for: .browser, idSuffix: "search-engine"),
         "browser.customSearchEngineURLTemplate": settingID(for: .browser, idSuffix: "search-engine"),
         "browser.showSearchSuggestions": settingID(for: .browser, idSuffix: "search-suggestions"),
-        "browser.theme": settingID(for: .themes, idSuffix: "browser-theme"),
+        "app.appearance": settingID(for: .themes, idSuffix: "appearance"),
         "browser.defaultZoomLevel": settingID(for: .browser, idSuffix: "default-zoom-level"),
         "browser.discardHiddenWebViews": settingID(for: .browser, idSuffix: "hidden-webview-discard"),
         "browser.hiddenWebViewDiscardMode": settingID(for: .browser, idSuffix: "hidden-webview-discard-mode"),

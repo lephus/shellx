@@ -311,14 +311,14 @@ final class AppearanceSettingsTests: XCTestCase {
         XCTAssertEqual(
             AppearanceSettings.terminalColorSchemePreference(
                 defaults: defaults,
-                systemAppearance: .init(prefersDark: false)
+                systemAppearance: .init(interfaceStyle: nil)
             ),
             .light
         )
         XCTAssertEqual(
             AppearanceSettings.terminalColorSchemePreference(
                 defaults: defaults,
-                systemAppearance: .init(prefersDark: true)
+                systemAppearance: .init(interfaceStyle: "Dark")
             ),
             .dark
         )
@@ -484,7 +484,7 @@ final class AppearanceSettingsTests: XCTestCase {
         XCTAssertEqual(AppearanceSettings.colorSchemeOverride(for: AppearanceMode.dark.rawValue), .dark)
         XCTAssertNil(AppearanceSettings.colorSchemeOverride(for: AppearanceMode.system.rawValue))
         XCTAssertNil(AppearanceSettings.colorSchemeOverride(for: AppearanceMode.auto.rawValue))
-        XCTAssertNil(AppearanceSettings.colorSchemeOverride(for: "invalid"))
+        XCTAssertEqual(AppearanceSettings.colorSchemeOverride(for: "invalid"), .dark)
         XCTAssertEqual(AppearanceSettings.colorScheme(for: AppearanceMode.dark.rawValue, fallback: .light), .dark)
         XCTAssertEqual(AppearanceSettings.colorScheme(for: AppearanceMode.system.rawValue, fallback: .dark), .dark)
     }

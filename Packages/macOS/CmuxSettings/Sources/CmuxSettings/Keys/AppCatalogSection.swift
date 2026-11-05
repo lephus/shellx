@@ -5,7 +5,7 @@ import Foundation
 public struct AppCatalogSection: SettingCatalogSection {
     public let appearance = DefaultsKey<AppearanceMode>(
         id: "app.appearance",
-        defaultValue: .system,
+        defaultValue: .dark,
         userDefaultsKey: "appearanceMode"
     )
 

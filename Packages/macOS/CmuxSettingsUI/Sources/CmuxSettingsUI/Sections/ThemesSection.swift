@@ -3,10 +3,8 @@ import CmuxSettings
 import SwiftUI
 
 /// **Themes** section: every color and appearance setting in one place.
-/// Accent color and app icon, the browser page theme, the adaptive default
-/// theme toggle, and the terminal theme gallery with every theme Ghostty
-/// ships. ShellX is dark-only (spec §7.4), so the app Appearance
-/// (light/dark/system) picker is not shown.
+/// App appearance (System / Light / Dark), accent color and app icon, and the
+/// terminal theme gallery with every theme Ghostty ships.
 @MainActor
 public struct ThemesSection: View {
     private let hostActions: SettingsHostActions
@@ -16,8 +14,6 @@ public struct ThemesSection: View {
     @State private var accentColorCustomHex: DefaultsValueModel<String>
     @State private var accentColorWriter: AccentColorSettingsFileWriter
     @State private var appIcon: DefaultsValueModel<AppIconMode>
-    @State private var adaptiveDefaultTheme: DefaultsValueModel<Bool>
-    @State private var browserTheme: DefaultsValueModel<BrowserThemeMode>
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -52,30 +48,29 @@ public struct ThemesSection: View {
         _accentColor = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.accentColor))
         _accentColorCustomHex = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.accentColorCustomHex))
         _appIcon = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.app.appIcon))
-        _adaptiveDefaultTheme = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.terminal.adaptiveDefaultTheme))
-        _browserTheme = State(initialValue: DefaultsValueModel(store: defaultsStore, key: catalog.browser.theme))
     }
 
     public var body: some View {
         Group {
             SettingsSectionHeader(String(localized: "settings.section.themes", defaultValue: "Themes"), section: .themes)
             appCard
-            SettingsCard {
-                browserThemeRow
-            }
             // Last: the gallery lists every theme and runs long.
             SettingsCard {
-                adaptiveDefaultThemeRow
-                SettingsCardDivider()
                 TerminalThemeSettingsRows(hostActions: hostActions)
             }
         }
-        .task { startSettingsObservation([appearance, accentColor, accentColorCustomHex, appIcon, adaptiveDefaultTheme, browserTheme]) }
+        .task { startSettingsObservation([appearance, accentColor, accentColorCustomHex, appIcon]) }
     }
 
     @ViewBuilder
     private var appCard: some View {
         SettingsCard {
+            ThemePickerRow(
+                selectedMode: appearance.current,
+                onSelect: { appearance.set($0) }
+            )
+            .settingsSearchAnchors(["setting:themes:appearance"])
+            SettingsCardDivider()
             SettingsCardRow(
                 configurationReview: .json("app.accentColor"),
                 String(localized: "settings.app.accentColor", defaultValue: "Accent Color"),
@@ -139,60 +134,5 @@ public struct ThemesSection: View {
     private func requestAccentColor(mode: CmuxAccentColorMode, customHex: String?) {
         guard let value = CmuxAccentColorMode.settingsFileValue(mode: mode, customHex: customHex) else { return }
         accentColorWriter.request(value)
-    }
-
-    private var adaptiveDefaultThemeRow: some View {
-        SettingsCardRow(
-            configurationReview: .json("terminal.adaptiveDefaultTheme"),
-            String(
-                localized: "settings.terminal.adaptiveDefaultTheme",
-                defaultValue: "Adapt Default Theme to Appearance"
-            ),
-            subtitle: String(localized: "settings.terminal.adaptiveDefaultTheme.subtitle", defaultValue: "Matches terminal colors to the light or dark appearance when no Ghostty theme or colors are set.")
-        ) {
-            Toggle(
-                "",
-                isOn: Binding(
-                    get: { adaptiveDefaultTheme.current },
-                    set: { enabled in
-                        adaptiveDefaultTheme.set(enabled) {
-                            @MainActor [hostActions] in
-                            hostActions.terminalAdaptiveDefaultThemeDidChange()
-                        }
-                    }
-                )
-            )
-            .labelsHidden()
-            .controlSize(.small)
-            .accessibilityIdentifier("SettingsTerminalAdaptiveDefaultThemeToggle")
-        }
-    }
-
-    private var browserThemeRow: some View {
-        SettingsCardRow(
-            configurationReview: .json("browser.theme"),
-            String(localized: "settings.browser.theme", defaultValue: "Browser Theme"),
-            subtitle: String(localized: "settings.browser.theme.subtitle", defaultValue: "Choose light or dark pages for sites that support both. System matches the app appearance."),
-            controlWidth: Self.columnWidth
-        ) {
-            Picker("", selection: Binding(get: { browserTheme.current }, set: { browserTheme.set($0) })) {
-                ForEach(BrowserThemeMode.allCases, id: \.self) { mode in
-                    Text(Self.browserThemeDisplayName(mode)).tag(mode)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-        }
-    }
-
-    private static func browserThemeDisplayName(_ mode: BrowserThemeMode) -> String {
-        switch mode {
-        case .system:
-            return String(localized: "theme.system", defaultValue: "System")
-        case .light:
-            return String(localized: "theme.light", defaultValue: "Light")
-        case .dark:
-            return String(localized: "theme.dark", defaultValue: "Dark")
-        }
     }
 }

@@ -64,16 +64,11 @@ enum AppearanceSettings {
 
     private static func defaultLiveEnvironment() -> LiveApplyEnvironment {
         LiveApplyEnvironment(
-            // ShellX is dark-only (spec §7.4): every live apply lands on the
-            // forced appearance, whatever mode a caller resolved.
-            setApplicationAppearance: { _ in
-                NSApplication.shared.appearance = ShellXAppearance.forcedAppearance
+            setApplicationAppearance: { appearance in
+                NSApplication.shared.appearance = appearance
             },
-            synchronizeTerminalThemeWithAppearance: { _, source in
-                GhosttyApp.shared.synchronizeThemeWithAppearance(
-                    ShellXAppearance.forcedAppearance,
-                    source: source
-                )
+            synchronizeTerminalThemeWithAppearance: { appearance, source in
+                GhosttyApp.shared.synchronizeThemeWithAppearance(appearance, source: source)
             },
             systemAppearance: {
                 AppearanceSettings.systemNSAppearance()
@@ -89,7 +84,7 @@ enum AppearanceSettings {
     typealias SystemAppearance = TerminalSystemAppearance
 
     static let appearanceModeKey = "appearanceMode"
-    static let defaultMode: AppearanceMode = .system
+    static let defaultMode: AppearanceMode = .dark
 
     static func mode(for rawValue: String?) -> AppearanceMode {
         guard let rawValue, let mode = AppearanceMode(rawValue: rawValue) else {
@@ -98,25 +93,12 @@ enum AppearanceSettings {
         return mode == .auto ? .system : mode
     }
 
-    /// ShellX is dark-only (spec §7.4). Pins the stored appearance mode to
-    /// ``ShellXAppearance/forcedModeRawValue`` so the terminal theme side,
-    /// SwiftUI color schemes and chrome all resolve dark, even when an old
-    /// default or a hand-edited settings file stored Light or System.
-    /// Returns whether it changed the stored value.
-    @discardableResult
-    static func enforceShellXDarkOnly(defaults: UserDefaults = .standard) -> Bool {
-        guard defaults.string(forKey: appearanceModeKey) != ShellXAppearance.forcedModeRawValue else {
-            return false
-        }
-        defaults.set(ShellXAppearance.forcedModeRawValue, forKey: appearanceModeKey)
-        return true
-    }
-
     @discardableResult
     static func resolvedMode(defaults: UserDefaults = .standard) -> AppearanceMode {
         let stored = defaults.string(forKey: appearanceModeKey)
         let resolved = mode(for: stored)
-        if stored != resolved.rawValue {
+        // A missing value resolves to the default without being written.
+        if let stored, stored != resolved.rawValue {
             defaults.set(resolved.rawValue, forKey: appearanceModeKey)
         }
         return resolved
@@ -314,12 +296,9 @@ final class AppearanceSettingsUserDefaultsObserver {
                 currentRawValue: {
                     defaults.string(forKey: AppearanceSettings.appearanceModeKey)
                 },
-                applyStoredMode: { _, source in
-                    // ShellX is dark-only: a stored Light/System value is
-                    // pinned back to dark before it is applied.
-                    AppearanceSettings.enforceShellXDarkOnly(defaults: defaults)
-                    return AppearanceSettings.applyStoredMode(
-                        rawValue: ShellXAppearance.forcedModeRawValue,
+                applyStoredMode: { rawValue, source in
+                    AppearanceSettings.applyStoredMode(
+                        rawValue: rawValue,
                         defaults: defaults,
                         source: source
                     )

@@ -51,8 +51,6 @@ struct SettingsTaxonomyTests {
     @Test func themeSettingsResolveToTheThemesSection() throws {
         let index = SettingsSearchIndex(catalog: SettingCatalog())
         #expect(index.anchorID(forSettingsPath: "app.accentColor") == "setting:themes:accent-color")
-        #expect(index.anchorID(forSettingsPath: "terminal.adaptiveDefaultTheme") == "setting:themes:adaptive-default-theme")
-        #expect(index.anchorID(forSettingsPath: "browser.theme") == "setting:themes:browser-theme")
 
         let hits = index.match("terminal theme")
         let terminalTheme = try #require(hits.first { $0.id == "setting:themes:terminal-theme" })

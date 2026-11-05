@@ -166,27 +166,14 @@ enum BrowserThemeSettings {
     static let legacyForcedDarkModeEnabledKey = "browserForcedDarkModeEnabled"
     static let defaultMode: BrowserThemeMode = .system
 
-    static func mode(for rawValue: String?) -> BrowserThemeMode {
-        guard let rawValue, let mode = BrowserThemeMode(rawValue: rawValue) else {
-            return defaultMode
-        }
-        return mode
+    /// Deprecated: the stored value is ignored. Pages always follow the app
+    /// appearance (`app.appearance`), so this is always `.system`.
+    static func mode(for _: String?) -> BrowserThemeMode {
+        defaultMode
     }
 
-    static func mode(defaults: UserDefaults = .standard) -> BrowserThemeMode {
-        let resolvedMode = mode(for: defaults.string(forKey: modeKey))
-        if defaults.string(forKey: modeKey) != nil {
-            return resolvedMode
-        }
-
-        // Migrate the legacy bool toggle only when the new mode key is unset.
-        if defaults.object(forKey: legacyForcedDarkModeEnabledKey) != nil {
-            let migratedMode: BrowserThemeMode = defaults.bool(forKey: legacyForcedDarkModeEnabledKey) ? .dark : .system
-            defaults.set(migratedMode.rawValue, forKey: modeKey)
-            return migratedMode
-        }
-
-        return defaultMode
+    static func mode(defaults _: UserDefaults = .standard) -> BrowserThemeMode {
+        defaultMode
     }
 
     static func apply(_ mode: BrowserThemeMode, to webView: WKWebView) {

@@ -328788,6 +328788,71 @@
         }
       }
     },
+    "settings.app.appearance.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch ShellX, the terminal and web pages between light and dark. System follows macOS."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schaltet ShellX, das Terminal und Webseiten zwischen Hell und Dunkel um. „System“ folgt macOS."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bascule ShellX, le terminal et les pages web entre clair et sombre. « Système » suit macOS."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بدّل ShellX والطرفية وصفحات الويب بين الوضع الفاتح والداكن. يتبع «النظام» إعداد macOS."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambia ShellX, el terminal y las páginas web entre claro y oscuro. «Sistema» sigue a macOS."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在淺色與深色之間切換 ShellX、終端機與網頁。「系統」會跟隨 macOS。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在浅色与深色之间切换 ShellX、终端和网页。“系统”会跟随 macOS。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX, 터미널, 웹 페이지를 라이트와 다크 사이에서 전환합니다. 시스템은 macOS를 따릅니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX、ターミナル、Web ページをライトとダークで切り替えます。「システム」は macOS に従います。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển ShellX, terminal và trang web giữa sáng và tối. Hệ thống theo macOS."
+          }
+        }
+      }
+    },
     "settings.app.canvasPaneGap": {
       "extractionState": "manual",
       "localizations": {
