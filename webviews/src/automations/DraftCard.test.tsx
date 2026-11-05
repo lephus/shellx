@@ -123,7 +123,7 @@ test("defaultsToFlowchart: a skill draft with a usable flow shows the chart and 
   expect(html).toContain("<svg");
   expect(html).toContain("Fetch the PRs");
   expect(html).toContain(label("flowCaption"));
-  expect(html).not.toContain("<textarea");
+  expect((html.match(/<textarea/g) ?? []).length).toBe(1);
   expect(html).not.toContain('data-field="skillMarkdown"');
   expect(html).toMatch(/aria-pressed="true"[^>]*>Flowchart/);
   expect(html).toMatch(/aria-pressed="false"[^>]*>Text/);

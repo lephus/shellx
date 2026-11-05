@@ -1,4 +1,5 @@
 import type { AutomationsBridge } from "./bridge";
+import { usableFlow } from "./flowChartModel";
 import { readFrontmatter, writeFrontmatter } from "./frontmatter";
 import type {
   AutomationDraft,
@@ -34,7 +35,13 @@ export type CreatorState = {
   editId: string | null;
   /** The user changed the draft on the card and the host has not been told yet. */
   draftDirty: boolean;
+  /** The draft card shows the flowchart or the text fields. */
+  draftView: DraftViewMode;
+  /** The chart matches the draft: false once the user edits the card, until the next draft event. */
+  flowCurrent: boolean;
 };
+
+export type DraftViewMode = "flow" | "text";
 
 /** The draft fields the user can change on the card. */
 export type DraftEdit = Partial<Pick<AutomationDraft, "name" | "description" | "skillMarkdown">>;
@@ -66,6 +73,8 @@ function initialCreator(editId: string | null = null): CreatorState {
     saving: false,
     editId,
     draftDirty: false,
+    draftView: "flow",
+    flowCurrent: false,
   };
 }
 
@@ -208,7 +217,12 @@ export class AutomationsStore {
         break;
       case "draft":
         // A malformed or partial draft keeps the last good one.
-        if (isDraft(event.draft)) this.setCreator({ draft: event.draft, issues: [], draftDirty: false });
+        if (isDraft(event.draft)) this.setCreator({
+            draft: event.draft,
+            issues: [],
+            draftDirty: false,
+            flowCurrent: usableFlow(event.draft.flow) !== null,
+          });
         break;
       case "busy":
         this.setCreator({ busy: event.busy === true });
@@ -297,6 +311,10 @@ export class AutomationsStore {
     if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
 
+  setDraftView(mode: DraftViewMode): void {
+    this.setCreator({ draftView: mode });
+  }
+
   /**
    * Changes the draft on the card. Name and description stay in step with the SKILL.md
    * frontmatter, both ways. The host hears about it on `flushDraftEdit`.
@@ -313,7 +331,7 @@ export class AutomationsStore {
       draft = { ...draft, skillMarkdown: writeFrontmatter(draft.skillMarkdown, edit) };
     }
     const touched = new Set(["name", "description", "skillMarkdown"]);
-    this.setCreator({ draft, draftDirty: true, issues: c.issues.filter((i) => !touched.has(i.field)) });
+    this.setCreator({ draft, draftDirty: true, flowCurrent: false, issues: c.issues.filter((i) => !touched.has(i.field)) });
   }
 
   /**

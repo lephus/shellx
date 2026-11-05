@@ -92,6 +92,11 @@ export const DEFAULT_AUTOMATION_LABELS = {
   flowNotify: "Notify {targets} · {events}",
   flowDone: "Done",
   flowRunning: "● running",
+  viewFlow: "Flowchart",
+  viewText: "Text",
+  flowDrawing: "Claude is drawing the flowchart…",
+  flowOutdated: "Out of date: Claude redraws it with the next draft",
+  flowCaption: "Drawn by Claude from SKILL.md · see Text for the details",
 } as const;
 
 export type AutomationLabelKey = keyof typeof DEFAULT_AUTOMATION_LABELS;

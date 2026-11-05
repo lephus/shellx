@@ -105,6 +105,9 @@ export function CreatorView({
                 issues={creator.issues}
                 ready={ready}
                 locked={creator.busy}
+                view={creator.draftView}
+                onViewChange={(mode) => store.setDraftView(mode)}
+                flowCurrent={creator.flowCurrent}
                 onEdit={(edit) => store.editDraft(edit)}
                 onCommit={() => void store.flushDraftEdit()}
               />
