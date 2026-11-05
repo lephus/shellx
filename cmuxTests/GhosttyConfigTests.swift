@@ -353,6 +353,8 @@ final class GhosttyConfigTests: XCTestCase {
         try fileManager.createDirectory(at: firstThemeDir, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: secondThemeDir, withIntermediateDirectories: true)
 
+        // A light appearance with no theme set resolves to the light default.
+        XCTAssertEqual(GhosttyConfig.cmuxDefaultLightThemeName, "Catppuccin Latte")
         let firstTheme = firstThemeDir.appendingPathComponent(GhosttyConfig.cmuxDefaultLightThemeName, isDirectory: false)
         try Data([0xff, 0xfe]).write(to: firstTheme)
 

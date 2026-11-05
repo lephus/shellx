@@ -21,9 +21,9 @@ public struct GhosttyConfig {
     /// terminal view/engine code.
     public typealias ColorSchemePreference = TerminalColorSchemePreference
 
-    /// Managed default theme name for a light appearance: a soft built-in
-    /// Ghostty light theme. Dark keeps the ShellX theme
-    /// (``ShellXTerminalTheme``).
+    /// Managed default theme name for a light appearance: "Catppuccin Latte", a
+    /// soft built-in Ghostty light theme. A dark appearance keeps the ShellX
+    /// theme (``ShellXTerminalTheme``), so the two differ.
     public static let cmuxDefaultLightThemeName = "Catppuccin Latte"
     /// Managed default theme name for a dark appearance: the ShellX theme.
     public static let cmuxDefaultDarkThemeName = ShellXTerminalTheme.name

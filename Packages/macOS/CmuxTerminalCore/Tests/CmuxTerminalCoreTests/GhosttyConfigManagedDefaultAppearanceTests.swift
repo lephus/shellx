@@ -238,8 +238,8 @@ import Testing
         }
     }
 
-    /// ShellX is dark-only: one managed theme serves both appearances.
-    @Test func optedInManagedDefaultIsTheSameForBothAppearances() throws {
+    /// Dark resolves to the ShellX default and light to Catppuccin Latte.
+    @Test func optedInManagedDefaultFollowsTheAppearance() throws {
         try withTempConfigDir { dir in
             let themesRoot = dir.appendingPathComponent("resources", isDirectory: true)
             let themesDir = themesRoot.appendingPathComponent("themes", isDirectory: true)
@@ -247,10 +247,18 @@ import Testing
                 at: themesDir,
                 withIntermediateDirectories: true
             )
-            #expect(GhosttyConfig.cmuxDefaultLightThemeName == GhosttyConfig.cmuxDefaultDarkThemeName)
+            #expect(GhosttyConfig.cmuxDefaultLightThemeName == "Catppuccin Latte")
+            #expect(GhosttyConfig.cmuxDefaultDarkThemeName == "ShellX")
             try "background = #090A0B\nforeground = #F0F1F2\n".write(
                 to: themesDir.appendingPathComponent(
                     GhosttyConfig.cmuxDefaultDarkThemeName
+                ),
+                atomically: true,
+                encoding: .utf8
+            )
+            try "background = #FAF0E6\nforeground = #1A1B1C\n".write(
+                to: themesDir.appendingPathComponent(
+                    GhosttyConfig.cmuxDefaultLightThemeName
                 ),
                 atomically: true,
                 encoding: .utf8
@@ -274,11 +282,12 @@ import Testing
                 return config
             }
 
-            for scheme in [GhosttyConfig.ColorSchemePreference.light, .dark] {
-                let config = load(scheme)
-                #expect(config.backgroundColor.hexString() == "#090A0B")
-                #expect(config.foregroundColor.hexString() == "#F0F1F2")
-            }
+            let dark = load(.dark)
+            #expect(dark.backgroundColor.hexString() == "#090A0B")
+            #expect(dark.foregroundColor.hexString() == "#F0F1F2")
+            let light = load(.light)
+            #expect(light.backgroundColor.hexString() == "#FAF0E6")
+            #expect(light.foregroundColor.hexString() == "#1A1B1C")
         }
     }
 

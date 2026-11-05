@@ -119,7 +119,7 @@ struct ShellXThemeTests {
         #expect(config.cursorColor.hexString() == "#60A5FA")
         #expect(config.foregroundColor.hexString() == "#CDC7E0")
         #expect(GhosttyConfig.cmuxDefaultDarkThemeName == "ShellX")
-        #expect(GhosttyConfig.cmuxDefaultLightThemeName == "ShellX")
+        #expect(GhosttyConfig.cmuxDefaultLightThemeName == "Catppuccin Latte")
     }
 
     /// Review Focus 2: a user Ghostty theme or color always wins over the

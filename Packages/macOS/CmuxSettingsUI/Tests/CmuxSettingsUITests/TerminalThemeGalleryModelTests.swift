@@ -257,7 +257,7 @@ struct TerminalThemeGalleryModelTests {
     }
 
     private static let curatedDark = [
-        "ShellX", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
+        "One Half Dark", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
         "Gruvbox Dark", "Everforest Dark Hard", "Atom One Dark", "Nord", "Ayu Mirage", "Kanagawa Wave",
     ]
     private static let curatedLight = [
