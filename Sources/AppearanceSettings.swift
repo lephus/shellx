@@ -84,7 +84,16 @@ enum AppearanceSettings {
     typealias SystemAppearance = TerminalSystemAppearance
 
     static let appearanceModeKey = "appearanceMode"
-    static let defaultMode: AppearanceMode = .dark
+    /// The mode used when nothing is stored (Dark), from the one ShellX constant.
+    static let defaultMode = AppearanceMode(rawValue: ShellXAppearance.defaultModeRawValue)!
+
+    /// Registers ``defaultMode`` as the fallback for ``appearanceModeKey`` so
+    /// every reader of the raw value (terminal theme, appearance sync,
+    /// observers) agrees with the chrome on a fresh install. Registration is
+    /// not persisted.
+    static func registerDefaultMode(defaults: UserDefaults = .standard) {
+        defaults.register(defaults: [appearanceModeKey: defaultMode.rawValue])
+    }
 
     static func mode(for rawValue: String?) -> AppearanceMode {
         guard let rawValue, let mode = AppearanceMode(rawValue: rawValue) else {

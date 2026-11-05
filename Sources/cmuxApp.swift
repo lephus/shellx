@@ -53,6 +53,9 @@ struct cmuxApp: App {
     }
 
     init() {
+        // Before anything reads `appearanceMode`: a fresh install resolves to
+        // the default mode (Dark) for every reader, chrome and terminal alike.
+        AppearanceSettings.registerDefaultMode()
         // Gather settings package dependencies once. The runtime itself
         // is assigned after the saved language override below, because
         // it owns localized search-index text for the process lifetime.
