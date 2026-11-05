@@ -408,6 +408,12 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         let record = try XCTUnwrap(stored)
         XCTAssertEqual(record.sourceHash, ShellXFlowFingerprint.of(draft.skillMarkdown))
         XCTAssertEqual(record.flow, Self.sampleFlow)
+        // The page opened right after the save shows that chart as current.
+        let detailReply = await controller.handle(method: "automations.detail", params: ["id": id])
+        let detail = try XCTUnwrap(result(detailReply))
+        XCTAssertEqual(detail["flowStatus"] as? String, "current")
+        let nodes = try XCTUnwrap((detail["flow"] as? [String: Any])?["nodes"] as? [[String: Any]])
+        XCTAssertEqual(nodes.map { $0["id"] as? String }, ["n1", "n2", "n3"])
     }
 
     /// A flow Claude drew before the user changed `SKILL.md` on the card is kept, but shown as stale.
@@ -552,12 +558,32 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         }
     }
 
+    /// A SKILL.md that is not UTF-8 text keeps the page open with a reason, not "no longer exists".
+    func testDrawFlowWithUnreadableSkillFailsReadably() async throws {
+        let saved = try await fixture.store.save(fixture.cronDraft("unreadable"), replacing: nil)
+        try Data([0xFF, 0xFE, 0x00, 0xC3, 0x28]).write(to: saved.directory.appending(path: "SKILL.md"))
+
+        let reply = await controller.handle(method: "automations.drawFlow", params: ["id": saved.id])
+
+        XCTAssertEqual(errorCode(reply), "failed")
+        XCTAssertTrue(errorMessage(reply).contains("SKILL.md"), errorMessage(reply))
+        XCTAssertTrue(drawnMarkdown.isEmpty)
+        let stored = try await fixture.store.flowRecord(id: saved.id)
+        XCTAssertNil(stored)
+    }
+
     func testCreatorPromptHasFlowRules() throws {
         let prompt = ShellXAutomationsRuntime.creatorSystemPrompt(bundle: .main)
 
         XCTAssertTrue(prompt.contains("Draw only what SKILL.md says. Do not invent steps, checks or outcomes."))
         XCTAssertTrue(prompt.contains("## Flowchart"))
         XCTAssertFalse(prompt.contains("{{SHELLX_FLOW_RULES}}"))
+        // The rules sit inside "## Flowchart" without a top-level heading of their own.
+        XCTAssertFalse(prompt.components(separatedBy: "\n").contains { $0.hasPrefix("# ") })
+        // The closing rule about files belongs to the whole prompt, not to the flowchart section.
+        let never = try XCTUnwrap(prompt.range(of: "Never write files"))
+        let heading = prompt[..<never.lowerBound].components(separatedBy: "\n").last { $0.hasPrefix("## ") }
+        XCTAssertNotEqual(heading, "## Flowchart")
         XCTAssertEqual(
             ShellXAutomationsRuntime.composeCreatorPrompt(template: "a {{SHELLX_FLOW_RULES}} b", flowRules: "rules"),
             "a rules b"
