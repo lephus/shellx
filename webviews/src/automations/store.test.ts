@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { AutomationsBridge } from "./bridge";
-import { AutomationsStore, draftInProgress, visibleAutomations } from "./store";
+import { AutomationsStore, draftInProgress, pageShownSignal, visibleAutomations } from "./store";
 import type { AutomationDetail, AutomationDTO, AutomationDraft, AutomationsEvent, AutomationsMethod } from "./types";
 
 function dto(over: Partial<AutomationDTO>): AutomationDTO {
@@ -512,4 +512,84 @@ test("drawFlowUpdatesDetail", async () => {
   await failing.store.drawFlow();
   expect(failing.store.getState().detail).toMatchObject({ drawing: false, error: "bad" });
   expect(failing.store.getState().detail?.data?.flowStatus).toBe("missing");
+});
+
+/** A page-shown signal the test fires by hand. */
+function fakePage() {
+  let shown: () => void = () => {};
+  return {
+    signal: (onShown: () => void) => {
+      shown = onShown;
+      return () => {
+        shown = () => {};
+      };
+    },
+    show: () => shown(),
+  };
+}
+
+test("shownAgainRefreshesDetail: an edit made in another app shows once the page is back", async () => {
+  let status: AutomationDetail["flowStatus"] = "current";
+  const page = fakePage();
+  const f = fakeBridge({ ...listWithA, "automations.detail": () => detailOf({ flowStatus: status }) });
+  const store = new AutomationsStore(f.bridge, page.signal);
+  await store.start();
+  page.show();
+  await settle();
+  expect(f.calls.filter((c) => c.method === "automations.detail")).toHaveLength(0);
+  await store.openDetail("a");
+  status = "stale";
+  page.show();
+  await settle();
+  expect(f.calls.filter((c) => c.method === "automations.detail").map((c) => c.params)).toEqual([{ id: "a" }, { id: "a" }]);
+  expect(store.getState().detail?.data?.flowStatus).toBe("stale");
+  store.dispose();
+  page.show();
+  await settle();
+  expect(f.calls.filter((c) => c.method === "automations.detail")).toHaveLength(2);
+});
+
+test("pageShownSignal fires on window focus and when the document becomes visible", () => {
+  const win = new EventTarget();
+  const doc = Object.assign(new EventTarget(), { visibilityState: "hidden" });
+  let shown = 0;
+  const off = pageShownSignal(win, doc)(() => shown++);
+  win.dispatchEvent(new Event("focus"));
+  expect(shown).toBe(1);
+  doc.dispatchEvent(new Event("visibilitychange"));
+  expect(shown).toBe(1);
+  doc.visibilityState = "visible";
+  doc.dispatchEvent(new Event("visibilitychange"));
+  expect(shown).toBe(2);
+  off();
+  win.dispatchEvent(new Event("focus"));
+  expect(shown).toBe(2);
+  expect(pageShownSignal(undefined, undefined)(() => shown++)).toBeInstanceOf(Function);
+});
+
+test("editFileRefreshesDetail: the detail is asked for again once Edit file returns", async () => {
+  const { store, calls } = await started({ ...listWithA, "automations.detail": () => detailOf() });
+  await store.openDetail("a");
+  await store.editFile("a");
+  await settle();
+  expect(calls.filter((c) => c.method === "automations.detail")).toHaveLength(2);
+});
+
+test("failedRefreshKeepsPageWithError: the chart stays and the error shows until a refresh works", async () => {
+  let fail = false;
+  const { store, emit } = await started({
+    ...listWithA,
+    "automations.detail": () => (fail ? FAIL() : detailOf({ flowStatus: "current" })),
+  });
+  await store.openDetail("a");
+  fail = true;
+  emit({ type: "automations.changed" });
+  await settle();
+  expect(store.getState().view).toBe("detail");
+  expect(store.getState().detail?.error).toBe("bad");
+  expect(store.getState().detail?.data?.flowStatus).toBe("current");
+  fail = false;
+  emit({ type: "automations.changed" });
+  await settle();
+  expect(store.getState().detail?.error).toBeNull();
 });

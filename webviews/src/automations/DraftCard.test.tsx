@@ -141,10 +141,26 @@ test("switchShowsText: the Text view is today's card and its fields stay editabl
   expect(html).toMatch(/aria-pressed="true"[^>]*>Text/);
 });
 
-test("earlyDraftShowsDrawing: a skill draft with a name and no flow says Claude is drawing", () => {
-  const html = render({ ...skill, flow: undefined }, [], false, "flow");
+test("earlyDraftShowsDrawing: a skill draft with no flow says Claude is drawing only while Claude works", () => {
+  const html = render({ ...skill, flow: undefined }, [], false, "flow", true, true);
   expect(html).toContain(label("flowDrawing"));
+  expect(html).not.toContain(label("flowNone"));
   expect(html).not.toContain("<svg");
+  const idle = render({ ...skill, flow: undefined }, [], true, "flow", true, false);
+  expect(idle).not.toContain(label("flowDrawing"));
+  expect(idle).toContain("No flowchart yet — see Text");
+  expect(idle).not.toContain("<svg");
+});
+
+test("flowViewShowsTools: the tools a cronjob may use stay visible next to the chart", () => {
+  const cron = { ...skill, kind: "cronjob" as const, allowedTools: ["Read", "Bash(rm:*)"] };
+  const html = render(cron, [], true, "flow");
+  expect(html).toContain("<svg");
+  const tools = html.indexOf('data-field="tools"');
+  expect(tools).toBeGreaterThan(html.indexOf("<svg"));
+  expect(html).toContain("Read, Bash(rm:*)");
+  expect(render(cron, [], true, "text")).toContain('data-field="tools"');
+  expect(render({ ...cron, allowedTools: [] }, [], true, "flow")).not.toContain('data-field="tools"');
 });
 
 test("workflowNeedsNoFlow: a workflow draft with steps renders the chart without a placeholder or caption", () => {

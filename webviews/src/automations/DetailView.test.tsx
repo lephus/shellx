@@ -106,3 +106,15 @@ test("textModeIsReadOnly", () => {
   expect(workflow).toMatch(/<ol[^>]*>.*Fetch.*Fetch the PRs.*<\/ol>/s);
   expect(workflow).toContain('<pre class="au-pre">');
 });
+
+test("refreshErrorShowsAboveChart: a failed refresh is said above the chart it keeps", () => {
+  const html = render({ flowStatus: "current", flow }, { error: "SKILL.md could not be read" });
+  const alert = html.indexOf("SKILL.md could not be read");
+  expect(alert).toBeGreaterThan(-1);
+  expect(alert).toBeLessThan(html.indexOf("au-flow-svg"));
+  expect(html).toMatch(/role="alert"[^>]*>SKILL.md could not be read/);
+  const text = render({ flowStatus: "current", flow }, { error: "SKILL.md could not be read", mode: "text" });
+  expect(text.indexOf("SKILL.md could not be read")).toBeLessThan(text.indexOf('<pre class="au-pre">'));
+  expect(text.indexOf("SKILL.md could not be read")).toBeGreaterThan(-1);
+  expect(render({ flowStatus: "current", flow })).not.toContain('role="alert"');
+});
