@@ -1,5 +1,3 @@
-# Flowchart rules
-
 A flowchart shows how a skill runs, as one JSON object:
 
 ```json

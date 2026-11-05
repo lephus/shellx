@@ -1301,6 +1301,71 @@
         }
       }
     },
+    "automations.error.skillUnreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX could not read SKILL.md as text, so there is nothing to draw."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX konnte SKILL.md nicht als Text lesen, daher gibt es nichts zu zeichnen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX n’a pas pu lire SKILL.md comme du texte : il n’y a rien à dessiner."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر على ShellX قراءة SKILL.md كنص، لذا لا يوجد ما يُرسم."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX no pudo leer SKILL.md como texto, así que no hay nada que dibujar."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 無法以文字讀取 SKILL.md，因此沒有可繪製的內容。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 无法以文本读取 SKILL.md，因此没有可绘制的内容。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX가 SKILL.md를 텍스트로 읽을 수 없어 그릴 내용이 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX は SKILL.md をテキストとして読み込めなかったため、描くものがありません。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX không đọc được SKILL.md dưới dạng văn bản nên không có gì để vẽ."
+          }
+        }
+      }
+    },
     "automations.error.drawInProgress": {
       "extractionState": "manual",
       "localizations": {
@@ -7862,6 +7927,71 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sơ đồ do Claude vẽ từ SKILL.md · xem bản Văn bản để biết chi tiết"
+          }
+        }
+      }
+    },
+    "automations.label.flowNone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No flowchart yet — see Text"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch kein Flussdiagramm – siehe Text"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas encore d’organigramme — voir Texte"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يوجد مخطط انسيابي بعد — راجع «نص»"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay diagrama de flujo — consulta Texto"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還沒有流程圖 — 請見「文字」"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有流程图 — 请见“文本”"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 순서도가 없습니다 — 텍스트 참고"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フローチャートはまだありません — 「テキスト」を参照"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có sơ đồ — xem bản Văn bản"
           }
         }
       }

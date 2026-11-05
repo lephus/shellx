@@ -102,6 +102,7 @@ struct ShellXAutomationsLabels {
             "viewFlow": String(localized: "automations.label.viewFlow", defaultValue: "Flowchart"),
             "viewText": String(localized: "automations.label.viewText", defaultValue: "Text"),
             "flowDrawing": String(localized: "automations.label.flowDrawing", defaultValue: "Claude is drawing the flowchart…"),
+            "flowNone": String(localized: "automations.label.flowNone", defaultValue: "No flowchart yet — see Text"),
             "flowOutdated": String(localized: "automations.label.flowOutdated", defaultValue: "Out of date: Claude redraws it with the next draft"),
             "flowCaption": String(localized: "automations.label.flowCaption", defaultValue: "Drawn by Claude from SKILL.md · see Text for the details"),
             "flowMissing": String(localized: "automations.label.flowMissing", defaultValue: "This automation has no flowchart yet"),

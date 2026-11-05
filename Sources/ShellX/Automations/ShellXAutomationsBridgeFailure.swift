@@ -182,6 +182,14 @@ struct ShellXAutomationsBridgeFailure: Error, Equatable {
         ))
     }
 
+    /// "Draw flowchart" found the automation but could not read its `SKILL.md` as text.
+    static var skillUnreadable: Self {
+        Self(.failed, String(
+            localized: "automations.error.skillUnreadable",
+            defaultValue: "ShellX could not read SKILL.md as text, so there is nothing to draw."
+        ))
+    }
+
     static var flowNotForWorkflow: Self {
         Self(.failed, String(
             localized: "automations.error.flowNotForWorkflow",

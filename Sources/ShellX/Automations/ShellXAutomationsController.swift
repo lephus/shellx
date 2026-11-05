@@ -422,8 +422,9 @@ final class ShellXAutomationsController {
         guard automation.kind != .workflow else { throw Failure.flowNotForWorkflow }
         guard inFlightDraws.insert(automation.id).inserted else { throw Failure.drawInProgress }
         defer { inFlightDraws.remove(automation.id) }
+        // The automation exists (`existing` found it); its SKILL.md is not UTF-8 text or not there.
         guard let markdown = await Self.readText(automation.directory.appending(path: "SKILL.md")) else {
-            throw Failure.notFound
+            throw Failure.skillUnreadable
         }
         let flow: ShellXAutomationFlow
         do {

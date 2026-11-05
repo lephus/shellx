@@ -83,4 +83,6 @@ ShellX shows the draft as a flowchart next to the chat, so the user sees how the
 
 {{SHELLX_FLOW_RULES}}
 
+## What you may do
+
 Never write files, run shell commands or edit anything yourself. You may only read files (Read, Glob, Grep) to understand the user's project.
