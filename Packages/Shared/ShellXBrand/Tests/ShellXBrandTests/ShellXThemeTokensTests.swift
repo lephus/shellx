@@ -93,6 +93,16 @@ import Testing
         #expect(ShellXTerminalTheme.name == "ShellX")
     }
 
+    /// The bundled theme file Ghostty resolves `theme = ShellX` (or
+    /// `dark:ShellX`) from is the Swift table, byte for byte.
+    @Test func bundledThemeFileMatchesTheTable() throws {
+        let fileURL = Self.repoRoot
+            .appendingPathComponent("Resources/ghostty/themes", isDirectory: true)
+            .appendingPathComponent(ShellXTerminalTheme.name, isDirectory: false)
+        let contents = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(contents == ShellXTerminalTheme.ghosttyConfigContents + "\n")
+    }
+
     // MARK: Display font
 
     @Test func displayFontFallsBackToSystemWhenSpaceGroteskIsMissing() {

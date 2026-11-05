@@ -130,6 +130,22 @@ struct TerminalThemeGalleryModelTests {
         #expect(try file.managedThemeValue() == "light:Catppuccin Latte,dark:TokyoNight")
     }
 
+    @Test("With no theme set, a light pick keeps ShellX dark, which ships as a real theme with the first dark card")
+    func firstLightPickKeepsShippedShellXDark() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        // The themes directory the app bundles, not a fixture: Ghostty must
+        // find `dark:ShellX` there once the pair is written.
+        let bundledThemes = Self.repoRoot.appendingPathComponent("Resources/ghostty/themes", isDirectory: true)
+        let (model, file, _) = try makeModel(existingConfig: nil, currentThemeValue: nil, themeDirectories: [bundledThemes])
+
+        model.select("Rose Pine Dawn", slot: .light)
+
+        #expect(try file.managedThemeValue() == "light:Rose Pine Dawn,dark:ShellX")
+        #expect(FileManager.default.fileExists(atPath: bundledThemes.appendingPathComponent("ShellX").path))
+        await model.load()
+        #expect(model.results.dark.first?.name == "ShellX")
+    }
+
     @Test("A dark pick keeps the light side")
     func selectDarkKeepsLight() throws {
         defer { try? FileManager.default.removeItem(at: root) }
@@ -256,8 +272,19 @@ struct TerminalThemeGalleryModelTests {
         #expect(try file.readContents() == nil)
     }
 
+    /// Tests/CmuxSettingsUITests/<file> -> package -> macOS -> Packages -> repo.
+    private static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
     private static let curatedDark = [
-        "One Half Dark", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
+        "ShellX", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
         "Gruvbox Dark", "Everforest Dark Hard", "Atom One Dark", "Nord", "Ayu Mirage", "Kanagawa Wave",
     ]
     private static let curatedLight = [
