@@ -4,7 +4,7 @@
 enum TerminalThemeCuration {
     /// Dark themes, in display order.
     static let dark: [String] = [
-        "One Half Dark", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
+        "ShellX", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
         "Gruvbox Dark", "Everforest Dark Hard", "Atom One Dark", "Nord", "Ayu Mirage", "Kanagawa Wave",
     ]
     /// Light themes, in display order.

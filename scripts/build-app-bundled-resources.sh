@@ -13,6 +13,7 @@ GHOSTTY_SRC="${SRC_SHARE}/ghostty"
 TERMINFO_SRC="${SRC_SHARE}/terminfo"
 FALLBACK_GHOSTTY="${SRCROOT}/Resources/ghostty"
 FALLBACK_TERMINFO="${SRCROOT}/Resources/ghostty/terminfo"
+SHELLX_THEME_SRC="${SRCROOT}/Resources/ghostty/themes/ShellX"
 TERMINFO_OVERLAY="${SRCROOT}/Resources/terminfo-overlay"
 CMUX_SHELL_SRC="${SRCROOT}/Resources/shell-integration"
 GHOSTTY_SHELL_SRC="${SRCROOT}/ghostty/src/shell-integration"
@@ -233,6 +234,7 @@ fingerprint="$({
   hash_tree "$CMUX_CUA_PATCH"
   hash_tree "$GHOSTTY_SRC"
   hash_tree "$FALLBACK_GHOSTTY"
+  hash_tree "$SHELLX_THEME_SRC"
   hash_tree "$TERMINFO_SRC"
   hash_tree "$FALLBACK_TERMINFO"
   hash_tree "$TERMINFO_OVERLAY"
@@ -286,6 +288,12 @@ elif [ -d "$FALLBACK_GHOSTTY" ]; then
   rsync -a --delete "$FALLBACK_GHOSTTY/" "$GHOSTTY_DEST/"
 else
   rm -rf "$GHOSTTY_DEST"
+fi
+# ShellX's default dark theme (`theme = dark:ShellX`) lives in Resources, so a
+# Ghostty share built from the submodule still carries it.
+if [ -d "$GHOSTTY_DEST" ] && [ -f "$SHELLX_THEME_SRC" ]; then
+  mkdir -p "$GHOSTTY_DEST/themes"
+  cp "$SHELLX_THEME_SRC" "$GHOSTTY_DEST/themes/ShellX"
 fi
 if [ ! -d "$GHOSTTY_SHELL_SRC" ]; then
   echo "error: missing Ghostty shell integration resources at $GHOSTTY_SHELL_SRC" >&2

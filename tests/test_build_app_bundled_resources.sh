@@ -21,6 +21,10 @@ printf 'resource-v1\n' > "$SRCROOT/ghostty/zig-out/share/ghostty/nested/file"
 printf 'shell\n' > "$SRCROOT/ghostty/src/shell-integration/zsh/ghostty-integration"
 printf 'term\n' > "$SRCROOT/ghostty/zig-out/share/terminfo/x"
 printf 'cmux\n' > "$SRCROOT/Resources/shell-integration/cmux.zsh"
+# ShellX's default dark theme ships from Resources even when the Ghostty share
+# comes from the submodule build.
+mkdir -p "$SRCROOT/Resources/ghostty/themes"
+printf 'background = #0b0716\n' > "$SRCROOT/Resources/ghostty/themes/ShellX"
 printf 'alternate\n' > "$SRCROOT/Resources/shell-integration/alternate.zsh"
 ln -s cmux.zsh "$SRCROOT/Resources/shell-integration/current.zsh"
 printf 'plist\n' > "$BUILD_DIR/Products/Info.plist"
@@ -126,6 +130,10 @@ run_app_phase() {
 }
 
 run_phase > "$TMP_DIR/first.log"
+if [[ "$(cat "$BUILD_DIR/Resources/ghostty/themes/ShellX" 2>/dev/null)" != 'background = #0b0716' ]]; then
+  echo 'FAIL: the ShellX theme was not bundled with the submodule Ghostty share' >&2
+  exit 1
+fi
 run_phase > "$TMP_DIR/second.log"
 grep -q 'skipping helper rebuilds' "$TMP_DIR/second.log"
 
