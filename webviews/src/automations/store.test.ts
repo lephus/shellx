@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AutomationsBridge } from "./bridge";
 import { AutomationsStore, draftInProgress, visibleAutomations } from "./store";
-import type { AutomationDTO, AutomationDraft, AutomationsEvent, AutomationsMethod } from "./types";
+import type { AutomationDetail, AutomationDTO, AutomationDraft, AutomationsEvent, AutomationsMethod } from "./types";
 
 function dto(over: Partial<AutomationDTO>): AutomationDTO {
   return {
@@ -43,7 +43,10 @@ function fakeBridge(handlers: Partial<Record<AutomationsMethod, (p: object) => u
       const h = handlers[method];
       if (h) {
         const r = await h(params);
-        if (r && typeof r === "object" && "__error" in r) return { ok: false, error: { code: "x", message: "bad" } } as never;
+        if (r && typeof r === "object" && "__error" in r) {
+          const code = typeof r.__error === "string" ? r.__error : "x";
+          return { ok: false, error: { code, message: "bad" } } as never;
+        }
         return { ok: true, result: r } as never;
       }
       if (method === "app.context") return { ok: true, result: { labels: {}, reduceMotion: false } } as never;
@@ -395,4 +398,118 @@ test("editMarksFlowOutdated: an edit makes the chart out of date until the next 
   expect(store.getState().creator.flowCurrent).toBe(false);
   store.setDraftView("text");
   expect(store.getState().creator.draftView).toBe("text");
+});
+
+// Detail page
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+function detailOf(over: Partial<AutomationDetail> = {}): AutomationDetail {
+  return { automation: dto({ id: "a" }), skillMarkdown: "---\nname: a\n---\nBody\n", flow: null, flowStatus: "missing", ...over };
+}
+
+const listWithA = { "automations.list": () => ({ automations: [dto({ id: "a" })] }) };
+
+test("openDetailLoads", async () => {
+  const { store, calls } = await started({ ...listWithA, "automations.detail": () => detailOf() });
+  await store.openDetail("a");
+  expect(calls.filter((c) => c.method === "automations.detail").map((c) => c.params)).toEqual([{ id: "a" }]);
+  const s = store.getState();
+  expect(s.view).toBe("detail");
+  expect(s.detail).toMatchObject({ id: "a", loading: false, error: null, drawing: false, mode: "flow" });
+  expect(s.detail?.data?.skillMarkdown).toBe("---\nname: a\n---\nBody\n");
+  store.setDetailView("text");
+  expect(store.getState().detail?.mode).toBe("text");
+  store.closeDetail();
+  expect(store.getState().view).toBe("list");
+  expect(store.getState().detail).toBeNull();
+  expect(store.getState().focusId).toBe("a");
+});
+
+test("changedReloadsDetail", async () => {
+  let status: AutomationDetail["flowStatus"] = "missing";
+  const { store, calls, emit } = await started({ ...listWithA, "automations.detail": () => detailOf({ flowStatus: status }) });
+  await store.openDetail("a");
+  const lists = calls.filter((c) => c.method === "automations.list").length;
+  status = "stale";
+  emit({ type: "automations.changed" });
+  await settle();
+  expect(calls.filter((c) => c.method === "automations.list")).toHaveLength(lists + 1);
+  expect(calls.filter((c) => c.method === "automations.detail").map((c) => c.params)).toEqual([{ id: "a" }, { id: "a" }]);
+  expect(store.getState().view).toBe("detail");
+  expect(store.getState().detail?.data?.flowStatus).toBe("stale");
+});
+
+test("changedGoneReturnsToList", async () => {
+  let gone = false;
+  const { store, emit } = await started({
+    ...listWithA,
+    "automations.detail": () => (gone ? { __error: "notFound" } : detailOf()),
+  });
+  await store.openDetail("a");
+  gone = true;
+  emit({ type: "automations.changed" });
+  await settle();
+  expect(store.getState().view).toBe("list");
+  expect(store.getState().detail).toBeNull();
+});
+
+test("changedGoneFromListReturnsToList", async () => {
+  let ids = ["a"];
+  const { store, calls, emit } = await started({
+    "automations.list": () => ({ automations: ids.map((id) => dto({ id })) }),
+    "automations.detail": () => detailOf(),
+  });
+  await store.openDetail("a");
+  ids = ["b"];
+  emit({ type: "automations.changed" });
+  await settle();
+  expect(store.getState().view).toBe("list");
+  expect(store.getState().detail).toBeNull();
+  expect(calls.filter((c) => c.method === "automations.detail")).toHaveLength(1);
+});
+
+test("deleteFromDetailReturnsToList", async () => {
+  const { store, calls } = await started({ ...listWithA, "automations.detail": () => detailOf() });
+  await store.openDetail("a");
+  store.requestDelete(dto({ id: "a" }));
+  await store.confirmDelete();
+  expect(calls.find((c) => c.method === "automations.delete")?.params).toEqual({ id: "a" });
+  expect(store.getState().view).toBe("list");
+  expect(store.getState().detail).toBeNull();
+});
+
+test("a focus event leaves the detail page for the list", async () => {
+  const { store, emit } = await started({ ...listWithA, "automations.detail": () => detailOf() });
+  await store.openDetail("a");
+  emit({ type: "focus", id: "b" });
+  expect(store.getState().view).toBe("list");
+  expect(store.getState().detail).toBeNull();
+  expect(store.getState().focusId).toBe("b");
+});
+
+test("drawFlowUpdatesDetail", async () => {
+  let reply: (value: unknown) => void = () => {};
+  const flow = { nodes: [{ id: "n", type: "step" as const, label: "Go" }], edges: [] };
+  const { store, calls } = await started({
+    ...listWithA,
+    "automations.detail": () => detailOf(),
+    "automations.drawFlow": () => new Promise((resolve) => { reply = resolve; }),
+  });
+  await store.openDetail("a");
+  const drawing = store.drawFlow();
+  expect(store.getState().detail?.drawing).toBe(true);
+  await Promise.resolve();
+  expect(calls.find((c) => c.method === "automations.drawFlow")?.params).toEqual({ id: "a" });
+  reply(detailOf({ flow, flowStatus: "current" }));
+  await drawing;
+  expect(store.getState().detail).toMatchObject({ drawing: false, error: null });
+  expect(store.getState().detail?.data?.flowStatus).toBe("current");
+  expect(store.getState().detail?.data?.flow).toEqual(flow);
+
+  const failing = await started({ ...listWithA, "automations.detail": () => detailOf(), "automations.drawFlow": FAIL });
+  await failing.store.openDetail("a");
+  await failing.store.drawFlow();
+  expect(failing.store.getState().detail).toMatchObject({ drawing: false, error: "bad" });
+  expect(failing.store.getState().detail?.data?.flowStatus).toBe("missing");
 });
