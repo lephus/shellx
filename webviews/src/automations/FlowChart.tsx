@@ -86,12 +86,15 @@ function EdgeLine({ edge, marker }: { edge: PlacedEdge; marker: string }) {
   );
 }
 
-/** Lines for the text alternative: branches, labelled edges and loops, as "Approve? → No: Stop". */
-function branchTexts(layout: ChartLayout, node: PlacedNode): string[] {
+/**
+ * Lines for the text alternative, as "Approve? → No: Stop": branches, labelled edges, loops, and a
+ * lone edge whose target is not `nextId`, the node listed right after this one.
+ */
+function branchTexts(layout: ChartLayout, node: PlacedNode, nextId: string | undefined): string[] {
   const outgoing = layout.edges.filter((e) => e.from === node.id);
   const labels = new Map(layout.nodes.map((n) => [n.id, n.label]));
   return outgoing
-    .filter((e) => outgoing.length > 1 || e.label !== undefined || e.back)
+    .filter((e) => outgoing.length > 1 || e.label !== undefined || e.back || e.to !== nextId)
     .map((e) => `${node.label} → ${e.label !== undefined ? `${e.label}: ` : ""}${labels.get(e.to) ?? e.to}`);
 }
 
@@ -122,8 +125,8 @@ export function FlowChart({ layout, label, runningNodeId, busy = false }: Props)
         ))}
       </svg>
       <ol className="au-visually-hidden">
-        {layout.nodes.map((node) => {
-          const branches = branchTexts(layout, node);
+        {layout.nodes.map((node, index) => {
+          const branches = branchTexts(layout, node, layout.nodes[index + 1]?.id);
           const extra = [node.detail, node.id === runningNodeId ? runningText : undefined].filter(Boolean).join(" · ");
           return (
             <li key={node.id}>

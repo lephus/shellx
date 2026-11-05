@@ -16,7 +16,7 @@ type Props = {
   onEdit?: (edit: DraftEdit) => void;
   /** Called when an edited field loses focus. */
   onCommit?: () => void;
-  /** Keeps the fields read-only, e.g. while Claude rewrites the draft. */
+  /** Set while Claude works on the draft: the fields stay read-only and a missing chart is being drawn. */
   locked?: boolean;
   /** Flowchart or text fields for the steps, tools and SKILL.md. */
   view: DraftViewMode;
@@ -129,6 +129,13 @@ export function DraftCard({
   // A flow Claude drew that cannot be charted shows the text instead of a blank card.
   const unusableFlow = layout === null && draft.flow != null;
   const flowView = view === "flow" && !unusableFlow;
+  // A cronjob's unattended permissions stay in sight in both views.
+  const toolsField =
+    draft.allowedTools.length > 0 ? (
+      <Field name="tools" title={label("fieldTools")} issues={[]}>
+        <span className="au-mono">{draft.allowedTools.join(", ")}</span>
+      </Field>
+    ) : null;
 
   return (
     <div className="au-card au-draft" data-ready={ready ? "true" : "false"}>
@@ -201,13 +208,14 @@ export function DraftCard({
               {!isWorkflow && !flowCurrent ? <p className="au-flow-note">{label("flowOutdated")}</p> : null}
             </div>
           ) : (
-            <p className="au-flow-note" role="status">{label("flowDrawing")}</p>
+            <p className="au-flow-note" role="status">{locked ? label("flowDrawing") : label("flowNone")}</p>
           )}
           {[...forField("steps"), ...forField("skillMarkdown")].map((issue) => (
             <p key={`${issue.code}:${issue.message}`} className="au-issue" role="alert">
               {issue.message}
             </p>
           ))}
+          {toolsField}
         </>
       ) : (
         <>
@@ -222,11 +230,7 @@ export function DraftCard({
               ) : null}
             </Field>
           ) : null}
-          {draft.allowedTools.length > 0 ? (
-            <Field name="tools" title={label("fieldTools")} issues={[]}>
-              <span className="au-mono">{draft.allowedTools.join(", ")}</span>
-            </Field>
-          ) : null}
+          {toolsField}
           {draft.skillMarkdown !== "" || forField("skillMarkdown").length > 0 ? (
             <Field name="skillMarkdown" title={label("fieldSkill")} issues={forField("skillMarkdown")}>
               {editable ? (

@@ -77,6 +77,35 @@ export type AutomationsState = {
   detail: DetailState | null;
 };
 
+/** Calls `onShown` each time the page comes back into view; returns a function that stops it. */
+export type PageShownSignal = (onShown: () => void) => () => void;
+
+/**
+ * Fires on window `focus` and when the document turns `visible`, e.g. after the user edited a
+ * file in another app. Without a window (tests, server rendering) it never fires.
+ */
+export function pageShownSignal(
+  win: EventTarget | undefined,
+  doc: (EventTarget & { visibilityState: string }) | undefined,
+): PageShownSignal {
+  return (onShown) => {
+    const visible = () => {
+      if (doc?.visibilityState === "visible") onShown();
+    };
+    win?.addEventListener("focus", onShown);
+    doc?.addEventListener("visibilitychange", visible);
+    return () => {
+      win?.removeEventListener("focus", onShown);
+      doc?.removeEventListener("visibilitychange", visible);
+    };
+  };
+}
+
+const browserPageShown: PageShownSignal = pageShownSignal(
+  typeof window === "undefined" ? undefined : window,
+  typeof document === "undefined" ? undefined : document,
+);
+
 /** The host's error code when the automation no longer exists. */
 const NOT_FOUND = "notFound";
 
@@ -149,9 +178,15 @@ export class AutomationsStore {
   private listeners = new Set<() => void>();
   private nextId = 1;
   private off: (() => void) | null = null;
+  private offShown: (() => void) | null = null;
+  /** A refresh started because the page came back; focus and visibility often fire together. */
+  private shownRefresh: Promise<void> | null = null;
   private editInFlight: Promise<string | null> | null = null;
 
-  constructor(private readonly bridge: AutomationsBridge) {}
+  constructor(
+    private readonly bridge: AutomationsBridge,
+    private readonly pageShown: PageShownSignal = browserPageShown,
+  ) {}
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -182,6 +217,8 @@ export class AutomationsStore {
   async start(): Promise<void> {
     this.off?.();
     this.off = this.bridge.onEvent((e) => this.handleEvent(e));
+    this.offShown?.();
+    this.offShown = this.pageShown(() => this.pageWasShown());
     const ctx = await this.bridge.request<AutomationsContext>("app.context");
     if (ctx.ok) {
       const c = ctx.result;
@@ -208,6 +245,20 @@ export class AutomationsStore {
   dispose(): void {
     this.off?.();
     this.off = null;
+    this.offShown?.();
+    this.offShown = null;
+  }
+
+  /**
+   * Files can change outside ShellX without an `automations.changed` (an edit to SKILL.md in an
+   * editor), so an open detail page asks again whenever the page is back in view.
+   */
+  private pageWasShown(): void {
+    const d = this.state.detail;
+    if (this.state.view !== "detail" || !d || this.shownRefresh) return;
+    this.shownRefresh = this.refreshDetail(d.id).finally(() => {
+      this.shownRefresh = null;
+    });
   }
 
   async reload(): Promise<void> {
@@ -296,7 +347,12 @@ export class AutomationsStore {
 
   runNow = (id: string) => this.act("automations.runNow", { id });
   reveal = (id: string) => this.act("automations.reveal", { id });
-  editFile = (id: string) => this.act("automations.editFile", { id });
+  /** Opens SKILL.md in the user's editor; an open detail page asks again once that returns. */
+  async editFile(id: string): Promise<boolean> {
+    const opened = await this.act("automations.editFile", { id });
+    if (opened && this.state.view === "detail" && this.state.detail?.id === id) await this.refreshDetail(id);
+    return opened;
+  }
   openLog = (id: string) => this.act("automations.openLog", { id });
   continueInTerminal = (id: string) => this.act("automations.continueInTerminal", { id });
   async setEnabled(id: string, enabled: boolean): Promise<void> {
@@ -364,8 +420,8 @@ export class AutomationsStore {
     if (!reply.ok && reply.error.code === NOT_FOUND) return this.leaveGoneDetail(id);
     if (reply.ok && isDetail(reply.result)) {
       this.setDetail(id, { loading: false, data: reply.result, error: null });
-    } else if (this.state.detail?.data == null) {
-      // A failed refresh keeps the page it already shows.
+    } else {
+      // A failed refresh keeps the page it already shows and says why above it.
       this.setDetail(id, { loading: false, error: reply.ok ? "" : reply.error.message || reply.error.code });
     }
   }

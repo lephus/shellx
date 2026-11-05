@@ -95,6 +95,7 @@ export const DEFAULT_AUTOMATION_LABELS = {
   viewFlow: "Flowchart",
   viewText: "Text",
   flowDrawing: "Claude is drawing the flowchart…",
+  flowNone: "No flowchart yet — see Text",
   flowOutdated: "Out of date: Claude redraws it with the next draft",
   flowCaption: "Drawn by Claude from SKILL.md · see Text for the details",
   flowMissing: "This automation has no flowchart yet",

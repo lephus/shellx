@@ -66,11 +66,6 @@ function FlowBody({ store, detail, data, label }: { store: AutomationsStore; det
   return (
     <div className="au-flow-empty">
       <p className="au-muted">{data.flowStatus === "stale" ? label("flowStale") : label("flowMissing")}</p>
-      {detail.error !== null ? (
-        <p className="au-issue" role="alert">
-          {detail.error || label("genericError")}
-        </p>
-      ) : null}
       <button type="button" className="au-button au-primary" disabled={detail.drawing} onClick={() => void store.drawFlow()}>
         {detail.drawing ? label("drawingFlow") : label("drawFlow")}
       </button>
@@ -129,6 +124,12 @@ export function DetailView({ store, detail, actionError, label }: Props) {
       </header>
       <ActionErrorBanner store={store} actionError={actionError} label={label} />
       <div className="au-detail-body">
+        {data && detail.error !== null ? (
+          // A failed refresh or Draw flowchart; what is shown below may be out of date.
+          <p className="au-issue" role="alert">
+            {detail.error || label("genericError")}
+          </p>
+        ) : null}
         {data ? (
           detail.mode === "flow" ? (
             <FlowBody store={store} detail={detail} data={data} label={label} />
