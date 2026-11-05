@@ -104,6 +104,11 @@ struct ShellXAutomationsLabels {
             "flowDrawing": String(localized: "automations.label.flowDrawing", defaultValue: "Claude is drawing the flowchart…"),
             "flowOutdated": String(localized: "automations.label.flowOutdated", defaultValue: "Out of date: Claude redraws it with the next draft"),
             "flowCaption": String(localized: "automations.label.flowCaption", defaultValue: "Drawn by Claude from SKILL.md · see Text for the details"),
+            "flowMissing": String(localized: "automations.label.flowMissing", defaultValue: "This automation has no flowchart yet"),
+            "flowStale": String(localized: "automations.label.flowStale", defaultValue: "The content changed since the flowchart was drawn"),
+            "drawFlow": String(localized: "automations.label.drawFlow", defaultValue: "Draw flowchart"),
+            "drawingFlow": String(localized: "automations.label.drawingFlow", defaultValue: "Drawing…"),
+            "drawFlowHint": String(localized: "automations.label.drawFlowHint", defaultValue: "Claude reads SKILL.md and draws it, it takes a few seconds"),
         ]
     }
 }

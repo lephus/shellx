@@ -2,6 +2,7 @@ import type { AutomationsBridge } from "./bridge";
 import { usableFlow } from "./flowChartModel";
 import { readFrontmatter, writeFrontmatter } from "./frontmatter";
 import type {
+  AutomationDetail,
   AutomationDraft,
   AutomationDTO,
   AutomationKind,
@@ -46,9 +47,21 @@ export type DraftViewMode = "flow" | "text";
 /** The draft fields the user can change on the card. */
 export type DraftEdit = Partial<Pick<AutomationDraft, "name" | "description" | "skillMarkdown">>;
 
+/** The detail page of one saved automation. */
+export type DetailState = {
+  id: string;
+  /** The first `automations.detail` reply has not arrived yet. */
+  loading: boolean;
+  data: AutomationDetail | null;
+  /** Why loading or the last Draw flowchart failed; "" when the host gave no message. */
+  error: string | null;
+  drawing: boolean;
+  mode: DraftViewMode;
+};
+
 export type AutomationsState = {
   context: AutomationsContext | null;
-  view: "list" | "creator";
+  view: "list" | "creator" | "detail";
   loading: boolean;
   loadFailed: boolean;
   automations: AutomationDTO[];
@@ -60,7 +73,12 @@ export type AutomationsState = {
   /** Asking before a draft in progress is thrown away; `then` is the creator to open afterwards. */
   pendingDiscard: { then: { editId: string | null } | null } | null;
   creator: CreatorState;
+  /** Set only while `view` is "detail". */
+  detail: DetailState | null;
 };
+
+/** The host's error code when the automation no longer exists. */
+const NOT_FOUND = "notFound";
 
 function initialCreator(editId: string | null = null): CreatorState {
   return {
@@ -91,7 +109,14 @@ function initialState(): AutomationsState {
     actionError: null,
     pendingDiscard: null,
     creator: initialCreator(),
+    detail: null,
   };
+}
+
+function isDetail(value: unknown): value is AutomationDetail {
+  if (typeof value !== "object" || value === null) return false;
+  const d = value as Partial<AutomationDetail>;
+  return typeof d.automation === "object" && d.automation !== null && typeof d.skillMarkdown === "string" && typeof d.flowStatus === "string";
 }
 
 function isDraft(value: unknown): value is AutomationDraft {
@@ -138,8 +163,16 @@ export class AutomationsStore {
   getState = (): AutomationsState => this.state;
 
   private set(patch: Partial<AutomationsState>): void {
-    this.state = { ...this.state, ...patch };
+    const next = { ...this.state, ...patch };
+    // Leaving the detail page, by any path, drops it.
+    if (next.view !== "detail") next.detail = null;
+    this.state = next;
     for (const l of this.listeners) l();
+  }
+
+  private setDetail(id: string, patch: Partial<DetailState>): void {
+    const d = this.state.detail;
+    if (this.state.view === "detail" && d?.id === id) this.set({ detail: { ...d, ...patch } });
   }
 
   private setCreator(patch: Partial<CreatorState>): void {
@@ -189,7 +222,8 @@ export class AutomationsStore {
   handleEvent(event: AutomationsEvent): void {
     switch (event.type) {
       case "automations.changed":
-        void this.reload();
+        if (this.state.view === "detail" && this.state.detail) void this.refreshDetail(this.state.detail.id);
+        else void this.reload();
         break;
       case "focus":
         this.set({ focusId: event.id, view: "list", filter: "all" });
@@ -246,10 +280,6 @@ export class AutomationsStore {
     this.set({ filter });
   }
 
-  selectCard(id: string | null): void {
-    this.set({ focusId: id });
-  }
-
   /** Sends a list action; a failed reply becomes `actionError`. Returns whether it succeeded. */
   private async act(method: Parameters<AutomationsBridge["request"]>[0], params: object): Promise<boolean> {
     const reply = await this.bridge.request(method, params);
@@ -289,7 +319,68 @@ export class AutomationsStore {
     if (!pending) return;
     this.set({ pendingDelete: null });
     const params = pending.external ? { id: pending.id, confirmedExternal: true } : { id: pending.id };
-    if (await this.act("automations.delete", params)) await this.reload();
+    if (!(await this.act("automations.delete", params))) return;
+    if (this.state.view === "detail" && this.state.detail?.id === pending.id) this.set({ view: "list", focusId: null });
+    await this.reload();
+  }
+
+  // Detail page
+
+  /** Shows one automation's page, flowchart first. */
+  async openDetail(id: string): Promise<void> {
+    this.set({
+      view: "detail",
+      focusId: id,
+      detail: { id, loading: true, data: null, error: null, drawing: false, mode: "flow" },
+    });
+    await this.loadDetail(id);
+  }
+
+  /** Back to the list, with the card of the page just left selected. */
+  closeDetail(): void {
+    const id = this.state.detail?.id ?? this.state.focusId;
+    this.set({ view: "list", focusId: id });
+  }
+
+  setDetailView(mode: DraftViewMode): void {
+    const d = this.state.detail;
+    if (d) this.setDetail(d.id, { mode });
+  }
+
+  /** Asks Claude to draw the flowchart from SKILL.md; the reply is the new detail. */
+  async drawFlow(): Promise<void> {
+    const d = this.state.detail;
+    if (this.state.view !== "detail" || !d || d.drawing) return;
+    this.setDetail(d.id, { drawing: true, error: null });
+    const reply = await this.bridge.request<AutomationDetail>("automations.drawFlow", { id: d.id });
+    if (!reply.ok && reply.error.code === NOT_FOUND) return this.leaveGoneDetail(d.id);
+    if (reply.ok && isDetail(reply.result)) this.setDetail(d.id, { drawing: false, data: reply.result });
+    else this.setDetail(d.id, { drawing: false, error: reply.ok ? "" : reply.error.message || reply.error.code });
+  }
+
+  /** Requests the detail; a reply for a page no longer shown is dropped. */
+  private async loadDetail(id: string): Promise<void> {
+    const reply = await this.bridge.request<AutomationDetail>("automations.detail", { id });
+    if (!reply.ok && reply.error.code === NOT_FOUND) return this.leaveGoneDetail(id);
+    if (reply.ok && isDetail(reply.result)) {
+      this.setDetail(id, { loading: false, data: reply.result, error: null });
+    } else if (this.state.detail?.data == null) {
+      // A failed refresh keeps the page it already shows.
+      this.setDetail(id, { loading: false, error: reply.ok ? "" : reply.error.message || reply.error.code });
+    }
+  }
+
+  /** After a change: the list, then this page again, or the list alone when the automation is gone. */
+  private async refreshDetail(id: string): Promise<void> {
+    await this.reload();
+    const s = this.state;
+    if (s.view !== "detail" || s.detail?.id !== id) return;
+    if (!s.loadFailed && !s.automations.some((a) => a.id === id)) return this.leaveGoneDetail(id);
+    await this.loadDetail(id);
+  }
+
+  private leaveGoneDetail(id: string): void {
+    if (this.state.view === "detail" && this.state.detail?.id === id) this.set({ view: "list", focusId: null });
   }
 
   // Creator

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AutomationActions } from "./AutomationActions";
 import { formatDuration, formatTime, kindLabelKey, runDurationMs, statusLabelKey } from "./format";
 import type { AutomationLabelResolver } from "./labels";
 import type { AutomationsStore } from "./store";
@@ -38,8 +39,8 @@ export function AutomationCard({
             type="button"
             className="au-name-button"
             onClick={() => {
-              store.selectCard(a.id);
               if (run?.unread) void store.markRead(a.id);
+              void store.openDetail(a.id);
             }}
           >
             {a.name}
@@ -79,40 +80,7 @@ export function AutomationCard({
           {run && (run.summary || run.reason) ? <span className="au-muted"> — {run.reason ?? run.summary}</span> : null}
         </p>
       ) : null}
-      <div className="au-actions">
-        {a.kind !== "skill" ? (
-          <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.runNow(a.id))}>
-            {label("runNow")}
-          </button>
-        ) : null}
-        {canToggle ? (
-          <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.setEnabled(a.id, !a.enabled))}>
-            {a.enabled ? label("disable") : label("enable")}
-          </button>
-        ) : null}
-        <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.startCreator(a.id))}>
-          {label("edit")}
-        </button>
-        <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.editFile(a.id))}>
-          {label("editFile")}
-        </button>
-        <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.reveal(a.id))}>
-          {label("reveal")}
-        </button>
-        {a.kind !== "skill" ? (
-          <button type="button" className="au-button" onClick={(e) => (e.preventDefault(), void store.openLog(a.id))}>
-            {label("openLog")}
-          </button>
-        ) : null}
-        {run?.status === "needsYou" && run.sessionId ? (
-          <button type="button" className="au-button au-primary" onClick={(e) => (e.preventDefault(), void store.continueInTerminal(a.id))}>
-            {label("continueInTerminal")}
-          </button>
-        ) : null}
-        <button type="button" className="au-button au-danger" onClick={(e) => (e.preventDefault(), store.requestDelete(a))}>
-          {label("delete")}
-        </button>
-      </div>
+      <AutomationActions store={store} automation={a} label={label} />
     </article>
   );
 }

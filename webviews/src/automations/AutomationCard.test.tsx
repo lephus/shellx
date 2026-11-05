@@ -98,7 +98,6 @@ test("nameOpensDetail", () => {
   const store = {
     openDetail: (id: string) => (calls.push(`openDetail:${id}`), Promise.resolve()),
     markRead: (id: string) => (calls.push(`markRead:${id}`), Promise.resolve()),
-    selectCard: (id: string) => calls.push(`selectCard:${id}`),
   };
   let container = mount(base, store);
   container.querySelector<HTMLButtonElement>(".au-name-button")!.click();

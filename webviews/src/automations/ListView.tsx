@@ -10,6 +10,27 @@ const FILTERS: { value: ListFilter; key: "filterAll" | "filterSkills" | "filterW
   { value: "cronjob", key: "filterCronjobs" },
 ];
 
+/** The last failed action, until dismissed; on the list and on a detail page. */
+export function ActionErrorBanner({
+  store,
+  actionError,
+  label,
+}: {
+  store: AutomationsStore;
+  actionError: string | null;
+  label: AutomationLabelResolver;
+}) {
+  if (actionError === null) return null;
+  return (
+    <div className="au-banner" role="alert">
+      <span>{label("actionFailed", { message: actionError })}</span>
+      <button type="button" className="au-button" onClick={() => store.dismissActionError()}>
+        {label("dismiss")}
+      </button>
+    </div>
+  );
+}
+
 export function ListView({
   store,
   state,
@@ -42,14 +63,7 @@ export function ListView({
           {label("newAutomation")}
         </button>
       </header>
-      {state.actionError !== null ? (
-        <div className="au-banner" role="alert">
-          <span>{label("actionFailed", { message: state.actionError })}</span>
-          <button type="button" className="au-button" onClick={() => store.dismissActionError()}>
-            {label("dismiss")}
-          </button>
-        </div>
-      ) : null}
+      <ActionErrorBanner store={store} actionError={state.actionError} label={label} />
       <div className="au-list-body">
         {draftInProgress(state.creator) ? (
           <DraftInProgressCard store={store} creator={state.creator} label={label} automations={state.automations} />

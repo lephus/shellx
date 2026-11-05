@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createAutomationsBridge, type AutomationsBridge } from "./bridge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CreatorView } from "./CreatorView";
+import { DetailView } from "./DetailView";
 import { DiscardDialog } from "./DiscardDialog";
 import { createAutomationLabelResolver } from "./labels";
 import { ListView } from "./ListView";
@@ -30,6 +31,8 @@ export function AutomationsApp({ bridge }: { bridge?: AutomationsBridge }) {
     <div className="au-app" data-reduce-motion={reduceMotion ? "true" : "false"}>
       {state.context === null ? null : state.view === "creator" ? (
         <CreatorView store={store} creator={state.creator} label={label} reduceMotion={reduceMotion} />
+      ) : state.view === "detail" && state.detail ? (
+        <DetailView store={store} detail={state.detail} actionError={state.actionError} label={label} />
       ) : (
         <ListView store={store} state={state} label={label} />
       )}
