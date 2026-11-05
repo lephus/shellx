@@ -366,6 +366,27 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertTrue(events.contains { $0["type"] as? String == "focus" && $0["id"] as? String == "abc" })
     }
 
+    func testAppearanceChangeEmitsEventOnlyWhenItChanges() async throws {
+        var appearance = NSAppearance(named: .darkAqua)!
+        controller.effectiveAppearance = { appearance }
+        let reply = await controller.handle(method: "app.context", params: [:])
+        XCTAssertEqual(try XCTUnwrap(result(reply))["appearance"] as? String, "dark")
+
+        controller.appearanceDidChange()
+        XCTAssertTrue(events.filter { $0["type"] as? String == "appearance" }.isEmpty)
+
+        appearance = NSAppearance(named: .aqua)!
+        controller.appearanceDidChange()
+        controller.appearanceDidChange()
+        let sent = events.filter { $0["type"] as? String == "appearance" }
+        XCTAssertEqual(sent.count, 1)
+        XCTAssertEqual(sent.first?["appearance"] as? String, "light")
+
+        appearance = NSAppearance(named: .darkAqua)!
+        controller.appearanceDidChange()
+        XCTAssertEqual(events.last?["appearance"] as? String, "dark")
+    }
+
     func testUnknownMethodIsInvalidArgument() async {
         let reply = await controller.handle(method: "automations.explode", params: [:])
         XCTAssertEqual(errorCode(reply), "invalidArgument")

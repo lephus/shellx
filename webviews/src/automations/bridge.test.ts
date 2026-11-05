@@ -60,6 +60,15 @@ test("receive fans events out and unsubscribe stops delivery; junk is ignored", 
   expect(seen).toEqual(["focus"]);
 });
 
+test("receive accepts the appearance event", () => {
+  const host = fakeHost(() => ({ ok: true, result: null }));
+  const bridge = createAutomationsBridge(host);
+  const seen: unknown[] = [];
+  bridge.onEvent((e) => seen.push(e));
+  host.shellxAutomations!.receive({ type: "appearance", appearance: "light" });
+  expect(seen).toEqual([{ type: "appearance", appearance: "light" }]);
+});
+
 test("no automations source uses dangerouslySetInnerHTML or window dialogs", async () => {
   const glob = new Bun.Glob("src/automations/**/*.{ts,tsx}");
   for await (const file of glob.scan(".")) {
