@@ -379,3 +379,20 @@ test("save waits for an edit a blur already sent", async () => {
   await saving;
   expect(order).toEqual(["edit", "save"]);
 });
+
+test("editMarksFlowOutdated: an edit makes the chart out of date until the next draft with a flow", async () => {
+  const { store, emit } = await started();
+  await store.startCreator();
+  const flow = { nodes: [{ id: "a", type: "step" as const, label: "Go" }], edges: [] };
+  expect(store.getState().creator.draftView).toBe("flow");
+  emit(creator({ type: "draft", draft: draft({ kind: "skill", name: "a", skillMarkdown: "---\nname: a\n---\n", flow }) }));
+  expect(store.getState().creator.flowCurrent).toBe(true);
+  store.editDraft({ skillMarkdown: "---\nname: a\n---\nMore\n" });
+  expect(store.getState().creator.flowCurrent).toBe(false);
+  emit(creator({ type: "draft", draft: draft({ kind: "skill", name: "a", skillMarkdown: "x", flow }) }));
+  expect(store.getState().creator.flowCurrent).toBe(true);
+  emit(creator({ type: "draft", draft: draft({ kind: "skill", name: "a", skillMarkdown: "x" }) }));
+  expect(store.getState().creator.flowCurrent).toBe(false);
+  store.setDraftView("text");
+  expect(store.getState().creator.draftView).toBe("text");
+});
