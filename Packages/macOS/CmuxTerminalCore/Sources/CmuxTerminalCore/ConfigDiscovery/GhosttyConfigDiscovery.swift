@@ -325,9 +325,12 @@ public struct GhosttyConfigDiscovery {
     /// Computes the resolved plain-theme override cmux must inject when the
     /// user's last `theme` directive uses Ghostty's conditional
     /// `light:…`/`dark:…` syntax, returning `nil` when no override is needed.
+    /// `environment` and `bundleResourceURL` locate theme files.
     public func conditionalThemeOverrideConfigContents(
         preferredColorScheme: GhosttyConfig.ColorSchemePreference,
-        configPaths: [String]? = nil
+        configPaths: [String]? = nil,
+        environment _: [String: String] = ProcessInfo.processInfo.environment,
+        bundleResourceURL _: URL? = Bundle.main.resourceURL
     ) -> String? {
         let configPaths = configPaths ?? loadedGhosttyConfigScanPaths()
         let summary = GhosttyConfig.userAppearanceConfigSummary(configPaths: configPaths)
