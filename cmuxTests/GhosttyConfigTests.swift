@@ -824,11 +824,14 @@ final class GhosttyConfigTests: XCTestCase {
         """
         try themeContents.write(to: themePath, atomically: true, encoding: .utf8)
 
+        // A light theme on its own only suits Light; in Dark it would give way
+        // to the default dark theme, so resolve it for the appearance it suits.
         var config = GhosttyConfig()
         config.loadTheme(
             "Builtin Solarized Light",
             environment: ["GHOSTTY_RESOURCES_DIR": root.path],
-            bundleResourceURL: nil
+            bundleResourceURL: nil,
+            preferredColorScheme: .light
         )
 
         XCTAssertEqual(rgb255(config.backgroundColor), RGB(red: 253, green: 246, blue: 227))
@@ -854,7 +857,8 @@ final class GhosttyConfigTests: XCTestCase {
         config.loadTheme(
             "iTerm2 Solarized Light",
             environment: ["GHOSTTY_RESOURCES_DIR": root.path],
-            bundleResourceURL: nil
+            bundleResourceURL: nil,
+            preferredColorScheme: .light
         )
 
         XCTAssertEqual(rgb255(config.backgroundColor), RGB(red: 253, green: 246, blue: 227))

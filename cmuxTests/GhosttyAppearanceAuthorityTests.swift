@@ -90,8 +90,12 @@ struct GhosttyAppearanceAuthorityTests {
         #expect(resolved == (mode == "light" ? .light : .dark))
     }
 
-    @Test
-    func fixedGhosttyThemeIsPreservedWhenAppBecomesLight() throws {
+    /// A fixed dark theme is ShellX's dark side only: when the app becomes
+    /// light it gives way to the default light theme (Catppuccin Latte), and
+    /// the terminal's runtime scheme follows that light background. In dark
+    /// the fixed theme is kept as configured.
+    @Test(arguments: [false, true])
+    func fixedDarkThemeIsTheDarkSideWhenAppChangesAppearance(toLight: Bool) throws {
         let suite = "GhosttyAppearanceAuthorityTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -102,18 +106,32 @@ struct GhosttyAppearanceAuthorityTests {
             to: theme, atomically: true, encoding: .utf8
         )
         defer { try? FileManager.default.removeItem(at: theme) }
+        // The repo's bundled Ghostty resources hold the default light theme.
+        let resources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/ghostty", isDirectory: true)
         let resolved = GhosttyConfig.appearanceSyncColorSchemePreference(
-            passedAppearance: NSAppearance(named: .darkAqua),
+            passedAppearance: NSAppearance(named: toLight ? .darkAqua : .aqua),
             defaults: defaults,
             isApplicationFinishedLaunching: { true },
-            liveEffectiveAppearance: { NSAppearance(named: .aqua) }
+            liveEffectiveAppearance: { NSAppearance(named: toLight ? .aqua : .darkAqua) }
         ).preference
+        #expect(resolved == (toLight ? .light : .dark))
         var config = GhosttyConfig()
-        config.loadTheme(theme.path, environment: [:], bundleResourceURL: nil, preferredColorScheme: resolved)
-        #expect(config.backgroundColor.hexString() == "#121314")
-        #expect(config.foregroundColor.hexString() == "#E1E2E3")
-        #expect(config.palette[1]?.hexString() == "#C04050")
-        #expect(GhosttyApp.terminalRuntimeColorSchemePreference(forBackgroundColor: config.backgroundColor) == .dark)
+        config.loadTheme(
+            theme.path,
+            environment: ["GHOSTTY_RESOURCES_DIR": resources.path],
+            bundleResourceURL: nil,
+            preferredColorScheme: resolved
+        )
+        #expect(config.backgroundColor.hexString() == (toLight ? "#EFF1F5" : "#121314"))
+        #expect(config.foregroundColor.hexString() == (toLight ? "#4C4F69" : "#E1E2E3"))
+        #expect(config.palette[1]?.hexString() == (toLight ? "#D20F39" : "#C04050"))
+        #expect(
+            GhosttyApp.terminalRuntimeColorSchemePreference(forBackgroundColor: config.backgroundColor)
+                == (toLight ? .light : .dark)
+        )
     }
 
     @Test(arguments: [false, true])
