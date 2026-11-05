@@ -309,7 +309,6 @@ final class MenuKeyEquivalentRoutingUITests: XCTestCase {
             "BrowserDesignModeButton",
             "BrowserToggleDevToolsButton",
             "BrowserProfileButton",
-            "BrowserThemeModeButton",
         ]
         for identifier in expectedInlineIdentifiers {
             XCTAssertTrue(
@@ -317,14 +316,19 @@ final class MenuKeyEquivalentRoutingUITests: XCTestCase {
                 "Expected the wide browser toolbar to expose \(identifier)"
             )
         }
+        // Pages follow the app appearance; the separate page-theme button is gone.
+        XCTAssertFalse(
+            toolbarElement(app, identifier: "BrowserThemeModeButton").exists,
+            "The browser toolbar should not show a page-theme button"
+        )
         XCTAssertGreaterThan(
             toolbarElement(app, identifier: "BrowserOverflowMenu").frame.minX,
-            toolbarElement(app, identifier: "BrowserThemeModeButton").frame.maxX,
+            toolbarElement(app, identifier: "BrowserProfileButton").frame.maxX,
             "More should be the rightmost accessory control"
         )
         XCTAssertGreaterThan(
             toolbarElement(app, identifier: "BrowserToggleDevToolsButton").frame.minX,
-            toolbarElement(app, identifier: "BrowserThemeModeButton").frame.maxX,
+            toolbarElement(app, identifier: "BrowserProfileButton").frame.maxX,
             "Inspect/DevTools should sit immediately before More"
         )
         XCTAssertGreaterThan(

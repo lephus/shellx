@@ -2239,25 +2239,27 @@ final class BrowserPanelWebViewLifecycleTests: XCTestCase {
 
 @MainActor
 final class BrowserDefaultsNormalizationTests: XCTestCase {
-    /// The legacy forced-dark-mode migration must run through the same defaults
-    /// normalization entry point used at app startup. Registering a fallback for
-    /// `modeKey` before reading the legacy value makes an unset key look like an
-    /// explicit `.system` choice and silently skips the migration.
-    func testNormalizeMigratesLegacyForcedDarkModeBeforeDefaultFallbackRegistration() throws {
-        let suiteName = "cmux.browserDefaultsLegacyThemeMigrationTests.\(UUID().uuidString)"
+    /// `browserThemeMode` is deprecated and ignored: pages follow the app
+    /// appearance. Startup normalization must leave whatever is stored alone
+    /// (no rewrite to `system`, no legacy forced-dark migration).
+    func testNormalizeLeavesTheDeprecatedBrowserThemeModeUntouched() throws {
+        let suiteName = "cmux.browserDefaultsDeprecatedThemeTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
+        defaults.set("dark", forKey: BrowserThemeSettings.modeKey)
+        BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
+        XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), "dark")
+
+        defaults.set("not-a-real-mode", forKey: BrowserThemeSettings.modeKey)
+        BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
+        XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), "not-a-real-mode")
+
         defaults.removeObject(forKey: BrowserThemeSettings.modeKey)
         defaults.set(true, forKey: BrowserThemeSettings.legacyForcedDarkModeEnabledKey)
-
         BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
-
-        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .dark)
-        XCTAssertEqual(
-            defaults.string(forKey: BrowserThemeSettings.modeKey),
-            BrowserThemeMode.dark.rawValue
-        )
+        XCTAssertNil(defaults.string(forKey: BrowserThemeSettings.modeKey))
+        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .system)
     }
 
     /// Moving default registration + settings normalization out of
@@ -2271,7 +2273,6 @@ final class BrowserDefaultsNormalizationTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         // Out-of-range / invalid raw values that must be canonicalized.
-        defaults.set("not-a-real-mode", forKey: BrowserThemeSettings.modeKey)
         defaults.set("not-a-real-variant", forKey: BrowserImportHintSettings.variantKey)
         defaults.set(999, forKey: BrowserToolbarAccessorySpacingDebugSettings.key)
         defaults.set(999.0, forKey: BrowserProfilePopoverDebugSettings.horizontalPaddingKey)
@@ -2279,7 +2280,6 @@ final class BrowserDefaultsNormalizationTests: XCTestCase {
 
         BrowserPanel.normalizeBrowserDefaults(defaults: defaults)
 
-        XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), BrowserThemeSettings.defaultMode.rawValue)
         XCTAssertEqual(defaults.string(forKey: BrowserImportHintSettings.variantKey), BrowserImportHintSettings.defaultVariant.rawValue)
         XCTAssertEqual(defaults.integer(forKey: BrowserToolbarAccessorySpacingDebugSettings.key), BrowserToolbarAccessorySpacingDebugSettings.defaultSpacing)
         XCTAssertEqual(defaults.double(forKey: BrowserProfilePopoverDebugSettings.horizontalPaddingKey), BrowserProfilePopoverDebugSettings.defaultHorizontalPadding, accuracy: 0.0001)
