@@ -195,3 +195,125 @@ test("wrapsLongLabels", () => {
   expect(lines[2]?.endsWith("…")).toBe(true);
   for (const line of lines) expect(Array.from(line).length).toBeLessThanOrEqual(36);
 });
+
+const flowNode = (id: string, type: AutomationFlow["nodes"][number]["type"] = "step") => ({ id, type, label: id });
+const layoutOf = (flow: AutomationFlow) => layoutChart(chart({ ...skill, flow }));
+
+/** Ids of the boxes, other than its own two ends, that an edge's segments pass through. */
+function crossedBoxes(layout: ReturnType<typeof layoutChart>): string[] {
+  const hits: string[] = [];
+  for (const edge of layout.edges) {
+    edge.points.forEach(([x1, y1], i) => {
+      const next = edge.points[i + 1];
+      if (!next) return;
+      const [x2, y2] = next;
+      for (const n of layout.nodes) {
+        if (n.id === edge.from || n.id === edge.to) continue;
+        const crosses =
+          Math.max(x1, x2) > n.x && Math.min(x1, x2) < n.x + n.w && Math.max(y1, y2) > n.y && Math.min(y1, y2) < n.y + n.h;
+        if (crosses) hits.push(`${edge.from}->${edge.to} crosses ${n.id}`);
+      }
+    });
+  }
+  return hits;
+}
+
+test("edgesNeverCrossOtherBoxes", () => {
+  // A side branch's drop into its column would run through a later side step.
+  const elbowRight: AutomationFlow = {
+    nodes: [flowNode("a"), flowNode("d1", "decision"), flowNode("b"), flowNode("d2", "decision"), flowNode("c"), flowNode("e", "end"), flowNode("y"), flowNode("x", "end")],
+    edges: [
+      { from: "a", to: "d1" },
+      { from: "d1", to: "b", label: "Yes" },
+      { from: "d1", to: "x", label: "No" },
+      { from: "b", to: "d2" },
+      { from: "d2", to: "c", label: "Yes" },
+      { from: "d2", to: "y", label: "No" },
+      { from: "y", to: "x" },
+      { from: "c", to: "e" },
+    ],
+  };
+  // A side branch merging back left would run down its column through a later side step.
+  const mergeLeft: AutomationFlow = {
+    nodes: [flowNode("a"), flowNode("d1", "decision"), flowNode("b"), flowNode("d2", "decision"), flowNode("c"), flowNode("p"), flowNode("q"), flowNode("e", "end")],
+    edges: [
+      { from: "a", to: "d1" },
+      { from: "d1", to: "b", label: "Yes" },
+      { from: "d1", to: "p", label: "No" },
+      { from: "b", to: "d2" },
+      { from: "d2", to: "c", label: "Yes" },
+      { from: "d2", to: "q", label: "No" },
+      { from: "p", to: "e" },
+      { from: "q", to: "c" },
+      { from: "c", to: "e" },
+    ],
+  };
+  // A loop's stub to the lane would run through a side sibling in the same row.
+  const backStub: AutomationFlow = {
+    nodes: [flowNode("a"), flowNode("d", "decision"), flowNode("b"), flowNode("z"), flowNode("e", "end")],
+    edges: [
+      { from: "a", to: "d" },
+      { from: "d", to: "b", label: "Yes" },
+      { from: "d", to: "z", label: "No" },
+      { from: "b", to: "a" },
+      { from: "b", to: "e" },
+      { from: "z", to: "e" },
+    ],
+  };
+  const looped = { ...diskFlow, edges: [...diskFlow.edges, { from: "measure-again", to: "measure" }] };
+  for (const flow of [elbowRight, mergeLeft, backStub, diskFlow, looped]) {
+    const layout = layoutOf(flow);
+    expect(crossedBoxes(layout)).toEqual([]);
+    for (const edge of layout.edges) {
+      for (const [x, y] of edge.points) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(layout.width);
+        expect(y).toBeLessThanOrEqual(layout.height);
+      }
+    }
+  }
+  expect(layoutOf(backStub).edges.find((e) => e.from === "b" && e.to === "a")?.back).toBe(true);
+});
+
+test("branchLabelsDoNotOverlap", () => {
+  const threeWay: AutomationFlow = {
+    nodes: [flowNode("d", "decision"), flowNode("a"), flowNode("b"), flowNode("c"), flowNode("e", "end")],
+    edges: [
+      { from: "d", to: "a", label: "Small" },
+      { from: "d", to: "b", label: "Medium" },
+      { from: "d", to: "c", label: "Large" },
+      { from: "a", to: "e" },
+      { from: "b", to: "e" },
+      { from: "c", to: "e" },
+    ],
+  };
+  const layout = layoutOf(threeWay);
+  const labelled = layout.edges.filter((e) => e.label !== undefined);
+  expect(labelled).toHaveLength(3);
+  // Text boxes of 11px labels: about 6.2 px per character, baseline at y.
+  const boxes = labelled.map((e) => {
+    const [x, y] = e.labelAt ?? [Number.NaN, Number.NaN];
+    return { x, y, w: (e.label ?? "").length * 6.2, h: 12, edge: e };
+  });
+  for (const box of boxes) {
+    expect(Number.isFinite(box.x) && Number.isFinite(box.y)).toBe(true);
+    // Each label sits beside a segment of its own edge.
+    const near = box.edge.points.some(([x1, y1], i) => {
+      const [x2, y2] = box.edge.points[i + 1] ?? [x1, y1];
+      const dx = Math.max(Math.min(x1, x2) - box.x, 0, box.x - Math.max(x1, x2));
+      const dy = Math.max(Math.min(y1, y2) - box.y, 0, box.y - Math.max(y1, y2));
+      return i + 1 < box.edge.points.length && Math.hypot(dx, dy) <= 16;
+    });
+    expect(near).toBe(true);
+  }
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i];
+      const b = boxes[j];
+      if (!a || !b) continue;
+      const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y - a.h < b.y && b.y - b.h < a.y;
+      expect(overlap).toBe(false);
+    }
+  }
+});
