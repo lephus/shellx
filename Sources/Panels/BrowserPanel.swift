@@ -3644,22 +3644,9 @@ final class BrowserPanel: Panel, ObservableObject {
             BrowserProfilePopoverDebugSettings.horizontalPaddingKey: BrowserProfilePopoverDebugSettings.defaultHorizontalPadding,
             BrowserProfilePopoverDebugSettings.verticalPaddingKey: BrowserProfilePopoverDebugSettings.defaultVerticalPadding,
             BrowserZoomSettings.userDefaultsKey: BrowserZoomSettings.defaultLevel,
-            // The theme mode deliberately has no registered fallback. Registration
-            // writes into the process-wide registration domain, which every
-            // `UserDefaults` reads through, so the mode key would always resolve to
-            // a value and `BrowserThemeSettings.mode(defaults:)` could no longer tell
-            // "never chosen" from "chosen as system" — which is what lets it migrate
-            // the legacy `browserForcedDarkModeEnabled` toggle. The accessor already
-            // falls back to `defaultMode`, and the SwiftUI binding carries its own
-            // default, so nothing needs the registered value.
+            // `browserThemeMode` is deprecated and ignored (pages follow the app
+            // appearance), so it is neither registered nor rewritten here.
         ])
-
-        let resolvedThemeMode = BrowserThemeSettings.mode(defaults: defaults)
-        let currentThemeRaw = defaults.string(forKey: BrowserThemeSettings.modeKey)
-            ?? BrowserThemeSettings.defaultMode.rawValue
-        if currentThemeRaw != resolvedThemeMode.rawValue {
-            defaults.set(resolvedThemeMode.rawValue, forKey: BrowserThemeSettings.modeKey)
-        }
 
         let resolvedHintVariant = BrowserImportHintSettings.variant(defaults: defaults)
         let currentHintRaw = defaults.string(forKey: BrowserImportHintSettings.variantKey)

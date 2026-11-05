@@ -299,7 +299,6 @@ struct BrowserPanelView: View {
     private var browserProfilePopoverHorizontalPaddingRaw = BrowserProfilePopoverDebugSettings.defaultHorizontalPadding
     @AppStorage(BrowserProfilePopoverDebugSettings.verticalPaddingKey)
     private var browserProfilePopoverVerticalPaddingRaw = BrowserProfilePopoverDebugSettings.defaultVerticalPadding
-    @AppStorage(BrowserThemeSettings.modeKey) private var browserThemeModeRaw = BrowserThemeSettings.defaultMode.rawValue
     @AppStorage(BrowserImportHintSettings.variantKey) private var browserImportHintVariantRaw = BrowserImportHintSettings.defaultVariant.rawValue
     @AppStorage(BrowserImportHintSettings.showOnBlankTabsKey) private var showBrowserImportHintOnBlankTabs = BrowserImportHintSettings.defaultShowOnBlankTabs
     @AppStorage(BrowserImportHintSettings.dismissedKey) private var isBrowserImportHintDismissed = BrowserImportHintSettings.defaultDismissed
@@ -340,7 +339,6 @@ struct BrowserPanelView: View {
     @State private var omnibarSelectAllRequestId: UInt64 = 0
     @State private var pendingFocusGainedSelectionIntent: BrowserAddressBarFocusSelectionIntent = .preserveFieldEditorSelection
     @State private var isBrowserProfileMenuPresented = false
-    @State private var isBrowserThemeMenuPresented = false
     @State private var browserChromeStyle: BrowserChromeStyle
     // The browser top chrome scales with the tab bar font size so tabs and the
     // browser toolbar share one consistent scale. Seeded from the cached config
@@ -444,10 +442,6 @@ struct BrowserPanelView: View {
 
     private var devToolsColorOption: BrowserDevToolsIconColorOption {
         BrowserDevToolsIconColorOption(rawValue: devToolsIconColorRaw) ?? BrowserDevToolsButtonDebugSettings.defaultColor
-    }
-
-    private var browserThemeMode: BrowserThemeMode {
-        BrowserThemeSettings.mode(for: browserThemeModeRaw)
     }
 
     private var browserImportHintVariant: BrowserImportHintVariant {
@@ -740,7 +734,6 @@ struct BrowserPanelView: View {
             reason: "view.onAppear"
         )
         panel.refreshAppearanceDrivenColors()
-        panel.setBrowserThemeMode(browserThemeMode)
         applyPendingAddressBarFocusRequestIfNeeded()
         syncURLFromPanel()
         // If the browser surface is focused but has no URL loaded yet, auto-focus the omnibar.
@@ -851,14 +844,6 @@ struct BrowserPanelView: View {
         if panel.isShowingNewTabPage {
             refreshEmptyStateImportBrowsers()
         }
-    }
-
-    private func handleBrowserThemeModeRawChange() {
-        let normalizedMode = BrowserThemeSettings.mode(for: browserThemeModeRaw)
-        if browserThemeModeRaw != normalizedMode.rawValue {
-            browserThemeModeRaw = normalizedMode.rawValue
-        }
-        panel.setBrowserThemeMode(normalizedMode)
     }
 
     private func handleInheritedColorSchemeChange() {
@@ -1100,9 +1085,6 @@ struct BrowserPanelView: View {
             .onChange(of: panel.backgroundAppearanceRevision) { _, _ in
                 refreshBrowserChromeStyle()
             }
-            .onChange(of: browserThemeModeRaw) { _, _ in
-                handleBrowserThemeModeRawChange()
-            }
             .onChange(of: inheritedColorScheme) { _, _ in
                 handleInheritedColorSchemeChange()
             }
@@ -1208,7 +1190,6 @@ struct BrowserPanelView: View {
                     browserActiveModeButtonWithShortcutHint
                     browserScreenshotCopiedIndicator
                     browserProfileButton
-                    browserThemeModeButton
                     browserOverflowMenu
                 } else {
                     // Keep the stable wide-row sizing and place Inspect/DevTools
@@ -1225,7 +1206,6 @@ struct BrowserPanelView: View {
                         )
                     }
                     browserProfileButton
-                    browserThemeModeButton
                     developerToolsButton
                     browserOverflowMenu
                 }
@@ -1621,33 +1601,6 @@ struct BrowserPanelView: View {
             .accessibilityHidden(true)
     }
 
-    private var browserThemeModeButton: some View {
-        Button(action: {
-            isBrowserThemeMenuPresented.toggle()
-        }) {
-            CmuxSystemSymbolImage(symbolName: browserThemeMode.iconName, pointSize: devToolsButtonIconSize, weight: .medium, tint: browserThemeModeIconColor)
-                .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
-        }
-        .buttonStyle(OmnibarAddressButtonStyle())
-        .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
-        .popover(isPresented: $isBrowserThemeMenuPresented, arrowEdge: .bottom) {
-            browserThemeModePopover.browserChromePopoverAppearance(resolvedColorScheme)
-        }
-        .safeHelp(browserThemeModeButtonLabel)
-        .accessibilityLabel(browserThemeModeButtonLabel)
-        .accessibilityIdentifier("BrowserThemeModeButton")
-    }
-
-    private var browserThemeModeButtonLabel: String {
-        String(
-            format: String(
-                localized: "browser.theme.buttonHelp",
-                defaultValue: "Browser Theme: %@"
-            ),
-            browserThemeMode.displayName
-        )
-    }
-
     private var browserImportHintToolbarChip: some View {
         Button(action: {
             isBrowserImportHintPopoverPresented.toggle()
@@ -1734,41 +1687,6 @@ struct BrowserPanelView: View {
         .padding(.horizontal, browserProfilePopoverHorizontalPadding)
         .padding(.vertical, browserProfilePopoverVerticalPadding)
         .frame(minWidth: 208)
-    }
-
-    private var browserThemeModePopover: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(BrowserThemeMode.allCases) { mode in
-                Button {
-                    applyBrowserThemeModeSelection(mode)
-                    isBrowserThemeMenuPresented = false
-                } label: {
-                    HStack(spacing: 8) {
-                        CmuxSystemSymbolImage(symbolName: mode == browserThemeMode ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
-                            .opacity(mode == browserThemeMode ? 1.0 : 0.0)
-                            .frame(width: 12, alignment: .center)
-                        Text(mode.displayName)
-                            .cmuxFont(size: 12)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .contentShape(Rectangle())
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(mode == browserThemeMode ? Color.primary.opacity(0.12) : Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("BrowserThemeModeOption\(mode.rawValue.capitalized)")
-            }
-        }
-        .padding(8)
-        .frame(minWidth: 128)
-    }
-
-    private var browserThemeModeIconColor: Color {
-        devToolsColorOption.color(accent: cmuxAccent)
     }
 
     private var omnibarField: some View {
@@ -2502,13 +2420,6 @@ struct BrowserPanelView: View {
         if !panel.toggleDeveloperTools() {
             NSSound.beep()
         }
-    }
-
-    private func applyBrowserThemeModeSelection(_ mode: BrowserThemeMode) {
-        if browserThemeModeRaw != mode.rawValue {
-            browserThemeModeRaw = mode.rawValue
-        }
-        panel.setBrowserThemeMode(mode)
     }
 
     private func handleOmnibarTap() {
