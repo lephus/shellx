@@ -1879,25 +1879,14 @@ final class BrowserThemeSettingsTests: XCTestCase {
         )
     }
 
-    func testModeReadsPersistedValue() {
+    func testStoredValueIgnored() {
         let defaults = makeIsolatedDefaults()
-        defaults.set(BrowserThemeMode.dark.rawValue, forKey: BrowserThemeSettings.modeKey)
-        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .dark)
-
         defaults.set(BrowserThemeMode.light.rawValue, forKey: BrowserThemeSettings.modeKey)
-        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .light)
-    }
+        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .system)
+        XCTAssertEqual(BrowserThemeSettings.mode(for: BrowserThemeMode.dark.rawValue), .system)
 
-    func testModeMigratesLegacyForcedDarkModeFlag() {
-        let defaults = makeIsolatedDefaults()
         defaults.set(true, forKey: BrowserThemeSettings.legacyForcedDarkModeEnabledKey)
-        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .dark)
-        XCTAssertEqual(defaults.string(forKey: BrowserThemeSettings.modeKey), BrowserThemeMode.dark.rawValue)
-
-        let otherDefaults = makeIsolatedDefaults()
-        otherDefaults.set(false, forKey: BrowserThemeSettings.legacyForcedDarkModeEnabledKey)
-        XCTAssertEqual(BrowserThemeSettings.mode(defaults: otherDefaults), .system)
-        XCTAssertEqual(otherDefaults.string(forKey: BrowserThemeSettings.modeKey), BrowserThemeMode.system.rawValue)
+        XCTAssertEqual(BrowserThemeSettings.mode(defaults: defaults), .system)
     }
 }
 

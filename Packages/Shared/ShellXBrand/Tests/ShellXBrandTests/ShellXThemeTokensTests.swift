@@ -5,16 +5,14 @@ import SwiftUI
 import Testing
 @testable import ShellXBrand
 
-/// ShellX look tokens beyond the palette: dark-only appearance, status
+/// ShellX look tokens beyond the palette: default appearance, status
 /// colors, the built-in terminal theme and the Space Grotesk display font
 /// (spec §7.4).
 @Suite struct ShellXThemeTokensTests {
     // MARK: Appearance
 
-    @Test func appIsDarkOnly() {
-        #expect(ShellXAppearance.forcedAppearanceName == .darkAqua)
-        #expect(ShellXAppearance.forcedModeRawValue == "dark")
-        #expect(ShellXAppearance.forcedAppearance?.name == .darkAqua)
+    @Test func newInstallsDefaultToDark() {
+        #expect(ShellXAppearance.defaultModeRawValue == "dark")
     }
 
     // MARK: Status colors

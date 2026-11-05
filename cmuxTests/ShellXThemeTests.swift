@@ -91,17 +91,15 @@ struct ShellXThemeTests {
         #expect(WindowChromeSidebarPresetOption.nativeSidebar.tintOpacity == 1.0)
     }
 
-    @Test func appIsDarkOnly() throws {
-        #expect(ShellXAppearance.forcedAppearanceName == .darkAqua)
-        let suite = "ShellXThemeTests.dark.\(UUID().uuidString)"
+    @Test func appearanceIsUserChoice() throws {
+        let suite = "ShellXThemeTests.appearance.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
         defaults.set(AppearanceMode.light.rawValue, forKey: AppearanceSettings.appearanceModeKey)
-        #expect(AppearanceSettings.enforceShellXDarkOnly(defaults: defaults))
-        #expect(defaults.string(forKey: AppearanceSettings.appearanceModeKey) == "dark")
-        #expect(!AppearanceSettings.enforceShellXDarkOnly(defaults: defaults))
-        #expect(AppearanceSettings.terminalColorSchemePreference(defaults: defaults) == .dark)
+        #expect(AppearanceSettings.resolvedMode(defaults: defaults) == .light)
+        #expect(defaults.string(forKey: AppearanceSettings.appearanceModeKey) == "light")
+        #expect(AppearanceSettings.terminalColorSchemePreference(defaults: defaults) == .light)
     }
 
     @Test func defaultTerminalThemeUsesPalette() throws {

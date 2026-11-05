@@ -222,7 +222,7 @@ final class AppearanceSettingsTests: XCTestCase {
         )
     }
 
-    func testResolvedModeDefaultsToSystemWhenUnset() {
+    func testMissingStoredModeDefaultsDark() {
         let suiteName = "AppearanceSettingsTests.Default.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create isolated UserDefaults suite")
@@ -233,8 +233,95 @@ final class AppearanceSettingsTests: XCTestCase {
         defaults.removeObject(forKey: AppearanceSettings.appearanceModeKey)
 
         let resolved = AppearanceSettings.resolvedMode(defaults: defaults)
-        XCTAssertEqual(resolved, .system)
-        XCTAssertEqual(defaults.string(forKey: AppearanceSettings.appearanceModeKey), AppearanceMode.system.rawValue)
+        XCTAssertEqual(resolved, .dark)
+        XCTAssertNil(defaults.string(forKey: AppearanceSettings.appearanceModeKey))
+    }
+
+    func testStoredDarkStaysDark() {
+        let suiteName = "AppearanceSettingsTests.StoredDark.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(AppearanceMode.dark.rawValue, forKey: AppearanceSettings.appearanceModeKey)
+        XCTAssertEqual(AppearanceSettings.resolvedMode(defaults: defaults), .dark)
+        XCTAssertEqual(defaults.string(forKey: AppearanceSettings.appearanceModeKey), "dark")
+    }
+
+    func testStoredLightAppliesLight() {
+        let suiteName = "AppearanceSettingsTests.StoredLight.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var appliedName: NSAppearance.Name?
+        var synchronizedName: NSAppearance.Name?
+        let environment = AppearanceSettings.LiveApplyEnvironment(
+            setApplicationAppearance: { appliedName = $0?.bestMatch(from: [.darkAqua, .aqua]) },
+            synchronizeTerminalThemeWithAppearance: { appearance, _ in
+                synchronizedName = appearance?.bestMatch(from: [.darkAqua, .aqua])
+            },
+            systemAppearance: { nil }
+        )
+        defaults.set(AppearanceMode.light.rawValue, forKey: AppearanceSettings.appearanceModeKey)
+
+        let applied = AppearanceSettings.applyStoredMode(
+            rawValue: AppearanceMode.light.rawValue,
+            defaults: defaults,
+            source: "test",
+            environment: environment
+        )
+
+        XCTAssertEqual(applied, .light)
+        XCTAssertEqual(appliedName, .aqua)
+        XCTAssertEqual(synchronizedName, .aqua)
+        XCTAssertEqual(AppearanceSettings.terminalColorSchemePreference(defaults: defaults), .light)
+        XCTAssertEqual(defaults.string(forKey: AppearanceSettings.appearanceModeKey), "light")
+    }
+
+    func testSystemFollowsSystem() {
+        let suiteName = "AppearanceSettingsTests.SystemFollows.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var appliedCleared = false
+        let environment = AppearanceSettings.LiveApplyEnvironment(
+            setApplicationAppearance: { appliedCleared = ($0 == nil) },
+            synchronizeTerminalThemeWithAppearance: { _, _ in },
+            systemAppearance: { nil }
+        )
+        defaults.set(AppearanceMode.system.rawValue, forKey: AppearanceSettings.appearanceModeKey)
+
+        let applied = AppearanceSettings.applyStoredMode(
+            rawValue: AppearanceMode.system.rawValue,
+            defaults: defaults,
+            source: "test",
+            environment: environment
+        )
+
+        XCTAssertEqual(applied, .system)
+        XCTAssertTrue(appliedCleared)
+        XCTAssertEqual(
+            AppearanceSettings.terminalColorSchemePreference(
+                defaults: defaults,
+                systemAppearance: .init(prefersDark: false)
+            ),
+            .light
+        )
+        XCTAssertEqual(
+            AppearanceSettings.terminalColorSchemePreference(
+                defaults: defaults,
+                systemAppearance: .init(prefersDark: true)
+            ),
+            .dark
+        )
     }
 
     func testCurrentColorSchemePreferenceUsesStoredDarkModeBeforeAppAppearanceExists() {
