@@ -99,7 +99,6 @@ private struct TerminalThemeGalleryView: View {
 
     var body: some View {
         let results = model.results
-        let selectedName = model.themeInUse
 
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -119,13 +118,15 @@ private struct TerminalThemeGalleryView: View {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, alignment: .center)
-            } else if results.themes.isEmpty {
+            } else if results.isEmpty {
                 Text(String(localized: "settings.terminal.themeGallery.noResults", defaultValue: "No themes match your search.", bundle: .module))
                     .cmuxFont(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                themeGroup(results.matchingSlot, isDark: model.slotInUse == .dark, selectedName: selectedName)
-                themeGroup(results.otherAppearance, isDark: model.slotInUse != .dark, selectedName: selectedName)
+                let first = model.slotInUse
+                let second: TerminalThemeGalleryModel.Slot = first == .dark ? .light : .dark
+                themeGroup(results.themes(for: first), slot: first)
+                themeGroup(results.themes(for: second), slot: second)
             }
 
             if model.writeFailed {
@@ -143,15 +144,15 @@ private struct TerminalThemeGalleryView: View {
         .accessibilityIdentifier("SettingsTerminalThemeGallery")
     }
 
-    /// One appearance's cards under a "Dark Themes" or "Light Themes" heading.
+    /// One section's cards under a "Dark Themes" or "Light Themes" heading;
+    /// a pick there sets only that section's side of the pair.
     @ViewBuilder
     private func themeGroup(
         _ themes: [TerminalThemeGalleryModel.Theme],
-        isDark: Bool,
-        selectedName: String?
+        slot: TerminalThemeGalleryModel.Slot
     ) -> some View {
         if !themes.isEmpty {
-            Text(Self.groupTitle(isDark: isDark))
+            Text(Self.groupTitle(isDark: slot == .dark))
                 .cmuxFont(.caption, weight: .semibold)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
@@ -159,8 +160,8 @@ private struct TerminalThemeGalleryView: View {
                 ForEach(themes) { theme in
                     TerminalThemeCard(
                         theme: theme,
-                        isSelected: Self.matches(theme.name, selectedName),
-                        onSelect: { model.select(theme.name) }
+                        isSelected: Self.matches(theme.name, model.selectedName(for: slot)),
+                        onSelect: { model.select(theme.name, slot: slot) }
                     )
                     .equatable()
                 }

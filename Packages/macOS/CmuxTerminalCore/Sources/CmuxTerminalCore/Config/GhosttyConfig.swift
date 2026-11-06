@@ -21,12 +21,10 @@ public struct GhosttyConfig {
     /// terminal view/engine code.
     public typealias ColorSchemePreference = TerminalColorSchemePreference
 
-    /// Managed default theme name for a light appearance. ShellX is dark-only
-    /// (spec §7.4), so both appearances use the ShellX theme
-    /// (``ShellXTerminalTheme``). A Ghostty theme file of this name, if one
-    /// exists in a theme search path, is used first; otherwise the built-in
-    /// ShellX palette applies.
-    public static let cmuxDefaultLightThemeName = ShellXTerminalTheme.name
+    /// Managed default theme name for a light appearance: "Catppuccin Latte", a
+    /// soft built-in Ghostty light theme. A dark appearance keeps the ShellX
+    /// theme (``ShellXTerminalTheme``), so the two differ.
+    public static let cmuxDefaultLightThemeName = "Catppuccin Latte"
     /// Managed default theme name for a dark appearance: the ShellX theme.
     public static let cmuxDefaultDarkThemeName = ShellXTerminalTheme.name
 
@@ -1063,10 +1061,17 @@ public struct GhosttyConfig {
         bundleResourceURL: URL?,
         preferredColorScheme: ColorSchemePreference? = nil
     ) {
-        guard let resolvedThemeName = Self.appliedThemeName(
+        let colorScheme = preferredColorScheme ?? Self.currentColorSchemePreference()
+        guard let appliedThemeName = Self.appliedThemeName(
             from: name,
-            preferredColorScheme: preferredColorScheme ?? Self.currentColorSchemePreference()
+            preferredColorScheme: colorScheme
         ) else { return }
+        let resolvedThemeName = Self.singleThemeAppearanceSubstitute(
+            rawThemeValue: name,
+            preferredColorScheme: colorScheme,
+            environment: environment,
+            bundleResourceURL: bundleResourceURL
+        ) ?? appliedThemeName
         let expandedThemePath = NSString(string: resolvedThemeName).expandingTildeInPath
         if (expandedThemePath as NSString).isAbsolutePath,
            let contents = try? String(contentsOfFile: expandedThemePath, encoding: .utf8) {

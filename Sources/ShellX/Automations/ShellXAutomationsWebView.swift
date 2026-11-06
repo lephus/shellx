@@ -27,6 +27,7 @@ final class ShellXAutomationsWebHost: NSObject, WKScriptMessageHandlerWithReply,
     private static let page = WebviewsAppPage.automations
     let controller: ShellXAutomationsController
     private var webView: WKWebView?
+    private var appearanceObservation: NSKeyValueObservation?
     private var reloadBudget = GitGraphReloadBudget()
 
     init(controller: ShellXAutomationsController) {
@@ -74,6 +75,7 @@ final class ShellXAutomationsWebHost: NSObject, WKScriptMessageHandlerWithReply,
             forName: ShellXAutomationsBridgeContract.handlerName,
             contentWorld: .page
         )
+        appearanceObservation = nil
         webView.navigationDelegate = nil
         webView.removeFromSuperview()
         self.webView = nil
@@ -134,6 +136,9 @@ final class ShellXAutomationsWebHost: NSObject, WKScriptMessageHandlerWithReply,
         }
         controller.effectiveAppearance = { [weak self] in
             self?.webView?.effectiveAppearance ?? NSApplication.shared.effectiveAppearance
+        }
+        appearanceObservation = webView?.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in self?.controller.appearanceDidChange() }
         }
     }
 

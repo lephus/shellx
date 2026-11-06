@@ -4,8 +4,8 @@
 - Space Grotesk ships in the app bundle (Resources/Fonts folder reference in
   the app's Resources phase), with its OFL license, and Info.plist registers
   it through ATSApplicationFontsPath.
-- The app is dark-only: the Light/Dark/System picker is hidden and live
-  appearance applies land on the forced ShellX appearance.
+- The Appearance (System/Light/Dark) row leads Themes and live appearance
+  applies follow the stored mode; nothing forces dark.
 - The sidebar defaults to the opaque panel tint (match terminal background off).
 - Buttons, inputs and popovers carry no gradients outside the allowlist (content fades,
   debug-only styles, decorative art).
@@ -40,7 +40,7 @@ GRADIENT_ALLOW = [
     ("Sources/ProBadgeStyle.swift", "logo gradient (logo is the spec's one exception)"),
     ("Sources/Cloud/CloudWelcomeMedia.swift", "cloud welcome artwork (cloud UI hidden in ShellX)"),
     ("Sources/App/ComputerUseCursorOverlayController.swift", "agent cursor overlay art"),
-    ("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Rows/ThemeWindowThumbnail.swift", "wallpaper art in the hidden appearance picker"),
+    ("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Rows/ThemeWindowThumbnail.swift", "wallpaper art in the appearance picker"),
     ("Packages/macOS/CmuxComputerUse/Sources/CmuxComputerUse/AgentCursorPointerView.swift", "agent cursor art"),
     ("Packages/macOS/CmuxSwiftRender/Sources/CmuxSwiftRender/SwiftViewInterpreter.swift", "user-authored view interpreter"),
     ("Packages/macOS/CmuxSwiftRender/Sources/CmuxSwiftRender/RenderNode.swift", "user-authored view model"),
@@ -85,23 +85,25 @@ class ShellXThemeGuardTests(unittest.TestCase):
         source = read("Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFonts.swift")
         self.assertIn('familyName = "Space Grotesk"', source)
 
-    def test_appearance_picker_is_hidden(self):
+    def test_appearance_row_first_in_themes(self):
         themes = read("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/ThemesSection.swift")
-        self.assertNotIn("ThemePickerRow(", themes)
-        self.assertNotIn("setting:themes:appearance", themes)
+        self.assertIn("ThemePickerRow(", themes)
+        self.assertIn("setting:themes:appearance", themes)
+        self.assertLess(themes.index("ThemePickerRow("), themes.index("settings.app.accentColor\""))
+        self.assertNotIn("browserThemeRow", themes)
+        self.assertNotIn("adaptiveDefaultThemeRow", themes)
         curated = read("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Navigation/CuratedSettingEntry+Default.swift")
-        self.assertNotIn('id: "appearance"', curated)
+        self.assertIn('id: "appearance"', curated)
         index = read("Sources/SettingsSearchIndex.swift")
-        self.assertNotIn('setting(.themes, "appearance"', index)
+        self.assertIn('setting(.themes, "appearance"', index)
 
-    def test_live_appearance_is_forced_dark(self):
-        settings = read("Sources/AppearanceSettings.swift")
-        self.assertIn("NSApplication.shared.appearance = ShellXAppearance.forcedAppearance", settings)
-        self.assertNotIn("NSApplication.shared.appearance = appearance", settings)
-        app = read("Sources/cmuxApp.swift")
-        self.assertIn("AppearanceSettings.enforceShellXDarkOnly()", app)
-        launch = app.index("AppearanceSettings.enforceShellXDarkOnly()")
-        self.assertLess(launch, app.index("let startupAppearance = AppearanceSettings.resolvedMode()"))
+    def test_no_forced_appearance(self):
+        for path in ("Sources/AppearanceSettings.swift", "Sources/cmuxApp.swift",
+                     "Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXAppearance.swift"):
+            source = read(path)
+            self.assertNotIn("forcedAppearance", source, path)
+            self.assertNotIn("forcedModeRawValue", source, path)
+            self.assertNotIn("enforceShellXDarkOnly", source, path)
 
     def test_sidebar_defaults_to_the_panel_tint(self):
         catalog = read("Packages/macOS/CmuxSettings/Sources/CmuxSettings/Keys/SidebarAppearanceCatalogSection.swift")

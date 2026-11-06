@@ -733,7 +733,7 @@ enum CmuxEmbeddedConfigSchema {
         "appearance": {
           "type": "string",
           "enum": ["system", "light", "dark"],
-          "default": "system",
+          "default": "dark",
           "description": "App appearance mode."
         },
         "accentColor": {
@@ -2202,7 +2202,8 @@ enum CmuxEmbeddedConfigSchema {
           "type": "string",
           "enum": ["system", "light", "dark"],
           "default": "system",
-          "description": "Embedded browser theme."
+          "description": "Deprecated and ignored, replaced by app.appearance. Pages follow the app appearance.",
+          "deprecated": true
         },
         "defaultZoomLevel": {
           "type": "number",

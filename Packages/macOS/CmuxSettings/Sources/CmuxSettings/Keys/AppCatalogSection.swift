@@ -1,11 +1,12 @@
 import CmuxFoundation
 import Foundation
+import ShellXBrand
 
 /// Settings under the dotted-id prefix `app.*` — user-facing app behavior.
 public struct AppCatalogSection: SettingCatalogSection {
     public let appearance = DefaultsKey<AppearanceMode>(
         id: "app.appearance",
-        defaultValue: .system,
+        defaultValue: AppearanceMode(rawValue: ShellXAppearance.defaultModeRawValue)!,
         userDefaultsKey: "appearanceMode"
     )
 

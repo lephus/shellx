@@ -53,6 +53,9 @@ struct cmuxApp: App {
     }
 
     init() {
+        // Before anything reads `appearanceMode`: a fresh install resolves to
+        // the default mode (Dark) for every reader, chrome and terminal alike.
+        AppearanceSettings.registerDefaultMode()
         // Gather settings package dependencies once. The runtime itself
         // is assigned after the saved language override below, because
         // it owns localized search-index text for the process lifetime.
@@ -216,8 +219,6 @@ struct cmuxApp: App {
         )
         StartupBreadcrumbLog.append("app.init.settingsRuntime.created")
 
-        // ShellX is dark-only: pin the stored mode before anything resolves it.
-        AppearanceSettings.enforceShellXDarkOnly()
         let startupAppearance = AppearanceSettings.resolvedMode()
         Self.applyAppearance(startupAppearance, duringLaunch: true)
         StartupBreadcrumbLog.append("app.init.appearance.applied", fields: ["mode": startupAppearance.rawValue])
@@ -1335,9 +1336,8 @@ struct cmuxApp: App {
     }
 
     private func applyAppearance() {
-        // ShellX is dark-only: any stored mode applies (and is pinned back) as dark.
         let mode = AppearanceSettings.applyStoredMode(
-            rawValue: ShellXAppearance.forcedModeRawValue,
+            rawValue: appearanceMode,
             source: "cmuxApp.appearanceModeChanged"
         )
         if appearanceMode != mode.rawValue {

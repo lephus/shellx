@@ -185,6 +185,10 @@ export class AutomationsStore {
       case "focus":
         this.set({ focusId: event.id, view: "list", filter: "all" });
         break;
+      case "appearance":
+        if (event.appearance !== "dark" && event.appearance !== "light") break;
+        if (this.state.context) this.set({ context: { ...this.state.context, appearance: event.appearance } });
+        break;
       case "creator.event":
         this.handleCreatorEvent(event.event);
         break;

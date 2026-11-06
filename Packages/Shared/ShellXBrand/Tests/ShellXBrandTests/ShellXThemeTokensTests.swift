@@ -5,16 +5,14 @@ import SwiftUI
 import Testing
 @testable import ShellXBrand
 
-/// ShellX look tokens beyond the palette: dark-only appearance, status
+/// ShellX look tokens beyond the palette: default appearance, status
 /// colors, the built-in terminal theme and the Space Grotesk display font
 /// (spec §7.4).
 @Suite struct ShellXThemeTokensTests {
     // MARK: Appearance
 
-    @Test func appIsDarkOnly() {
-        #expect(ShellXAppearance.forcedAppearanceName == .darkAqua)
-        #expect(ShellXAppearance.forcedModeRawValue == "dark")
-        #expect(ShellXAppearance.forcedAppearance?.name == .darkAqua)
+    @Test func newInstallsDefaultToDark() {
+        #expect(ShellXAppearance.defaultModeRawValue == "dark")
     }
 
     // MARK: Status colors
@@ -93,6 +91,16 @@ import Testing
         #expect(lines.contains("selection-background = \(ShellXTerminalTheme.selectionBackground.hexString)"))
         #expect(lines.contains("selection-foreground = #e6e2f2"))
         #expect(ShellXTerminalTheme.name == "ShellX")
+    }
+
+    /// The bundled theme file Ghostty resolves `theme = ShellX` (or
+    /// `dark:ShellX`) from is the Swift table, byte for byte.
+    @Test func bundledThemeFileMatchesTheTable() throws {
+        let fileURL = Self.repoRoot
+            .appendingPathComponent("Resources/ghostty/themes", isDirectory: true)
+            .appendingPathComponent(ShellXTerminalTheme.name, isDirectory: false)
+        let contents = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(contents == ShellXTerminalTheme.ghosttyConfigContents + "\n")
     }
 
     // MARK: Display font

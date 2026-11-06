@@ -19,9 +19,14 @@ struct ThemePickerRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Text(String(localized: "settings.app.appearance", defaultValue: "Appearance"))
-                .cmuxFont(size: 13, weight: .medium)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "settings.app.appearance", defaultValue: "Appearance"))
+                    .cmuxFont(size: 13, weight: .medium)
+                Text(String(localized: "settings.app.appearance.subtitle", defaultValue: "Switch ShellX, the terminal and web pages between light and dark. System follows macOS."))
+                    .cmuxFont(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 8) {
                 ForEach(AppearanceMode.allCases, id: \.self) { mode in

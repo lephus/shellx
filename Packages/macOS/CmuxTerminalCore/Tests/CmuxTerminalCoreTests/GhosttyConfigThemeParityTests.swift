@@ -32,6 +32,9 @@ import Testing
         let light: ColorSnapshot
         let dark: ColorSnapshot
         let changesWithAppearance: Bool
+        /// A dark theme named for both appearances only suits Dark: Light
+        /// shows the default light theme instead of `light`.
+        var lightShowsDefaultLightTheme = false
     }
 
     private static let ghosttyDefaultPalette = [
@@ -93,6 +96,12 @@ import Testing
         let darkAfterFlip = try loadSnapshot(configPath: configURL.path, colorScheme: .dark)
         let lightAfterFlipBack = try loadSnapshot(configPath: configURL.path, colorScheme: .light)
 
+        if fixture.lightShowsDefaultLightTheme {
+            #expect(darkAfterFlip == fixture.dark, "dark appearance mismatch for \(scenario.rawValue)")
+            #expect(light.background != fixture.dark.background, "a dark single theme must not stay in light")
+            #expect(lightAfterFlipBack == light, "flip-back mismatch for \(scenario.rawValue)")
+            return
+        }
         #expect(light == fixture.light, "light appearance mismatch for \(scenario.rawValue)")
         #expect(darkAfterFlip == fixture.dark, "dark appearance mismatch for \(scenario.rawValue)")
         #expect(lightAfterFlipBack == fixture.light, "flip-back mismatch for \(scenario.rawValue)")
@@ -170,7 +179,8 @@ import Testing
                 configContents: "theme = \(themeURL.path)\n",
                 light: expected,
                 dark: expected,
-                changesWithAppearance: false
+                changesWithAppearance: true,
+                lightShowsDefaultLightTheme: true
             )
 
         case .conditionalThemePair:

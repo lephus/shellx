@@ -15,6 +15,9 @@ public struct TerminalThemeGalleryContext: Sendable {
     public let readCurrentThemeValue: @MainActor @Sendable () -> String?
     /// Whether the app currently renders in dark appearance.
     public let prefersDarkAppearance: Bool
+    /// The themes each appearance resolves to when the config sets none, used
+    /// to fill the side a pick leaves alone.
+    public let defaultPair: CmuxTerminalThemePair
 
     /// Creates a context.
     /// - Parameters:
@@ -22,16 +25,19 @@ public struct TerminalThemeGalleryContext: Sendable {
     ///   - themeDirectories: Usually ``GhosttyThemeDirectories/urls``.
     ///   - readCurrentThemeValue: Returns the effective `theme` value now.
     ///   - prefersDarkAppearance: Picks the slot the gallery opens on.
+    ///   - defaultPair: The built-in light and dark themes.
     public init(
         configFile: CmuxManagedThemeConfigFile,
         themeDirectories: [URL],
         readCurrentThemeValue: @escaping @MainActor @Sendable () -> String?,
-        prefersDarkAppearance: Bool
+        prefersDarkAppearance: Bool,
+        defaultPair: CmuxTerminalThemePair
     ) {
         self.configFile = configFile
         self.themeDirectories = themeDirectories
         self.readCurrentThemeValue = readCurrentThemeValue
         self.prefersDarkAppearance = prefersDarkAppearance
+        self.defaultPair = defaultPair
     }
 }
 

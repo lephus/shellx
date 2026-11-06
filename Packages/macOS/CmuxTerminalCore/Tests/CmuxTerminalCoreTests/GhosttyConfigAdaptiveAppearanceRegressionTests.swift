@@ -4,8 +4,8 @@ import Testing
 @testable import CmuxTerminalCore
 
 /// Non-color settings must not opt an otherwise untouched terminal out of the
-/// managed default palette. ShellX is dark-only: both appearances resolve the
-/// same managed theme (``GhosttyConfig/cmuxDefaultDarkThemeName``).
+/// managed default palette. Dark resolves ``GhosttyConfig/cmuxDefaultDarkThemeName``
+/// and light ``GhosttyConfig/cmuxDefaultLightThemeName``.
 @Suite struct GhosttyConfigAdaptiveAppearanceRegressionTests {
     @Test(arguments: [
         "font-size = 17",
@@ -21,8 +21,8 @@ import Testing
 
             #expect(dark.backgroundColor.hexString() == "#101112")
             #expect(dark.foregroundColor.hexString() == "#F0F1F2")
-            #expect(light.backgroundColor.hexString() == "#101112")
-            #expect(light.foregroundColor.hexString() == "#F0F1F2")
+            #expect(light.backgroundColor.hexString() == "#FAF0E6")
+            #expect(light.foregroundColor.hexString() == "#1A1B1C")
             if setting.hasPrefix("font-size") {
                 #expect(dark.fontSize == 17)
                 #expect(light.fontSize == 17)
@@ -36,20 +36,30 @@ import Testing
                 .appendingPathComponent("fonts.conf")
             try "font-size = 17\n".write(to: included, atomically: true, encoding: .utf8)
             let light = load(path, resources: resources, scheme: .light)
-            #expect(light.backgroundColor.hexString() == "#101112")
-            #expect(light.foregroundColor.hexString() == "#F0F1F2")
+            #expect(light.backgroundColor.hexString() == "#FAF0E6")
+            #expect(light.foregroundColor.hexString() == "#1A1B1C")
             #expect(light.fontSize == 17)
         }
     }
 
-    @Test(arguments: ["background = #123456", "theme = Deliberate Dark"])
-    func authoredAppearanceStillOwnsColors(setting: String) throws {
-        try withFixture(setting) { path, resources in
+    @Test func authoredBackgroundStillOwnsColors() throws {
+        try withFixture("background = #123456") { path, resources in
             let light = load(path, resources: resources, scheme: .light)
             let dark = load(path, resources: resources, scheme: .dark)
             #expect(light.backgroundColor == dark.backgroundColor)
             #expect(light.foregroundColor == dark.foregroundColor)
-            #expect(light.backgroundColor.hexString() == (setting.hasPrefix("theme") ? "#334455" : "#123456"))
+            #expect(light.backgroundColor.hexString() == "#123456")
+        }
+    }
+
+    /// An authored dark theme owns Dark; Light shows the default light theme
+    /// (one theme on both sides only suits one appearance).
+    @Test func authoredDarkThemeOwnsDarkOnly() throws {
+        try withFixture("theme = Deliberate Dark") { path, resources in
+            let light = load(path, resources: resources, scheme: .light)
+            let dark = load(path, resources: resources, scheme: .dark)
+            #expect(dark.backgroundColor.hexString() == "#334455")
+            #expect(light.backgroundColor.hexString() != "#334455")
         }
     }
 
@@ -78,8 +88,8 @@ import Testing
         let themes = root.appendingPathComponent("themes")
         try FileManager.default.createDirectory(at: themes, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        // One managed theme serves both appearances (ShellX is dark-only).
-        #expect(GhosttyConfig.cmuxDefaultLightThemeName == GhosttyConfig.cmuxDefaultDarkThemeName)
+        #expect(GhosttyConfig.cmuxDefaultLightThemeName == "Catppuccin Latte")
+        #expect(GhosttyConfig.cmuxDefaultDarkThemeName == "ShellX")
         try "background = #101112\nforeground = #f0f1f2\n".write(
             to: themes.appendingPathComponent(GhosttyConfig.cmuxDefaultDarkThemeName),
             atomically: true,
@@ -89,6 +99,11 @@ import Testing
         let authoredTheme = root.appendingPathComponent("Deliberate Dark")
         try "background = #334455\nforeground = #ddeeff\n".write(
             to: authoredTheme, atomically: true, encoding: .utf8
+        )
+        try "background = #FAF0E6\nforeground = #1A1B1C\n".write(
+            to: themes.appendingPathComponent(GhosttyConfig.cmuxDefaultLightThemeName),
+            atomically: true,
+            encoding: .utf8
         )
         try contents.replacingOccurrences(of: "Deliberate Dark", with: authoredTheme.path)
             .write(to: path, atomically: true, encoding: .utf8)

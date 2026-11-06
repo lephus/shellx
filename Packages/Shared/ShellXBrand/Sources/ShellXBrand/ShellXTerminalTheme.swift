@@ -61,7 +61,9 @@ public enum ShellXTerminalTheme {
     ]
 
     /// The theme as Ghostty config lines (the same format as a Ghostty
-    /// theme file).
+    /// theme file). `Resources/ghostty/themes/ShellX` ships these exact
+    /// lines so Ghostty can resolve `theme = dark:ShellX`; a test keeps the
+    /// two equal.
     public static var ghosttyConfigContents: String {
         var lines = ansi.enumerated().map { index, color in
             "palette = \(index)=\(color.hexString)"

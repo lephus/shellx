@@ -79,7 +79,8 @@ export type CreatorEvent =
 export type AutomationsEvent =
   | { type: "automations.changed" }
   | { type: "creator.event"; event: CreatorEvent }
-  | { type: "focus"; id: string };
+  | { type: "focus"; id: string }
+  | { type: "appearance"; appearance: "dark" | "light" };
 
 export type AutomationsMethod =
   | "app.context"

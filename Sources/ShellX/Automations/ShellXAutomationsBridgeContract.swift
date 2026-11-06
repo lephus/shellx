@@ -33,6 +33,7 @@ enum ShellXAutomationsBridgeContract {
         case changed = "automations.changed"
         case creatorEvent = "creator.event"
         case focus
+        case appearance
     }
 
     /// `error.code` of a failed reply. `notAllowed` marks a request from an untrusted

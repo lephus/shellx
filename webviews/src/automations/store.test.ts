@@ -139,6 +139,16 @@ test("focusEventSelectsCard", async () => {
   expect(store.getState().view).toBe("list");
 });
 
+test("appearanceEventUpdatesContext", async () => {
+  const f = fakeBridge({ "app.context": () => ({ labels: {}, reduceMotion: false, appearance: "dark" }) });
+  const store = new AutomationsStore(f.bridge);
+  await store.start();
+  expect(store.getState().context?.appearance).toBe("dark");
+  f.emit({ type: "appearance", appearance: "light" });
+  expect(store.getState().context?.appearance).toBe("light");
+  expect(store.getState().context?.labels).toEqual({});
+});
+
 test("context focusId and reduceMotion are applied", async () => {
   const f = fakeBridge({ "app.context": () => ({ labels: { save: "Lưu" }, focusId: "z", reduceMotion: true }) });
   const store = new AutomationsStore(f.bridge);
