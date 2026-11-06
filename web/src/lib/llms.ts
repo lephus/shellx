@@ -56,29 +56,26 @@ ${en.map((g) => `- [${g.title}](${siteUrl}${g.path}): ${g.description}`).join('\
 ## Pages
 
 - [Home](${siteUrl}${pathFor('en', 'home')}): what ShellX does, features, security, FAQ, downloads
-- [Videos](${siteUrl}${pathFor('en', 'videos')}): ${video('en', 'tutorial').title} (3 minutes, with chapters and transcript) and ${video('en', 'intro').title}
+- [Videos](${siteUrl}${pathFor('en', 'videos')}): ${video('en', 'tutorial').title} (3 minutes), ${video('en', 'automations').title} (2 minutes), both with chapters and transcript, and ${video('en', 'intro').title}
 - [Privacy Policy](${siteUrl}${pathFor('en', 'privacy')}): what is stored, end-to-end encryption, account deletion
 - [Terms of Use](${siteUrl}${pathFor('en', 'terms')})
 
 ## Optional
 
-- [Full text for LLMs](${siteUrl}/llms-full.txt): this summary plus the video transcript, the FAQ and every guide in full
+- [Full text for LLMs](${siteUrl}/llms-full.txt): this summary plus the video transcripts, the FAQ and every guide in full
 `;
 }
 
 export function llmsFullTxt(): string {
   const body = (lang: Lang) =>
     guides(lang).map((g) => `---\n\n# ${g.title}\n\nURL: ${siteUrl}${g.path}\nUpdated: ${g.updated}\n\n${g.body}`).join('\n\n');
-  const tutorial = video('en', 'tutorial');
-  const transcript = tutorial.chapters.map((c) => `### ${clock(c.start)} ${c.title}\n\n${c.text}`).join('\n\n');
+  const transcripts = (['tutorial', 'automations'] as const).map((id) => {
+    const v = video('en', id);
+    const chapters = v.chapters.map((c) => `### ${clock(c.start)} ${c.title}\n\n${c.text}`).join('\n\n');
+    return `---\n\n# Video transcript: ${v.title}\n\nURL: ${siteUrl}${pathFor('en', 'videos')}#${id}\n\n${chapters}`;
+  });
   return `${llmsTxt()}
----
-
-# Video transcript: ${tutorial.title}
-
-URL: ${siteUrl}${pathFor('en', 'videos')}
-
-${transcript}
+${transcripts.join('\n\n')}
 
 ---
 

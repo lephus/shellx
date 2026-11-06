@@ -1,12 +1,13 @@
-// The site's two videos: files in public/media/, captions in src/videos/<name>.srt. The captions are
+// The site's videos: files in public/media/, captions in src/videos/<name>.srt. The captions are
 // burned into the picture, so the players carry no text track; the .srt files feed the chapters, the
 // transcripts and the VideoObject JSON-LD, so those never drift from what is said.
 import type { Lang } from '../i18n/ui';
 import { organization, siteUrl } from './seo';
 import introCaptions from '../videos/shellx-intro.srt?raw';
 import tutorialCaptions from '../videos/shellx-tutorial.srt?raw';
+import automationsCaptions from '../videos/shellx-automations.srt?raw';
 
-export type VideoId = 'intro' | 'tutorial';
+export type VideoId = 'intro' | 'tutorial' | 'automations';
 
 interface Source {
   /** File stem in public/media/: <name>.mp4 and the poster <name>.webp. */
@@ -56,6 +57,27 @@ const sources: Record<VideoId, Source> = {
       { cue: 26, title: { en: 'Needs You: allow, answer, review plans' } },
       { cue: 31, title: { en: 'End-to-end encryption' } },
       { cue: 34, title: { en: 'Download ShellX' } },
+    ],
+  },
+  automations: {
+    name: 'shellx-automations',
+    seconds: 97,
+    uploaded: '2026-11-06T17:00:00+07:00',
+    captions: automationsCaptions,
+    title: { en: 'Automations for Claude Code' },
+    description: {
+      en: 'Describe a job in plain English and Claude Code drafts it: a schedule, a folder, the commands it may run and how it tells you. Check the flowchart, save, and ShellX runs it on your Mac.',
+    },
+    chapters: [
+      { cue: 1, title: { en: 'Introduction' } },
+      { cue: 2, title: { en: 'Skills, workflows and jobs in one place' } },
+      { cue: 4, title: { en: 'Describe a new automation' } },
+      { cue: 6, title: { en: 'Claude Code drafts the cronjob' } },
+      { cue: 8, title: { en: 'Choose how to hear back' } },
+      { cue: 9, title: { en: 'Check the flowchart and the skill file' } },
+      { cue: 11, title: { en: 'Save it and run it now' } },
+      { cue: 14, title: { en: 'Your existing Claude Code skills' } },
+      { cue: 16, title: { en: 'Download ShellX' } },
     ],
   },
 };
@@ -114,6 +136,12 @@ export function clock(s: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/** Query that opens the watch page at second `t` of video `id`: plain ?t= for the tutorial (the first
+ *  video with chapters, whose links are already shared), ?v=<id>&t= for the others. */
+export function startQuery(id: VideoId, t: number): string {
+  return id === 'tutorial' ? `?t=${t}` : `?v=${id}&t=${t}`;
+}
+
 /** VideoObject for the watch page at `path`; a chapter is a Clip that opens the page at its start. */
 export function videoLd(v: Video, path: string) {
   const s = sources[v.id];
@@ -130,7 +158,7 @@ export function videoLd(v: Video, path: string) {
     ...(v.chapters.length > 1 && {
       hasPart: v.chapters.map((c) => ({
         '@type': 'Clip', name: c.title, startOffset: c.start, endOffset: c.end,
-        url: `${siteUrl}${path}?t=${c.start}`,
+        url: `${siteUrl}${path}${startQuery(v.id, c.start)}`,
       })),
     }),
   };
