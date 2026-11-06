@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DraftCard } from "./DraftCard";
 import { createAutomationLabelResolver } from "./labels";
+import type { DraftViewMode } from "./store";
 import type { AutomationDraft, ValidationIssueDTO } from "./types";
 
 const label = createAutomationLabelResolver();
@@ -15,8 +16,26 @@ const empty: AutomationDraft = {
   skillMarkdown: "",
 };
 
-function render(draft: AutomationDraft, issues: ValidationIssueDTO[] = [], ready = false): string {
-  return renderToStaticMarkup(<DraftCard label={label} draft={draft} issues={issues} ready={ready} />);
+function render(
+  draft: AutomationDraft,
+  issues: ValidationIssueDTO[] = [],
+  ready = false,
+  view: DraftViewMode = "text",
+  flowCurrent = true,
+  locked = false,
+): string {
+  return renderToStaticMarkup(
+    <DraftCard
+      label={label}
+      draft={draft}
+      issues={issues}
+      ready={ready}
+      view={view}
+      onViewChange={() => {}}
+      flowCurrent={flowCurrent}
+      locked={locked}
+    />,
+  );
 }
 
 test("fields appear only once they are non-empty", () => {
@@ -73,10 +92,107 @@ test("the iPhone target shows the pending label", () => {
 test("with onEdit, name, description and SKILL.md are editable fields", () => {
   const draft = { ...empty, kind: "skill" as const, name: "n", description: "d", skillMarkdown: "---\nname: n\n---\n" };
   const html = renderToStaticMarkup(
-    <DraftCard label={label} draft={draft} issues={[]} ready onEdit={() => {}} locked />,
+    <DraftCard label={label} draft={draft} issues={[]} ready onEdit={() => {}} locked view="text" onViewChange={() => {}} flowCurrent />,
   );
   expect(html).toContain('<input class="au-edit"');
   expect((html.match(/<textarea/g) ?? []).length).toBe(2);
   expect((html.match(/readOnly=""|readonly=""/g) ?? []).length).toBe(3);
   expect(render(draft)).not.toContain("<textarea");
+});
+
+const flow = {
+  nodes: [
+    { id: "a", type: "step" as const, label: "Fetch the PRs" },
+    { id: "b", type: "step" as const, label: "Write the digest" },
+  ],
+  edges: [{ from: "a", to: "b" }],
+};
+const skill: AutomationDraft = {
+  ...empty,
+  kind: "skill",
+  name: "pr-digest",
+  description: "Digest PRs",
+  skillMarkdown: "---\nname: pr-digest\n---\nBody",
+  flow,
+};
+
+test("defaultsToFlowchart: a skill draft with a usable flow shows the chart and the caption", () => {
+  const html = renderToStaticMarkup(
+    <DraftCard label={label} draft={skill} issues={[]} ready onEdit={() => {}} view="flow" onViewChange={() => {}} flowCurrent />,
+  );
+  expect(html).toContain("<svg");
+  expect(html).toContain("Fetch the PRs");
+  expect(html).toContain(label("flowCaption"));
+  expect((html.match(/<textarea/g) ?? []).length).toBe(1);
+  expect(html).not.toContain('data-field="skillMarkdown"');
+  expect(html).toMatch(/aria-pressed="true"[^>]*>Flowchart/);
+  expect(html).toMatch(/aria-pressed="false"[^>]*>Text/);
+  expect(html).not.toContain(label("flowOutdated"));
+});
+
+test("switchShowsText: the Text view is today's card and its fields stay editable", () => {
+  const html = renderToStaticMarkup(
+    <DraftCard label={label} draft={skill} issues={[]} ready onEdit={() => {}} view="text" onViewChange={() => {}} flowCurrent />,
+  );
+  expect(html).not.toContain("<svg");
+  expect(html).not.toContain(label("flowCaption"));
+  expect((html.match(/<textarea/g) ?? []).length).toBe(2);
+  expect(html).toContain('data-field="skillMarkdown"');
+  expect(html).toMatch(/aria-pressed="true"[^>]*>Text/);
+});
+
+test("earlyDraftShowsDrawing: a skill draft with no flow says Claude is drawing only while Claude works", () => {
+  const html = render({ ...skill, flow: undefined }, [], false, "flow", true, true);
+  expect(html).toContain(label("flowDrawing"));
+  expect(html).not.toContain(label("flowNone"));
+  expect(html).not.toContain("<svg");
+  const idle = render({ ...skill, flow: undefined }, [], true, "flow", true, false);
+  expect(idle).not.toContain(label("flowDrawing"));
+  expect(idle).toContain("No flowchart yet — see Text");
+  expect(idle).not.toContain("<svg");
+});
+
+test("flowViewShowsTools: the tools a cronjob may use stay visible next to the chart", () => {
+  const cron = { ...skill, kind: "cronjob" as const, allowedTools: ["Read", "Bash(rm:*)"] };
+  const html = render(cron, [], true, "flow");
+  expect(html).toContain("<svg");
+  const tools = html.indexOf('data-field="tools"');
+  expect(tools).toBeGreaterThan(html.indexOf("<svg"));
+  expect(html).toContain("Read, Bash(rm:*)");
+  expect(render(cron, [], true, "text")).toContain('data-field="tools"');
+  expect(render({ ...cron, allowedTools: [] }, [], true, "flow")).not.toContain('data-field="tools"');
+});
+
+test("workflowNeedsNoFlow: a workflow draft with steps renders the chart without a placeholder or caption", () => {
+  const html = render(
+    { ...empty, kind: "workflow", name: "w", steps: [{ title: "Pull", prompt: "p" }, { title: "Push", prompt: "q" }] },
+    [],
+    true,
+    "flow",
+  );
+  expect(html).toContain("<svg");
+  expect(html).toContain("Pull");
+  expect(html).not.toContain(label("flowDrawing"));
+  expect(html).not.toContain(label("flowCaption"));
+});
+
+test("badFlowFallsBackToText: an edge to an unknown node shows the Text fields", () => {
+  const bad = { ...skill, flow: { nodes: flow.nodes, edges: [{ from: "a", to: "zzz" }] } };
+  const html = render(bad, [], true, "flow");
+  expect(html).not.toContain("<svg");
+  expect(html).not.toContain(label("flowDrawing"));
+  expect(html).toContain('data-field="skillMarkdown"');
+});
+
+test("an out-of-date chart is dimmed with a note, and busy while locked", () => {
+  const html = render(skill, [], true, "flow", false, true);
+  expect(html).toContain(label("flowOutdated"));
+  expect(html).toContain("<svg");
+  expect(html).toContain('data-busy="true"');
+  expect(render(skill, [], true, "flow", true, false)).not.toContain('data-busy="true"');
+});
+
+test("issues on hidden fields still show in the flow view", () => {
+  const html = render(skill, [{ field: "skillMarkdown", code: "bad", message: "SKILL.md is broken" }], false, "flow");
+  expect(html).toContain("SKILL.md is broken");
 });

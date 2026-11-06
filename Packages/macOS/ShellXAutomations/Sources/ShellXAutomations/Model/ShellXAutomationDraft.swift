@@ -18,6 +18,8 @@ public struct ShellXAutomationDraft: Codable, Sendable, Equatable {
     public var steps: [ShellXWorkflowStep]
     /// Full `SKILL.md` text including frontmatter.
     public var skillMarkdown: String
+    /// Flowchart of the automation, if Claude drew a usable one.
+    public var flow: ShellXAutomationFlow?
 
     /// Creates a draft.
     public init(
@@ -29,7 +31,8 @@ public struct ShellXAutomationDraft: Codable, Sendable, Equatable {
         notify: ShellXNotifySettings = ShellXNotifySettings(),
         allowedTools: [String] = [],
         steps: [ShellXWorkflowStep] = [],
-        skillMarkdown: String
+        skillMarkdown: String,
+        flow: ShellXAutomationFlow? = nil
     ) {
         self.kind = kind
         self.name = name
@@ -40,5 +43,6 @@ public struct ShellXAutomationDraft: Codable, Sendable, Equatable {
         self.allowedTools = allowedTools
         self.steps = steps
         self.skillMarkdown = skillMarkdown
+        self.flow = flow
     }
 }

@@ -459,4 +459,72 @@ private struct Fixture {
         let fd = try #require(await f.store.heldLockDescriptor(for: cron.id))
         #expect(fcntl(fd, F_GETFD) & FD_CLOEXEC != 0)
     }
+
+    // MARK: - Flow cache
+
+    private func sampleFlow() -> ShellXAutomationFlow {
+        ShellXAutomationFlow(
+            trigger: "Every day",
+            nodes: [.init(id: "a", type: .step, label: "Fetch"), .init(id: "b", type: .end, label: "Done")],
+            edges: [.init(from: "a", to: "b")]
+        )
+    }
+
+    private func sampleRecord(hash: String = "abc") -> ShellXFlowRecord {
+        ShellXFlowRecord(flow: sampleFlow(), sourceHash: hash, drawnAt: Date(timeIntervalSince1970: 1_800_000_000))
+    }
+
+    @Test func flowRoundTrip() async throws {
+        let f = Fixture()
+        let saved = try await f.store.save(f.skillDraft(), replacing: nil)
+        let record = sampleRecord()
+        #expect(try await f.store.flowRecord(id: saved.id) == nil)
+        try await f.store.saveFlow(record, id: saved.id)
+        #expect(try await f.store.flowRecord(id: saved.id) == record)
+        try await f.store.saveFlow(record, id: "external:my-skill")
+        #expect(try await f.store.flowRecord(id: "external:my-skill") == record)
+    }
+
+    @Test func flowFileLocation() async throws {
+        let f = Fixture()
+        let skillDir = f.environment.skillsRoot.appending(path: "my-skill", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: skillDir, withIntermediateDirectories: true)
+        try "---\nname: my-skill\ndescription: x\n---\nBody\n".write(to: skillDir.appending(path: "SKILL.md"), atomically: true, encoding: .utf8)
+        let before = try await f.store.list().map(\.id)
+        try await f.store.saveFlow(sampleRecord(), id: "external:my-skill")
+        let after = try await f.store.list().map(\.id)
+        #expect(before == after)
+        let contents = try FileManager.default.contentsOfDirectory(atPath: skillDir.path)
+        #expect(contents == ["SKILL.md"])
+        let flows = f.environment.automationsRoot.appending(path: ".flows", directoryHint: .isDirectory)
+        let files = try FileManager.default.contentsOfDirectory(atPath: flows.path)
+        #expect(files.count == 1)
+        #expect(files.first?.hasPrefix("_") == true && files.first?.hasSuffix(".json") == true)
+    }
+
+    @Test func deleteRemovesFlow() async throws {
+        let f = Fixture()
+        let saved = try await f.store.save(f.skillDraft(), replacing: nil)
+        try await f.store.saveFlow(sampleRecord(), id: saved.id)
+        #expect(try await f.store.flowRecord(id: saved.id) != nil)
+        try await f.store.delete(id: saved.id)
+        #expect(try await f.store.flowRecord(id: saved.id) == nil)
+    }
+
+    @Test func flowStatusCases() {
+        let markdown = "---\nname: x\n---\nBody\n"
+        let hash = ShellXFlowFingerprint.of(markdown)
+        let good = sampleRecord(hash: hash)
+        let workflow = ShellXAutomationStore.flowStatus(kind: .workflow, record: good, skillMarkdown: markdown)
+        #expect(workflow.status == .derived && workflow.flow == nil)
+        let none = ShellXAutomationStore.flowStatus(kind: .skill, record: nil, skillMarkdown: markdown)
+        #expect(none.status == .missing && none.flow == nil)
+        let unusable = ShellXFlowRecord(flow: ShellXAutomationFlow(nodes: [], edges: []), sourceHash: hash, drawnAt: good.drawnAt)
+        let bad = ShellXAutomationStore.flowStatus(kind: .cronjob, record: unusable, skillMarkdown: markdown)
+        #expect(bad.status == .missing && bad.flow == nil)
+        let stale = ShellXAutomationStore.flowStatus(kind: .skill, record: good, skillMarkdown: markdown + "more")
+        #expect(stale.status == .stale && stale.flow == nil)
+        let current = ShellXAutomationStore.flowStatus(kind: .skill, record: good, skillMarkdown: markdown)
+        #expect(current.status == .current && current.flow == good.flow)
+    }
 }

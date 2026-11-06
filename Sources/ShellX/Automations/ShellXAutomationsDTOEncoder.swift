@@ -2,7 +2,7 @@ import Foundation
 import ShellXAutomations
 
 /// Turns package values into the JSON objects the Automations page reads
-/// (`AutomationDTO`, `AutomationDraft`, `ValidationIssueDTO` and `CreatorEvent` in `types.ts`).
+/// (`AutomationDTO`, `AutomationDraft`, `FlowDTO`, `ValidationIssueDTO` and `CreatorEvent` in `types.ts`).
 struct ShellXAutomationsDTOEncoder {
     private let calendar: Calendar
     private let now: () -> Date
@@ -78,7 +78,26 @@ struct ShellXAutomationsDTOEncoder {
             "allowedTools": draft.allowedTools,
             "steps": draft.steps.map(step),
             "skillMarkdown": draft.skillMarkdown,
+            "flow": draft.flow.map { self.flow($0) as Any } ?? NSNull(),
         ]
+    }
+
+    /// `FlowDTO`: optional fields are left out when absent.
+    func flow(_ flow: ShellXAutomationFlow) -> [String: Any] {
+        var object: [String: Any] = [
+            "nodes": flow.nodes.map { node -> [String: Any] in
+                var object: [String: Any] = ["id": node.id, "type": node.type.rawValue, "label": node.label]
+                if let detail = node.detail { object["detail"] = detail }
+                return object
+            },
+            "edges": flow.edges.map { edge -> [String: Any] in
+                var object: [String: Any] = ["from": edge.from, "to": edge.to]
+                if let label = edge.label { object["label"] = label }
+                return object
+            },
+        ]
+        if let trigger = flow.trigger { object["trigger"] = trigger }
+        return object
     }
 
     /// Issues for the page, with a localized message for every known field and code.
@@ -112,8 +131,9 @@ struct ShellXAutomationsDTOEncoder {
         }
     }
 
-    /// A `ShellXAutomationDraft` that reproduces a saved automation, for editing.
-    func draft(from automation: ShellXAutomation, skillMarkdown: String) -> ShellXAutomationDraft {
+    /// A `ShellXAutomationDraft` that reproduces a saved automation, for editing. `flow` is its
+    /// stored flow when that is current.
+    func draft(from automation: ShellXAutomation, skillMarkdown: String, flow: ShellXAutomationFlow? = nil) -> ShellXAutomationDraft {
         ShellXAutomationDraft(
             kind: automation.kind,
             name: automation.name,
@@ -123,7 +143,8 @@ struct ShellXAutomationsDTOEncoder {
             notify: automation.notify,
             allowedTools: automation.allowedTools,
             steps: automation.steps,
-            skillMarkdown: skillMarkdown
+            skillMarkdown: skillMarkdown,
+            flow: flow
         )
     }
 

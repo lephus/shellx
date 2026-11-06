@@ -6327,5 +6327,11 @@
       "fr": "h and min are the standard French abbreviations for hours and minutes; a translated entry is still required.",
       "es": "h and min are the standard Spanish abbreviations for hours and minutes; a translated entry is still required."
     }
+  },
+  "automations.label.viewText": {
+    "source": "Text",
+    "identityLocales": {
+      "de": "Text is the German word for text; the translated entry is still required."
+    }
   }
 }

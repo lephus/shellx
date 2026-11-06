@@ -14,7 +14,7 @@ const draft = {
 function render(over: Partial<CreatorState>, reduceMotion = false): string {
   const creator: CreatorState = {
     messages: [{ id: 1, role: "user", text: "hi" }],
-    streaming: null, draft: null, issues: [], busy: false, type: "auto", saving: false, editId: null, draftDirty: false, ...over,
+    streaming: null, draft: null, issues: [], busy: false, type: "auto", saving: false, editId: null, draftDirty: false, draftView: "flow", flowCurrent: false, ...over,
   };
   return renderToStaticMarkup(<CreatorView store={store} creator={creator} label={label} reduceMotion={reduceMotion} />);
 }

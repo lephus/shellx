@@ -88,6 +88,21 @@ export const DEFAULT_AUTOMATION_LABELS = {
   dismiss: "Dismiss",
   actionFailed: "That did not work: {message}",
   genericError: "Something went wrong.",
+  flowStartManual: "Runs when you press Run now",
+  flowNotify: "Notify {targets} · {events}",
+  flowDone: "Done",
+  flowRunning: "● running",
+  viewFlow: "Flowchart",
+  viewText: "Text",
+  flowDrawing: "Claude is drawing the flowchart…",
+  flowNone: "No flowchart yet — see Text",
+  flowOutdated: "Out of date: Claude redraws it with the next draft",
+  flowCaption: "Drawn by Claude from SKILL.md · see Text for the details",
+  flowMissing: "This automation has no flowchart yet",
+  flowStale: "The content changed since the flowchart was drawn",
+  drawFlow: "Draw flowchart",
+  drawingFlow: "Drawing…",
+  drawFlowHint: "Claude reads SKILL.md and draws it, it takes a few seconds",
 } as const;
 
 export type AutomationLabelKey = keyof typeof DEFAULT_AUTOMATION_LABELS;

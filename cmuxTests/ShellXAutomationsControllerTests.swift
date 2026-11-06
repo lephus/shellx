@@ -17,6 +17,9 @@ final class ShellXAutomationsControllerTests: XCTestCase {
 
     /// What "Run now" reports; nil means the run started.
     private var runFailure: String?
+    /// What "Draw flowchart" answers; each call's `SKILL.md` is kept in `drawnMarkdown`.
+    private var fakeDrawer: (String) async throws -> ShellXAutomationFlow = { _ in ShellXAutomationsControllerTests.sampleFlow }
+    private var drawnMarkdown: [String] = []
 
     override func setUp() async throws {
         fixture = ShellXAutomationsFixture()
@@ -51,6 +54,11 @@ final class ShellXAutomationsControllerTests: XCTestCase {
             makeValidator: { _ in
                 let names = Set(((try? await store.list()) ?? []).map(\.name))
                 return ShellXAutomationValidator(existingNames: names, directoryExists: { _ in true }, claudeAvailable: true)
+            },
+            flowDrawer: { [weak self] markdown in
+                guard let self else { throw CancellationError() }
+                self.drawnMarkdown.append(markdown)
+                return try await self.fakeDrawer(markdown)
             }
         )
         controller.emit = { [weak self] event in self?.events.append(event) }
@@ -64,6 +72,7 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         controller = nil
         launcher = nil
         events = []
+        drawnMarkdown = []
     }
 
     // MARK: Tests
@@ -392,7 +401,258 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         XCTAssertEqual(errorCode(reply), "invalidArgument")
     }
 
+    // MARK: Flowchart
+
+    func testDraftEventCarriesFlow() async throws {
+        try await startCreatorWithDraft(skillDraft(flow: Self.sampleFlow))
+
+        let draftEvent = try XCTUnwrap(events.last { creatorEventType($0) == "draft" })
+        let draft = try XCTUnwrap((draftEvent["event"] as? [String: Any])?["draft"] as? [String: Any])
+        let flow = try XCTUnwrap(draft["flow"] as? [String: Any])
+        let nodes = try XCTUnwrap(flow["nodes"] as? [[String: Any]])
+        XCTAssertEqual(nodes.map { $0["id"] as? String }, ["n1", "n2", "n3"])
+        XCTAssertEqual(nodes.map { $0["type"] as? String }, ["step", "askUser", "end"])
+        XCTAssertEqual(flow["trigger"] as? String, "when asked to tidy up")
+        let edges = try XCTUnwrap(flow["edges"] as? [[String: Any]])
+        XCTAssertEqual(edges.first { $0["from"] as? String == "n2" }?["label"] as? String, "approve")
+        XCTAssertTrue(JSONSerialization.isValidJSONObject(draftEvent))
+    }
+
+    func testSaveStoresFlowWithDraftHash() async throws {
+        let draft = skillDraft(flow: Self.sampleFlow)
+        try await startCreatorWithDraft(draft)
+
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let id = try XCTUnwrap((result(reply)?["automation"] as? [String: Any])?["id"] as? String)
+        let stored = try await fixture.store.flowRecord(id: id)
+        let record = try XCTUnwrap(stored)
+        XCTAssertEqual(record.sourceHash, ShellXFlowFingerprint.of(draft.skillMarkdown))
+        XCTAssertEqual(record.flow, Self.sampleFlow)
+        // The page opened right after the save shows that chart as current.
+        let detailReply = await controller.handle(method: "automations.detail", params: ["id": id])
+        let detail = try XCTUnwrap(result(detailReply))
+        XCTAssertEqual(detail["flowStatus"] as? String, "current")
+        let nodes = try XCTUnwrap((detail["flow"] as? [String: Any])?["nodes"] as? [[String: Any]])
+        XCTAssertEqual(nodes.map { $0["id"] as? String }, ["n1", "n2", "n3"])
+    }
+
+    /// A flow Claude drew before the user changed `SKILL.md` on the card is kept, but shown as stale.
+    func testSaveAfterCardEditStoresStaleFlow() async throws {
+        let draft = skillDraft(flow: Self.sampleFlow)
+        try await startCreatorWithDraft(draft)
+        let edited = "---\nname: tidy\ndescription: Tidies up\n---\nDelete without asking\n"
+        _ = await controller.handle(method: "creator.edit", params: ["skillMarkdown": edited])
+
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let id = try XCTUnwrap((result(reply)?["automation"] as? [String: Any])?["id"] as? String)
+        let stored = try await fixture.store.flowRecord(id: id)
+        XCTAssertEqual(stored?.sourceHash, ShellXFlowFingerprint.of(draft.skillMarkdown))
+        let detailReply = await controller.handle(method: "automations.detail", params: ["id": id])
+        let detail = try XCTUnwrap(result(detailReply))
+        XCTAssertEqual(detail["flowStatus"] as? String, "stale")
+        XCTAssertTrue(detail["flow"] is NSNull)
+        XCTAssertEqual(detail["skillMarkdown"] as? String, edited)
+    }
+
+    func testSaveWithoutFlowSucceeds() async throws {
+        try await startCreatorWithDraft(skillDraft(flow: nil))
+
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let id = try XCTUnwrap((result(reply)?["automation"] as? [String: Any])?["id"] as? String)
+        let stored = try await fixture.store.flowRecord(id: id)
+        XCTAssertNil(stored)
+        let detailReply = await controller.handle(method: "automations.detail", params: ["id": id])
+        let detail = try XCTUnwrap(result(detailReply))
+        XCTAssertEqual(detail["flowStatus"] as? String, "missing")
+        XCTAssertTrue(detail["flow"] is NSNull)
+        XCTAssertEqual((detail["automation"] as? [String: Any])?["id"] as? String, id)
+        XCTAssertTrue(JSONSerialization.isValidJSONObject(detailReply))
+    }
+
+    /// A workflow's chart comes from its steps: even a flow Claude sent is not stored.
+    func testWorkflowDetailIsDerived() async throws {
+        try await startCreatorWithDraft(workflowDraft(flow: Self.sampleFlow))
+
+        let reply = await controller.handle(method: "creator.save", params: [:])
+
+        let id = try XCTUnwrap((result(reply)?["automation"] as? [String: Any])?["id"] as? String)
+        let stored = try await fixture.store.flowRecord(id: id)
+        XCTAssertNil(stored)
+        let detailReply = await controller.handle(method: "automations.detail", params: ["id": id])
+        let detail = try XCTUnwrap(result(detailReply))
+        XCTAssertEqual(detail["flowStatus"] as? String, "derived")
+        XCTAssertTrue(detail["flow"] is NSNull)
+    }
+
+    func testEditSeedsCurrentFlow() async throws {
+        let saved = try await fixture.store.save(skillDraft(flow: nil), replacing: nil)
+        let markdown = try String(contentsOf: saved.directory.appending(path: "SKILL.md"), encoding: .utf8)
+        try await fixture.store.saveFlow(
+            ShellXFlowRecord(flow: Self.sampleFlow, sourceHash: ShellXFlowFingerprint.of(markdown), drawnAt: Date()),
+            id: saved.id
+        )
+
+        _ = await controller.handle(method: "creator.start", params: ["editId": saved.id])
+
+        let current = try XCTUnwrap(seededDraft())
+        let nodes = try XCTUnwrap((current["flow"] as? [String: Any])?["nodes"] as? [[String: Any]])
+        XCTAssertEqual(nodes.count, Self.sampleFlow.nodes.count)
+
+        try await fixture.store.saveFlow(
+            ShellXFlowRecord(flow: Self.sampleFlow, sourceHash: ShellXFlowFingerprint.of("older text"), drawnAt: Date()),
+            id: saved.id
+        )
+        events = []
+        _ = await controller.handle(method: "creator.start", params: ["editId": saved.id])
+
+        let stale = try XCTUnwrap(seededDraft())
+        XCTAssertTrue(stale["flow"] is NSNull)
+    }
+
+    func testDrawFlowSavesAndReturnsCurrent() async throws {
+        try fixture.externalSkill("theirs")
+        let folder = fixture.environment.skillsRoot.appending(path: "theirs", directoryHint: .isDirectory)
+        let markdown = try String(contentsOf: folder.appending(path: "SKILL.md"), encoding: .utf8)
+        let before = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+
+        let reply = await controller.handle(method: "automations.drawFlow", params: ["id": "external:theirs"])
+
+        XCTAssertEqual(drawnMarkdown, [markdown])
+        let detail = try XCTUnwrap(result(reply))
+        XCTAssertEqual(detail["flowStatus"] as? String, "current")
+        XCTAssertEqual(((detail["flow"] as? [String: Any])?["nodes"] as? [[String: Any]])?.count, Self.sampleFlow.nodes.count)
+        XCTAssertEqual(detail["skillMarkdown"] as? String, markdown)
+        XCTAssertTrue(JSONSerialization.isValidJSONObject(reply))
+        let stored = try await fixture.store.flowRecord(id: "external:theirs")
+        XCTAssertEqual(stored?.sourceHash, ShellXFlowFingerprint.of(markdown))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted(), before)
+    }
+
+    func testDrawFlowRejectsWorkflowAndConcurrent() async throws {
+        let workflow = try await fixture.store.save(workflowDraft(flow: nil), replacing: nil)
+        let refused = await controller.handle(method: "automations.drawFlow", params: ["id": workflow.id])
+        XCTAssertEqual(errorCode(refused), "failed")
+        XCTAssertFalse(errorMessage(refused).isEmpty)
+        XCTAssertTrue(drawnMarkdown.isEmpty)
+
+        try fixture.externalSkill("theirs")
+        let gate = ShellXFlowDrawGate()
+        fakeDrawer = { _ in
+            await gate.wait()
+            return Self.sampleFlow
+        }
+        let controller = controller!
+        let first = Task { await controller.handle(method: "automations.drawFlow", params: ["id": "external:theirs"]) }
+        await waitUntil { gate.isWaiting }
+        let second = await controller.handle(method: "automations.drawFlow", params: ["id": "external:theirs"])
+        XCTAssertEqual(errorCode(second), "failed")
+        XCTAssertFalse(errorMessage(second).isEmpty)
+        gate.open()
+        let firstReply = await first.value
+        XCTAssertEqual(result(firstReply)?["flowStatus"] as? String, "current")
+        XCTAssertEqual(drawnMarkdown.count, 1)
+    }
+
+    func testDrawFlowFailureIsReported() async throws {
+        try fixture.externalSkill("theirs")
+        fakeDrawer = { _ in throw ShellXFlowDrawError.failed("Claude hit its usage limit") }
+
+        let reply = await controller.handle(method: "automations.drawFlow", params: ["id": "external:theirs"])
+
+        XCTAssertEqual(reply["ok"] as? Bool, false)
+        XCTAssertEqual(errorCode(reply), "failed")
+        XCTAssertTrue(errorMessage(reply).contains("Claude hit its usage limit"))
+        let stored = try await fixture.store.flowRecord(id: "external:theirs")
+        XCTAssertNil(stored)
+
+        // Without a detail from Claude the message still says why.
+        for error in [ShellXFlowDrawError.failed(""), .invalidFlow] {
+            fakeDrawer = { _ in throw error }
+            let failed = await controller.handle(method: "automations.drawFlow", params: ["id": "external:theirs"])
+            let empty = errorMessage(failed)
+            let trimmed = empty.trimmingCharacters(in: .whitespacesAndNewlines)
+            XCTAssertFalse(trimmed.isEmpty)
+            XCTAssertFalse(trimmed.hasSuffix(":"), empty)
+        }
+    }
+
+    /// A SKILL.md that is not UTF-8 text keeps the page open with a reason, not "no longer exists".
+    func testDrawFlowWithUnreadableSkillFailsReadably() async throws {
+        let saved = try await fixture.store.save(fixture.cronDraft("unreadable"), replacing: nil)
+        try Data([0xFF, 0xFE, 0x00, 0xC3, 0x28]).write(to: saved.directory.appending(path: "SKILL.md"))
+
+        let reply = await controller.handle(method: "automations.drawFlow", params: ["id": saved.id])
+
+        XCTAssertEqual(errorCode(reply), "failed")
+        XCTAssertTrue(errorMessage(reply).contains("SKILL.md"), errorMessage(reply))
+        XCTAssertTrue(drawnMarkdown.isEmpty)
+        let stored = try await fixture.store.flowRecord(id: saved.id)
+        XCTAssertNil(stored)
+    }
+
+    func testCreatorPromptHasFlowRules() throws {
+        let prompt = ShellXAutomationsRuntime.creatorSystemPrompt(bundle: .main)
+
+        XCTAssertTrue(prompt.contains("Draw only what SKILL.md says. Do not invent steps, checks or outcomes."))
+        XCTAssertTrue(prompt.contains("## Flowchart"))
+        XCTAssertFalse(prompt.contains("{{SHELLX_FLOW_RULES}}"))
+        // The rules sit inside "## Flowchart" without a top-level heading of their own.
+        XCTAssertFalse(prompt.components(separatedBy: "\n").contains { $0.hasPrefix("# ") })
+        // The closing rule about files belongs to the whole prompt, not to the flowchart section.
+        let never = try XCTUnwrap(prompt.range(of: "Never write files"))
+        let heading = prompt[..<never.lowerBound].components(separatedBy: "\n").last { $0.hasPrefix("## ") }
+        XCTAssertNotEqual(heading, "## Flowchart")
+        XCTAssertEqual(
+            ShellXAutomationsRuntime.composeCreatorPrompt(template: "a {{SHELLX_FLOW_RULES}} b", flowRules: "rules"),
+            "a rules b"
+        )
+    }
+
     // MARK: Helpers
+
+    /// Measure, ask, then end; the ask has an approve and a decline outcome.
+    static let sampleFlow = ShellXAutomationFlow(
+        trigger: "when asked to tidy up",
+        nodes: [
+            .init(id: "n1", type: .step, label: "Measure disk usage"),
+            .init(id: "n2", type: .askUser, label: "Delete these files?"),
+            .init(id: "n3", type: .end, label: "Done", detail: "Nothing else to do"),
+        ],
+        edges: [
+            .init(from: "n1", to: "n2"),
+            .init(from: "n2", to: "n3", label: "approve"),
+        ]
+    )
+
+    private func skillDraft(flow: ShellXAutomationFlow?) -> ShellXAutomationDraft {
+        ShellXAutomationDraft(
+            kind: .skill, name: "tidy", description: "Tidies up",
+            skillMarkdown: "---\nname: tidy\ndescription: Tidies up\n---\nMeasure, then ask before deleting\n",
+            flow: flow
+        )
+    }
+
+    private func workflowDraft(flow: ShellXAutomationFlow?) -> ShellXAutomationDraft {
+        var draft = fixture.cronDraft("steps")
+        draft.kind = .workflow
+        draft.schedule = nil
+        draft.steps = [ShellXWorkflowStep(title: "Check", prompt: "Check the build")]
+        draft.flow = flow
+        return draft
+    }
+
+    /// The draft the creator showed first after `creator.start` with an edit id.
+    private func seededDraft() -> [String: Any]? {
+        let event = events.first { creatorEventType($0) == "draft" }
+        return (event?["event"] as? [String: Any])?["draft"] as? [String: Any]
+    }
+
+    private func errorMessage(_ reply: [String: Any]) -> String {
+        (reply["error"] as? [String: Any])?["message"] as? String ?? ""
+    }
 
     /// Starts the creator and makes the fake assistant propose `draft`.
     private func startCreatorWithDraft(_ draft: ShellXAutomationDraft, editId: String? = nil) async throws {
@@ -435,5 +695,35 @@ final class ShellXAutomationsControllerTests: XCTestCase {
         while !condition(), clock.now < deadline {
             try? await Task.sleep(for: .milliseconds(20))
         }
+    }
+}
+
+/// Holds a fake flow draw until the test opens it.
+private final class ShellXFlowDrawGate: @unchecked Sendable {
+    // Test-only: touched from the drawing task and the test.
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    var isWaiting: Bool { lock.withLock { waiter != nil } }
+
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let resumeNow = lock.withLock { () -> Bool in
+                if isOpen { return true }
+                waiter = continuation
+                return false
+            }
+            if resumeNow { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let ready = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            isOpen = true
+            defer { waiter = nil }
+            return waiter
+        }
+        ready?.resume()
     }
 }

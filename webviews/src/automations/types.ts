@@ -42,6 +42,21 @@ export type AutomationDTO = {
   iphonePending: boolean;
 };
 
+export type FlowNodeType = "step" | "decision" | "askUser" | "end";
+export type FlowNode = { id: string; type: FlowNodeType; label: string; detail?: string };
+export type FlowEdge = { from: string; to: string; label?: string };
+/** Mirrors the Swift `ShellXAutomationFlow`; absent optional fields are omitted. */
+export type AutomationFlow = { trigger?: string; nodes: FlowNode[]; edges: FlowEdge[] };
+export type FlowStatus = "current" | "stale" | "missing" | "derived";
+
+/** Reply of `automations.detail` and `automations.drawFlow`. */
+export type AutomationDetail = {
+  automation: AutomationDTO;
+  skillMarkdown: string;
+  flow: AutomationFlow | null;
+  flowStatus: FlowStatus;
+};
+
 export type ValidationField =
   | "name"
   | "description"
@@ -64,6 +79,7 @@ export type AutomationDraft = {
   allowedTools: string[];
   steps: AutomationStep[];
   skillMarkdown: string;
+  flow?: AutomationFlow | null;
 };
 
 export type ChoiceSet = { question: string; multi: boolean; options: string[] };
@@ -93,6 +109,8 @@ export type AutomationsMethod =
   | "automations.openLog"
   | "automations.continueInTerminal"
   | "automations.markRead"
+  | "automations.detail"
+  | "automations.drawFlow"
   | "creator.start"
   | "creator.send"
   | "creator.cancel"

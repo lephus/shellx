@@ -1,6 +1,8 @@
 import type { AutomationsBridge } from "./bridge";
+import { usableFlow } from "./flowChartModel";
 import { readFrontmatter, writeFrontmatter } from "./frontmatter";
 import type {
+  AutomationDetail,
   AutomationDraft,
   AutomationDTO,
   AutomationKind,
@@ -34,14 +36,32 @@ export type CreatorState = {
   editId: string | null;
   /** The user changed the draft on the card and the host has not been told yet. */
   draftDirty: boolean;
+  /** The draft card shows the flowchart or the text fields. */
+  draftView: DraftViewMode;
+  /** The chart matches the draft: false once the user edits the card, until the next draft event. */
+  flowCurrent: boolean;
 };
+
+export type DraftViewMode = "flow" | "text";
 
 /** The draft fields the user can change on the card. */
 export type DraftEdit = Partial<Pick<AutomationDraft, "name" | "description" | "skillMarkdown">>;
 
+/** The detail page of one saved automation. */
+export type DetailState = {
+  id: string;
+  /** The first `automations.detail` reply has not arrived yet. */
+  loading: boolean;
+  data: AutomationDetail | null;
+  /** Why loading or the last Draw flowchart failed; "" when the host gave no message. */
+  error: string | null;
+  drawing: boolean;
+  mode: DraftViewMode;
+};
+
 export type AutomationsState = {
   context: AutomationsContext | null;
-  view: "list" | "creator";
+  view: "list" | "creator" | "detail";
   loading: boolean;
   loadFailed: boolean;
   automations: AutomationDTO[];
@@ -53,7 +73,41 @@ export type AutomationsState = {
   /** Asking before a draft in progress is thrown away; `then` is the creator to open afterwards. */
   pendingDiscard: { then: { editId: string | null } | null } | null;
   creator: CreatorState;
+  /** Set only while `view` is "detail". */
+  detail: DetailState | null;
 };
+
+/** Calls `onShown` each time the page comes back into view; returns a function that stops it. */
+export type PageShownSignal = (onShown: () => void) => () => void;
+
+/**
+ * Fires on window `focus` and when the document turns `visible`, e.g. after the user edited a
+ * file in another app. Without a window (tests, server rendering) it never fires.
+ */
+export function pageShownSignal(
+  win: EventTarget | undefined,
+  doc: (EventTarget & { visibilityState: string }) | undefined,
+): PageShownSignal {
+  return (onShown) => {
+    const visible = () => {
+      if (doc?.visibilityState === "visible") onShown();
+    };
+    win?.addEventListener("focus", onShown);
+    doc?.addEventListener("visibilitychange", visible);
+    return () => {
+      win?.removeEventListener("focus", onShown);
+      doc?.removeEventListener("visibilitychange", visible);
+    };
+  };
+}
+
+const browserPageShown: PageShownSignal = pageShownSignal(
+  typeof window === "undefined" ? undefined : window,
+  typeof document === "undefined" ? undefined : document,
+);
+
+/** The host's error code when the automation no longer exists. */
+const NOT_FOUND = "notFound";
 
 function initialCreator(editId: string | null = null): CreatorState {
   return {
@@ -66,6 +120,8 @@ function initialCreator(editId: string | null = null): CreatorState {
     saving: false,
     editId,
     draftDirty: false,
+    draftView: "flow",
+    flowCurrent: false,
   };
 }
 
@@ -82,7 +138,14 @@ function initialState(): AutomationsState {
     actionError: null,
     pendingDiscard: null,
     creator: initialCreator(),
+    detail: null,
   };
+}
+
+function isDetail(value: unknown): value is AutomationDetail {
+  if (typeof value !== "object" || value === null) return false;
+  const d = value as Partial<AutomationDetail>;
+  return typeof d.automation === "object" && d.automation !== null && typeof d.skillMarkdown === "string" && typeof d.flowStatus === "string";
 }
 
 function isDraft(value: unknown): value is AutomationDraft {
@@ -115,9 +178,15 @@ export class AutomationsStore {
   private listeners = new Set<() => void>();
   private nextId = 1;
   private off: (() => void) | null = null;
+  private offShown: (() => void) | null = null;
+  /** A refresh started because the page came back; focus and visibility often fire together. */
+  private shownRefresh: Promise<void> | null = null;
   private editInFlight: Promise<string | null> | null = null;
 
-  constructor(private readonly bridge: AutomationsBridge) {}
+  constructor(
+    private readonly bridge: AutomationsBridge,
+    private readonly pageShown: PageShownSignal = browserPageShown,
+  ) {}
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -129,8 +198,16 @@ export class AutomationsStore {
   getState = (): AutomationsState => this.state;
 
   private set(patch: Partial<AutomationsState>): void {
-    this.state = { ...this.state, ...patch };
+    const next = { ...this.state, ...patch };
+    // Leaving the detail page, by any path, drops it.
+    if (next.view !== "detail") next.detail = null;
+    this.state = next;
     for (const l of this.listeners) l();
+  }
+
+  private setDetail(id: string, patch: Partial<DetailState>): void {
+    const d = this.state.detail;
+    if (this.state.view === "detail" && d?.id === id) this.set({ detail: { ...d, ...patch } });
   }
 
   private setCreator(patch: Partial<CreatorState>): void {
@@ -140,6 +217,8 @@ export class AutomationsStore {
   async start(): Promise<void> {
     this.off?.();
     this.off = this.bridge.onEvent((e) => this.handleEvent(e));
+    this.offShown?.();
+    this.offShown = this.pageShown(() => this.pageWasShown());
     const ctx = await this.bridge.request<AutomationsContext>("app.context");
     if (ctx.ok) {
       const c = ctx.result;
@@ -166,6 +245,20 @@ export class AutomationsStore {
   dispose(): void {
     this.off?.();
     this.off = null;
+    this.offShown?.();
+    this.offShown = null;
+  }
+
+  /**
+   * Files can change outside ShellX without an `automations.changed` (an edit to SKILL.md in an
+   * editor), so an open detail page asks again whenever the page is back in view.
+   */
+  private pageWasShown(): void {
+    const d = this.state.detail;
+    if (this.state.view !== "detail" || !d || this.shownRefresh) return;
+    this.shownRefresh = this.refreshDetail(d.id).finally(() => {
+      this.shownRefresh = null;
+    });
   }
 
   async reload(): Promise<void> {
@@ -180,7 +273,8 @@ export class AutomationsStore {
   handleEvent(event: AutomationsEvent): void {
     switch (event.type) {
       case "automations.changed":
-        void this.reload();
+        if (this.state.view === "detail" && this.state.detail) void this.refreshDetail(this.state.detail.id);
+        else void this.reload();
         break;
       case "focus":
         this.set({ focusId: event.id, view: "list", filter: "all" });
@@ -212,7 +306,12 @@ export class AutomationsStore {
         break;
       case "draft":
         // A malformed or partial draft keeps the last good one.
-        if (isDraft(event.draft)) this.setCreator({ draft: event.draft, issues: [], draftDirty: false });
+        if (isDraft(event.draft)) this.setCreator({
+            draft: event.draft,
+            issues: [],
+            draftDirty: false,
+            flowCurrent: usableFlow(event.draft.flow) !== null,
+          });
         break;
       case "busy":
         this.setCreator({ busy: event.busy === true });
@@ -236,10 +335,6 @@ export class AutomationsStore {
     this.set({ filter });
   }
 
-  selectCard(id: string | null): void {
-    this.set({ focusId: id });
-  }
-
   /** Sends a list action; a failed reply becomes `actionError`. Returns whether it succeeded. */
   private async act(method: Parameters<AutomationsBridge["request"]>[0], params: object): Promise<boolean> {
     const reply = await this.bridge.request(method, params);
@@ -256,7 +351,12 @@ export class AutomationsStore {
 
   runNow = (id: string) => this.act("automations.runNow", { id });
   reveal = (id: string) => this.act("automations.reveal", { id });
-  editFile = (id: string) => this.act("automations.editFile", { id });
+  /** Opens SKILL.md in the user's editor; an open detail page asks again once that returns. */
+  async editFile(id: string): Promise<boolean> {
+    const opened = await this.act("automations.editFile", { id });
+    if (opened && this.state.view === "detail" && this.state.detail?.id === id) await this.refreshDetail(id);
+    return opened;
+  }
   openLog = (id: string) => this.act("automations.openLog", { id });
   continueInTerminal = (id: string) => this.act("automations.continueInTerminal", { id });
   async setEnabled(id: string, enabled: boolean): Promise<void> {
@@ -279,7 +379,68 @@ export class AutomationsStore {
     if (!pending) return;
     this.set({ pendingDelete: null });
     const params = pending.external ? { id: pending.id, confirmedExternal: true } : { id: pending.id };
-    if (await this.act("automations.delete", params)) await this.reload();
+    if (!(await this.act("automations.delete", params))) return;
+    if (this.state.view === "detail" && this.state.detail?.id === pending.id) this.set({ view: "list", focusId: null });
+    await this.reload();
+  }
+
+  // Detail page
+
+  /** Shows one automation's page, flowchart first. */
+  async openDetail(id: string): Promise<void> {
+    this.set({
+      view: "detail",
+      focusId: id,
+      detail: { id, loading: true, data: null, error: null, drawing: false, mode: "flow" },
+    });
+    await this.loadDetail(id);
+  }
+
+  /** Back to the list, with the card of the page just left selected. */
+  closeDetail(): void {
+    const id = this.state.detail?.id ?? this.state.focusId;
+    this.set({ view: "list", focusId: id });
+  }
+
+  setDetailView(mode: DraftViewMode): void {
+    const d = this.state.detail;
+    if (d) this.setDetail(d.id, { mode });
+  }
+
+  /** Asks Claude to draw the flowchart from SKILL.md; the reply is the new detail. */
+  async drawFlow(): Promise<void> {
+    const d = this.state.detail;
+    if (this.state.view !== "detail" || !d || d.drawing) return;
+    this.setDetail(d.id, { drawing: true, error: null });
+    const reply = await this.bridge.request<AutomationDetail>("automations.drawFlow", { id: d.id });
+    if (!reply.ok && reply.error.code === NOT_FOUND) return this.leaveGoneDetail(d.id);
+    if (reply.ok && isDetail(reply.result)) this.setDetail(d.id, { drawing: false, data: reply.result });
+    else this.setDetail(d.id, { drawing: false, error: reply.ok ? "" : reply.error.message || reply.error.code });
+  }
+
+  /** Requests the detail; a reply for a page no longer shown is dropped. */
+  private async loadDetail(id: string): Promise<void> {
+    const reply = await this.bridge.request<AutomationDetail>("automations.detail", { id });
+    if (!reply.ok && reply.error.code === NOT_FOUND) return this.leaveGoneDetail(id);
+    if (reply.ok && isDetail(reply.result)) {
+      this.setDetail(id, { loading: false, data: reply.result, error: null });
+    } else {
+      // A failed refresh keeps the page it already shows and says why above it.
+      this.setDetail(id, { loading: false, error: reply.ok ? "" : reply.error.message || reply.error.code });
+    }
+  }
+
+  /** After a change: the list, then this page again, or the list alone when the automation is gone. */
+  private async refreshDetail(id: string): Promise<void> {
+    await this.reload();
+    const s = this.state;
+    if (s.view !== "detail" || s.detail?.id !== id) return;
+    if (!s.loadFailed && !s.automations.some((a) => a.id === id)) return this.leaveGoneDetail(id);
+    await this.loadDetail(id);
+  }
+
+  private leaveGoneDetail(id: string): void {
+    if (this.state.view === "detail" && this.state.detail?.id === id) this.set({ view: "list", focusId: null });
   }
 
   // Creator
@@ -301,6 +462,10 @@ export class AutomationsStore {
     if (!reply.ok) this.handleCreatorEvent({ type: "failed", message: reply.error.message });
   }
 
+  setDraftView(mode: DraftViewMode): void {
+    this.setCreator({ draftView: mode });
+  }
+
   /**
    * Changes the draft on the card. Name and description stay in step with the SKILL.md
    * frontmatter, both ways. The host hears about it on `flushDraftEdit`.
@@ -317,7 +482,7 @@ export class AutomationsStore {
       draft = { ...draft, skillMarkdown: writeFrontmatter(draft.skillMarkdown, edit) };
     }
     const touched = new Set(["name", "description", "skillMarkdown"]);
-    this.setCreator({ draft, draftDirty: true, issues: c.issues.filter((i) => !touched.has(i.field)) });
+    this.setCreator({ draft, draftDirty: true, flowCurrent: false, issues: c.issues.filter((i) => !touched.has(i.field)) });
   }
 
   /**

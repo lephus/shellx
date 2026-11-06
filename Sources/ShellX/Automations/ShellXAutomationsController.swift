@@ -1,13 +1,15 @@
 import AppKit
 import Foundation
 import Observation
+import OSLog
 import ShellXAutomations
 
 /// Answers the Automations page's bridge requests and forwards creator events to it.
 ///
 /// One controller backs one Automations panel. It reads and writes through the store,
 /// installs and removes launchd jobs through the scheduler, and owns at most one creator
-/// session (a headless Claude Code chat) at a time. Replies are
+/// session (a headless Claude Code chat) at a time. It keeps the flowchart Claude sends with a
+/// draft, and redraws a saved automation's flowchart on request. Replies are
 /// `{ok: true, result}` or `{ok: false, error: {code, message}}`.
 @MainActor
 final class ShellXAutomationsController {
@@ -31,7 +33,9 @@ final class ShellXAutomationsController {
     private let terminalOpener: (ShellXAutomation) -> Void
     private let fileOpener: (URL) -> Void
     private let makeValidator: (_ replacingName: String?) async -> ShellXAutomationValidator
+    private let flowDrawer: (_ skillMarkdown: String) async throws -> ShellXAutomationFlow
     private let encoder = ShellXAutomationsDTOEncoder()
+    private let logger = Logger(subsystem: "pro.shellx.desktop", category: "automations")
 
     private var pendingFocusId: String?
     /// The appearance the page was last told about, in `app.context` or an `appearance` event.
@@ -44,6 +48,11 @@ final class ShellXAutomationsController {
     private var latestDraft: ShellXAutomationDraft?
     /// Whether the user changed `latestDraft` on the card since Claude last heard about it.
     private var userEditedDraft = false
+    /// Fingerprint of the `SKILL.md` the flow of `latestDraft` was drawn from, or nil when it has
+    /// none. Card edits leave it as it is, so a flow saved after them is stale.
+    private var latestFlowHash: String?
+    /// Ids whose flowchart is being drawn.
+    private var inFlightDraws: Set<String> = []
     /// Bumped by every `creator.start` and every end of a session, so a start that is still
     /// awaiting finds out it was replaced or cancelled.
     private var creatorGeneration: UInt64 = 0
@@ -56,7 +65,8 @@ final class ShellXAutomationsController {
         runLauncher: @escaping @Sendable (String) async -> String?,
         terminalOpener: @escaping (ShellXAutomation) -> Void,
         fileOpener: @escaping (URL) -> Void,
-        makeValidator: @escaping (_ replacingName: String?) async -> ShellXAutomationValidator
+        makeValidator: @escaping (_ replacingName: String?) async -> ShellXAutomationValidator,
+        flowDrawer: @escaping (_ skillMarkdown: String) async throws -> ShellXAutomationFlow
     ) {
         self.library = library
         self.store = store
@@ -66,6 +76,7 @@ final class ShellXAutomationsController {
         self.terminalOpener = terminalOpener
         self.fileOpener = fileOpener
         self.makeValidator = makeValidator
+        self.flowDrawer = flowDrawer
         observeLibrary()
     }
 
@@ -177,6 +188,10 @@ final class ShellXAutomationsController {
             try await store.markRead(id: id)
             await library.reload()
             return [:]
+        case .detail:
+            return try await detail(of: try await existing(params))
+        case .drawFlow:
+            return try await drawFlow(for: try await existing(params))
         case .creatorStart:
             try await startCreator(editId: try optionalString(params, "editId"))
             return [:]
@@ -221,6 +236,7 @@ final class ShellXAutomationsController {
         var seed: ShellXCreatorSeed?
         var editedAutomation: ShellXAutomation?
         var seededDraft: ShellXAutomationDraft?
+        var seededFlowHash: String?
         if let editId {
             guard let automation = try await store.automation(id: editId) else {
                 throw Failure.notFound
@@ -228,12 +244,17 @@ final class ShellXAutomationsController {
             let markdown = await Self.readText(automation.directory.appending(path: "SKILL.md")) ?? ""
             seed = ShellXCreatorSeed(automation: automation, skillMarkdown: markdown)
             editedAutomation = automation
-            seededDraft = encoder.draft(from: automation, skillMarkdown: markdown)
+            // Only a flow drawn from this exact SKILL.md is shown; a stale one is left out.
+            let record = try? await store.flowRecord(id: automation.id)
+            let flow = ShellXAutomationStore.flowStatus(kind: automation.kind, record: record, skillMarkdown: markdown).flow
+            seededDraft = encoder.draft(from: automation, skillMarkdown: markdown, flow: flow)
+            seededFlowHash = flow.map { _ in ShellXFlowFingerprint.of(markdown) }
         }
         // A later `creator.start` or `creator.cancel` ran while this one read the files.
         guard generation == creatorGeneration else { return }
         editing = editedAutomation
         latestDraft = seededDraft
+        latestFlowHash = seededFlowHash
         let session = creatorFactory(seed)
         self.session = session
         let events = session.events
@@ -263,6 +284,7 @@ final class ShellXAutomationsController {
         if case .draft(let draft) = event {
             latestDraft = draft
             userEditedDraft = false
+            latestFlowHash = draft.flow.map { _ in ShellXFlowFingerprint.of(draft.skillMarkdown) }
         }
         send(creatorEvent(encoder.creatorEvent(event)))
     }
@@ -271,6 +293,7 @@ final class ShellXAutomationsController {
         guard let draft = latestDraft else {
             throw Failure.noDraft
         }
+        let flowHash = latestFlowHash
         let editingName = editing?.name
         let validator = await makeValidator(editingName)
         var issues = validator.validate(draft, replacingName: editingName)
@@ -308,9 +331,30 @@ final class ShellXAutomationsController {
         } catch {
             throw Failure.scheduleFailed
         }
+        await storeFlow(of: draft, hash: flowHash, saved: saved, previous: previous)
         endSession()
         await library.reload()
         return ["automation": encoder.automation(saved)]
+    }
+
+    /// Keeps the flow Claude drew for a saved skill or cronjob, under the fingerprint of the
+    /// `SKILL.md` it was drawn from. Workflows keep none. A failure here never fails the save.
+    private func storeFlow(
+        of draft: ShellXAutomationDraft, hash: String?, saved: ShellXAutomation, previous: ShellXAutomation?
+    ) async {
+        do {
+            if saved.kind == .workflow {
+                try await store.removeFlow(id: saved.id)
+            } else if let flow = draft.flow, let hash {
+                try await store.saveFlow(ShellXFlowRecord(flow: flow, sourceHash: hash, drawnAt: Date()), id: saved.id)
+            }
+            if let previous, previous.id != saved.id {
+                // A renamed skill ShellX did not create gets a new id; its old flow would be orphaned.
+                try await store.removeFlow(id: previous.id)
+            }
+        } catch {
+            logger.error("Could not store the flow of \(saved.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Applies the user's own changes to the draft's name, description and `SKILL.md`.
@@ -370,6 +414,43 @@ final class ShellXAutomationsController {
         editing = nil
         latestDraft = nil
         userEditedDraft = false
+        latestFlowHash = nil
+    }
+
+    // MARK: Flowchart
+
+    /// `{automation, skillMarkdown, flow, flowStatus}` for the detail page.
+    private func detail(of automation: ShellXAutomation) async throws -> [String: Any] {
+        let markdown = await Self.readText(automation.directory.appending(path: "SKILL.md")) ?? ""
+        // Workflows are `derived` whatever is stored.
+        let record = try await store.flowRecord(id: automation.id)
+        let (status, flow) = ShellXAutomationStore.flowStatus(kind: automation.kind, record: record, skillMarkdown: markdown)
+        return [
+            "automation": encoder.automation(automation),
+            "skillMarkdown": markdown,
+            "flow": flow.map { encoder.flow($0) as Any } ?? NSNull(),
+            "flowStatus": status.rawValue,
+        ]
+    }
+
+    /// Asks Claude to draw `automation`'s `SKILL.md` again, stores the flow and returns the detail.
+    private func drawFlow(for automation: ShellXAutomation) async throws -> [String: Any] {
+        guard automation.kind != .workflow else { throw Failure.flowNotForWorkflow }
+        guard inFlightDraws.insert(automation.id).inserted else { throw Failure.drawInProgress }
+        defer { inFlightDraws.remove(automation.id) }
+        // The automation exists (`existing` found it); its SKILL.md is not UTF-8 text or not there.
+        guard let markdown = await Self.readText(automation.directory.appending(path: "SKILL.md")) else {
+            throw Failure.skillUnreadable
+        }
+        let flow: ShellXAutomationFlow
+        do {
+            flow = try await flowDrawer(markdown)
+        } catch {
+            throw Failure.drawFailed(for: error)
+        }
+        let record = ShellXFlowRecord(flow: flow, sourceHash: ShellXFlowFingerprint.of(markdown), drawnAt: Date())
+        try await store.saveFlow(record, id: automation.id)
+        return try await detail(of: automation)
     }
 
     // MARK: Events

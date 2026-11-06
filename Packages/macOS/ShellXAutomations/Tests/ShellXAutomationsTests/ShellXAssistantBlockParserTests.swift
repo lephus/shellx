@@ -4,6 +4,25 @@ import Testing
 struct ShellXAssistantBlockParserTests {
     private let draftJSON = #"{"kind":"skill","name":"pr-digest","description":"Digest PRs","skillMarkdown":"---\nname: pr-digest\n---"}"#
 
+    private func draftBlock(flow: String) -> String {
+        "```shellx-draft\n{\"kind\":\"skill\",\"name\":\"pr-digest\",\"flow\":\(flow)}\n```"
+    }
+
+    @Test func draftKeepsUsableFlow() {
+        let flow = #"{"nodes":[{"id":"a","type":"step","label":"A"},{"id":"b","type":"askUser","label":"B"},{"id":"c","type":"end","label":"C"}],"edges":[{"from":"a","to":"b"},{"from":"b","to":"c"}]}"#
+        let draft = ShellXAssistantBlockParser().finish(fullText: draftBlock(flow: flow)).draft
+        #expect(draft?.flow?.nodes.count == 3)
+    }
+
+    @Test func draftDropsBadFlow() {
+        let unusable = #"{"nodes":[{"id":"a","type":"step","label":"A"}],"edges":[{"from":"a","to":"zzz"}]}"#
+        for flow in [#""oops""#, unusable] {
+            let draft = ShellXAssistantBlockParser().finish(fullText: draftBlock(flow: flow)).draft
+            #expect(draft?.name == "pr-digest")
+            #expect(draft?.flow == nil)
+        }
+    }
+
     @Test func hidesDraftBlockFromChat() {
         var parser = ShellXAssistantBlockParser()
         let text = "Here you go.\n```shellx-draft\n\(draftJSON)\n```\nAnything else?"

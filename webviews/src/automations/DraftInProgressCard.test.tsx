@@ -18,6 +18,8 @@ function creator(over: Partial<CreatorState>): CreatorState {
     saving: false,
     editId: null,
     draftDirty: false,
+    draftView: "flow",
+    flowCurrent: false,
     ...over,
   };
 }

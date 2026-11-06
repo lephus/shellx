@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The keys are those of `DEFAULT_AUTOMATION_LABELS` in `webviews/src/automations/labels.ts`
 /// (catalog keys `automations.label.<key>`). The page fills `{name}`, `{time}`, `{message}`,
-/// `{current}`, `{total}`, `{seconds}`, `{minutes}` and `{hours}` itself, so those placeholders stay literal in every translation.
+/// `{current}`, `{total}`, `{seconds}`, `{minutes}`, `{hours}`, `{targets}` and `{events}` itself, so those placeholders stay literal in every translation.
 struct ShellXAutomationsLabels {
     func localized() -> [String: String] {
         [
@@ -95,6 +95,21 @@ struct ShellXAutomationsLabels {
             "dismiss": String(localized: "automations.label.dismiss", defaultValue: "Dismiss"),
             "actionFailed": String(localized: "automations.label.actionFailed", defaultValue: "That did not work: {message}"),
             "genericError": String(localized: "automations.label.genericError", defaultValue: "Something went wrong."),
+            "flowStartManual": String(localized: "automations.label.flowStartManual", defaultValue: "Runs when you press Run now"),
+            "flowNotify": String(localized: "automations.label.flowNotify", defaultValue: "Notify {targets} · {events}"),
+            "flowDone": String(localized: "automations.label.flowDone", defaultValue: "Done"),
+            "flowRunning": String(localized: "automations.label.flowRunning", defaultValue: "● running"),
+            "viewFlow": String(localized: "automations.label.viewFlow", defaultValue: "Flowchart"),
+            "viewText": String(localized: "automations.label.viewText", defaultValue: "Text"),
+            "flowDrawing": String(localized: "automations.label.flowDrawing", defaultValue: "Claude is drawing the flowchart…"),
+            "flowNone": String(localized: "automations.label.flowNone", defaultValue: "No flowchart yet — see Text"),
+            "flowOutdated": String(localized: "automations.label.flowOutdated", defaultValue: "Out of date: Claude redraws it with the next draft"),
+            "flowCaption": String(localized: "automations.label.flowCaption", defaultValue: "Drawn by Claude from SKILL.md · see Text for the details"),
+            "flowMissing": String(localized: "automations.label.flowMissing", defaultValue: "This automation has no flowchart yet"),
+            "flowStale": String(localized: "automations.label.flowStale", defaultValue: "The content changed since the flowchart was drawn"),
+            "drawFlow": String(localized: "automations.label.drawFlow", defaultValue: "Draw flowchart"),
+            "drawingFlow": String(localized: "automations.label.drawingFlow", defaultValue: "Drawing…"),
+            "drawFlowHint": String(localized: "automations.label.drawFlowHint", defaultValue: "Claude reads SKILL.md and draws it, it takes a few seconds"),
         ]
     }
 }

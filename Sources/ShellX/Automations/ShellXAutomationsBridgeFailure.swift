@@ -147,6 +147,56 @@ struct ShellXAutomationsBridgeFailure: Error, Equatable {
         ))
     }
 
+    /// "Draw flowchart" failed; `detail` is already readable (localized or Claude Code's own output).
+    static func drawFailed(_ detail: String) -> Self {
+        Self(.failed, String(
+            localized: "automations.error.drawFailed",
+            defaultValue: "Claude could not draw the flowchart: \(detail)"
+        ))
+    }
+
+    /// `drawFailed` for an error the flow drawer threw, never with an empty reason.
+    static func drawFailed(for error: any Error) -> Self {
+        var detail = ""
+        switch error {
+        case ShellXFlowDrawError.failed(let text):
+            detail = text
+        case ShellXFlowDrawError.invalidFlow:
+            break
+        case let localized as LocalizedError:
+            detail = localized.errorDescription ?? ""
+        default:
+            break
+        }
+        detail = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if detail.isEmpty {
+            detail = String(localized: "automations.error.noFlowReturned", defaultValue: "Claude did not return a flowchart.")
+        }
+        return drawFailed(detail)
+    }
+
+    static var drawInProgress: Self {
+        Self(.failed, String(
+            localized: "automations.error.drawInProgress",
+            defaultValue: "This flowchart is already being drawn."
+        ))
+    }
+
+    /// "Draw flowchart" found the automation but could not read its `SKILL.md` as text.
+    static var skillUnreadable: Self {
+        Self(.failed, String(
+            localized: "automations.error.skillUnreadable",
+            defaultValue: "ShellX could not read SKILL.md as text, so there is nothing to draw."
+        ))
+    }
+
+    static var flowNotForWorkflow: Self {
+        Self(.failed, String(
+            localized: "automations.error.flowNotForWorkflow",
+            defaultValue: "A workflow’s flowchart comes from its steps, so there is nothing to draw."
+        ))
+    }
+
     /// "Run now" could not start `shellx routine run`, or it stopped at once.
     static func runFailed(_ detail: String) -> Self {
         Self(.failed, String(
