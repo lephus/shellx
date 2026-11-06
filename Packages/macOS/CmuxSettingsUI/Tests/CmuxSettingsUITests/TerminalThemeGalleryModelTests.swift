@@ -130,7 +130,7 @@ struct TerminalThemeGalleryModelTests {
         #expect(try file.managedThemeValue() == "light:Catppuccin Latte,dark:TokyoNight")
     }
 
-    @Test("With no theme set, a light pick keeps ShellX dark, which ships as a real theme with the first dark card")
+    @Test("With no theme set, a light pick keeps ShellX dark, which ships as a real theme with a dark card")
     func firstLightPickKeepsShippedShellXDark() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         // The themes directory the app bundles, not a fixture: Ghostty must
@@ -143,7 +143,7 @@ struct TerminalThemeGalleryModelTests {
         #expect(try file.managedThemeValue() == "light:Rose Pine Dawn,dark:ShellX")
         #expect(FileManager.default.fileExists(atPath: bundledThemes.appendingPathComponent("ShellX").path))
         await model.load()
-        #expect(model.results.dark.first?.name == "ShellX")
+        #expect(model.results.dark.map(\.name).contains("ShellX"))
     }
 
     @Test("An older gallery's dark light:X,dark:X shows Catppuccin Latte for Light without writing, and a dark pick keeps it")
@@ -200,27 +200,18 @@ struct TerminalThemeGalleryModelTests {
         #expect(try file.managedThemeValue() == "light:Rose Pine Dawn,dark:Abernathy")
     }
 
-    @Test("Without a query each section lists its curated themes in order")
-    func curatedWhenNoQuery() async throws {
+    @Test("Without a query each section lists every theme, in catalog order")
+    func everyThemeWhenNoQuery() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        let dir = try makeThemes(Self.curatedDark.map { ($0, "#101010") } + Self.curatedLight.map { ($0, "#f5f5f5") } + [("Zenburn", "#3f3f3f")])
+        let dir = try makeThemes([
+            ("Abernathy", "#111416"), ("Catppuccin Latte", "#eff1f5"), ("Nord", "#2e3440"),
+            ("Rose Pine Dawn", "#faf4ed"), ("Zenburn", "#3f3f3f"),
+        ])
         let (model, _, _) = try makeModel(existingConfig: nil, currentThemeValue: nil, themeDirectories: [dir])
         await model.load()
 
-        #expect(model.results.dark.map(\.name) == Self.curatedDark)
-        #expect(model.results.light.map(\.name) == Self.curatedLight)
-        #expect(Self.curatedDark == TerminalThemeCuration.dark)
-        #expect(Self.curatedLight == TerminalThemeCuration.light)
-    }
-
-    @Test("A theme in use outside the curated set is still shown")
-    func inUseOutsideCurationShown() async throws {
-        defer { try? FileManager.default.removeItem(at: root) }
-        let dir = try makeThemes([("Abernathy", "#000000"), ("Nord", "#2e3440")])
-        let (model, _, _) = try makeModel(existingConfig: nil, currentThemeValue: "light:Nord Light,dark:Abernathy", themeDirectories: [dir])
-        await model.load()
-
-        #expect(model.results.dark.map(\.name).contains("Abernathy"))
+        #expect(model.results.dark.map(\.name) == ["Abernathy", "Nord", "Zenburn"])
+        #expect(model.results.light.map(\.name) == ["Catppuccin Latte", "Rose Pine Dawn"])
     }
 
     @Test("A query shows every matching theme in its section")
@@ -316,15 +307,6 @@ struct TerminalThemeGalleryModelTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
     }
-
-    private static let curatedDark = [
-        "ShellX", "Catppuccin Mocha", "iTerm2 Solarized Dark", "GitHub Dark Default", "TokyoNight", "Rose Pine",
-        "Gruvbox Dark", "Everforest Dark Hard", "Atom One Dark", "Nord", "Ayu Mirage", "Kanagawa Wave",
-    ]
-    private static let curatedLight = [
-        "Catppuccin Latte", "iTerm2 Solarized Light", "GitHub Light Default", "TokyoNight Day", "Rose Pine Dawn",
-        "Gruvbox Light", "Everforest Light Med", "Atom One Light", "Nord Light", "Ayu Light", "Kanagawa Lotus", "One Half Light",
-    ]
 
     /// Writes one theme file per `(name, background)` into a fresh directory.
     private func makeThemes(_ items: [(String, String)]) throws -> URL {
