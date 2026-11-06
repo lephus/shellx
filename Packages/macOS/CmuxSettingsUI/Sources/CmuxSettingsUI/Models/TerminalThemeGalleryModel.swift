@@ -139,8 +139,7 @@ final class TerminalThemeGalleryModel {
 
     /// The cards for the current query.
     var results: Results {
-        let inUse = [selection.light, selection.dark].compactMap { $0 }
-        return Self.results(in: themes, query: query, inUse: inUse)
+        Self.results(in: themes, query: query)
     }
 
     /// The theme the terminal shows now: the highlighted card.
@@ -251,25 +250,13 @@ final class TerminalThemeGalleryModel {
         }
     }
 
-    /// The cards per section. With an empty query each section lists its
-    /// curated themes in order, then any theme in use that the list lacks.
-    /// With a query, every matching theme in catalog order. A theme goes to
-    /// the dark section unless its background is light.
-    nonisolated static func results(in themes: [Theme], query: String, inUse: [String]) -> Results {
+    /// The cards per section: every theme whose name contains the query (all
+    /// themes when the query is empty), in catalog order. A theme goes to the
+    /// dark section unless its background is light.
+    nonisolated static func results(in themes: [Theme], query: String) -> Results {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matches = query.isEmpty ? themes : themes.filter { $0.name.localizedCaseInsensitiveContains(query) }
         func isDark(_ theme: Theme) -> Bool { theme.colors.isDark ?? true }
-        if !query.isEmpty {
-            let matches = themes.filter { $0.name.localizedCaseInsensitiveContains(query) }
-            return Results(dark: matches.filter(isDark), light: matches.filter { !isDark($0) })
-        }
-        let byName = Dictionary(themes.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
-        var dark = TerminalThemeCuration.dark.compactMap { byName[$0] }
-        var light = TerminalThemeCuration.light.compactMap { byName[$0] }
-        for name in inUse {
-            guard let theme = themes.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }),
-                  !dark.contains(theme), !light.contains(theme) else { continue }
-            if isDark(theme) { dark.append(theme) } else { light.append(theme) }
-        }
-        return Results(dark: dark, light: light)
+        return Results(dark: matches.filter(isDark), light: matches.filter { !isDark($0) })
     }
 }
