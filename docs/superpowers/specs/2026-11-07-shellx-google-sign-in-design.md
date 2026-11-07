@@ -148,8 +148,8 @@ Khi một ID token hợp lệ đến **từ màn đăng nhập** (chưa đăng n
      App báo: "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài
      khoản › Chuyển sang Google, rồi thử lại." **[người viết; chống chiếm tài khoản, mục 8]**
 3. Không trùng, nhà cung cấp là Google → tạo tài khoản mới với email Google.
-4. Không trùng, nhà cung cấp là Apple (email ẩn, hoặc email thật nhưng không có tài khoản) → **không tạo
-   tài khoản**; trả `link_required` (mục 6.4) **[người viết, người dùng xác nhận]**. Lý do: desktop chỉ có
+4. Nhà cung cấp là Apple mà không trùng (email ẩn, hoặc email thật nhưng không có tài khoản), **hoặc** trùng một
+   tài khoản còn mật khẩu → **không tạo tài khoản, không nối theo email**; trả `link_required` (mục 6.4) **[người viết, người dùng xác nhận]**. Lý do: desktop chỉ có
    Google, nên một tài khoản chỉ có Apple sẽ không bao giờ có Mac.
 
 Thiết bị: như `login` hôm nay, cùng tài khoản + cùng khoá công khai → cùng `device_id`. Nhờ vậy Mac giữ
@@ -324,7 +324,7 @@ dụng). Lần gọi REST hay lần xin vé relay2 kế tiếp nhận 401 (vé s
 ## 9. Kiểm thử
 
 - **Relay** (vitest): JWKS giả và token ký bằng khoá thử; đủ các nhánh của 6.3; nonce dùng hai lần; `aud`
-  lạ; email chưa xác minh; nối tài khoản có mật khẩu thì xoá mật khẩu và đăng xuất thiết bị khác; Apple
+  lạ; email chưa xác minh; trước ngày cắt không tự nối vào tài khoản còn mật khẩu (`switch_from_signed_in_device`, Apple thì `link_required`); nối tại chỗ (6.3b); Apple
   link duyệt / từ chối / hết hạn; xoá tài khoản bằng token mới; `PASSWORD_LOGIN=off`.
 - **shellx-core** (Rust): `auth.google.*` với Google giả (máy chủ token giả) và `shellx-core/fake-api`;
   `state` sai; hết giờ; huỷ.
