@@ -52,6 +52,8 @@ public final class ShellXAccount {
     @ObservationIgnored private let file: URL
     @ObservationIgnored private let openURL: @MainActor (URL) -> Bool
     @ObservationIgnored private var waitingFlowID: String?
+    @ObservationIgnored private var googleCancelRequested = false
+    @ObservationIgnored private var googleToken: UUID?
 
     public init(service: ShellXRemoteService, openURL: @escaping @MainActor (URL) -> Bool = { _ in false }) {
         self.service = service
@@ -113,14 +115,29 @@ public final class ShellXAccount {
         guard googleStep == .idle else {
             throw ShellXCoreError(code: "google_in_progress", message: "a Google sign-in is already waiting")
         }
+        // Busy from the first await on, so a second click or a cancel during begin is seen.
+        googleStep = .waiting(purpose)
+        googleCancelRequested = false
+        let token = UUID()
+        googleToken = token
+        defer {
+            if googleToken == token {
+                googleStep = .idle
+                waitingFlowID = nil
+                googleToken = nil
+            }
+        }
         let gate = service.env.gateEnabled()
         if gate { await service.prepareLocal() }
         try await service.ensureConfigured()
         let core = service.env.core
         let start = try await ShellXRemoteService.offMain { try core.beginGoogleSignIn(purpose: purpose) }
-        googleStep = .waiting(purpose)
         waitingFlowID = start.flowID
-        defer { googleStep = .idle; waitingFlowID = nil }
+        if googleCancelRequested {
+            // Cancelled while begin ran: end the flow, never open the browser.
+            _ = try? await ShellXRemoteService.offMain { try core.cancelGoogleSignIn(flowID: start.flowID) }
+            throw ShellXCoreError(code: "google_cancelled", message: "Google sign-in was cancelled")
+        }
         guard openURL(start.authURL) else {
             _ = try? await ShellXRemoteService.offMain { try core.cancelGoogleSignIn(flowID: start.flowID) }
             throw ShellXCoreError(code: "browser_unavailable", message: "the browser could not be opened")
@@ -142,6 +159,8 @@ public final class ShellXAccount {
 
     /// Ends the waiting Google flow, if any; the pending `signInWithGoogle` throws `google_cancelled`.
     public func cancelGoogleSignIn() async {
+        guard googleStep != .idle else { return }
+        googleCancelRequested = true   // a begin still in flight ends itself when it answers
         guard let flow = waitingFlowID else { return }
         let core = service.env.core
         _ = try? await ShellXRemoteService.offMain { try core.cancelGoogleSignIn(flowID: flow) }
