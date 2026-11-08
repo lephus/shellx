@@ -1802,19 +1802,19 @@
       }
     },
     "pairing.instructions": {
-      "comment": "Where to find the pairing QR code on the Mac. “This Mac” and Pair iPhone… name items of the Mac app.",
+      "comment": "Where to find the pairing QR code on the Mac. “This Mac” and Pair Phone… name items of the Mac app: `remote.phonePairing.menu` from desktop 1.8.0 (contracts §10).",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "On your Mac, open ShellX, right-click “This Mac” and choose Pair iPhone…"
+            "value": "On your Mac, open ShellX, right-click “This Mac” and choose Pair Phone…"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trên Mac, mở ShellX, bấm chuột phải vào “Mac này” rồi chọn Ghép cặp iPhone…"
+            "value": "Trên Mac, mở ShellX, bấm chuột phải vào “Mac này” rồi chọn Ghép cặp điện thoại…"
           }
         }
       }
@@ -4726,6 +4726,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hãy chuyển iPhone này sang đăng nhập Google trước, rồi xoá tài khoản tại đây."
+          }
+        }
+      }
+    },
+    "appleLink.title": {
+      "comment": "Title of the screen that links an Apple ID to a Mac's account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to Your Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kết nối với Mac của bạn"
+          }
+        }
+      }
+    },
+    "appleLink.intro": {
+      "comment": "Above the scanner of Connect to Your Mac. Allow is the Mac's button.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Apple ID isn't linked to a ShellX account yet. Scan the pairing code on your Mac and click Allow there; this Apple ID then signs in to that Mac's account."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple ID này chưa gắn với tài khoản ShellX nào. Quét mã ghép cặp trên Mac rồi bấm Đồng ý ở đó; từ đó Apple ID này đăng nhập vào tài khoản của Mac."
           }
         }
       }

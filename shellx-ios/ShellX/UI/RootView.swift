@@ -19,7 +19,13 @@ struct RootView: View {
         case let .signedOut(expired):
             SignInView(coordinator: coordinator, expired: expired, notice: coordinator.signInNotice)
         case .linkingApple:
-            LaunchView()
+            if let link = coordinator.appleLink {
+                PairingSheet(
+                    model: link, close: { link.close() }, title: String(localized: "appleLink.title"),
+                    intro: String(localized: "appleLink.intro"))
+            } else {
+                LaunchView()
+            }
         case let .signedIn(email):
             if let hub = coordinator.hub, hub.isLoaded, let scope = graph.scopes.scope(for: hub) {
                 SignedInView(
