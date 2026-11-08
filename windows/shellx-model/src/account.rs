@@ -13,11 +13,15 @@
 
 use std::fmt;
 
-use crate::core_api::{CoreErr, LoginInfo, Registered};
+use crate::core_api::{
+    CoreErr, GoogleBegin, GooglePurpose, GoogleSignIn, LoginInfo, Registered, SessionInfo, SignInMethod,
+};
 use crate::sidebar::MachineInfo;
 
 pub const HEARTBEAT_INTERVAL_MS: u64 = 30_000;
 pub const LIST_INTERVAL_MS: u64 = 15_000;
+/// Desktop account deletion is a link only.
+pub const DELETE_ACCOUNT_URL: &str = "https://shellx.pro/privacy#delete-account";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AccountState {
@@ -50,6 +54,29 @@ pub enum AccountEvent {
     LogoutResult(Result<(), CoreErr>),
     /// The logout call succeeded (same as `LogoutResult(Ok(()))`).
     LoggedOut,
+    /// "Continue with Google": `SignIn` from signed out, `Link` switches a password session in place.
+    GoogleRequested(GooglePurpose),
+    /// Result of `CallGoogleBegin`.
+    GoogleBegun {
+        purpose: GooglePurpose,
+        result: Result<GoogleBegin, CoreErr>,
+    },
+    /// Result of `CallGoogleFinish` (the browser answered, the flow was cancelled or it timed out).
+    GoogleFinished {
+        flow_id: String,
+        result: Result<GoogleSignIn, CoreErr>,
+    },
+    /// The person closed the dialog while a Google flow runs.
+    GoogleCancelRequested,
+    /// Result of `CallSession` (`auth.session`, local).
+    SessionResult(Result<SessionInfo, CoreErr>),
+    SignInMethodsRequested,
+    SignInMethodsResult(Result<Vec<SignInMethod>, CoreErr>),
+    RemoveSignInMethodRequested(String),
+    SignInMethodRemoved {
+        identity_id: String,
+        result: Result<(), CoreErr>,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -60,6 +87,15 @@ pub enum AccountAction {
     CallHeartbeat,
     CallLogout,
     ScheduleTick { at_ms: u64 },
+    CallGoogleBegin(GooglePurpose),
+    /// The window opens this URL in the system browser.
+    OpenBrowser(String),
+    /// Blocks until the browser answers (up to 300 s): the app runs it on its own task.
+    CallGoogleFinish(String),
+    CallGoogleCancel(String),
+    CallSession,
+    CallListSignInMethods,
+    CallRemoveSignInMethod(String),
 }
 
 impl fmt::Debug for AccountEvent {
@@ -79,6 +115,31 @@ impl fmt::Debug for AccountEvent {
             AccountEvent::LogoutRequested => write!(f, "LogoutRequested"),
             AccountEvent::LogoutResult(r) => f.debug_tuple("LogoutResult").field(r).finish(),
             AccountEvent::LoggedOut => write!(f, "LoggedOut"),
+            AccountEvent::GoogleRequested(p) => f.debug_tuple("GoogleRequested").field(p).finish(),
+            AccountEvent::GoogleBegun { purpose, result } => f
+                .debug_struct("GoogleBegun")
+                .field("purpose", purpose)
+                .field("result", result)
+                .finish(),
+            AccountEvent::GoogleFinished { flow_id, result } => f
+                .debug_struct("GoogleFinished")
+                .field("flow_id", flow_id)
+                .field("result", result)
+                .finish(),
+            AccountEvent::GoogleCancelRequested => write!(f, "GoogleCancelRequested"),
+            AccountEvent::SessionResult(r) => f.debug_tuple("SessionResult").field(r).finish(),
+            AccountEvent::SignInMethodsRequested => write!(f, "SignInMethodsRequested"),
+            AccountEvent::SignInMethodsResult(r) => {
+                f.debug_tuple("SignInMethodsResult").field(&r.as_ref().map(Vec::len)).finish()
+            }
+            AccountEvent::RemoveSignInMethodRequested(id) => {
+                f.debug_tuple("RemoveSignInMethodRequested").field(id).finish()
+            }
+            AccountEvent::SignInMethodRemoved { identity_id, result } => f
+                .debug_struct("SignInMethodRemoved")
+                .field("identity_id", identity_id)
+                .field("result", result)
+                .finish(),
         }
     }
 }
@@ -99,8 +160,25 @@ impl fmt::Debug for AccountAction {
                 .debug_struct("ScheduleTick")
                 .field("at_ms", at_ms)
                 .finish(),
+            AccountAction::CallGoogleBegin(p) => f.debug_tuple("CallGoogleBegin").field(p).finish(),
+            AccountAction::OpenBrowser(_) => f.debug_tuple("OpenBrowser").field(&"<auth url>").finish(),
+            AccountAction::CallGoogleFinish(id) => f.debug_tuple("CallGoogleFinish").field(id).finish(),
+            AccountAction::CallGoogleCancel(id) => f.debug_tuple("CallGoogleCancel").field(id).finish(),
+            AccountAction::CallSession => write!(f, "CallSession"),
+            AccountAction::CallListSignInMethods => write!(f, "CallListSignInMethods"),
+            AccountAction::CallRemoveSignInMethod(id) => {
+                f.debug_tuple("CallRemoveSignInMethod").field(id).finish()
+            }
         }
     }
+}
+
+/// A Google flow the person started and has not seen end yet.
+#[derive(Debug)]
+struct GoogleRun {
+    purpose: GooglePurpose,
+    /// Known once `auth.google.begin` answered.
+    flow_id: Option<String>,
 }
 
 #[derive(Debug)]
@@ -123,6 +201,16 @@ pub struct AccountFlow {
     retry_list: bool,
     /// Tick the app has been asked to deliver and has not delivered yet.
     tick_pending: Option<u64>,
+    google: Option<GoogleRun>,
+    /// `auth.google.begin` calls dropped by a cancel whose answers have not arrived yet.
+    stale_begins: u32,
+    email: Option<String>,
+    auth_method: Option<String>,
+    /// `auth.session` already asked for this session.
+    session_requested: bool,
+    signed_out_by_server: bool,
+    methods: Option<Vec<SignInMethod>>,
+    removing: Option<String>,
 }
 
 impl Default for AccountFlow {
@@ -145,6 +233,14 @@ impl AccountFlow {
             last_heartbeat_ms: 0,
             retry_list: false,
             tick_pending: None,
+            google: None,
+            stale_begins: 0,
+            email: None,
+            auth_method: None,
+            session_requested: false,
+            signed_out_by_server: false,
+            methods: None,
+            removing: None,
         }
     }
 
@@ -175,6 +271,62 @@ impl AccountFlow {
         self.login_in_flight
     }
 
+    /// The Google flow the person started and has not seen end, if any.
+    pub fn google_in_flight(&self) -> Option<GooglePurpose> {
+        self.google.as_ref().map(|g| g.purpose)
+    }
+
+    /// The account email (from Google sign-in or `auth.session`); `None` until known.
+    pub fn email(&self) -> Option<&str> {
+        self.email.as_deref()
+    }
+
+    /// `"google"`, `"password"`, ...; `None` until known.
+    pub fn auth_method(&self) -> Option<&str> {
+        self.auth_method.as_deref()
+    }
+
+    /// Signed in with a password: Settings offers the switch to Google.
+    pub fn needs_google_switch(&self) -> bool {
+        matches!(self.state, AccountState::LoggedIn { .. }) && self.auth_method.as_deref() == Some("password")
+    }
+
+    pub fn sign_in_methods(&self) -> Option<&[SignInMethod]> {
+        self.methods.as_deref()
+    }
+
+    pub fn removing_sign_in_method(&self) -> Option<&str> {
+        self.removing.as_deref()
+    }
+
+    /// True once after the server ended the session (the app shows sign-in).
+    pub fn take_signed_out_by_server(&mut self) -> bool {
+        std::mem::take(&mut self.signed_out_by_server)
+    }
+
+    fn logged_in(&self) -> bool {
+        matches!(self.state, AccountState::LoggedIn { .. })
+    }
+
+    /// A Google flow ended without a session: `SignIn` shows the error (a cancel returns to signed
+    /// out); `Link` keeps the session and sets the notice (a cancel sets nothing).
+    fn end_google(&mut self, purpose: GooglePurpose, result: Result<(), CoreErr>) {
+        self.google = None;
+        let Err(e) = result else { return };
+        let cancelled = e.code == "google_cancelled";
+        match purpose {
+            GooglePurpose::SignIn => {
+                self.login_in_flight = false;
+                self.state = if cancelled { AccountState::LoggedOut } else { AccountState::Error(e) };
+            }
+            GooglePurpose::Link => {
+                if !cancelled {
+                    self.notice = Some(e);
+                }
+            }
+        }
+    }
+
     fn arm(&mut self, at_ms: u64, now_ms: u64, out: &mut Vec<AccountAction>) {
         if self.tick_pending.is_some_and(|p| p > now_ms) {
             return;
@@ -190,6 +342,12 @@ impl AccountFlow {
         self.logout_in_flight = false;
         self.retry_list = false;
         self.notice = None;
+        self.google = None;
+        self.email = None;
+        self.auth_method = None;
+        self.session_requested = false;
+        self.methods = None;
+        self.removing = None;
     }
 
     pub fn on(&mut self, ev: AccountEvent, now_ms: u64) -> Vec<AccountAction> {
@@ -237,6 +395,10 @@ impl AccountFlow {
                                     now_ms,
                                     &mut out,
                                 );
+                                if entering && self.email.is_none() && !self.session_requested {
+                                    self.session_requested = true;
+                                    out.push(AccountAction::CallSession);
+                                }
                             }
                             None if !self.register_requested => {
                                 self.register_requested = true;
@@ -256,7 +418,14 @@ impl AccountFlow {
                             }
                         }
                     }
-                    Err(e) if e.code == "not_logged_in" => {
+                    Err(e)
+                        if e.code == "not_logged_in"
+                            || (self.logged_in() && matches!(e.code.as_str(), "unauthorized" | "http_401")) =>
+                    {
+                        // The server (or a revoked token) ended the session while signed in: ask for sign-in.
+                        if self.logged_in() {
+                            self.signed_out_by_server = true;
+                        }
                         self.reset_session();
                         self.state = AccountState::LoggedOut;
                     }
@@ -367,6 +536,135 @@ impl AccountFlow {
             AccountEvent::LogoutResult(_) | AccountEvent::LoggedOut => {
                 self.reset_session();
                 self.state = AccountState::LoggedOut;
+            }
+            AccountEvent::GoogleRequested(purpose) => {
+                if self.google.is_some() {
+                    return out;
+                }
+                match purpose {
+                    GooglePurpose::SignIn if self.accepts_login() => {
+                        self.state = AccountState::LoggingIn;
+                        self.retry_list = false;
+                        self.login_in_flight = true;
+                        self.notice = None;
+                    }
+                    GooglePurpose::Link if self.needs_google_switch() => self.notice = None,
+                    _ => return out,
+                }
+                self.google = Some(GoogleRun { purpose, flow_id: None });
+                out.push(AccountAction::CallGoogleBegin(purpose));
+            }
+            AccountEvent::GoogleBegun { purpose, result } => {
+                if self.stale_begins > 0 {
+                    self.stale_begins -= 1;
+                    if let Ok(b) = result {
+                        out.push(AccountAction::CallGoogleCancel(b.flow_id));
+                    }
+                    return out;
+                }
+                let waiting = self
+                    .google
+                    .as_ref()
+                    .is_some_and(|g| g.purpose == purpose && g.flow_id.is_none());
+                if !waiting {
+                    if let Ok(b) = result {
+                        out.push(AccountAction::CallGoogleCancel(b.flow_id));
+                    }
+                    return out;
+                }
+                match result {
+                    Ok(b) => {
+                        if let Some(g) = self.google.as_mut() {
+                            g.flow_id = Some(b.flow_id.clone());
+                        }
+                        out.push(AccountAction::OpenBrowser(b.auth_url));
+                        out.push(AccountAction::CallGoogleFinish(b.flow_id));
+                    }
+                    Err(e) => self.end_google(purpose, Err(e)),
+                }
+            }
+            AccountEvent::GoogleFinished { flow_id, result } => {
+                let Some(purpose) = self
+                    .google
+                    .as_ref()
+                    .filter(|g| g.flow_id.as_deref() == Some(flow_id.as_str()))
+                    .map(|g| g.purpose)
+                else {
+                    return out; // a flow that already ended
+                };
+                match result {
+                    Ok(info) => {
+                        self.google = None;
+                        self.email = Some(info.email);
+                        self.auth_method = Some(info.auth_method);
+                        self.notice = None;
+                        match purpose {
+                            GooglePurpose::SignIn => {
+                                self.login_in_flight = false;
+                                self.register_requested = false;
+                                self.list_in_flight = true;
+                                self.last_list_ms = now_ms;
+                                out.push(AccountAction::CallList);
+                            }
+                            GooglePurpose::Link => out.push(AccountAction::CallListSignInMethods),
+                        }
+                    }
+                    Err(e) => self.end_google(purpose, Err(e)),
+                }
+            }
+            AccountEvent::GoogleCancelRequested => {
+                let Some(run) = self.google.as_ref() else { return out };
+                match run.flow_id.clone() {
+                    Some(id) => out.push(AccountAction::CallGoogleCancel(id)),
+                    None => {
+                        // begin has not answered: forget the flow and cancel what it returns.
+                        let purpose = run.purpose;
+                        self.google = None;
+                        self.stale_begins += 1;
+                        if purpose == GooglePurpose::SignIn {
+                            self.login_in_flight = false;
+                            self.state = AccountState::LoggedOut;
+                        }
+                    }
+                }
+            }
+            AccountEvent::SessionResult(result) => {
+                if let (Ok(info), true) = (result, self.logged_in()) {
+                    if info.email.is_some() {
+                        self.email = info.email;
+                    }
+                    self.auth_method = Some(info.auth_method);
+                }
+            }
+            AccountEvent::SignInMethodsRequested => {
+                if self.logged_in() {
+                    out.push(AccountAction::CallListSignInMethods);
+                }
+            }
+            AccountEvent::SignInMethodsResult(result) => {
+                if self.logged_in() {
+                    match result {
+                        Ok(list) => self.methods = Some(list),
+                        Err(e) => self.notice = Some(e),
+                    }
+                }
+            }
+            AccountEvent::RemoveSignInMethodRequested(id) => {
+                if self.logged_in() && self.removing.is_none() {
+                    self.removing = Some(id.clone());
+                    self.notice = None;
+                    out.push(AccountAction::CallRemoveSignInMethod(id));
+                }
+            }
+            AccountEvent::SignInMethodRemoved { identity_id, result } => {
+                if self.removing.as_deref() != Some(identity_id.as_str()) {
+                    return out;
+                }
+                self.removing = None;
+                match result {
+                    Ok(()) => out.push(AccountAction::CallListSignInMethods),
+                    Err(e) => self.notice = Some(e),
+                }
             }
         }
         out
