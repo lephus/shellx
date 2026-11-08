@@ -1,113 +1,114 @@
 import AppKit
 import ShellXBrand
+import ShellXRemoteCore
 import ShellXRemoteUI
 import SwiftUI
 
-/// State behind the "Sign in to ShellX" sheet.
-@MainActor
-final class SignInSheetModel: ObservableObject {
-    @Published var email = ""
-    @Published var password = ""
-    @Published private(set) var errorText: String?
-    @Published private(set) var isSubmitting = false
+/// "Continue with Google" in the browser, then "Signed in as …". `.link` is the switch from a password
+/// session. Dark panel, flat fills, 1 px borders; the Google button keeps Google's own Light look.
+struct SignInSheet: View {
+    let model: GoogleSignInModel
 
-    /// Called with true after a successful sign-in, false on cancel.
-    var onFinished: ((Bool) -> Void)?
-    private let signIn: @MainActor (String, String) async throws -> Void
-
-    init(signIn: @escaping @MainActor (String, String) async throws -> Void) {
-        self.signIn = signIn
-    }
-
-    var canSubmit: Bool {
-        !isSubmitting
-            && !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !password.isEmpty
-    }
-
-    func submit() {
-        guard canSubmit else { return }
-        isSubmitting = true
-        errorText = nil
-        let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let password = password
-        let signIn = signIn
-        Task { @MainActor in
-            do {
-                try await signIn(email, password)
-                self.isSubmitting = false
-                // The password is never kept beyond the call; the email stays for a retry.
-                self.password = ""
-                self.onFinished?(true)
-            } catch {
-                self.isSubmitting = false
-                self.password = ""
-                self.errorText = SignInErrorMessage.text(for: error, labels: .localized)
-            }
+    private var title: String {
+        switch model.purpose {
+        case .signIn: String(localized: "remote.signin.title", defaultValue: "Sign in to ShellX")
+        case .link: String(localized: "remote.signin.switch.title", defaultValue: "Switch to Google sign-in")
         }
     }
 
-    func cancel() {
-        password = ""
-        onFinished?(false)
-    }
-}
-
-/// Email, password, primary "Sign in"; a failure shows inline in the error
-/// color. Dark only, flat fills, 1 px borders.
-struct SignInSheet: View {
-    @ObservedObject var model: SignInSheetModel
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "remote.signin.title", defaultValue: "Sign in to ShellX"))
+            Text(title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(ShellXPalette.textHi.color)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            TextField(
-                String(localized: "remote.signin.email", defaultValue: "Email"),
-                text: $model.email
-            )
-            .textFieldStyle(.roundedBorder)
-            .autocorrectionDisabled()
-            SecureField(
-                String(localized: "remote.signin.password", defaultValue: "Password"),
-                text: $model.password
-            )
-            .textFieldStyle(.roundedBorder)
-            .onSubmit { model.submit() }
+            if model.purpose == .link {
+                Text(String(
+                    localized: "remote.signin.switch.intro",
+                    defaultValue: "ShellX now signs in with Google. Switching keeps this computer, your phones and your share links."
+                ))
+                .font(.system(size: 12))
+                .foregroundColor(ShellXPalette.text.color)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            content
             if let errorText = model.errorText {
                 Text(errorText)
                     .font(.system(size: 11))
                     .foregroundColor(ShellXPalette.error.color)
-                    .lineLimit(2)
+                    .lineLimit(4)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
-                if model.isSubmitting {
-                    ProgressView()
-                        .controlSize(.small)
+            if !isSignedIn {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
+                        model.cancel()
+                    }
+                    .buttonStyle(ShellXSheetButtonStyle(kind: .secondary))
+                    .keyboardShortcut(.cancelAction)
                 }
-                Button(String(localized: "common.cancel", defaultValue: "Cancel")) {
-                    model.cancel()
-                }
-                .buttonStyle(ShellXSheetButtonStyle(kind: .secondary))
-                .keyboardShortcut(.cancelAction)
-                Button(String(localized: "remote.signin.submit", defaultValue: "Sign in")) {
-                    model.submit()
-                }
-                .buttonStyle(ShellXSheetButtonStyle(kind: .primary))
-                .keyboardShortcut(.defaultAction)
-                .disabled(!model.canSubmit)
             }
         }
         .padding(20)
         .frame(width: 340, alignment: .leading)
         .background(ShellXPalette.panel.color)
         .environment(\.colorScheme, .dark)
+    }
+
+    private var isSignedIn: Bool {
+        if case .signedIn = model.phase { return true }
+        return false
+    }
+
+    @ViewBuilder private var content: some View {
+        switch model.phase {
+        case .ready:
+            HStack {
+                Spacer(minLength: 0)
+                GoogleSignInButton(
+                    title: String(localized: "remote.signin.google", defaultValue: "Continue with Google")
+                ) { model.start() }
+                Spacer(minLength: 0)
+            }
+        case .waiting:
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(String(localized: "remote.signin.waiting", defaultValue: "Waiting for Google…"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(ShellXPalette.textHi.color)
+                }
+                Text(String(
+                    localized: "remote.signin.browserHint",
+                    defaultValue: "Finish signing in in your browser, then come back here."
+                ))
+                .font(.system(size: 11))
+                .foregroundColor(ShellXPalette.muted.color)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        case .signedIn(let email):
+            VStack(alignment: .leading, spacing: 12) {
+                Text(String(
+                    format: String(localized: "remote.signin.signedInAs", defaultValue: "Signed in as %@"),
+                    email
+                ))
+                .font(.system(size: 12))
+                .foregroundColor(ShellXPalette.text.color)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                HStack {
+                    Spacer(minLength: 0)
+                    Button(String(localized: "remote.signin.done", defaultValue: "Done")) {
+                        model.finish()
+                    }
+                    .buttonStyle(ShellXSheetButtonStyle(kind: .primary))
+                    .keyboardShortcut(.defaultAction)
+                }
+            }
+        }
     }
 }
 
@@ -150,31 +151,35 @@ final class SignInSheetPresenter {
 
     private var sheet: CloudSheetWindow?
     private var hostWindow: NSWindow?
-    private var model: SignInSheetModel?
+    private var model: GoogleSignInModel?
 
     private init() {}
 
+    /// The sheet over the remote service's own sign-in (the fixture service in previews).
     func present(service: any ShellXRemoteServicing, preferredWindow: NSWindow? = nil) {
-        present(preferredWindow: preferredWindow) { email, password in
-            try await service.signIn(email: email, password: password)
-        }
+        present(
+            model: GoogleSignInModel(
+                purpose: .signIn, labels: .localized,
+                signIn: { try await service.signInWithGoogle() },
+                cancel: { await service.cancelGoogleSignIn() }
+            ),
+            preferredWindow: preferredWindow
+        )
     }
 
-    /// The same sheet for any sign-in, such as Settings → Account's `ShellXAccount`.
-    func present(
-        preferredWindow: NSWindow? = nil,
-        signIn: @escaping @MainActor (String, String) async throws -> Void
-    ) {
+    /// One sheet at a time: an open one is brought to front and `model` is dropped.
+    func present(model: GoogleSignInModel, preferredWindow: NSWindow? = nil) {
         if let window = sheet?.window {
             (hostWindow ?? window).makeKeyAndOrderFront(nil)
             return
         }
-        let model = SignInSheetModel(signIn: signIn)
         model.onFinished = { [weak self] _ in self?.dismiss() }
         let sheet = CloudSheetWindow(rootView: SignInSheet(model: model))
         let window = sheet.window
         window.styleMask = [.titled]
-        window.title = String(localized: "remote.signin.title", defaultValue: "Sign in to ShellX")
+        window.title = model.purpose == .link
+            ? String(localized: "remote.signin.switch.title", defaultValue: "Switch to Google sign-in")
+            : String(localized: "remote.signin.title", defaultValue: "Sign in to ShellX")
         window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         self.model = model

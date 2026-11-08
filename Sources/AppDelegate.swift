@@ -1733,6 +1733,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         CmuxTuiSurfaceProviderRegistry.shared.start(catalog: .shared)
         let env = ProcessInfo.processInfo.environment
+        if !MacSentryStartupPolicy.isRunningUnderXCTest(environment: env) {
+            ShellXAccountFlow.shared.prepareAtLaunch(defaults: .standard) // ShellX: sign-in sheet after a server sign-out; one-time Google switch offer
+        }
         if ShellXRemoteGate.startsAtLaunch(environment: env) {
             ShellXRemoteService.shared.startIfEnabled() // ShellX: serves phones over ShellX Link (1.5.1); remote machines stay off (W2 Task 13)
         }

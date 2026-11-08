@@ -719760,61 +719760,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Email or password is incorrect"
+            "value": "Google sign-in didn't work. Try again."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+            "value": "لم ينجح تسجيل الدخول عبر Google. حاول مرة أخرى."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "E-Mail oder Passwort ist falsch"
+            "value": "Die Google-Anmeldung hat nicht funktioniert. Versuche es erneut."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El correo o la contraseña no son correctos"
+            "value": "El inicio de sesión con Google no funcionó. Inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "E-mail ou mot de passe incorrect"
+            "value": "La connexion Google n’a pas fonctionné. Réessayez."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "メールアドレスまたはパスワードが正しくありません"
+            "value": "Google サインインに失敗しました。もう一度お試しください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이메일 또는 비밀번호가 올바르지 않습니다"
+            "value": "Google 로그인에 실패했습니다. 다시 시도하세요."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Email hoặc mật khẩu không đúng"
+            "value": "Đăng nhập Google không thành công. Hãy thử lại."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "邮箱或密码不正确"
+            "value": "Google 登录未成功，请重试。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "電子郵件或密碼不正確"
+            "value": "Google 登入未成功，請再試一次。"
           }
         }
       }
@@ -728850,6 +728850,851 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude đọc SKILL.md rồi vẽ, mất vài giây"
+          }
+        }
+      }
+    },
+    "remote.signin.error.browser": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open your browser."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Browser konnte nicht geöffnet werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir votre navigateur."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر فتح المتصفح."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo abrir el navegador."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法開啟瀏覽器。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开浏览器。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브라우저를 열 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ブラウザを開けませんでした。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không mở được trình duyệt."
+          }
+        }
+      }
+    },
+    "remote.signin.error.emailInUse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another ShellX account already uses this Google account's email. Choose a different Google account."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die E-Mail-Adresse dieses Google-Kontos gehört bereits zu einem anderen ShellX-Konto. Wähle ein anderes Google-Konto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’adresse e-mail de ce compte Google appartient déjà à un autre compte ShellX. Choisissez un autre compte Google."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البريد الإلكتروني لحساب Google هذا مستخدم بالفعل في حساب ShellX آخر. اختر حساب Google مختلفًا."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El correo de esta cuenta de Google ya pertenece a otra cuenta de ShellX. Elige otra cuenta de Google."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個 Google 帳號的電子郵件已屬於另一個 ShellX 帳號，請選擇其他 Google 帳號。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Google 账号的邮箱已属于另一个 ShellX 账号，请选择其他 Google 账号。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Google 계정의 이메일은 이미 다른 ShellX 계정에서 사용 중입니다. 다른 Google 계정을 선택하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Google アカウントのメールアドレスは、既に別の ShellX アカウントで使われています。別の Google アカウントを選んでください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email của tài khoản Google này đã thuộc một tài khoản ShellX khác. Hãy chọn tài khoản Google khác."
+          }
+        }
+      }
+    },
+    "remote.signin.error.identityInUse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Google account already signs in to another ShellX account, or this account already uses another Google account."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Google-Konto meldet bereits ein anderes ShellX-Konto an, oder dieses Konto verwendet bereits ein anderes Google-Konto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce compte Google sert déjà à se connecter à un autre compte ShellX, ou ce compte utilise déjà un autre compte Google."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حساب Google هذا يسجّل الدخول بالفعل إلى حساب ShellX آخر، أو أن هذا الحساب يستخدم حساب Google آخر."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta cuenta de Google ya inicia sesión en otra cuenta de ShellX, o esta cuenta ya usa otra cuenta de Google."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個 Google 帳號已用於登入另一個 ShellX 帳號，或這個帳號已使用另一個 Google 帳號。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Google 账号已用于登录另一个 ShellX 账号，或这个账号已使用另一个 Google 账号。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Google 계정은 이미 다른 ShellX 계정에 로그인하는 데 사용되고 있거나, 이 계정이 이미 다른 Google 계정을 사용하고 있습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Google アカウントは既に別の ShellX アカウントのサインインに使われているか、このアカウントが既に別の Google アカウントを使っています。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tài khoản Google này đã dùng để đăng nhập một tài khoản ShellX khác, hoặc tài khoản này đã dùng một tài khoản Google khác."
+          }
+        }
+      }
+    },
+    "remote.signin.error.stateMismatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in didn't finish. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion n’a pas abouti. Réessayez."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يكتمل تسجيل الدخول. حاول مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El inicio de sesión no se completó. Inténtalo de nuevo."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入未完成，請再試一次。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录未完成，请重试。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인이 완료되지 않았습니다. 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインインが完了しませんでした。もう一度お試しください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập chưa hoàn tất. Hãy thử lại."
+          }
+        }
+      }
+    },
+    "remote.signin.error.switchFromSignedInDevice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für diese E-Mail-Adresse gibt es bereits ein ShellX-Konto. Öffne ShellX auf einem Gerät, das noch angemeldet ist, gehe zu Einstellungen › Konto › Zur Google-Anmeldung wechseln und versuche es dann erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette adresse e-mail a déjà un compte ShellX. Ouvrez ShellX sur un appareil encore connecté, allez dans Réglages › Compte › Passer à la connexion Google, puis réessayez."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذا البريد الإلكتروني لديه حساب ShellX بالفعل. افتح ShellX على جهاز لا يزال مسجّلاً للدخول، وانتقل إلى الإعدادات › الحساب › التبديل إلى تسجيل الدخول عبر Google، ثم حاول مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este correo ya tiene una cuenta de ShellX. Abre ShellX en un dispositivo que siga con la sesión iniciada, ve a Ajustes › Cuenta › Cambiar al inicio de sesión con Google y vuelve a intentarlo."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個電子郵件已有 ShellX 帳號。請在仍保持登入的裝置上開啟 ShellX，前往「設定 › 帳號 › 切換為 Google 登入」，然後再試一次。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个邮箱已有 ShellX 账号。请在仍保持登录的设备上打开 ShellX，前往“设置 › 账号 › 切换为 Google 登录”，然后重试。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 이메일에는 이미 ShellX 계정이 있습니다. 아직 로그인된 기기에서 ShellX를 열고 설정 › 계정 › Google 로그인으로 전환으로 이동한 다음 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このメールアドレスには既に ShellX アカウントがあります。サインインしたままのデバイスで ShellX を開き、設定 › アカウント › Google サインインに切り替え、を選んでから、もう一度お試しください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài khoản › Chuyển sang đăng nhập Google, rồi thử lại."
+          }
+        }
+      }
+    },
+    "remote.signin.error.timeout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google sign-in timed out. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Google-Anmeldung hat zu lange gedauert. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion Google a expiré. Réessayez."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "انتهت مهلة تسجيل الدخول عبر Google. حاول مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El inicio de sesión con Google caducó. Inténtalo de nuevo."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 登入逾時，請再試一次。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 登录超时，请重试。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 로그인 시간이 초과되었습니다. 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google サインインがタイムアウトしました。もう一度お試しください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập Google đã hết thời gian chờ. Hãy thử lại."
+          }
+        }
+      }
+    },
+    "remote.signin.browserHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish signing in in your browser, then come back here."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schließe die Anmeldung in deinem Browser ab und kehre dann hierher zurück."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminez la connexion dans votre navigateur, puis revenez ici."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أكمل تسجيل الدخول في المتصفح ثم عد إلى هنا."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termina de iniciar sesión en tu navegador y vuelve aquí."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在瀏覽器中完成登入，然後回到這裡。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在浏览器中完成登录，然后回到这里。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브라우저에서 로그인을 마친 뒤 이곳으로 돌아오세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ブラウザでサインインを完了してから、ここに戻ってください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy hoàn tất đăng nhập trong trình duyệt rồi quay lại đây."
+          }
+        }
+      }
+    },
+    "remote.signin.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertig"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "완료"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
+        }
+      }
+    },
+    "remote.signin.google": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue with Google"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiter mit Google"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuer avec Google"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المتابعة باستخدام Google"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuar con Google"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Google 繼續"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Google 继续"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google로 계속하기"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google で続行"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếp tục với Google"
+          }
+        }
+      }
+    },
+    "remote.signin.signedInAs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed in as %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angemeldet als %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecté en tant que %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم تسجيل الدخول باسم %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesión iniciada como %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已登入為 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已登录为 %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 계정으로 로그인됨"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ としてサインイン済み"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã đăng nhập: %@"
+          }
+        }
+      }
+    },
+    "remote.signin.switch.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX now signs in with Google. Switching keeps this computer, your phones and your share links."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX meldet jetzt mit Google an. Beim Wechsel bleiben dieser Computer, deine Telefone und deine Freigabelinks erhalten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX se connecte désormais avec Google. Le changement conserve cet ordinateur, vos téléphones et vos liens de partage."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أصبح ShellX يسجّل الدخول عبر Google. يحتفظ التبديل بهذا الكمبيوتر وهواتفك وروابط المشاركة."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX ahora inicia sesión con Google. Al cambiar se conservan este ordenador, tus teléfonos y tus enlaces para compartir."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 現在使用 Google 登入。切換後會保留這部電腦、你的手機和你的分享連結。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 现在使用 Google 登录。切换后会保留这台电脑、你的手机和你的分享链接。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX는 이제 Google로 로그인합니다. 전환해도 이 컴퓨터, 휴대전화, 공유 링크는 그대로 유지됩니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX は Google でサインインするようになりました。切り替えても、このコンピュータ、スマートフォン、共有リンクはそのまま使えます。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX giờ đăng nhập bằng Google. Chuyển sang Google vẫn giữ máy tính này, điện thoại và các liên kết chia sẻ của bạn."
+          }
+        }
+      }
+    },
+    "remote.signin.switch.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Google sign-in"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zur Google-Anmeldung wechseln"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passer à la connexion Google"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التبديل إلى تسجيل الدخول عبر Google"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar al inicio de sesión con Google"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換為 Google 登入"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换为 Google 登录"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 로그인으로 전환"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google サインインに切り替え"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang đăng nhập Google"
+          }
+        }
+      }
+    },
+    "remote.signin.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Google…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warten auf Google …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente de Google…"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "في انتظار Google…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando a Google…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待 Google…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待 Google…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google을 기다리는 중…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google を待っています…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chờ Google…"
           }
         }
       }

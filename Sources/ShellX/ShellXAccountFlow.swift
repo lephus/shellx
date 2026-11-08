@@ -2,14 +2,15 @@ import AppKit
 import CmuxSettingsUI
 import Observation
 import ShellXRemoteCore
+import ShellXRemoteUI
 
-/// ShellX: Settings → Account's `AccountFlow`, backed by the ShellX account (`ShellXAccount`, email and
-/// password against the ShellX API) instead of the Manaflow sign-in in `HostAccountFlow`, which stays off.
+/// ShellX: Settings → Account's `AccountFlow`, backed by the ShellX account (`ShellXAccount`, Google sign-in
+/// against the ShellX API) instead of the Manaflow sign-in in `HostAccountFlow`, which stays off.
 /// No teams, billing or Pro: those rows stay hidden.
 @MainActor
 @Observable
 final class ShellXAccountFlow: AccountFlow {
-    static let shared = ShellXAccountFlow(account: ShellXAccount(service: .shared))
+    static let shared = ShellXAccountFlow(account: ShellXAccount(service: .shared, openURL: { NSWorkspace.shared.open($0) }))
 
     @ObservationIgnored private let account: ShellXAccount
 
@@ -37,12 +38,35 @@ final class ShellXAccountFlow: AccountFlow {
 
     var isWorkingOnAuth: Bool { account.isWorking }
 
-    /// Opens the "Sign in to ShellX" sheet; it closes itself once the server accepts the password.
+    /// Opens the "Sign in to ShellX" sheet with the Google button; it closes once the person confirms.
     func startSignIn() {
+        presentGoogleSheet(.signIn)
+    }
+
+    /// Opens the "Switch to Google sign-in" sheet for a password session.
+    func startGoogleSwitch() {
+        presentGoogleSheet(.link)
+    }
+
+    /// At launch: a session the server ended shows the sign-in sheet; the core's session fills in the email and
+    /// method; a password account is offered the switch to Google once.
+    func prepareAtLaunch(defaults: UserDefaults) {
+        account.onSignedOutByServer = { [weak self] in self?.startSignIn() }
         let account = account
-        SignInSheetPresenter.shared.present { email, password in
-            try await account.signIn(email: email, password: password)
+        Task { @MainActor [weak self] in
+            await account.reconcileWithSession()
+            if account.takeGoogleSwitchOffer(defaults: defaults) { self?.startGoogleSwitch() }
         }
+    }
+
+    private func presentGoogleSheet(_ purpose: GoogleSignInPurpose) {
+        let account = account
+        let model = GoogleSignInModel(
+            purpose: purpose, labels: .localized,
+            signIn: { try await account.signInWithGoogle(purpose: purpose).email },
+            cancel: { await account.cancelGoogleSignIn() }
+        )
+        SignInSheetPresenter.shared.present(model: model)
     }
 
     func signOut() async {

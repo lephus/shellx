@@ -2365,6 +2365,7 @@
 		3865A0153865A0153865A015 /* GlobalSearchTerminalText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3865B0153865B0153865B015 /* GlobalSearchTerminalText.swift */; };
 		3865A0143865A0143865A014 /* GlobalSearchTerminalTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3865B0143865B0143865B014 /* GlobalSearchTerminalTextTests.swift */; };
 		8561A0038561A0038561A003 /* GlobalSearchVisiblePopoverShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8561B0038561B0038561B003 /* GlobalSearchVisiblePopoverShortcutTests.swift */; };
+		8BD38EB9C84A0C24BC40528F /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */; };
 		DD9DE998158FEA6242A9C15F /* GotoSplitActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAA9FEEAC85B8AB216861F2 /* GotoSplitActionTests.swift */; };
 		CC000000A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000001A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift */; };
 		CC2639000000000000000001 /* GotoSplitCycleUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2639000000000000000002 /* GotoSplitCycleUITestSupport.swift */; };
@@ -7066,6 +7067,7 @@
 		3865B0153865B0153865B015 /* GlobalSearchTerminalText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search/GlobalSearchTerminalText.swift; sourceTree = "<group>"; };
 		3865B0143865B0143865B014 /* GlobalSearchTerminalTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchTerminalTextTests.swift; sourceTree = "<group>"; };
 		8561B0038561B0038561B003 /* GlobalSearchVisiblePopoverShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchVisiblePopoverShortcutTests.swift; sourceTree = "<group>"; };
+		D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/GoogleSignInButton.swift; sourceTree = "<group>"; };
 		7AAA9FEEAC85B8AB216861F2 /* GotoSplitActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GotoSplitActionTests.swift"; sourceTree = "<group>"; };
 		CC000001A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GotoSplitCycleUITests.swift; sourceTree = "<group>"; };
 		CC2639000000000000000002 /* GotoSplitCycleUITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug/UITests/GotoSplitCycleUITestSupport.swift; sourceTree = "<group>"; };
@@ -12704,6 +12706,7 @@
 				EB6E5A2DB3A98C3DE470A6A8 /* ShellXAutomationsBridgeFailure.swift */,
 				1A9344998632CF83439ECCF3 /* ShellXAutomationsOpenQueue.swift */,
 				7D6C2AF2DBDB0F61BF624FDA /* ShellXRoutineRunLauncher.swift */,
+				D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -16372,6 +16375,7 @@
 					3865A0083865A0083865A008 /* GlobalSearchPanelCaptureManager.swift in Sources */,
 				C5E96687F7398AC884B78744 /* GlobalSearchSnippet.swift in Sources */,
 				3865A0153865A0153865A015 /* GlobalSearchTerminalText.swift in Sources */,
+				8BD38EB9C84A0C24BC40528F /* GoogleSignInButton.swift in Sources */,
 				CC2639000000000000000001 /* GotoSplitCycleUITestSupport.swift in Sources */,
 					5B11E5A100000000000000B1 /* GPUSpinner.swift in Sources */,
 					A6AC72010000000000000001 /* GPUSpinnerNSView.swift in Sources */,
