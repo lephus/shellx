@@ -1,0 +1,17 @@
+# Dependencies the ShellX Android app (shellx-android/) and ShellX Link for Kotlin (shellx-link/kotlin/) may
+# resolve. scripts/shellx/check-android-license.sh checks every gradle.lockfile against this list.
+#
+# Format: <group>:<artifact>  <scope>  <licence>  [# note]
+#   scope    ship: allowed in the app (release and debug runtime classpaths) and in tests
+#            test: allowed only on test runtime classpaths
+#   licence  ship: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, Bouncy-Castle, Google-SDK
+#            test: also EPL-1.0, EPL-2.0, ICU, CDDL-1.1
+# Never GPL, LGPL or AGPL. Only the three wildcard lines below use "*". Google SDKs (com.google.android.gms,
+# com.google.firebase, com.google.android.datatransport, com.google.android.play,
+# com.google.android.libraries.identity.googleid) are always listed by name.
+# Add a line only after reading the artifact's POM licence; keep the lines sorted.
+# Each group:artifact is listed once. A test entry whose artifact starts to ship moves to ship, never both.
+
+androidx.*:*                 ship  Apache-2.0
+org.jetbrains.kotlin:*       ship  Apache-2.0
+org.jetbrains.kotlinx:*      ship  Apache-2.0
