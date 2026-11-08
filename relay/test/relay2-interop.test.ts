@@ -3,8 +3,9 @@ import { createServer } from "node:net";
 import { describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { formatResult, runRelay2Smoke } from "../scripts/relay2-smoke.js";
+import { mintSmokeToken } from "../src/scripts/mint-smoke-token.js";
 import {
-  approvePairing, call, loginDesktop, makeApp, onCleanup, registerAccount, registerMachine, requestPairing,
+  approvePairing, call, db, loginDesktop, makeApp, onCleanup, registerAccount, registerMachine, requestPairing,
   TEST_CONFIG, type Session, type TestApp,
 } from "./helpers.js";
 
@@ -169,11 +170,12 @@ describe.skipIf(BIN === undefined)("API-minted tickets against the real cmux-rel
     const port = await startCmuxRelay();
     const app = makeApp({ config: { ...TEST_CONFIG, relayV2Url: `ws://127.0.0.1:${port}/v1/relay` } });
     const running = await app.ready;
-    const account = await registerAccount(app);
-    const result = await runRelay2Smoke({ base: running.url, email: account.email, password: account.password });
+    const token = await mintSmokeToken(db(), Date.now());
+    const result = await runRelay2Smoke({ base: running.url, token });
     expect(result).toEqual({ ok: true, lease: 30 });
     expect(formatResult(result)).toBe("relay2 smoke: OK (registered, lease 30 s)");
-    const bad = await runRelay2Smoke({ base: running.url, email: account.email, password: "wrong password!" });
-    expect(formatResult(bad)).toMatch(/^relay2 smoke: FAIL at login \(401 /);
+    // The smoke logged its token out: it is now a bad token.
+    const bad = await runRelay2Smoke({ base: running.url, token });
+    expect(formatResult(bad)).toMatch(/^relay2 smoke: FAIL at machine \(401 /);
   });
 });
