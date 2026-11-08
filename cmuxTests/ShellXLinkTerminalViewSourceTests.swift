@@ -96,20 +96,20 @@ struct ShellXLinkTerminalViewSourceTests {
             let fake = listedFake()
             fake.terminal = terminal
             fake.surfaces[terminalID] = terminal.surface.id
-            let result = await makeSource(fake).openView(terminalId: terminalID.uuidString, cols: 20, rows: 5)
-            guard case .opened(let opened) = result else {
+            let source = makeSource(fake)
+            let result = await source.openView(terminalId: terminalID.uuidString, cols: 20, rows: 5)
+            guard case .opened(let opened) = result, let view = opened as? ShellXLinkTerminalView else {
                 Issue.record("not opened")
                 return
             }
-            let first = try await opened.nextFrame()
-            guard case .frame(let frame) = first else {
+            guard case .frame(let frame) = try await view.nextEvent() else {
                 Issue.record("no first frame")
                 return
             }
             #expect(frame.head.kind == .snapshot)
             fake.listed[terminalID] = nil
             fake.fireListChange()
-            let ended = await opened.nextFrame()
+            let ended = try await view.nextEvent()
             #expect(ended == .ended(.gone))
             await opened.close()
         }

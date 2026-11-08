@@ -175,7 +175,8 @@ struct ShellXLinkTerminalSessionTests {
         try await withRig { terminal, _, _, _, session, pushes in
             let id = terminal.surface.id.uuidString
             let other = UUID().uuidString
-            #expect(try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5) == .ok)
+            let outcomeOk = try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5)
+            #expect(outcomeOk == .ok)
             try await session.client.sendTerminalInput(terminalId: other, units: [.text("x")])
             #expect(await pushes.eventually { $0.ended(terminalId: other) == .notOpen })
             let leaked = try await terminal.inputBytesBeforeBarrier()
@@ -186,7 +187,8 @@ struct ShellXLinkTerminalSessionTests {
     @Test func unpairingClosesThePhonesView() async throws {
         try await withRig { terminal, fake, registry, _, session, _ in
             let id = terminal.surface.id.uuidString
-            #expect(try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5) == .ok)
+            let outcomeOk = try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5)
+            #expect(outcomeOk == .ok)
             await session.host.disconnect(clientKey: session.phoneKey.publicKey)
             let deadline = ContinuousClock.now + .seconds(5)
             while ContinuousClock.now < deadline,
@@ -201,11 +203,13 @@ struct ShellXLinkTerminalSessionTests {
     @Test func deviceManagementMidSessionRefusesTheViewAndNewOpens() async throws {
         try await withRig { terminal, fake, _, policy, session, pushes in
             let id = terminal.surface.id.uuidString
-            #expect(try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5) == .ok)
+            let outcomeOk = try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5)
+            #expect(outcomeOk == .ok)
             fake.blocked = true
             policy.change(blocked: true)
             #expect(await pushes.eventually { $0.ended(terminalId: id) == .refused })
-            #expect(try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5) == .refused)
+            let outcomeRefused = try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5)
+            #expect(outcomeRefused == .refused)
         }
     }
 
@@ -245,7 +249,7 @@ struct ShellXLinkTerminalSessionTests {
                 notificationCenter: NotificationCenter()
             )
             let session = try await connect(sources(views: views, creator: nil))
-            func selection() -> [String] {
+            @MainActor func selection() -> [String] {
                 let panes = workspace.bonsplitController.allPaneIds.map {
                     "\(String(describing: workspace.bonsplitController.selectedTab(inPane: $0)?.id))"
                 }
@@ -257,7 +261,8 @@ struct ShellXLinkTerminalSessionTests {
             }
             let before = selection()
             let id = panelID.uuidString
-            #expect(try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5) == .ok)
+            let outcomeOk = try await session.client.openTerminalView(terminalId: id, cols: 20, rows: 5)
+            #expect(outcomeOk == .ok)
             try await session.client.sendTerminalInput(terminalId: id, units: [.text("x"), .key(.enter, mods: [])])
             try await session.client.resizeTerminalView(terminalId: id, cols: 30, rows: 8)
             try await session.client.closeTerminalView(terminalId: id)

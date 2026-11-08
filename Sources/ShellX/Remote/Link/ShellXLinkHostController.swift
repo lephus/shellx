@@ -9,7 +9,7 @@ import ShellXRemoteCore
 /// ShellX: this Mac's ShellX Link host (P1 spike). It keeps the machine's link slot registered on the
 /// relay (`tickets.mint {permission: "register", lane: "link"}`, a fresh ticket per registration) and serves
 /// every incoming circuit with a `LinkHost` over the agent Feed, the agent sessions and their chat, the
-/// Mac's workspaces, and closing an agent's tab.
+/// Mac's workspaces and terminals (viewing, typing, a new tab), and closing an agent's tab.
 ///
 /// `ShellXRemoteService` starts it once `machines.register` returned a `link_slot`, which happens only while
 /// `ShellXRemoteGate.servesPhones` is on, and stops it when the host session ends. Logs carry slots, codes and
@@ -39,16 +39,33 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
 
     nonisolated static let log = Logger(subsystem: "pro.shellx.desktop", category: "link-host")
 
+    /// What the link host serves phones from: the agent Feed and every optional ShellX Link source.
+    struct Sources: Sendable {
+        var feed: any AgentFeedSource
+        var sessions: (any AgentSessionSource)?
+        var chat: (any AgentChatSource)?
+        var workspaces: (any WorkspaceSource)?
+        var workspaceControl: (any WorkspaceControl)?
+        var agentControl: (any AgentControl)?
+        var terminalControl: (any TerminalControl)?
+        var terminalViews: (any TerminalViewSource)?
+        var terminalCreator: (any TerminalCreator)?
+    }
+
+    /// The `LinkHost` of one registration attempt over `sources` (the only place sources enter a host).
+    nonisolated static func makeLinkHost(key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
+                                         sources: Sources, hostVersion: String, machineName: String) -> LinkHost {
+        LinkHost(key: key, trustedClients: trustedClients, feed: sources.feed,
+                 sessions: sources.sessions, chat: sources.chat, workspaces: sources.workspaces,
+                 workspaceControl: sources.workspaceControl, agentControl: sources.agentControl,
+                 terminalControl: sources.terminalControl, terminalViews: sources.terminalViews,
+                 terminalCreator: sources.terminalCreator, hostVersion: hostVersion, machineName: machineName)
+    }
+
     /// shellx-core: link-lane tickets here, and the `phones.*` calls of phone pairing.
     let core: ShellXCoreClient
     private let storage: any ShellXLinkSecretStorage
-    private let feed: any AgentFeedSource
-    private let sessions: (any AgentSessionSource)?
-    private let chat: (any AgentChatSource)?
-    private let workspaces: (any WorkspaceSource)?
-    private let workspaceControl: (any WorkspaceControl)?
-    private let agentControl: (any AgentControl)?
-    private let terminalControl: (any TerminalControl)?
+    private let sources: Sources
     private let hostVersion: String
     private let machineName: String
     private let isBlockedByPolicy: @MainActor () -> Bool
@@ -72,6 +89,9 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     ///   - agentControl: Closing an agent's terminal tab (the app passes the same ``ShellXLinkWorkspaceSource``).
     ///   - terminalControl: Closing a terminal tab the phone's user picked (the app passes the same
     ///     ``ShellXLinkWorkspaceSource``).
+    ///   - terminalViews: A phone's view of a Mac terminal (the app passes ``ShellXLinkTerminalViewSource``).
+    ///   - terminalCreator: Opening a terminal tab in a listed workspace (the app passes the same
+    ///     ``ShellXLinkWorkspaceSource``).
     ///   - hostVersion: The app version sent in `welcome`.
     ///   - machineName: This Mac's name sent in `welcome`.
     ///   - isBlockedByPolicy: Whether a configuration profile forbids serving phones (`DisableRemoteControl`
@@ -83,19 +103,17 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
          sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
          workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
          agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
+         terminalViews: (any TerminalViewSource)? = nil, terminalCreator: (any TerminalCreator)? = nil,
          hostVersion: String,
          machineName: String, isBlockedByPolicy: @escaping @MainActor () -> Bool = { MobileRemoteControlPolicy.isDisabled },
          notificationCenter: NotificationCenter = .default, phonePush: ShellXPhonePushForwarder? = nil) {
         self.core = core
         self.phonePush = phonePush
         self.storage = storage
-        self.feed = feed
-        self.sessions = sessions
-        self.chat = chat
-        self.workspaces = workspaces
-        self.workspaceControl = workspaceControl
-        self.agentControl = agentControl
-        self.terminalControl = terminalControl
+        self.sources = Sources(
+            feed: feed, sessions: sessions, chat: chat, workspaces: workspaces, workspaceControl: workspaceControl,
+            agentControl: agentControl, terminalControl: terminalControl, terminalViews: terminalViews,
+            terminalCreator: terminalCreator)
         self.hostVersion = hostVersion
         self.machineName = machineName
         self.isBlockedByPolicy = isBlockedByPolicy
@@ -136,17 +154,13 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     }
 
     private func launch(_ assignment: Assignment) {
-        let core = core, feed = feed, sessions = sessions, chat = chat
-        let workspaces = workspaces, workspaceControl = workspaceControl, agentControl = agentControl
-        let terminalControl = terminalControl
+        let core = core, sources = sources
         let hostVersion = hostVersion, machineName = machineName, linkSlot = assignment.linkSlot
         let keys = ShellXLinkKeyStore(storage: storage, accountID: assignment.accountID)
         let liveHost = LiveLinkHost()
         let task = Task.detached {
-            await Self.serve(linkSlot: linkSlot, core: core, keys: keys, liveHost: liveHost, feed: feed,
-                             sessions: sessions, chat: chat, workspaces: workspaces,
-                             workspaceControl: workspaceControl, agentControl: agentControl,
-                             terminalControl: terminalControl, hostVersion: hostVersion, machineName: machineName)
+            await Self.serve(linkSlot: linkSlot, core: core, keys: keys, liveHost: liveHost, sources: sources,
+                             hostVersion: hostVersion, machineName: machineName)
         }
         running = Running(machineID: assignment.machineID, linkSlot: linkSlot, accountID: assignment.accountID,
                           keys: keys, liveHost: liveHost, task: task)
@@ -249,12 +263,7 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     /// A ticket for another slot (an old relay) ends it: retrying cannot fix that. So does an unreadable host
     /// key or trusted list: the host fails closed and never replaces the key.
     private nonisolated static func serve(linkSlot: String, core: ShellXCoreClient, keys: ShellXLinkKeyStore,
-                                          liveHost: LiveLinkHost, feed: any AgentFeedSource,
-                                          sessions: (any AgentSessionSource)?, chat: (any AgentChatSource)?,
-                                          workspaces: (any WorkspaceSource)?,
-                                          workspaceControl: (any WorkspaceControl)?,
-                                          agentControl: (any AgentControl)?,
-                                          terminalControl: (any TerminalControl)?,
+                                          liveHost: LiveLinkHost, sources: Sources,
                                           hostVersion: String, machineName: String) async {
         let hostKey: NoiseStaticKey
         do {
@@ -292,11 +301,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
                     let next = try await offMain { try core.mintLinkTicket(.register, expectedSlot: linkSlot) }
                     return RelayTicket(ticket: next.ticket, expiresAtUnix: next.expiresAtUnix)
                 }
-                let host = LinkHost(key: hostKey, trustedClients: { keys.trustedClients() }, feed: feed,
-                                    sessions: sessions, chat: chat, workspaces: workspaces,
-                                    workspaceControl: workspaceControl, agentControl: agentControl,
-                                    terminalControl: terminalControl, hostVersion: hostVersion,
-                                    machineName: machineName)
+                let host = makeLinkHost(key: hostKey, trustedClients: { keys.trustedClients() }, sources: sources,
+                                        hostVersion: hostVersion, machineName: machineName)
                 await liveHost.set(host)
                 log.info("link host registering slot \(linkSlot, privacy: .public)")
                 try await registration.run { circuit in await host.serve(circuit) }

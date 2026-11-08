@@ -53,6 +53,8 @@ extension ShellXRemoteEnvironment {
         // ShellX Link: the agent Feed, sessions, chat and workspaces for phones. The service starts it only while
         // it serves phones (`ShellXRemoteGate.servesPhones`) and has a `link_slot` from `machines.register`.
         let workspaces = ShellXLinkWorkspaceSource()
+        let terminalViews = ShellXLinkTerminalViewSource(
+            mac: .live(workspaces: workspaces), frameSinks: MobileTerminalRenderObserver.shared)
         let feed = ShellXLinkFeedSource(coordinator: .shared)
         let linkHost = ShellXLinkHostController(
             core: core,
@@ -66,6 +68,8 @@ extension ShellXRemoteEnvironment {
             workspaceControl: workspaces,
             agentControl: workspaces,
             terminalControl: workspaces,
+            terminalViews: terminalViews,
+            terminalCreator: workspaces,
             hostVersion: device.appVersion,
             machineName: device.machineName,
             phonePush: .live(feed: feed, core: core))
