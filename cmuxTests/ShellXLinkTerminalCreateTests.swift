@@ -28,7 +28,7 @@ struct ShellXLinkTerminalCreateTests {
             let second = try #require(target.newTerminalSurface(
                 inPane: pane, focus: false, preserveBonsplitSelectionWhenUnfocused: true
             ))
-            func selection() -> [String] {
+            @MainActor func selection() -> [String] {
                 [
                     "\(String(describing: target.bonsplitController.selectedTab(inPane: pane)?.id))",
                     "\(String(describing: target.bonsplitController.focusedPaneId))",

@@ -16175,7 +16175,9 @@ class TerminalController {
         )
     }
 
-    func v2MobileTerminalCreate(params: [String: Any]) -> V2CallResult {
+    /// - Parameter preserveSelection: Keeps the selected tab of the pane (and so the Mac's selection) when the new
+    ///   tab opens unfocused. ShellX Link passes `true`; the iroh and socket callers keep `false`.
+    func v2MobileTerminalCreate(params: [String: Any], preserveSelection: Bool = false) -> V2CallResult {
         guard let tabManager = v2ResolveTabManager(params: params) else {
             return .err(code: "unavailable", message: "Workspace context is unavailable", data: nil)
         }
@@ -16193,6 +16195,7 @@ class TerminalController {
             focus: false,
             autoRefreshMetadata: false,
             preserveFocusWhenUnfocused: false,
+            preserveBonsplitSelectionWhenUnfocused: preserveSelection,
             inheritWorkingDirectoryFallback: true,
             allowTextBoxFocusDefault: false,
             inheritStartupWork: false

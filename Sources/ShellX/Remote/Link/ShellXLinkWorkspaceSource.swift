@@ -9,7 +9,8 @@ import ShellXLinkSession
 
 /// ShellX: ShellX Link's list of this Mac's workspaces (`workspace.list`), the phone's control of them
 /// (`workspace.create`, `workspace.rename`, `workspace.close`), and closing an agent's tab (`agent.close`) or any
-/// listed tab (`terminal.close`) in them, PROTOCOL.md sections 4 ("Workspace") and 10.
+/// listed tab (`terminal.close`) in them, PROTOCOL.md sections 4 ("Workspace") and 10, and opening a terminal tab in
+/// them (`terminal.create`, section 11.9).
 ///
 /// * The list is every local workspace of every main window, in sidebar order: window order, then the order
 ///   within the window, numbered from 0 without a gap. SSH, remote tmux and cloud workspaces are not listed
@@ -26,12 +27,14 @@ import ShellXLinkSession
 ///   there): never an SSH or remote one, and never the shell a tab runs once its agent has exited.
 /// * `terminal.close` closes a tab the user picked, whatever runs in it, and only the pair of workspace and terminal
 ///   the list shows: there is no live-agent check.
+/// * `terminal.create` opens a tab in a listed workspace's focused pane without changing the Mac's selection
+///   (`v2MobileTerminalCreate(params:preserveSelection: true)`).
 ///
 /// Titles, tab titles and directories are never logged. All state is main-actor isolated, like the windows it
 /// reads; `onTermination` only schedules the removal on the main actor, so it never waits for anything `yield`
 /// holds.
 @MainActor
-final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentControl, TerminalControl {
+final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentControl, TerminalControl, TerminalCreator {
     typealias Snapshot = @MainActor () -> [LinkWorkspace]
     /// Starts watching what the list shows and calls `onChange` after a change; returns the function that stops.
     typealias ChangeSignal = @MainActor (_ onChange: @escaping @MainActor () -> Void) -> @MainActor () -> Void
@@ -49,6 +52,9 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
         /// Closes that terminal without asking, or its workspace when it is the last tab (`agent.close` and
         /// `terminal.close`).
         var closeSurface: @MainActor @Sendable (_ workspaceId: UUID, _ surfaceId: UUID) -> V2CallResult
+        /// Opens a terminal tab in the workspace's focused pane without changing the Mac's selection
+        /// (`terminal.create`).
+        var createTerminal: @MainActor @Sendable (_ workspaceId: UUID) -> V2CallResult
         /// Whether a configuration profile blocks remote control now.
         var isBlocked: @MainActor @Sendable () -> Bool
 
@@ -72,6 +78,11 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
             // Without asking: the phone confirmed already.
             closeSurface: { workspaceId, surfaceId in
                 TerminalController.shared.v2MobileAgentSurfaceClose(workspaceID: workspaceId, surfaceID: surfaceId)
+            },
+            createTerminal: { workspaceId in
+                TerminalController.shared.v2MobileTerminalCreate(
+                    params: ["workspace_id": workspaceId.uuidString], preserveSelection: true
+                )
             },
             isBlocked: { MobileRemoteControlPolicy.isDisabled }
         )
@@ -228,6 +239,24 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
     /// Whether the list shows `terminal` in `workspace` now; never in an SSH or other remote workspace.
     private func isListed(_ workspace: UUID, terminal: UUID) -> Bool {
         listedWorkspaceID(holding: terminal) == workspace
+    }
+
+    // MARK: - TerminalCreator
+
+    /// Opens a terminal tab in a listed workspace's focused pane (PROTOCOL.md 11.9) without changing the Mac's
+    /// selection. Only a workspace the list holds: any other id, or one that is not a UUID, is not found and the Mac is
+    /// asked nothing. `terminalId` is nil when the Mac's answer names none.
+    func createTerminal(workspaceId: String) async -> (outcome: WorkspaceControlOutcome, terminalId: String?) {
+        guard !control.isBlocked() else { return (.refused, nil) }
+        guard let workspace = UUID(uuidString: workspaceId), isListed(workspaceId) else { return (.notFound, nil) }
+        let result = control.createTerminal(workspace)
+        let outcome = Self.outcome(of: result, action: "create-terminal")
+        guard outcome == .ok else { return (outcome, nil) }
+        refresh()
+        if case let .ok(payload) = result, let payload = payload as? [String: Any] {
+            return (.ok, payload["created_terminal_id"] as? String)
+        }
+        return (.ok, nil)
     }
 
     // MARK: - Titles and outcomes
