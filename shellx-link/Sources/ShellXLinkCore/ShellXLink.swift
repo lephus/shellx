@@ -24,6 +24,10 @@ public enum ShellXLink {
     public static let agentCloseFeature = "agent_close"
     /// The `welcome.features` entry of a host that takes `terminal.close`.
     public static let terminalCloseFeature = "terminal_close"
+    /// The `welcome.features` entry of a host that takes `terminal.view.*` (PROTOCOL.md section 11).
+    public static let terminalViewFeature = "terminal_view"
+    /// The `welcome.features` entry of a host that takes `terminal.create` (PROTOCOL.md section 11).
+    public static let terminalCreateFeature = "terminal_create"
     /// Longest `title` of a `workspace.rename`, in UTF-8 bytes (about 128 Vietnamese characters). The host checks it;
     /// the codec does not.
     public static let maxWorkspaceTitleBytes = 512

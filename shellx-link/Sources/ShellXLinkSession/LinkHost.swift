@@ -19,6 +19,8 @@ public actor LinkHost {
     private nonisolated let workspaceControl: (any WorkspaceControl)?
     private nonisolated let agentControl: (any AgentControl)?
     private nonisolated let terminalControl: (any TerminalControl)?
+    private nonisolated let terminalViews: (any TerminalViewSource)?
+    private nonisolated let terminalCreator: (any TerminalCreator)?
     private nonisolated let hostVersion: String
     private nonisolated let machineName: String
     private nonisolated let timings: LinkTimings
@@ -39,17 +41,24 @@ public actor LinkHost {
     ///     `agent.close` is answered `unsupported`.
     ///   - terminalControl: closing one terminal tab of a listed workspace; with it the host offers the
     ///     `terminal_close` feature, without it `terminal.close` is answered `unsupported`.
+    ///   - terminalViews: the host's terminals as phones view them; with it the host offers the `terminal_view` feature,
+    ///     without it `terminal.view.open` is answered `unsupported` and the other `terminal.view.*` messages are
+    ///     ignored.
+    ///   - terminalCreator: opening a terminal tab in a listed workspace; with it the host offers the
+    ///     `terminal_create` feature, without it `terminal.create` is answered `unsupported`.
     public init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
         workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
         agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
+        terminalViews: (any TerminalViewSource)? = nil, terminalCreator: (any TerminalCreator)? = nil,
         hostVersion: String, machineName: String
     ) {
         self.init(
             key: key, trustedClients: trustedClients, feed: feed, sessions: sessions, chat: chat,
             workspaces: workspaces, workspaceControl: workspaceControl, agentControl: agentControl,
-            terminalControl: terminalControl, hostVersion: hostVersion, machineName: machineName, timings: .standard)
+            terminalControl: terminalControl, terminalViews: terminalViews, terminalCreator: terminalCreator,
+            hostVersion: hostVersion, machineName: machineName, timings: .standard)
     }
 
     init(
@@ -57,6 +66,7 @@ public actor LinkHost {
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)?, chat: (any AgentChatSource)?,
         workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
         agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
+        terminalViews: (any TerminalViewSource)? = nil, terminalCreator: (any TerminalCreator)? = nil,
         hostVersion: String, machineName: String, timings: LinkTimings
     ) {
         self.key = key
@@ -68,6 +78,8 @@ public actor LinkHost {
         self.workspaceControl = workspaceControl
         self.agentControl = agentControl
         self.terminalControl = terminalControl
+        self.terminalViews = terminalViews
+        self.terminalCreator = terminalCreator
         self.hostVersion = hostVersion
         self.machineName = machineName
         self.timings = timings
@@ -163,6 +175,8 @@ public actor LinkHost {
         if workspaceControl != nil { features.append(ShellXLink.workspaceControlFeature) }
         if agentControl != nil { features.append(ShellXLink.agentCloseFeature) }
         if terminalControl != nil { features.append(ShellXLink.terminalCloseFeature) }
+        if terminalViews != nil { features.append(ShellXLink.terminalViewFeature) }
+        if terminalCreator != nil { features.append(ShellXLink.terminalCreateFeature) }
         do {
             try await channel.send(.welcome(
                 protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName,
@@ -228,15 +242,18 @@ public actor LinkHost {
         let workspaceControl = self.workspaceControl
         let agentControl = self.agentControl
         let terminalControl = self.terminalControl
+        let terminalCreator = self.terminalCreator
+        // The terminal view of this session (at most one), ended on every way out of the loop below.
+        let terminalSlot = terminalViews.map { TerminalViewSlot(source: $0, channel: channel) }
         // The uploads of this session: an id means nothing in another one, and they end with this scope.
         var uploads = AttachmentUploads(now: timings.now)
-        while true {
+        established: while true {
             let message: LinkMessage
             do {
                 message = try await channel.receive()
             } catch LinkCodecError.wrongVersion {
                 await Self.sendError(on: channel, "protocol_mismatch", "this host speaks ShellX Link protocol 1")
-                return
+                break established
             } catch let LinkCodecError.badJSON(callId) {
                 await Self.sendError(on: channel, "bad_request", "the frame could not be decoded", callId: callId)
                 continue
@@ -244,7 +261,7 @@ public actor LinkHost {
                 await Self.sendError(on: channel, "bad_request", "the frame could not be decoded")
                 continue
             } catch {
-                return
+                break established
             }
             switch message {
             case let .snapshotGet(callId):
@@ -426,9 +443,59 @@ public actor LinkHost {
                     let outcome = await terminalControl.closeTerminal(workspaceId: workspaceId, terminalId: terminalId)
                     try? await channel.send(.terminalCloseResult(callId: callId, outcome: outcome))
                 }
+            case let .terminalViewOpen(callId, terminalId, cols, rows):
+                guard let terminalSlot else {
+                    await Self.sendError(on: channel, "unsupported", "this host offers no terminal views", callId: callId)
+                    continue
+                }
+                guard cols >= 1, rows >= 1 else {
+                    await Self.sendError(on: channel, "bad_request", "cols and rows must be at least 1", callId: callId)
+                    continue
+                }
+                // Inline, so the messages after this one see the view as it is now.
+                await terminalSlot.open(
+                    callId: callId, terminalId: terminalId,
+                    cols: min(max(cols, ShellXLink.terminalColumns.lowerBound), ShellXLink.terminalColumns.upperBound),
+                    rows: min(max(rows, ShellXLink.terminalRows.lowerBound), ShellXLink.terminalRows.upperBound))
+            case let .terminalViewClose(terminalId):
+                await terminalSlot?.close(terminalId: terminalId)
+            case let .terminalCreate(callId, workspaceId):
+                guard let terminalCreator else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no terminal creation", callId: callId)
+                    continue
+                }
+                // Adding a tab may take a while; keep reading meanwhile.
+                group.addTask {
+                    let created = await terminalCreator.createTerminal(workspaceId: workspaceId)
+                    // The new id goes out only with `ok`.
+                    try? await channel.send(.terminalCreateResult(
+                        callId: callId, outcome: created.outcome, terminalId: created.outcome == .ok ? created.terminalId : nil))
+                }
+            case let .terminalViewInput(terminalId, units):
+                guard let terminalSlot else { continue }
+                do throws(TerminalInputError) {
+                    try TerminalInputCheck.check(units)
+                } catch {
+                    await Self.sendError(on: channel, "bad_request", "invalid terminal input: " + error.reason)
+                    continue
+                }
+                await terminalSlot.input(terminalId: terminalId, units: units)
+            case let .terminalViewResize(terminalId, cols, rows):
+                guard let terminalSlot else { continue }
+                guard cols >= 1, rows >= 1 else {
+                    await Self.sendError(on: channel, "bad_request", "cols and rows must be at least 1")
+                    continue
+                }
+                await terminalSlot.resize(
+                    terminalId: terminalId,
+                    cols: min(max(cols, ShellXLink.terminalColumns.lowerBound), ShellXLink.terminalColumns.upperBound),
+                    rows: min(max(rows, ShellXLink.terminalRows.lowerBound), ShellXLink.terminalRows.upperBound))
+            case let .terminalViewResync(terminalId):
+                await terminalSlot?.resync(terminalId: terminalId)
             case .pong, .unknown, .error:
                 break
-            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged:
+            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged,
+                 .terminalViewEnded, .terminalViewFrame:
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
             case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
@@ -436,10 +503,13 @@ public actor LinkHost {
                  let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
                  let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
                  let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
-                 let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _):
+                 let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _),
+                 let .terminalViewOpenResult(callId, _), let .terminalCreateResult(callId, _, _):
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }
+        // Every way out of the loop above: the terminal goes back to the Mac's size.
+        await terminalSlot?.endSession()
     }
 
     private static func sendError(
