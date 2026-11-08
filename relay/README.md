@@ -44,7 +44,8 @@ stops the relay with one line on stderr and exit status 1.
 | `HOST` | `0.0.0.0` | Listening address (`npm run dev` uses `127.0.0.1`) |
 | `DB_PATH` | `/data/relay.db` | SQLite file; its directory is created if missing |
 | `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade/notification limits off |
-| `FCM_SERVICE_ACCOUNT` | unset | Path of the Firebase service account JSON key (push notifications). Unset, unreadable or invalid → push is off, the relay runs normally, logs `push_disabled` with the reason once, and `POST /v1/notifications` answers 503 `push_unavailable` |
+| `FCM_SERVICE_ACCOUNT` | unset | Path of the Firebase service account JSON key (push through FCM: `POST /v1/notifications`, and the Android phones of `POST /v2/notifications`). Unset, unreadable or invalid → FCM push is off, the relay runs normally, logs `push_disabled` with the reason once, `POST /v1/notifications` answers 503 `push_unavailable` and `POST /v2/notifications` reaches iPhones only (503 when APNs is off too) |
+| `APNS_KEY_PATH`, `APNS_KEY_ID`, `APNS_TEAM_ID` | unset | The APNs provider key (`.p8` file path), its key id and the Apple team id (push to the native iPhone app through `POST /v2/notifications`). Any unset, or a file that is not a key → iPhone push is off, the relay runs normally and logs `apns_disabled` with the reason once; `POST /v2/notifications` then reaches Android phones only (503 `push_unavailable` when FCM is off too) |
 | `ADMIN_HOST` | `admin.shellx.pro` | Host name of the admin dashboard (see "Admin dashboard" below); a value that is not a bare host name stops the relay |
 | `ADMIN_PASSWORD` | unset | The admin dashboard's password. Unset or shorter than 16 characters → admin is off (`admin_disabled` logged once with the reason, never the password) and the relay runs normally |
 | `FCM_ENDPOINT`, `FCM_TOKEN_ENDPOINT` | Google | **Tests only:** base URL of the FCM API and the OAuth token URL, e.g. a fake FCM server. Honoured only for loopback `http(s)://127.0.0.1`/`localhost`/`[::1]` URLs, ignored otherwise |
@@ -211,7 +212,7 @@ Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.
 - **Local test against a fake FCM server:** `npm run fake-fcm-account -- .data/fake-fcm.json`, then
   `FCM_SERVICE_ACCOUNT=.data/fake-fcm.json FCM_ENDPOINT=http://127.0.0.1:8788
   FCM_TOKEN_ENDPOINT=http://127.0.0.1:8788/token npm run dev` (environment variables win over
-  `dev.env`). `packages/shellx_e2e/test/push_e2e_test.dart` runs that fake server on port 8788.
+  `dev.env`). `test/server.test.ts` ("push configuration") runs the relay process against such a fake server for `POST /v1/notifications` and for `POST /v2/notifications` to an Android phone.
 
 ## Admin dashboard
 

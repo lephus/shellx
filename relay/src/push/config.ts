@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
-import { FcmClient, parseServiceAccount, type PushGateway } from "./fcm.js";
+import { FcmClient, parseServiceAccount } from "./fcm.js";
 
 /** Why push is off: no `FCM_SERVICE_ACCOUNT`, the file cannot be read, or it is not a usable key. */
 export type PushDisabledReason = "not_configured" | "unreadable" | "invalid";
 
 export type PushSetup =
-  | { gateway: PushGateway; projectId: string }
+  | { gateway: FcmClient; projectId: string }
   | { gateway: null; reason: PushDisabledReason };
 
 export interface LoadPushOptions {
@@ -34,7 +34,8 @@ export function loopbackUrl(value: string | undefined): string | undefined {
 /**
  * Push configuration (push spec §5): `FCM_SERVICE_ACCOUNT` is the path of the service account JSON
  * key (mounted read-only into the container). Missing, unreadable or invalid → push is off and the
- * relay keeps running; `POST /v1/notifications` then answers 503 `push_unavailable`.
+ * relay keeps running; `POST /v1/notifications` then answers 503 `push_unavailable`, and
+ * `POST /v2/notifications` reaches iPhones only.
  */
 export function loadPush(env: Readonly<Record<string, string | undefined>>, options: LoadPushOptions = {}): PushSetup {
   const path = env.FCM_SERVICE_ACCOUNT?.trim();
