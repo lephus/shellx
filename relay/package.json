@@ -21,6 +21,7 @@
     "@node-rs/argon2": "2.2.1",
     "better-sqlite3": "13.0.3",
     "hono": "^4.13.9",
+    "jose": "6.2.13",
     "ws": "8.22.0"
   },
   "devDependencies": {
