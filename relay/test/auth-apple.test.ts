@@ -56,7 +56,11 @@ describe("POST /v1/auth/apple", () => {
     await linkAppleIdByQr(app, owner.token, machine.machine_id, { sub: "a-2" });
     expect(db().get("SELECT apple_refresh_token FROM identities WHERE subject = 'a-2'")).toEqual({ apple_refresh_token: null });
     tokens.refreshToken = "apple-refresh-token-2";
-    expect((await signInApple(app, { sub: "a-2" })).status).toBe(200);
+    const direct = await signInApple(app, { sub: "a-2" });
+    expect(direct.status).toBe(200);
+    const session = await direct.json<{ user_id: string; token: string }>();
+    expect(session.user_id).toBe(owner.userId);
+    expect(db().get("SELECT auth_method FROM tokens WHERE token_hash = ?", await hashToken(session.token))).toEqual({ auth_method: "apple" });
     expect(db().get("SELECT apple_refresh_token, apple_client_id FROM identities WHERE subject = 'a-2'")).toEqual({ apple_refresh_token: "apple-refresh-token-2", apple_client_id: "com.shellx.dev" });
     expect((await signInApple(app, { sub: "a-2" })).status).toBe(200);
     expect(tokens.exchanges).toHaveLength(2);

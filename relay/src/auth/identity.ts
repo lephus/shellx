@@ -18,6 +18,7 @@ export type AccountMatch =
  * S1 §6.3 steps 1 and 2: an identity with this (provider, subject) wins; else the account holding this
  * email: with `passwordLogin` on and a password still set, the user must switch from a signed-in device
  * (`switch_required`); otherwise the email links (`hasPrimary`: it already has a Google sign-in).
+ * Only the Google route links on `email`; the Apple route signs in on `identity` alone (S1 §6.3 step 4).
  */
 export function matchAccount(db: Db, token: VerifiedIdToken, passwordLogin: boolean): AccountMatch {
   const identity = db.get<{ id: string; user_id: string }>(
