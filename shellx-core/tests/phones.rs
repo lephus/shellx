@@ -34,7 +34,7 @@ fn phones_pending_lists_target_requests() {
     assert!(items[0]["proof_b64"].as_str().is_some_and(|p| !p.is_empty()));
     assert!(items[0]["created_at_unix"].as_u64().unwrap() > 0);
     let get = requests_to(&fake, "/v2/phone-pairings").into_iter().find(|r| r.method == "GET").unwrap();
-    assert_eq!(get.query, "role=target");
+    assert_eq!(get.query, "role=target&apple_links=1");
 }
 
 #[test]
@@ -129,4 +129,40 @@ fn phones_ids_must_be_path_safe_and_never_reach_the_server() {
     assert_eq!(core.call("phones.approve", json!({})).unwrap_err().code, "invalid_params");
     assert!(requests_to(&fake, "/v2/phone-grants").is_empty());
     assert!(requests_to(&fake, "/v2/phone-pairings").is_empty());
+}
+
+#[test]
+fn phones_pending_passes_links_apple_id() {
+    let (core, fake, _dir, machine) = registered();
+    let apple = fake.add_apple_link_phone_pairing(&machine, "Apple phone", KEY);
+    let plain = fake.add_phone_pairing(&machine, "Plain phone", "ios", [8u8; 32]);
+    let out = core.call("phones.pending", json!({})).unwrap();
+    let items = out["pairings"].as_array().unwrap();
+    let find = |id: &str| items.iter().find(|i| i["pairing_id"] == id).unwrap();
+    assert_eq!(find(&apple)["links_apple_id"], true);
+    assert_eq!(find(&plain)["links_apple_id"], false);
+    let get = requests_to(&fake, "/v2/phone-pairings").into_iter().find(|r| r.method == "GET").unwrap();
+    assert_eq!(get.query, "role=target&apple_links=1");
+}
+
+#[test]
+fn fake_api_hides_apple_links_without_the_parameter() {
+    let (core, fake, _dir, machine) = registered();
+    let apple = fake.add_apple_link_phone_pairing(&machine, "Apple phone", KEY);
+    let plain = fake.add_phone_pairing(&machine, "Plain phone", "ios", [8u8; 32]);
+    let token = fake.issued_token();
+    let addr = fake.base_url.strip_prefix("http://").unwrap().to_string();
+    let get = |path: &str| -> String {
+        use std::io::{Read, Write};
+        let mut s = std::net::TcpStream::connect(&addr).unwrap();
+        write!(s, "GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\nAuthorization: Bearer {token}\r\n\r\n").unwrap();
+        let mut r = String::new();
+        s.read_to_string(&mut r).unwrap();
+        r
+    };
+    let without = get("/v2/phone-pairings?role=target");
+    assert!(without.contains(&plain) && !without.contains(&apple));
+    let with = get("/v2/phone-pairings?role=target&apple_links=1");
+    assert!(with.contains(&plain) && with.contains(&apple));
+    let _ = core;
 }
