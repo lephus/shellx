@@ -64,6 +64,5 @@ final class ReleaseCheckTests: XCTestCase {
             XCTAssertTrue(result.output.contains("contains Debug-only code: \(name)"), result.output)
         }
     }
-    ```
 }
 #endif
