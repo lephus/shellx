@@ -495,4 +495,62 @@ mod tests {
         );
         assert_eq!(CoreErr::new("a", "b").to_string(), "a: b");
     }
+
+    #[test]
+    fn google_calls_send_their_params_and_parse() {
+        let f = FakeCore::new();
+        f.on("auth.google.begin", Ok(json!({"flow_id":"f1","auth_url":"https://accounts.google.com/x"})));
+        f.on(
+            "auth.google.finish",
+            Ok(json!({"user_id":"u","device_id":"d","device_public_key_b64":"AAA","fingerprint":"ff",
+                      "email":"g@x","auth_method":"google"})),
+        );
+        f.on("auth.google.cancel", Ok(json!({})));
+        f.on(
+            "auth.session",
+            Ok(json!({"user_id":"u","device_id":"d","email":null,"auth_method":"password"})),
+        );
+        f.on(
+            "account.identities.list",
+            Ok(json!({"identities":[
+                {"identity_id":"a1","provider":"apple","email":"x@privaterelay.appleid.com","is_private_email":true,
+                 "linked_via_device_name":"Phu's iPhone","created_at_unix":5},
+                {"identity_id":"g1","provider":"google","email":"g@x"}]})),
+        );
+        f.on("account.identities.remove", Ok(json!({})));
+        let b = google_begin(&f, GooglePurpose::Link).unwrap();
+        assert_eq!((b.flow_id.as_str(), b.auth_url.as_str()), ("f1", "https://accounts.google.com/x"));
+        let done = google_finish(&f, "f1").unwrap();
+        assert_eq!((done.email.as_str(), done.auth_method.as_str()), ("g@x", "google"));
+        google_cancel(&f, "f1").unwrap();
+        let s = session_info(&f).unwrap();
+        assert_eq!((s.email, s.auth_method.as_str()), (None, "password"));
+        let methods = list_sign_in_methods(&f).unwrap();
+        assert!(methods[0].is_apple() && methods[0].is_private_email);
+        assert_eq!(methods[0].linked_via_device_name.as_deref(), Some("Phu's iPhone"));
+        assert!(!methods[1].is_apple() && methods[1].linked_via_device_name.is_none());
+        remove_sign_in_method(&f, "a1").unwrap();
+        let calls = f.calls();
+        assert_eq!(calls[0], ("auth.google.begin".into(), json!({"purpose":"link"})));
+        assert_eq!(calls[1], ("auth.google.finish".into(), json!({"flow_id":"f1"})));
+        assert_eq!(calls[2], ("auth.google.cancel".into(), json!({"flow_id":"f1"})));
+        assert_eq!(calls[5], ("account.identities.remove".into(), json!({"identity_id":"a1"})));
+    }
+
+    #[test]
+    fn google_values_hide_urls_and_emails_in_debug() {
+        let b = GoogleBegin { flow_id: "f1".into(), auth_url: "https://x/?state=S".into() };
+        assert!(!format!("{b:?}").contains("state=S"));
+        let g = GoogleSignIn {
+            user_id: "u".into(),
+            device_id: "d".into(),
+            device_public_key_b64: "k".into(),
+            fingerprint: "ff".into(),
+            email: "g@x".into(),
+            auth_method: "google".into(),
+        };
+        assert!(!format!("{g:?}").contains("g@x"));
+        let s = SessionInfo { user_id: "u".into(), device_id: "d".into(), email: Some("g@x".into()), auth_method: "google".into() };
+        assert!(!format!("{s:?}").contains("g@x"));
+    }
 }

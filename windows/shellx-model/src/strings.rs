@@ -528,7 +528,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 89);
+        assert_eq!(Str::ALL.len(), 109);
     }
 
     #[test]
@@ -623,6 +623,97 @@ mod tests {
         );
         assert_eq!(t(Lang::Vi, Str::Cancel), "Hủy");
         assert_eq!(t(Lang::En, Str::Cancel), "Cancel");
+        let pairs = [
+            (Str::ContinueWithGoogle, "Tiếp tục với Google", "Continue with Google"),
+            (Str::WaitingForGoogle, "Đang chờ Google…", "Waiting for Google…"),
+            (
+                Str::BrowserHint,
+                "Hãy hoàn tất đăng nhập trong trình duyệt rồi quay lại đây.",
+                "Finish signing in in your browser, then come back here.",
+            ),
+            (Str::SwitchToGoogle, "Chuyển sang đăng nhập Google", "Switch to Google sign-in"),
+            (
+                Str::SwitchToGoogleIntro,
+                "ShellX giờ đăng nhập bằng Google. Chuyển sang Google vẫn giữ máy tính này, điện thoại và các liên kết chia sẻ của bạn.",
+                "ShellX now signs in with Google. Switching keeps this computer, your phones and your share links.",
+            ),
+            (Str::SwitchEllipsis, "Chuyển…", "Switch…"),
+            (
+                Str::GoogleFailed,
+                "Đăng nhập Google không thành công. Hãy thử lại.",
+                "Google sign-in didn't work. Try again.",
+            ),
+            (
+                Str::GoogleTimedOut,
+                "Đăng nhập Google đã hết thời gian chờ. Hãy thử lại.",
+                "Google sign-in timed out. Try again.",
+            ),
+            (
+                Str::GoogleStateMismatch,
+                "Đăng nhập chưa hoàn tất. Hãy thử lại.",
+                "Sign-in didn't finish. Try again.",
+            ),
+            (
+                Str::SwitchFromSignedInDevice,
+                "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài khoản › Chuyển sang đăng nhập Google, rồi thử lại.",
+                "This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again.",
+            ),
+            (
+                Str::EmailInUse,
+                "Email của tài khoản Google này đã thuộc một tài khoản ShellX khác. Hãy chọn tài khoản Google khác.",
+                "Another ShellX account already uses this Google account's email. Choose a different Google account.",
+            ),
+            (
+                Str::IdentityInUse,
+                "Tài khoản Google này đã dùng để đăng nhập một tài khoản ShellX khác, hoặc tài khoản này đã dùng một tài khoản Google khác.",
+                "This Google account already signs in to another ShellX account, or this account already uses another Google account.",
+            ),
+            (Str::BrowserUnavailable, "Không mở được trình duyệt.", "Couldn't open your browser."),
+            (
+                Str::RelayUnreachable,
+                "Không kết nối được relay.shellx.pro",
+                "Can't reach relay.shellx.pro",
+            ),
+            (Str::SignInMethods, "Cách đăng nhập", "Sign-in methods"),
+            (Str::GoogleAccount, "Tài khoản Google", "Google account"),
+            (Str::AppleId, "ID Apple", "Apple ID"),
+            (Str::HiddenEmail, "Email ẩn", "Hidden email"),
+            (Str::RemoveMethod, "Gỡ", "Remove"),
+            (Str::DeleteAccount, "Xóa tài khoản…", "Delete Account…"),
+        ];
+        assert_eq!(pairs.len(), 20);
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(added_from(Lang::Vi, "Phu's iPhone"), "Thêm từ Phu's iPhone");
+        assert_eq!(added_from(Lang::En, "Phu's iPhone"), "Added from Phu's iPhone");
+        assert_eq!(
+            sign_in_methods_error(Lang::En, "network"),
+            "Sign-in methods: something went wrong (network)"
+        );
+        assert_eq!(
+            sign_in_methods_error(Lang::Vi, "network"),
+            "Cách đăng nhập: có lỗi xảy ra (network)"
+        );
+    }
+
+    #[test]
+    fn google_error_maps_codes() {
+        for lang in [Lang::Vi, Lang::En] {
+            assert_eq!(google_error(lang, "google_cancelled"), None);
+            assert_eq!(
+                google_error(lang, "switch_from_signed_in_device").as_deref(),
+                Some(t(lang, Str::SwitchFromSignedInDevice))
+            );
+            assert_eq!(google_error(lang, "network").as_deref(), Some(t(lang, Str::RelayUnreachable)));
+            assert_eq!(google_error(lang, "google_timeout").as_deref(), Some(t(lang, Str::GoogleTimedOut)));
+            assert_eq!(google_error(lang, "rate_limited"), Some(login_failed(lang, "rate_limited")));
+            assert_eq!(
+                t(lang, Str::FontCredits),
+                "JetBrains Mono, Space Grotesk, Google Sans — SIL OFL 1.1"
+            );
+        }
     }
 
     #[test]
