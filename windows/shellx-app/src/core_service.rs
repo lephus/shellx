@@ -187,6 +187,7 @@ mod tests {
     /// Feeds `ev`, runs every returned call (in order, like the UI's serial
     /// worker), and feeds the results back until no call is left. Returns
     /// the methods' actions in the order they ran and the scheduled ticks.
+    /// `OpenBrowser(url)` opens a loopback URL in the fake browser (a thread), like the window opens the real one.
     fn drive(
         flow: &mut AccountFlow,
         core: &dyn CoreCall,
@@ -202,6 +203,10 @@ mod tests {
                 continue;
             }
             ran.push(format!("{action:?}"));
+            if let AccountAction::OpenBrowser(url) = &action {
+                let url = url.clone();
+                std::thread::spawn(move || shellx_fake_api::browse(&url));
+            }
             if let Some(result) = run_account_action(core, &facts(), action) {
                 queue.extend(flow.on(result, now));
             }
@@ -359,7 +364,8 @@ mod tests {
                 "CallLogin { email: \"a@b.c\", password: \"<redacted>\" }",
                 "CallList",
                 "CallRegister",
-                "CallList"
+                "CallList",
+                "CallSession"
             ]
         );
         let AccountState::LoggedIn { machine_id } = flow.state().clone() else {
@@ -408,5 +414,64 @@ mod tests {
         let down = FakeCore::new();
         down.on("version.check", Err(CoreErr::new("network", "down")));
         assert_eq!(run_version_check(&down), UpdateStatus::Unknown);
+    }
+
+    #[test]
+    fn take_once_is_true_only_the_first_time() {
+        let tmp = tempfile::tempdir().unwrap();
+        let marker = tmp.path().join(GOOGLE_SWITCH_MARKER);
+        assert!(take_once(&marker));
+        assert!(!take_once(&marker));
+    }
+
+    /// `config.set` with the fake API's Google overrides, like the plan's dev config.
+    struct FakeGoogleCore {
+        inner: crate::core_bridge::CoreBridge,
+        base: String,
+    }
+
+    impl CoreCall for FakeGoogleCore {
+        fn call(&self, method: &str, mut params: serde_json::Value) -> Result<serde_json::Value, CoreErr> {
+            if method == "config.set" {
+                params["google_auth_url"] = json!(format!("{}/fake-google/auth", self.base));
+                params["google_token_url"] = json!(format!("{}/fake-google/token", self.base));
+                params["google_client_id"] = json!("fake-desktop-client");
+                params["google_client_secret"] = json!("fake-desktop-secret");
+            }
+            self.inner.call(method, params)
+        }
+    }
+
+    /// Google sign-in through the real shellx-core against the fake API and fake Google.
+    #[test]
+    fn google_session_against_fake_api() {
+        use shellx_model::core_api::GooglePurpose;
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("core");
+        let base = api.base_url.clone();
+        let wrapped = FakeGoogleCore { inner: crate::core_bridge::CoreBridge::new(), base: base.clone() };
+        let core = ConfiguredCore::new(Box::new(wrapped), move || Ok(cfg(&base, &dir)));
+        let mut flow = AccountFlow::new();
+        drive(&mut flow, &core, AccountEvent::Started, 0);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+
+        let (ran, _) = drive(&mut flow, &core, AccountEvent::GoogleRequested(GooglePurpose::SignIn), 1);
+        assert_eq!(ran.len(), 6, "{ran:?}");
+        assert_eq!(ran[0], "CallGoogleBegin(SignIn)");
+        assert_eq!(ran[1], "OpenBrowser(\"<auth url>\")");
+        assert!(ran[2].starts_with("CallGoogleFinish("), "{ran:?}");
+        assert_eq!(ran[3..], ["CallList", "CallRegister", "CallList"]);
+        assert!(matches!(flow.state(), AccountState::LoggedIn { .. }), "{:?}", flow.state());
+        assert_eq!(flow.email(), Some("google-user@shellx.test"));
+        assert_eq!(flow.auth_method(), Some("google"));
+        assert!(!flow.needs_google_switch());
+
+        let (ran, _) = drive(&mut flow, &core, AccountEvent::SignInMethodsRequested, 2);
+        assert_eq!(ran, ["CallListSignInMethods"]);
+        let methods = flow.sign_in_methods().unwrap();
+        assert_eq!(methods.len(), 1);
+        assert_eq!(methods[0].provider, "google");
+        api.stop();
     }
 }

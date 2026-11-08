@@ -150,6 +150,15 @@ mod tests {
     }
 
     #[test]
+    fn the_google_mark_follows_the_build() {
+        assert_eq!(google_mark().is_some(), cfg!(shellx_google_mark));
+        assert_eq!(by_path(GOOGLE_MARK_PATH), google_mark());
+        if let Some(png) = google_mark() {
+            assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+        }
+    }
+
+    #[test]
     fn paths_are_unique_and_listed() {
         let mut paths: Vec<&str> = Icon::ALL.iter().map(|i| i.path()).collect();
         paths.sort_unstable();

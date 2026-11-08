@@ -357,7 +357,10 @@ pub fn run() -> Result<()> {
         "default background is not TERM_BG"
     );
     let embedded = fonts::embedded();
-    ensure!(embedded.len() == 5, "expected 5 embedded fonts");
+    ensure!(
+        embedded.len() == 5 + usize::from(fonts::has_google_sans()),
+        "expected 5 embedded fonts (6 with Google Sans)"
+    );
     ensure!(
         embedded.iter().all(|f| fonts::has_font_magic(f)),
         "an embedded font lacks a TrueType/OpenType header"

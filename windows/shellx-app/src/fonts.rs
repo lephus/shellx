@@ -25,9 +25,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn five_embedded_fonts_are_truetype() {
+    fn embedded_fonts_are_truetype_and_google_sans_follows_the_build() {
         let fonts = embedded();
-        assert_eq!(fonts.len(), 5);
+        assert_eq!(fonts.len(), 5 + usize::from(has_google_sans()));
+        assert_eq!(has_google_sans(), cfg!(shellx_google_sans));
         assert!(fonts.iter().all(|f| has_font_magic(f)));
     }
 }
