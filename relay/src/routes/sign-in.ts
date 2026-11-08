@@ -134,8 +134,10 @@ signInRoutes.post("/google/link", requireAuth, jsonBodyLimit, async (c) => {
 
 /**
  * POST /v1/auth/apple {identity_token, authorization_code, nonce, device} — sign in with Apple on an
- * iPhone. An Apple ID that matches an account signs in; one that matches none (or only an account that
- * still has a password) gets 202 `link_required` with a link token, to be approved on a Mac (S1 §6.4).
+ * iPhone. An Apple ID already linked to an account signs in; any other gets 202 `link_required` with a
+ * link token, to be approved on a Mac (S1 §6.4). Apple never links by email, even to an account without
+ * a password (decision 2026-11-08): verifying an inbox once, for example a recycled work address, must
+ * not open an account that reaches a Mac's terminals. The Google route refuses that case too.
  */
 signInRoutes.post("/apple", jsonBodyLimit, async (c) => {
   if (!(await c.get("limiters").loginIp.limit(requestIp(c)))) throw Errors.rateLimited();
@@ -154,8 +156,9 @@ signInRoutes.post("/apple", jsonBodyLimit, async (c) => {
   }
   const code = typeof body.authorization_code === "string" && body.authorization_code !== "" ? body.authorization_code : null;
   const passwordLogin = c.get("config").passwordLogin;
-  // `switch_required` is treated like `none`: the QR link proves ownership through the Mac's Allow and
-  // attaches the Apple ID to the Mac's account, never to the email-matched one (decision 2026-11-07).
+  // Only `identity` signs in. `email`, `switch_required` and `none` all take the QR link, which proves
+  // ownership through the Mac's Allow and attaches the Apple ID to the Mac's account, never to the
+  // email-matched one (decisions 2026-11-07 and 2026-11-08).
   const pre = matchAccount(db, verified, passwordLogin);
 
   const gateway = c.get("appleTokens");
@@ -172,7 +175,7 @@ signInRoutes.post("/apple", jsonBodyLimit, async (c) => {
   }
 
   purgeAppleLinks(db, now);
-  if (pre.kind === "none" || pre.kind === "switch_required") {
+  if (pre.kind !== "identity") {
     const linkToken = await createAppleLink(db, {
       subject: verified.subject, email: verified.email, isPrivateEmail: verified.isPrivateEmail, appleClientId: verified.audience,
       appleRefreshToken: refresh, deviceName: device.name, devicePublicKey: device.publicKey,
@@ -183,31 +186,20 @@ signInRoutes.post("/apple", jsonBodyLimit, async (c) => {
 
   const token = generateToken();
   const tokenHash = await hashToken(token);
-  let dropped = 0;
-  let via: "identity" | "email" = "identity";
   const result = db.transaction(() => {
+    // The identity may have been removed during the awaits above; it is never replaced by an email match.
     const match = matchAccount(db, verified, passwordLogin);
-    if (match.kind === "switch_required" || match.kind === "none") throw Errors.invalidCredentials();
-    let identityId: string;
-    if (match.kind === "identity") {
-      identityId = match.identityId;
-      db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", now, identityId);
-      if (refresh !== null) {
-        db.run("UPDATE identities SET apple_refresh_token = ?, apple_client_id = ? WHERE id = ?", refresh, verified.audience, identityId);
-      }
-    } else {
-      dropped = dropPasswordAccess(db, match.userId);
-      identityId = insertIdentity(db, match.userId, {
-        ...identityFromToken(verified), appleRefreshToken: refresh, appleClientId: refresh === null ? null : verified.audience,
-      }, now);
-      via = "email";
+    if (match.kind !== "identity") throw Errors.invalidCredentials();
+    const identityId = match.identityId;
+    db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", now, identityId);
+    if (refresh !== null) {
+      db.run("UPDATE identities SET apple_refresh_token = ?, apple_client_id = ? WHERE id = ?", refresh, verified.audience, identityId);
     }
     const deviceId = signInDevice(db, match.userId, device, tokenHash, "apple", identityId, now);
     return { userId: match.userId, deviceId, email: accountEmail(db, match.userId) };
   });
 
   recordAppVersion(db, result.deviceId, c.req.header(CLIENT_VERSION_HEADER));
-  logMeta("sign_in", { device_id: result.deviceId, provider: "apple", via });
-  if (dropped > 0) logMeta("password_access_dropped", { sessions: dropped });
+  logMeta("sign_in", { device_id: result.deviceId, provider: "apple", via: "identity" });
   return c.json({ user_id: result.userId, device_id: result.deviceId, token, email: result.email });
 });

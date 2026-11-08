@@ -275,7 +275,9 @@ email says now. Otherwise the account with the same email (`trim` + lower case) 
 the password off (or never set) the Google account is linked, the password is removed and the
 account's password sessions are signed out. An account has one Google sign-in: a new Google account
 with the email of one that already has another is refused (401), never linked. No match creates a
-passwordless account.
+passwordless account. Apple never links or creates by email: an Apple ID with no identity yet gets 202
+`link_required` whatever account its email matches, and a Mac's Allow attaches it to the Mac's account
+(S1 §6.4).
 
 **Switch in place** (`google/link`): a signed-in device adds Google to its account; the account's email
 becomes Google's, the password and the other devices stay, and only this device gets a `google` token.
