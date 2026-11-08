@@ -6,7 +6,7 @@ import ShellXLinkSession
 
 struct Arguments {
     /// Options that take no value.
-    static let flags: Set<String> = ["password-stdin", "hard", "recheck"]
+    static let flags: Set<String> = ["password-stdin", "hard", "recheck", "dry-run"]
 
     var positional: [String] = []
     private var options: [String: [String]] = [:]
