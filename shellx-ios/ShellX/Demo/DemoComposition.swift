@@ -37,6 +37,8 @@ enum DemoComposition {
         let history = ConversationStore(directory: historyDirectory)
         let coordinator = AppCoordinator(
             vault: vault, relay: relay, deviceName: "iPhone", wipers: [history],
+            // Its own defaults: the real app's "local wipe pending" marker is not the demo's to retry or clear.
+            pendingWipeDefaults: defaults,
             makeHub: {
                 let hub = MachineHub(
                     vault: vault, relay: relay, connector: connector, latency: latency, defaults: defaults,
