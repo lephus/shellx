@@ -181,7 +181,7 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
     func closeAgent(sessionId: String) async -> WorkspaceControlOutcome {
         guard !control.isBlocked() else { return .refused }
         guard let surface = control.agentSurface(sessionId),
-              let workspace = listedWorkspace(holding: surface) else { return .notFound }
+              let workspace = listedWorkspaceID(holding: surface) else { return .notFound }
         return closeListed(surface, in: workspace, action: "close-agent")
     }
 
@@ -197,7 +197,7 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
     /// The listed workspace whose terminals include `terminal`, wherever the tab has moved since its shell started,
     /// as `workspace.list` and `agent.sessions` show it; nil when no listed workspace has it (an SSH or other remote
     /// workspace, or a tab that is gone).
-    private func listedWorkspace(holding terminal: UUID) -> UUID? {
+    func listedWorkspaceID(holding terminal: UUID) -> UUID? {
         refresh()
         let terminalId = terminal.uuidString
         return published?
@@ -227,7 +227,7 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl, AgentC
 
     /// Whether the list shows `terminal` in `workspace` now; never in an SSH or other remote workspace.
     private func isListed(_ workspace: UUID, terminal: UUID) -> Bool {
-        listedWorkspace(holding: terminal) == workspace
+        listedWorkspaceID(holding: terminal) == workspace
     }
 
     // MARK: - Titles and outcomes

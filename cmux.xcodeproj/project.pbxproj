@@ -3420,9 +3420,12 @@
 		B72A6BB2702EFBE82606593C /* ShellXLinkTerminalCreateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26E568B65909E3B282F5B0A2 /* ShellXLinkTerminalCreateTests.swift */; };
 		AEBFC8BDC52207552478A524 /* ShellXLinkTerminalSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F672858E7AF401175C10BB1B /* ShellXLinkTerminalSessionTests.swift */; };
 		524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */; };
+		E1AF1CADF71D5D3FA11344FF /* ShellXLinkTerminalView+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */; };
 		2D3310D1326CB0E8DAA04227 /* ShellXLinkTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */; };
 		4A35B4DAAD9E15FD6411887C /* ShellXLinkTerminalViewFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */; };
 		1F7A85ED3876DAEE4D105874 /* ShellXLinkTerminalViewInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */; };
+		D12AB02961BBC2909971FE5E /* ShellXLinkTerminalViewSource+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */; };
+		BAA29CB2EA6E3A1A96D4A190 /* ShellXLinkTerminalViewSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */; };
 		A53BA0174A3AAA5D6A2D4BCC /* ShellXLinkTerminalViewSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723E1A8FA3865D682187CBA3 /* ShellXLinkTerminalViewSourceTests.swift */; };
 		786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */; };
 		83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */; };
@@ -8111,9 +8114,12 @@
 		26E568B65909E3B282F5B0A2 /* ShellXLinkTerminalCreateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalCreateTests.swift"; sourceTree = "<group>"; };
 		F672858E7AF401175C10BB1B /* ShellXLinkTerminalSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalSessionTests.swift"; sourceTree = "<group>"; };
 		395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalTestSupport.swift"; sourceTree = "<group>"; };
+		F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/ShellXLinkTerminalView+Live.swift"; sourceTree = "<group>"; };
 		552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkTerminalView.swift; sourceTree = "<group>"; };
 		F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewFrameTests.swift"; sourceTree = "<group>"; };
 		2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewInputTests.swift"; sourceTree = "<group>"; };
+		A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/ShellXLinkTerminalViewSource+Live.swift"; sourceTree = "<group>"; };
+		E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkTerminalViewSource.swift; sourceTree = "<group>"; };
 		723E1A8FA3865D682187CBA3 /* ShellXLinkTerminalViewSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewSourceTests.swift"; sourceTree = "<group>"; };
 		8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkWorkspaceSource.swift; sourceTree = "<group>"; };
 		0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkWorkspaceSourceTests.swift"; sourceTree = "<group>"; };
@@ -12748,6 +12754,9 @@
 				40371AAA99F3276010FAD7E1 /* ShellXLinkFramePacing.swift */,
 				552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */,
 				E9E07D9FF4B34827E56A308A /* ShellXLinkKeyChord.swift */,
+				E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */,
+				A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */,
+				F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -17067,7 +17076,10 @@
 				4F01552EA2EEE386C3CD1C23 /* ShellXLinkKeyStore.swift in Sources */,
 				A7C3D91E5B2F48A6908E1D01 /* ShellXLinkSecretStorage.swift in Sources */,
 				D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */,
+				E1AF1CADF71D5D3FA11344FF /* ShellXLinkTerminalView+Live.swift in Sources */,
 				2D3310D1326CB0E8DAA04227 /* ShellXLinkTerminalView.swift in Sources */,
+				D12AB02961BBC2909971FE5E /* ShellXLinkTerminalViewSource+Live.swift in Sources */,
+				BAA29CB2EA6E3A1A96D4A190 /* ShellXLinkTerminalViewSource.swift in Sources */,
 				786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */,
 				067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */,
 				94FD51A057547AB301A0EEA5 /* ShellXPhonePairingCoordinator.swift in Sources */,
