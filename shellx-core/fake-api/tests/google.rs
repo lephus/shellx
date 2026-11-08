@@ -38,8 +38,6 @@ fn challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
 }
 
-const REDIRECT: &str = "http://127.0.0.1:9/oauth2/callback";
-
 fn auth_path(challenge: &str, state: &str, nonce: &str) -> String {
     format!(
         "/fake-google/auth?client_id=fake-desktop-client&redirect_uri=http%3A%2F%2F127.0.0.1%3A9%2Foauth2%2Fcallback&response_type=code&scope=openid%20email%20profile&state={state}&nonce={nonce}&code_challenge={challenge}&code_challenge_method=S256&prompt=select_account"
