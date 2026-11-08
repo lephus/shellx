@@ -3401,6 +3401,7 @@
 		5E11A10000000000000000C1 /* ShellXLinkCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A1 /* ShellXLinkCore */; };
 		7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */; };
 		2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */; };
+		528E3F48C5F1339CB8436D74 /* ShellXLinkGridConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */; };
 		1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */; };
 		593001A30A7C992F6A0507BA /* ShellXLinkHostPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */; };
 		4F01552EA2EEE386C3CD1C23 /* ShellXLinkKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B03FC23876B84852EF3F72 /* ShellXLinkKeyStore.swift */; };
@@ -3411,6 +3412,7 @@
 		5E11A10000000000000000C3 /* ShellXLinkSession in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A3 /* ShellXLinkSession */; };
 		D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */; };
 		5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */; };
+		524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */; };
 		786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */; };
 		83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */; };
 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
@@ -8081,6 +8083,7 @@
 		717290D6E8F1BA131C1A049C /* ShellXLinkChatSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkChatSourceTests.swift"; sourceTree = "<group>"; };
 		213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkFeedSource.swift; sourceTree = "<group>"; };
 		8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkFeedSourceTests.swift"; sourceTree = "<group>"; };
+		7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkGridConverterTests.swift"; sourceTree = "<group>"; };
 		FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkHostController.swift; sourceTree = "<group>"; };
 		DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkHostPolicyTests.swift"; sourceTree = "<group>"; };
 		C1B03FC23876B84852EF3F72 /* ShellXLinkKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkKeyStore.swift; sourceTree = "<group>"; };
@@ -8088,6 +8091,7 @@
 		A7C3D91E5B2F48A6908E1D02 /* ShellXLinkSecretStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSecretStorage.swift; sourceTree = "<group>"; };
 		0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSessionSource.swift; sourceTree = "<group>"; };
 		5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkSessionSourceTests.swift"; sourceTree = "<group>"; };
+		395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalTestSupport.swift"; sourceTree = "<group>"; };
 		8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkWorkspaceSource.swift; sourceTree = "<group>"; };
 		0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkWorkspaceSourceTests.swift"; sourceTree = "<group>"; };
 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
@@ -14335,6 +14339,8 @@
 				884A8E5586F9A760EF0CA377 /* ShellXRoutineRunLauncherTests.swift */,
 				B4686D5E954A2598CCA6CB56 /* ShellXAutomationsWebHostTests.swift */,
 				5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */,
+				7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */,
+				395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19407,9 +19413,11 @@
 				E42EC94C29109FA8A189FE34 /* ShellXCoreFFITests.swift in Sources */,
 				D5E55992758670FA515A098C /* ShellXLinkChatSourceTests.swift in Sources */,
 				2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */,
+				528E3F48C5F1339CB8436D74 /* ShellXLinkGridConverterTests.swift in Sources */,
 				593001A30A7C992F6A0507BA /* ShellXLinkHostPolicyTests.swift in Sources */,
 				8228ADD7A74BFCB3F916A6A0 /* ShellXLinkKeyStoreTests.swift in Sources */,
 				5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */,
+				524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */,
 				83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */,
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
