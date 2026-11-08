@@ -76,4 +76,19 @@ final class TerminalViewLiveTests: XCTestCase {
         }
         XCTAssertTrue(failed, "one retry after 1 s, then Try Again")
     }
+
+    func testTypingEchoesThroughAFakeMac() async throws {
+        let mac = await makeMac()
+        let rig = try await HubRig.make([mac], in: self)
+        let up = await rig.online(sessions: 0); XCTAssertTrue(up)
+        let model = makeModel(mac, rig)
+        model.setPhoneGrid(cols: 30, rows: 6); model.show("t1")
+        let shown = await eventually { model.phase == .live && model.screen.screenText().first == "$" }
+        XCTAssertTrue(shown)
+        model.insertText("ls"); model.press(.enter)
+        let echoed = await eventually { Array(model.screen.screenText().prefix(2)) == ["$ ls", "$"] }
+        XCTAssertTrue(echoed, "\(model.screen.screenText())")
+        let inputs = await mac.terminalViewInputs("t1")
+        XCTAssertEqual(inputs, [[.text("ls")], [.key(.enter, mods: [])]])
+    }
 }
