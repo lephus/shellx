@@ -247,3 +247,24 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: file.path))
     #expect(calls == 1)
 }
+
+@MainActor @Test func cancelBeforeBeginAnswersEndsTheFlowWithoutOpeningTheBrowser() async {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let opened = Opened()
+    let account = googleAccount(rig, opened)
+    rig.core.holdNext.with { $0 = "auth.google.begin" }
+    let first = Task { await errorCode { _ = try await account.signInWithGoogle(purpose: .signIn) } }
+    #expect(await until { rig.core.isHoldingCall })
+    #expect(account.googleStep == .waiting(.signIn))
+    // A second click while begin is still in flight is refused.
+    let second = await errorCode { _ = try await account.signInWithGoogle(purpose: .signIn) }
+    #expect(second == "google_in_progress")
+    await account.cancelGoogleSignIn()
+    rig.core.releaseHeldCall()
+    #expect(await first.value == "google_cancelled")
+    #expect(opened.urls.isEmpty)
+    #expect(rig.core.lastParams("auth.google.cancel") == ["flow_id": .string("flow-1")])
+    #expect(rig.core.count("auth.google.finish") == 0)
+    #expect(account.googleStep == .idle)
+    #expect(account.identity == nil)
+}
