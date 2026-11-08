@@ -92,8 +92,22 @@ icon_table! {
     Logo => "logo.svg",
 }
 
+/// Asset path of Google's official "G" (the sign-in button's logo).
+pub const GOOGLE_MARK_PATH: &str = "google/google-g.png";
+
+/// The official "G" when the build found it (cfg `shellx_google_mark`), else `None`.
+pub fn google_mark() -> Option<&'static [u8]> {
+    #[cfg(shellx_google_mark)]
+    return Some(include_bytes!("../assets/google/google-g.png").as_slice());
+    #[cfg(not(shellx_google_mark))]
+    None
+}
+
 /// Bytes for an asset path (what GPUI's asset source is asked for).
 pub fn by_path(path: &str) -> Option<&'static [u8]> {
+    if path == GOOGLE_MARK_PATH {
+        return google_mark();
+    }
     Icon::ALL
         .iter()
         .find(|icon| icon.path() == path)

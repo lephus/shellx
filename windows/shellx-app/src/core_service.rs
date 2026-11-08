@@ -18,8 +18,9 @@ use std::sync::Mutex;
 
 use shellx_model::account::{AccountAction, AccountEvent};
 use shellx_model::core_api::{
-    CoreCall, CoreConfig, CoreErr, config_set, heartbeat, list_machines, login, logout,
-    register_machine,
+    CoreCall, CoreConfig, CoreErr, config_set, google_begin, google_cancel, google_finish,
+    heartbeat, list_machines, list_sign_in_methods, login, logout, register_machine,
+    remove_sign_in_method, session_info,
 };
 
 /// The ShellX API (K2). The relay URL is never set here: it comes from
@@ -40,6 +41,21 @@ fn api_base_from(env: Option<String>) -> String {
     #[cfg(not(debug_assertions))]
     let _ = env;
     API_BASE.to_string()
+}
+
+/// Marker file (in the native data dir) recording that the one-time "switch to Google" offer was made.
+pub const GOOGLE_SWITCH_MARKER: &str = "google-switch-offered";
+
+/// True only for the call that creates `marker` (`create_new`).
+pub fn take_once(marker: &std::path::Path) -> bool {
+    if let Some(dir) = marker.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(marker)
+        .is_ok()
 }
 
 /// Facts about this PC sent with `config.set` and `machines.register`.
@@ -146,6 +162,33 @@ pub fn run_account_action(
             Some(AccountEvent::HeartbeatResult(heartbeat(core).map(|_| ())))
         }
         AccountAction::CallLogout => Some(AccountEvent::LogoutResult(logout(core))),
+        AccountAction::CallGoogleBegin(purpose) => Some(AccountEvent::GoogleBegun {
+            purpose,
+            result: google_begin(core, purpose),
+        }),
+        // Blocks until the browser answers (up to 300 s): the window runs it on its own task.
+        AccountAction::CallGoogleFinish(flow_id) => {
+            let result = google_finish(core, &flow_id);
+            Some(AccountEvent::GoogleFinished { flow_id, result })
+        }
+        // The flow ends through the pending finish; this result is not needed.
+        AccountAction::CallGoogleCancel(flow_id) => {
+            let _ = google_cancel(core, &flow_id);
+            None
+        }
+        AccountAction::CallSession => Some(AccountEvent::SessionResult(session_info(core))),
+        AccountAction::CallListSignInMethods => Some(AccountEvent::SignInMethodsResult(
+            list_sign_in_methods(core),
+        )),
+        AccountAction::CallRemoveSignInMethod(identity_id) => {
+            let result = remove_sign_in_method(core, &identity_id);
+            Some(AccountEvent::SignInMethodRemoved {
+                identity_id,
+                result,
+            })
+        }
+        // The window opens the browser.
+        AccountAction::OpenBrowser(_) => None,
         AccountAction::ScheduleTick { .. } => None,
     }
 }
@@ -431,7 +474,11 @@ mod tests {
     }
 
     impl CoreCall for FakeGoogleCore {
-        fn call(&self, method: &str, mut params: serde_json::Value) -> Result<serde_json::Value, CoreErr> {
+        fn call(
+            &self,
+            method: &str,
+            mut params: serde_json::Value,
+        ) -> Result<serde_json::Value, CoreErr> {
             if method == "config.set" {
                 params["google_auth_url"] = json!(format!("{}/fake-google/auth", self.base));
                 params["google_token_url"] = json!(format!("{}/fake-google/token", self.base));
@@ -450,19 +497,31 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().join("core");
         let base = api.base_url.clone();
-        let wrapped = FakeGoogleCore { inner: crate::core_bridge::CoreBridge::new(), base: base.clone() };
+        let wrapped = FakeGoogleCore {
+            inner: crate::core_bridge::CoreBridge::new(),
+            base: base.clone(),
+        };
         let core = ConfiguredCore::new(Box::new(wrapped), move || Ok(cfg(&base, &dir)));
         let mut flow = AccountFlow::new();
         drive(&mut flow, &core, AccountEvent::Started, 0);
         assert_eq!(flow.state(), &AccountState::LoggedOut);
 
-        let (ran, _) = drive(&mut flow, &core, AccountEvent::GoogleRequested(GooglePurpose::SignIn), 1);
+        let (ran, _) = drive(
+            &mut flow,
+            &core,
+            AccountEvent::GoogleRequested(GooglePurpose::SignIn),
+            1,
+        );
         assert_eq!(ran.len(), 6, "{ran:?}");
         assert_eq!(ran[0], "CallGoogleBegin(SignIn)");
         assert_eq!(ran[1], "OpenBrowser(\"<auth url>\")");
         assert!(ran[2].starts_with("CallGoogleFinish("), "{ran:?}");
         assert_eq!(ran[3..], ["CallList", "CallRegister", "CallList"]);
-        assert!(matches!(flow.state(), AccountState::LoggedIn { .. }), "{:?}", flow.state());
+        assert!(
+            matches!(flow.state(), AccountState::LoggedIn { .. }),
+            "{:?}",
+            flow.state()
+        );
         assert_eq!(flow.email(), Some("google-user@shellx.test"));
         assert_eq!(flow.auth_method(), Some("google"));
         assert!(!flow.needs_google_switch());

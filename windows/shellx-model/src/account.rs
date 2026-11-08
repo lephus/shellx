@@ -14,7 +14,8 @@
 use std::fmt;
 
 use crate::core_api::{
-    CoreErr, GoogleBegin, GooglePurpose, GoogleSignIn, LoginInfo, Registered, SessionInfo, SignInMethod,
+    CoreErr, GoogleBegin, GooglePurpose, GoogleSignIn, LoginInfo, Registered, SessionInfo,
+    SignInMethod,
 };
 use crate::sidebar::MachineInfo;
 
@@ -82,11 +83,16 @@ pub enum AccountEvent {
 #[derive(Clone, PartialEq, Eq)]
 pub enum AccountAction {
     CallList,
-    CallLogin { email: String, password: String },
+    CallLogin {
+        email: String,
+        password: String,
+    },
     CallRegister,
     CallHeartbeat,
     CallLogout,
-    ScheduleTick { at_ms: u64 },
+    ScheduleTick {
+        at_ms: u64,
+    },
     CallGoogleBegin(GooglePurpose),
     /// The window opens this URL in the system browser.
     OpenBrowser(String),
@@ -129,13 +135,18 @@ impl fmt::Debug for AccountEvent {
             AccountEvent::GoogleCancelRequested => write!(f, "GoogleCancelRequested"),
             AccountEvent::SessionResult(r) => f.debug_tuple("SessionResult").field(r).finish(),
             AccountEvent::SignInMethodsRequested => write!(f, "SignInMethodsRequested"),
-            AccountEvent::SignInMethodsResult(r) => {
-                f.debug_tuple("SignInMethodsResult").field(&r.as_ref().map(Vec::len)).finish()
-            }
-            AccountEvent::RemoveSignInMethodRequested(id) => {
-                f.debug_tuple("RemoveSignInMethodRequested").field(id).finish()
-            }
-            AccountEvent::SignInMethodRemoved { identity_id, result } => f
+            AccountEvent::SignInMethodsResult(r) => f
+                .debug_tuple("SignInMethodsResult")
+                .field(&r.as_ref().map(Vec::len))
+                .finish(),
+            AccountEvent::RemoveSignInMethodRequested(id) => f
+                .debug_tuple("RemoveSignInMethodRequested")
+                .field(id)
+                .finish(),
+            AccountEvent::SignInMethodRemoved {
+                identity_id,
+                result,
+            } => f
                 .debug_struct("SignInMethodRemoved")
                 .field("identity_id", identity_id)
                 .field("result", result)
@@ -161,9 +172,15 @@ impl fmt::Debug for AccountAction {
                 .field("at_ms", at_ms)
                 .finish(),
             AccountAction::CallGoogleBegin(p) => f.debug_tuple("CallGoogleBegin").field(p).finish(),
-            AccountAction::OpenBrowser(_) => f.debug_tuple("OpenBrowser").field(&"<auth url>").finish(),
-            AccountAction::CallGoogleFinish(id) => f.debug_tuple("CallGoogleFinish").field(id).finish(),
-            AccountAction::CallGoogleCancel(id) => f.debug_tuple("CallGoogleCancel").field(id).finish(),
+            AccountAction::OpenBrowser(_) => {
+                f.debug_tuple("OpenBrowser").field(&"<auth url>").finish()
+            }
+            AccountAction::CallGoogleFinish(id) => {
+                f.debug_tuple("CallGoogleFinish").field(id).finish()
+            }
+            AccountAction::CallGoogleCancel(id) => {
+                f.debug_tuple("CallGoogleCancel").field(id).finish()
+            }
             AccountAction::CallSession => write!(f, "CallSession"),
             AccountAction::CallListSignInMethods => write!(f, "CallListSignInMethods"),
             AccountAction::CallRemoveSignInMethod(id) => {
@@ -195,6 +212,8 @@ pub struct AccountFlow {
     logout_in_flight: bool,
     /// Last error that did not change the state (a failed logout).
     notice: Option<CoreErr>,
+    /// `notice` is a failed sign-in-methods list or removal (Settings words it differently).
+    notice_is_methods: bool,
     last_list_ms: u64,
     last_heartbeat_ms: u64,
     /// A failed list outside LoggedIn is retried on the next tick.
@@ -229,6 +248,7 @@ impl AccountFlow {
             login_in_flight: false,
             logout_in_flight: false,
             notice: None,
+            notice_is_methods: false,
             last_list_ms: 0,
             last_heartbeat_ms: 0,
             retry_list: false,
@@ -257,6 +277,11 @@ impl AccountFlow {
     /// session). Cleared by the next login or logout attempt.
     pub fn notice(&self) -> Option<&CoreErr> {
         self.notice.as_ref()
+    }
+
+    /// The notice is a failed sign-in-methods list or removal.
+    pub fn notice_is_methods(&self) -> bool {
+        self.notice.is_some() && self.notice_is_methods
     }
 
     /// Whether `LoginSubmitted` would start a login now. Not while a login
@@ -288,7 +313,8 @@ impl AccountFlow {
 
     /// Signed in with a password: Settings offers the switch to Google.
     pub fn needs_google_switch(&self) -> bool {
-        matches!(self.state, AccountState::LoggedIn { .. }) && self.auth_method.as_deref() == Some("password")
+        matches!(self.state, AccountState::LoggedIn { .. })
+            && self.auth_method.as_deref() == Some("password")
     }
 
     pub fn sign_in_methods(&self) -> Option<&[SignInMethod]> {
@@ -317,11 +343,16 @@ impl AccountFlow {
         match purpose {
             GooglePurpose::SignIn => {
                 self.login_in_flight = false;
-                self.state = if cancelled { AccountState::LoggedOut } else { AccountState::Error(e) };
+                self.state = if cancelled {
+                    AccountState::LoggedOut
+                } else {
+                    AccountState::Error(e)
+                };
             }
             GooglePurpose::Link => {
                 if !cancelled {
                     self.notice = Some(e);
+                    self.notice_is_methods = false;
                 }
             }
         }
@@ -342,6 +373,7 @@ impl AccountFlow {
         self.logout_in_flight = false;
         self.retry_list = false;
         self.notice = None;
+        self.notice_is_methods = false;
         self.google = None;
         self.email = None;
         self.auth_method = None;
@@ -420,7 +452,8 @@ impl AccountFlow {
                     }
                     Err(e)
                         if e.code == "not_logged_in"
-                            || (self.logged_in() && matches!(e.code.as_str(), "unauthorized" | "http_401")) =>
+                            || (self.logged_in()
+                                && matches!(e.code.as_str(), "unauthorized" | "http_401")) =>
                     {
                         // The server (or a revoked token) ended the session while signed in: ask for sign-in.
                         if self.logged_in() {
@@ -532,6 +565,7 @@ impl AccountFlow {
                 // The session stays (and keeps ticking); the UI shows the error.
                 self.logout_in_flight = false;
                 self.notice = Some(e);
+                self.notice_is_methods = false;
             }
             AccountEvent::LogoutResult(_) | AccountEvent::LoggedOut => {
                 self.reset_session();
@@ -551,7 +585,10 @@ impl AccountFlow {
                     GooglePurpose::Link if self.needs_google_switch() => self.notice = None,
                     _ => return out,
                 }
-                self.google = Some(GoogleRun { purpose, flow_id: None });
+                self.google = Some(GoogleRun {
+                    purpose,
+                    flow_id: None,
+                });
                 out.push(AccountAction::CallGoogleBegin(purpose));
             }
             AccountEvent::GoogleBegun { purpose, result } => {
@@ -613,7 +650,9 @@ impl AccountFlow {
                 }
             }
             AccountEvent::GoogleCancelRequested => {
-                let Some(run) = self.google.as_ref() else { return out };
+                let Some(run) = self.google.as_ref() else {
+                    return out;
+                };
                 match run.flow_id.clone() {
                     Some(id) => out.push(AccountAction::CallGoogleCancel(id)),
                     None => {
@@ -645,7 +684,10 @@ impl AccountFlow {
                 if self.logged_in() {
                     match result {
                         Ok(list) => self.methods = Some(list),
-                        Err(e) => self.notice = Some(e),
+                        Err(e) => {
+                            self.notice = Some(e);
+                            self.notice_is_methods = true;
+                        }
                     }
                 }
             }
@@ -656,14 +698,20 @@ impl AccountFlow {
                     out.push(AccountAction::CallRemoveSignInMethod(id));
                 }
             }
-            AccountEvent::SignInMethodRemoved { identity_id, result } => {
+            AccountEvent::SignInMethodRemoved {
+                identity_id,
+                result,
+            } => {
                 if self.removing.as_deref() != Some(identity_id.as_str()) {
                     return out;
                 }
                 self.removing = None;
                 match result {
                     Ok(()) => out.push(AccountAction::CallListSignInMethods),
-                    Err(e) => self.notice = Some(e),
+                    Err(e) => {
+                        self.notice = Some(e);
+                        self.notice_is_methods = true;
+                    }
                 }
             }
         }
@@ -1375,8 +1423,14 @@ mod tests {
     fn a_second_google_request_while_one_runs_is_ignored() {
         let mut f = logged_out();
         f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
-        assert!(f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 3).is_empty());
-        assert!(f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 3).is_empty());
+        assert!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 3)
+                .is_empty()
+        );
+        assert!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 3)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1384,7 +1438,10 @@ mod tests {
         let mut f = logged_out();
         f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
         f.on(begun(GooglePurpose::SignIn, "f1"), 3);
-        assert!(f.on(finished("f0", Ok(google_done("g@x", "google"))), 4).is_empty());
+        assert!(
+            f.on(finished("f0", Ok(google_done("g@x", "google"))), 4)
+                .is_empty()
+        );
         assert_eq!(f.state(), &AccountState::LoggingIn);
         assert_eq!(f.email(), None);
     }
@@ -1399,7 +1456,10 @@ mod tests {
             vec![AccountAction::CallGoogleBegin(GooglePurpose::Link)]
         );
         assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
-        assert!(f.on(AccountEvent::Tick(16_000), 16_000).contains(&AccountAction::CallList));
+        assert!(
+            f.on(AccountEvent::Tick(16_000), 16_000)
+                .contains(&AccountAction::CallList)
+        );
         assert_eq!(
             f.on(begun(GooglePurpose::Link, "f1"), 16_100),
             vec![
@@ -1423,7 +1483,10 @@ mod tests {
         f.on(session(Some("old@x"), "password"), 1_100);
         f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200);
         f.on(begun(GooglePurpose::Link, "f1"), 1_300);
-        f.on(finished("f1", Err(CoreErr::new("email_in_use", "x"))), 1_400);
+        f.on(
+            finished("f1", Err(CoreErr::new("email_in_use", "x"))),
+            1_400,
+        );
         assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
         assert_eq!(f.notice().map(|e| e.code.as_str()), Some("email_in_use"));
         assert!(f.needs_google_switch());
@@ -1432,17 +1495,26 @@ mod tests {
         g.on(session(Some("old@x"), "password"), 1_100);
         g.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200);
         g.on(begun(GooglePurpose::Link, "f1"), 1_300);
-        g.on(finished("f1", Err(CoreErr::new("google_cancelled", ""))), 1_400);
+        g.on(
+            finished("f1", Err(CoreErr::new("google_cancelled", ""))),
+            1_400,
+        );
         assert!(g.notice().is_none());
     }
 
     #[test]
     fn link_is_refused_unless_signed_in_with_a_password() {
         let mut f = logged_out();
-        assert!(f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 2).is_empty());
+        assert!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 2)
+                .is_empty()
+        );
         let mut g = logged_in();
         g.on(session(Some("g@x"), "google"), 1_100);
-        assert!(g.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200).is_empty());
+        assert!(
+            g.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1466,7 +1538,10 @@ mod tests {
         for code in ["unauthorized", "http_401", "not_logged_in"] {
             let mut f = logged_in();
             f.on(AccountEvent::Tick(16_000), 16_000);
-            f.on(AccountEvent::ListResult(Err(CoreErr::new(code, ""))), 16_000);
+            f.on(
+                AccountEvent::ListResult(Err(CoreErr::new(code, ""))),
+                16_000,
+            );
             assert_eq!(f.state(), &AccountState::LoggedOut, "{code}");
             assert!(f.take_signed_out_by_server(), "{code}");
             assert!(!f.take_signed_out_by_server(), "{code}");
@@ -1478,7 +1553,10 @@ mod tests {
         // not_logged_in outside LoggedIn keeps today's behaviour: signed out, no flag
         let mut f = AccountFlow::new();
         f.on(AccountEvent::Started, 0);
-        f.on(AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))), 1);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+            1,
+        );
         assert_eq!(f.state(), &AccountState::LoggedOut);
         assert!(!f.take_signed_out_by_server());
     }
@@ -1504,27 +1582,48 @@ mod tests {
             vec![AccountAction::CallListSignInMethods]
         );
         f.on(
-            AccountEvent::SignInMethodsResult(Ok(vec![method("g1", "google"), method("a1", "apple")])),
+            AccountEvent::SignInMethodsResult(Ok(vec![
+                method("g1", "google"),
+                method("a1", "apple"),
+            ])),
             1_200,
         );
         assert_eq!(f.sign_in_methods().map(<[_]>::len), Some(2));
         assert_eq!(
-            f.on(AccountEvent::RemoveSignInMethodRequested("a1".into()), 1_300),
+            f.on(
+                AccountEvent::RemoveSignInMethodRequested("a1".into()),
+                1_300
+            ),
             vec![AccountAction::CallRemoveSignInMethod("a1".into())]
         );
         assert_eq!(f.removing_sign_in_method(), Some("a1"));
-        assert!(f.on(AccountEvent::RemoveSignInMethodRequested("a2".into()), 1_310).is_empty());
+        assert!(
+            f.on(
+                AccountEvent::RemoveSignInMethodRequested("a2".into()),
+                1_310
+            )
+            .is_empty()
+        );
         assert_eq!(
             f.on(
-                AccountEvent::SignInMethodRemoved { identity_id: "a1".into(), result: Ok(()) },
+                AccountEvent::SignInMethodRemoved {
+                    identity_id: "a1".into(),
+                    result: Ok(())
+                },
                 1_400
             ),
             vec![AccountAction::CallListSignInMethods]
         );
         assert_eq!(f.removing_sign_in_method(), None);
-        f.on(AccountEvent::RemoveSignInMethodRequested("a1".into()), 1_500);
         f.on(
-            AccountEvent::SignInMethodRemoved { identity_id: "a1".into(), result: Err(net()) },
+            AccountEvent::RemoveSignInMethodRequested("a1".into()),
+            1_500,
+        );
+        f.on(
+            AccountEvent::SignInMethodRemoved {
+                identity_id: "a1".into(),
+                result: Err(net()),
+            },
             1_600,
         );
         assert_eq!(f.notice(), Some(&net()));
@@ -1534,7 +1633,10 @@ mod tests {
     fn logout_clears_email_method_and_methods() {
         let mut f = logged_in();
         f.on(session(Some("a@b.c"), "password"), 1_100);
-        f.on(AccountEvent::SignInMethodsResult(Ok(vec![method("g1", "google")])), 1_200);
+        f.on(
+            AccountEvent::SignInMethodsResult(Ok(vec![method("g1", "google")])),
+            1_200,
+        );
         f.on(AccountEvent::LogoutRequested, 1_300);
         f.on(AccountEvent::LogoutResult(Ok(())), 1_400);
         assert_eq!((f.email(), f.auth_method()), (None, None));
@@ -1553,6 +1655,9 @@ mod tests {
 
     #[test]
     fn delete_account_url_is_the_privacy_page() {
-        assert_eq!(DELETE_ACCOUNT_URL, "https://shellx.pro/privacy#delete-account");
+        assert_eq!(
+            DELETE_ACCOUNT_URL,
+            "https://shellx.pro/privacy#delete-account"
+        );
     }
 }
