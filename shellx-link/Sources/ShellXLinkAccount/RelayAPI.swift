@@ -191,12 +191,12 @@ public struct RelayAPI: Sendable {
     }
 
     /// Ids go into URL paths; accept only what the relay issues (UUIDs and the like).
-    private static func isSafeSegment(_ id: String) -> Bool {
+    static func isSafeSegment(_ id: String) -> Bool {
         !id.isEmpty && id.utf8.count <= 64
             && id.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 | 0x20 >= 0x61 && $0 | 0x20 <= 0x7a) || $0 == 0x2d || $0 == 0x5f }
     }
 
-    private static func base64URL(_ data: Data) -> String {
+    static func base64URL(_ data: Data) -> String {
         data.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
