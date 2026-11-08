@@ -24,6 +24,7 @@ import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import { phoneGrantRoutes, phonePairingRoutes } from "./v2/phones.js";
 import type { ApnsGateway } from "./push/apns.js";
 import type { PushGateway } from "./push/fcm.js";
+import { signInRoutes } from "./routes/sign-in.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 import { readNativeLatest } from "./native-latest.js";
 import { versionAnswer } from "./settings.js";
@@ -118,6 +119,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   });
 
   app.route("/v1/auth", authRoutes);
+  app.route("/v1/auth", signInRoutes);
   app.route("/v1/account", accountRoutes);
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);

@@ -46,7 +46,7 @@ export const TEST_CONFIG: Config = {
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
-  loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
+  loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
   ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll,
 };
 
@@ -234,6 +234,13 @@ async function request(
     for (const chunk of chunks) req.write(chunk);
     req.end();
   });
+}
+
+/** POST /v1/auth/nonce; throws unless 201. */
+export async function newNonce(app: TestApp, ip?: string): Promise<string> {
+  const res = await call(app, "POST", "/v1/auth/nonce", { ip, body: {} });
+  if (res.status !== 201) throw new Error(`nonce failed: ${res.status} ${await res.text()}`);
+  return (await res.json<{ nonce: string }>()).nonce;
 }
 
 export const PASSWORD = "correct horse battery";

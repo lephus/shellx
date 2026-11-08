@@ -9,6 +9,8 @@ export interface RateLimiters {
   loginIp: RateLimiter;
   loginEmail: RateLimiter;
   registerIp: RateLimiter;
+  /** POST /v1/auth/nonce, keyed by client IP. */
+  nonceIp: RateLimiter;
   /** Every WebSocket upgrade attempt on /v1/ws, counted before its token is checked. */
   upgradeIp: RateLimiter;
   /** `POST /v1/notifications`, keyed by the agent's device id (push spec N10). */
@@ -28,6 +30,7 @@ export const RATE_WINDOW_MS = 60_000;
 export const LOGIN_PER_IP = 10;
 export const LOGIN_PER_EMAIL = 5;
 export const REGISTER_PER_IP = 3;
+export const NONCES_PER_IP = 30;
 /**
  * WebSocket upgrades per IP per window (residual R2, defence in depth): far above what reconnecting
  * clients with backoff need, low enough that one address cannot churn upgrades against the relay.
@@ -110,12 +113,13 @@ const allowAll: RateLimiter = { limit: async () => true };
 /** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all of them off. */
 export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, now: () => number = Date.now): RateLimiters {
   if (!config.rateLimitsEnabled) {
-    return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll, ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll };
+    return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll, ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll };
   }
   return {
     loginIp: new SlidingWindowLimiter({ limit: LOGIN_PER_IP, now }),
     loginEmail: new SlidingWindowLimiter({ limit: LOGIN_PER_EMAIL, now }),
     registerIp: new SlidingWindowLimiter({ limit: REGISTER_PER_IP, now }),
+    nonceIp: new SlidingWindowLimiter({ limit: NONCES_PER_IP, now }),
     upgradeIp: new SlidingWindowLimiter({ limit: UPGRADES_PER_IP, now }),
     notifyAgent: new SlidingWindowLimiter({ limit: NOTIFICATIONS_PER_AGENT, windowMs: NOTIFICATIONS_WINDOW_MS, now }),
     ticketMint: new SlidingWindowLimiter({ limit: TICKET_MINTS_PER_DEVICE, now }),
