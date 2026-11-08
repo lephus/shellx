@@ -109,6 +109,16 @@ check_app() {
   if [ "$(plist_value NSAppTransportSecurity:NSAllowsLocalNetworking "$info" || true)" = "true" ]; then
     fail+=("allows plain HTTP to the local network (NSAllowsLocalNetworking), which only Debug builds need")
   fi
+  # Google sign-in needs the real iOS OAuth client of com.shellx.prod (SHELLX_GOOGLE_IOS_CLIENT in
+  # Release.xcconfig); the placeholder only serves builds that never reach the store.
+  value="$(plist_value ShellXGoogleClientID "$info" || true)"
+  if ! [[ "$value" =~ ^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$ ]]; then
+    if [ "$mode" = "signed" ]; then
+      fail+=("ShellXGoogleClientID is '$value', not a Google iOS client id (set SHELLX_GOOGLE_IOS_CLIENT in shellx-ios/Config/Release.xcconfig)")
+    else
+      note "$label: ShellXGoogleClientID is not a Google iOS client id yet ('$value'): Continue with Google cannot work in this build"
+    fi
+  fi
 
   if [ "$mode" = "signed" ]; then
     local entitlements="$WORK/entitlements.plist"
@@ -122,6 +132,10 @@ check_app() {
     # Push is optional until P4; when the entitlement is there it must point at production APNs.
     if value="$(plist_value aps-environment "$entitlements")" && [ "$value" != "production" ]; then
       fail+=("aps-environment is '$value', expected production")
+    fi
+    # Sign in with Apple (S1 §6.6).
+    if [ "$(plist_value com.apple.developer.applesignin:0 "$entitlements" || true)" != "Default" ]; then
+      fail+=("lacks the Sign in with Apple entitlement (com.apple.developer.applesignin = Default)")
     fi
   fi
 

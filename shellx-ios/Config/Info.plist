@@ -57,6 +57,8 @@
 	<string>Apple turns your speech into text to send to your agents.</string>
 	<key>ShellXKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER).shared</string>
+	<key>ShellXGoogleClientID</key>
+	<string>$(SHELLX_GOOGLE_IOS_CLIENT).apps.googleusercontent.com</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

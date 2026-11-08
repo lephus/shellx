@@ -5,6 +5,9 @@
 PRODUCT_BUNDLE_IDENTIFIER = com.shellx.prod
 SHELLX_DISPLAY_NAME = ShellX
 SHELLX_APS_ENVIRONMENT = production
+// Google sign-in: the iOS OAuth client of com.shellx.prod without its ".apps.googleusercontent.com" suffix.
+// Not a secret. release/mobile/ios.sh refuses an App Store build that still has the placeholder.
+SHELLX_GOOGLE_IOS_CLIENT = 0-shellx-placeholder
 
 SWIFT_COMPILATION_MODE = wholemodule
 SWIFT_OPTIMIZATION_LEVEL = -O
