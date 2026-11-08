@@ -118,6 +118,7 @@ final class EventLog: @unchecked Sendable {
     private var chatCount = 0
     private var lastChatSession: String?
     private var signedOutCount = 0
+    private var terminalCount = 0
     private var isFinished = false
     private var reader: Task<Void, Never>?
 
@@ -140,6 +141,8 @@ final class EventLog: @unchecked Sendable {
     var workspaceIDs: [String] { workspaces?.set.workspaces.map(\.workspaceId) ?? [] }
     var chatEntries: Int { lock.withLock { chatCount } }
     var signedOut: Int { lock.withLock { signedOutCount } }
+    /// Terminal pushes seen (`MachineEvent.terminal`).
+    var terminalPushes: Int { lock.withLock { terminalCount } }
     /// True once the connection finished its event stream.
     var finished: Bool { lock.withLock { isFinished } }
 
@@ -162,6 +165,7 @@ final class EventLog: @unchecked Sendable {
                 lastChatSession = sessionId
             case let .chatReset(sessionId):
                 lastChatSession = sessionId
+            case .terminal: terminalCount += 1
             case .signedOut: signedOutCount += 1
             }
         }
