@@ -34,11 +34,13 @@ services:
       DB_PATH: /data/relay.db
       # Push notifications (push spec §5): path of the Firebase service account key inside the
       # container, e.g. /secrets/fcm.json, set once by hand in .env (deploy/README.md, "Push
-      # notifications"). Empty → push is off and the relay runs as before.
+      # notifications"). It also carries the Android app's alerts (POST /v2/notifications). Empty →
+      # no FCM push and the relay runs as before.
       FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
       # Push to the native iPhone app (APNs, no Firebase): the .p8 provider key inside the container,
       # e.g. /secrets/apns.p8, with its key id and the Apple team id, set once by hand in .env
-      # (deploy/README.md, "iPhone push (APNs)"). Any empty → POST /v2/notifications answers 503.
+      # (deploy/README.md, "iPhone push (APNs)"). Any empty → no iPhone push; POST /v2/notifications
+      # answers 503 only when FCM_SERVICE_ACCOUNT is empty too.
       APNS_KEY_PATH: ${APNS_KEY_PATH:-}
       APNS_KEY_ID: ${APNS_KEY_ID:-}
       APNS_TEAM_ID: ${APNS_TEAM_ID:-}

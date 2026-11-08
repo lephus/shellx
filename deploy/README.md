@@ -233,6 +233,23 @@ docker compose logs relay | grep apns_   # apns_enabled
 One key serves both APNs hosts: Debug builds (`com.shellx.dev`) register sandbox tokens, App Store
 builds (`com.shellx.prod`) production ones, and the relay sends each token to its own host.
 
+### Android push (FCM)
+
+The Android app gets its "needs you" alerts from the same `POST /v2/notifications` call that
+reaches iPhones: the relay sends each Android phone granted that Mac an FCM data-only message with
+the service account key above. Nothing else is set up on the VPS. Check it after a deploy:
+
+```bash
+cd ~/phu/shellx && docker compose logs relay | grep push_   # push_enabled {"project":"shellxpro"}
+```
+
+With `push_disabled` instead, Android phones get nothing (iPhones still get APNs): do steps 1–2
+above. Both Android apps, `com.shellx.prod` and `com.shellx.dev`, must be apps of Firebase project
+`shellxpro`; FCM refuses a token from another project (`fcm_send_failed` with `SENDER_ID_MISMATCH`)
+and the relay keeps such a token. `POST /v2/notifications` answers 503 `push_unavailable` only when
+both the FCM and the APNs key are missing. Each call logs one `v2_notification` line with
+`recipients`, `fcm_recipients`, `sent` and `tokens_removed`, never what the alert says or a token.
+
 The website only builds once the country hosting the VPS replaces `[quốc gia]` in
 `web/src/pages/privacy.md` and `web/src/pages/terms.md` (update their `updated:` dates too). Until
 then every deploy stops at the web image build, so fill it in before the first deploy.

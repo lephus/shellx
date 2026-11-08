@@ -20,6 +20,24 @@ export interface PushGateway {
   send(message: PushMessage): Promise<PushResult>;
 }
 
+/** One data-only message to one Android phone: no `notification` block, the app builds the alert from its own strings. */
+export interface FcmDataMessage {
+  token: string;
+  /** FCM data values are strings. */
+  data: Readonly<Record<string, string>>;
+  /** `android.priority`. */
+  priority: "high" | "normal";
+  /** `android.ttl` in whole seconds, sent as `"<n>s"`. */
+  ttlSec: number;
+  /** `android.collapse_key`; left out of the request when undefined. */
+  collapseKey?: string;
+}
+
+/** What `POST /v2/notifications` needs for Android phones; `FcmClient` in production, a fake in tests. */
+export interface FcmDataGateway {
+  sendData(message: FcmDataMessage): Promise<PushResult>;
+}
+
 /** The fields of a Google service account JSON key the relay uses. */
 export interface ServiceAccount {
   projectId: string;
@@ -109,9 +127,9 @@ interface CachedToken {
 /**
  * FCM HTTP v1 client (push spec §5): an OAuth access token from a JWT signed with the service
  * account's key (node:crypto, no Google library), cached until shortly before it expires, with at
- * most one token request in flight. Never logs tokens, titles or bodies.
+ * most one token request in flight. Never logs tokens, titles, bodies or data.
  */
-export class FcmClient implements PushGateway {
+export class FcmClient implements PushGateway, FcmDataGateway {
   private readonly fetch: typeof fetch;
   private readonly now: () => number;
   private readonly sendUrl: string;
@@ -128,6 +146,23 @@ export class FcmClient implements PushGateway {
   }
 
   async send(message: PushMessage): Promise<PushResult> {
+    return this.post({
+      token: message.token,
+      notification: { title: message.title, body: message.body },
+      data: message.data,
+      android: { priority: "high" },
+      apns: { payload: { aps: { sound: "default" } } },
+    });
+  }
+
+  /** A data-only message for an Android phone: `data` plus `android.priority`, `ttl` and `collapse_key`. */
+  async sendData(message: FcmDataMessage): Promise<PushResult> {
+    const android: Record<string, string> = { priority: message.priority, ttl: `${message.ttlSec}s` };
+    if (message.collapseKey !== undefined) android.collapse_key = message.collapseKey;
+    return this.post({ token: message.token, data: message.data, android });
+  }
+
+  private async post(message: Readonly<Record<string, unknown>>): Promise<PushResult> {
     let accessToken: string;
     try {
       accessToken = await this.accessToken();
@@ -140,15 +175,7 @@ export class FcmClient implements PushGateway {
       res = await this.fetch(this.sendUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: {
-            token: message.token,
-            notification: { title: message.title, body: message.body },
-            data: message.data,
-            android: { priority: "high" },
-            apns: { payload: { aps: { sound: "default" } } },
-          },
-        }),
+        body: JSON.stringify({ message }),
         signal: AbortSignal.timeout(FCM_TIMEOUT_MS),
       });
     } catch (err) {
