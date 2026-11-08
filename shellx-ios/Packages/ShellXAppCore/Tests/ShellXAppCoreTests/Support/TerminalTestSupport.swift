@@ -44,3 +44,25 @@ final class TerminalPushReader: @unchecked Sendable {
         }
     }
 }
+
+/// Keeps every element of `stream` as it arrives.
+final class Collector<Element: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var kept: [Element] = []
+    private var task: Task<Void, Never>?
+
+    init(_ stream: AsyncStream<Element>) {
+        task = Task { [weak self] in
+            for await element in stream {
+                guard let self else { return }
+                self.lock.withLock { self.kept.append(element) }
+            }
+        }
+    }
+
+    deinit {
+        task?.cancel()
+    }
+
+    var items: [Element] { lock.withLock { kept } }
+}
