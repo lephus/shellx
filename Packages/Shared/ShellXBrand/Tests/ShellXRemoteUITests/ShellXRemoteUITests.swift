@@ -207,13 +207,23 @@ private func rm(
     }
 
     @Test func signInErrorMapping() {
-        let labels = SignInErrorLabels(credentials: "Email or password is incorrect", network: "Can't reach relay.shellx.pro")
+        let labels = SignInErrorLabels(
+            credentials: "Google sign-in didn't work. Try again.", network: "Can't reach relay.shellx.pro",
+            timeout: "t", stateMismatch: "s", switchFromSignedInDevice: "sw", emailInUse: "e", identityInUse: "i", browser: "b")
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "invalid_credentials", message: "x"), labels: labels)
-            == "Email or password is incorrect")
+            == "Google sign-in didn't work. Try again.")
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "network", message: "x"), labels: labels)
             == "Can't reach relay.shellx.pro")
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "rate_limited", message: "slow down"), labels: labels)
             == "rate_limited")
         #expect(SignInErrorMessage.text(forCode: "network", labels: .english) == "Can't reach relay.shellx.pro")
+        #expect(SignInErrorMessage.text(forCode: "google_timeout", labels: labels) == "t")
+        #expect(SignInErrorMessage.text(forCode: "google_state_mismatch", labels: labels) == "s")
+        #expect(SignInErrorMessage.text(forCode: "switch_from_signed_in_device", labels: labels) == "sw")
+        #expect(SignInErrorMessage.text(forCode: "email_in_use", labels: labels) == "e")
+        #expect(SignInErrorMessage.text(forCode: "identity_in_use", labels: labels) == "i")
+        #expect(SignInErrorMessage.text(forCode: "browser_unavailable", labels: labels) == "b")
+        #expect(SignInErrorMessage.isCancellation(ShellXCoreError(code: "google_cancelled", message: "")))
+        #expect(!SignInErrorMessage.isCancellation(ShellXCoreError(code: "network", message: "")))
     }
 }
