@@ -312,6 +312,10 @@ class TerminalController {
     var cloudDetachedPhonesBySurfaceID: [UUID: [String: TerminalSharingDetachment]] = [:]
     /// Cloud mirrors that relay phones to a cmux-tui host, by surface id.
     var cloudSizingRelaysBySurfaceID: [UUID: CloudSizingRelayReference] = [:]
+    /// Surfaces whose explicit input a remote participant is applying right now, with nesting depth.
+    var remoteParticipantInputDepthBySurfaceID: [UUID: Int] = [:]
+    /// The policy a terminal had before its first ShellX Link phone made it `latest`.
+    var shellXLinkSizingPolicyRestoreBySurfaceID: [UUID: TerminalSizingPolicy] = [:]
     /// The single owner of shared-terminal size state and actions.
     let terminalSharing = TerminalSharingStore()
     /// The one size panel popover, anchored at a terminal's tab.

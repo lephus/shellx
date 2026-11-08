@@ -4070,6 +4070,7 @@
 		B49282191C80DC84B8AB0BCB /* TerminalController+RemoteTmuxTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCFC650BD590101D445C4A0 /* TerminalController+RemoteTmuxTestSupport.swift */; };
 		A1329C000000000000000101 /* TerminalController+SharedSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1329C000000000000000001 /* TerminalController+SharedSizing.swift */; };
 		7064AB823B7832097B63CFE8 /* TerminalController+ShellXLinkDebug.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA441B00522F75D832A8021 /* TerminalController+ShellXLinkDebug.swift */; };
+		E2988053A8A79463BFE596F9 /* TerminalController+ShellXLinkSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9366EB2E2F427115774F6D5 /* TerminalController+ShellXLinkSizing.swift */; };
 		D310E509C9FA457B8AE81CF6 /* TerminalController+ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC516CC8FB0418AA9D72AB4 /* TerminalController+ShortcutConfiguration.swift */; };
 		A6E57A0F0000000000000001 /* TerminalController+SocketBoundedLanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E57A0F0000000000000002 /* TerminalController+SocketBoundedLanes.swift */; };
 		A79840040000000000000002 /* TerminalController+SocketCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A79840040000000000000001 /* TerminalController+SocketCleanup.swift */; };
@@ -8743,6 +8744,7 @@
 		1CCFC650BD590101D445C4A0 /* TerminalController+RemoteTmuxTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/RemoteTmux/TerminalController+RemoteTmuxTestSupport.swift"; sourceTree = "<group>"; };
 		A1329C000000000000000001 /* TerminalController+SharedSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+SharedSizing.swift"; sourceTree = "<group>"; };
 		FFA441B00522F75D832A8021 /* TerminalController+ShellXLinkDebug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/TerminalController+ShellXLinkDebug.swift"; sourceTree = "<group>"; };
+		E9366EB2E2F427115774F6D5 /* TerminalController+ShellXLinkSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/TerminalController+ShellXLinkSizing.swift"; sourceTree = "<group>"; };
 		BBC516CC8FB0418AA9D72AB4 /* TerminalController+ShortcutConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+ShortcutConfiguration.swift"; sourceTree = "<group>"; };
 		A6E57A0F0000000000000002 /* TerminalController+SocketBoundedLanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+SocketBoundedLanes.swift"; sourceTree = "<group>"; };
 		A79840040000000000000001 /* TerminalController+SocketCleanup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+SocketCleanup.swift"; sourceTree = "<group>"; };
@@ -12728,6 +12730,7 @@
 				D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */,
 				C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */,
 				FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */,
+				E9366EB2E2F427115774F6D5 /* TerminalController+ShellXLinkSizing.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -17509,6 +17512,7 @@
 				B49282191C80DC84B8AB0BCB /* TerminalController+RemoteTmuxTestSupport.swift in Sources */,
 				A1329C000000000000000101 /* TerminalController+SharedSizing.swift in Sources */,
 				7064AB823B7832097B63CFE8 /* TerminalController+ShellXLinkDebug.swift in Sources */,
+				E2988053A8A79463BFE596F9 /* TerminalController+ShellXLinkSizing.swift in Sources */,
 				D310E509C9FA457B8AE81CF6 /* TerminalController+ShortcutConfiguration.swift in Sources */,
 				A6E57A0F0000000000000001 /* TerminalController+SocketBoundedLanes.swift in Sources */,
 				A79840040000000000000002 /* TerminalController+SocketCleanup.swift in Sources */,

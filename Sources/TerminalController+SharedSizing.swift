@@ -207,6 +207,7 @@ extension TerminalController {
     /// terminal is not shared, because it runs on every keystroke.
     func noteLocalTerminalSizingActivity(surfaceID: UUID) {
         guard var host = localSizingHostsBySurfaceID[surfaceID] else { return }
+        guard remoteParticipantInputDepthBySurfaceID[surfaceID] == nil else { return }
         let previous = host.state
         guard host.noteActivity(host.macParticipantID) else { return }
         localSizingHostsBySurfaceID[surfaceID] = host
@@ -235,6 +236,7 @@ extension TerminalController {
             removeLocalSizingHost(surfaceID: surfaceID)
         }
         cloudDetachedPhonesBySurfaceID.removeAll()
+        shellXLinkSizingPolicyRestoreBySurfaceID.removeAll()
     }
 
     /// Drops one surface's local host, its sharing controller and its store
@@ -247,6 +249,7 @@ extension TerminalController {
         }
         localSizingHostsBySurfaceID[surfaceID] = nil
         cloudDetachedPhonesBySurfaceID[surfaceID] = nil
+        shellXLinkSizingPolicyRestoreBySurfaceID[surfaceID] = nil
     }
 
     // MARK: - Presentation
