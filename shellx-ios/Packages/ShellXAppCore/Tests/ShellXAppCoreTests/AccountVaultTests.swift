@@ -91,4 +91,29 @@ final class AccountVaultTests: XCTestCase {
         }
         XCTAssertEqual(store.writeCount(for: .phoneKey), 0, "an unreadable store must not get a fresh key")
     }
+
+    func testStoredSessionWithoutAuthMethodReadsAsPassword() async throws {
+        let store = InMemorySecretStore()
+        try store.write(Data(#"{"userID":"u1","deviceID":"d1","token":"t","email":"a@b.c"}"#.utf8), for: .session)
+        let session = try await AccountVault(store: store).session()
+        XCTAssertEqual(session, StoredSession(userID: "u1", deviceID: "d1", token: "t", email: "a@b.c", authMethod: .password))
+    }
+
+    func testStoredSessionKeepsItsAuthMethodUnderAuthMethod() async throws {
+        let store = InMemorySecretStore()
+        let vault = AccountVault(store: store)
+        try await vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "t", email: "a@b.c", authMethod: .apple))
+        let read = try await vault.session()
+        XCTAssertEqual(read?.authMethod, .apple)
+        let raw = try XCTUnwrap(try store.read(.session))
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: raw) as? [String: Any])
+        XCTAssertEqual(json["auth_method"] as? String, "apple")
+    }
+
+    func testUnknownAuthMethodIsAnUnreadableSession() async throws {
+        let store = InMemorySecretStore()
+        try store.write(Data(#"{"userID":"u1","deviceID":"d1","token":"t","email":"a@b.c","auth_method":"carrier-pigeon"}"#.utf8), for: .session)
+        let session = try await AccountVault(store: store).session()
+        XCTAssertNil(session)
+    }
 }
