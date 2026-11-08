@@ -1,6 +1,8 @@
 import AppKit
 import CmuxSettingsUI
+import SwiftUI
 import Observation
+import ShellXBrand
 import ShellXRemoteCore
 import ShellXRemoteUI
 
@@ -71,6 +73,16 @@ final class ShellXAccountFlow: AccountFlow {
 
     func signOut() async {
         await account.signOut()
+    }
+
+    /// Sign-in methods, the Google switch and the delete link; hidden while signed out.
+    var accountDetailContent: AnyView? {
+        guard account.identity != nil else { return nil }
+        return AnyView(ShellXAccountDetailView(
+            account: account,
+            onSwitchToGoogle: { [weak self] in self?.startGoogleSwitch() },
+            openURL: { NSWorkspace.shared.open($0) }
+        ))
     }
 
     var availableTeams: [AccountTeamSummary] { [] }

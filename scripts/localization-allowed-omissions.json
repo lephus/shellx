@@ -6333,5 +6333,34 @@
     "identityLocales": {
       "de": "Text is the German word for text; the translated entry is still required."
     }
+  },
+  "settings.account.methods.apple": {
+    "source": "Apple ID",
+    "identityLocales": {
+      "zh-Hant": {
+        "reason": "Apple ID is Apple's product name and is written the same way in this language.",
+        "values": [
+          "Apple ID"
+        ]
+      },
+      "zh-Hans": {
+        "reason": "Apple ID is Apple's product name and is written the same way in this language.",
+        "values": [
+          "Apple ID"
+        ]
+      },
+      "ko": {
+        "reason": "Apple ID is Apple's product name and is written the same way in this language.",
+        "values": [
+          "Apple ID"
+        ]
+      },
+      "ja": {
+        "reason": "Apple ID is Apple's product name and is written the same way in this language.",
+        "values": [
+          "Apple ID"
+        ]
+      }
+    }
   }
 }

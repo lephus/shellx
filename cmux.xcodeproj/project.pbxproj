@@ -3357,6 +3357,7 @@
 		C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */; };
 		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157337FA38DA052318228A89 /* ShellXAboutTests.swift */; };
+		E1073194626D528861FB7697 /* ShellXAccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */; };
 		96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */; };
 		8D37189E2E5CD35178CB98A6 /* ShellXAgentActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */; };
 		5E1A7A000000000000000003 /* ShellXAutomations in Frameworks */ = {isa = PBXBuildFile; productRef = 5E1A7A000000000000000002 /* ShellXAutomations */; };
@@ -8042,6 +8043,7 @@
 		C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
 		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		157337FA38DA052318228A89 /* ShellXAboutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAboutTests.swift"; sourceTree = "<group>"; };
+		C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXAccountDetailView.swift; sourceTree = "<group>"; };
 		295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXAccountFlow.swift; sourceTree = "<group>"; };
 		1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAgentActivityTests.swift"; sourceTree = "<group>"; };
 		89060B2B57314E97A3234D09 /* ShellXAutomationsBridgeContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsBridgeContract.swift; sourceTree = "<group>"; };
@@ -12707,6 +12709,7 @@
 				1A9344998632CF83439ECCF3 /* ShellXAutomationsOpenQueue.swift */,
 				7D6C2AF2DBDB0F61BF624FDA /* ShellXRoutineRunLauncher.swift */,
 				D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */,
+				C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -16987,6 +16990,7 @@
 				F0ACC0DE0000000000000011 /* SharedLiveAgentIndex.swift in Sources */,
 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
+				E1073194626D528861FB7697 /* ShellXAccountDetailView.swift in Sources */,
 				96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */,
 				D123146A2E41E7A55B222355 /* ShellXAutomationsBridgeContract.swift in Sources */,
 				CA59AED5B345435E5B8ED98B /* ShellXAutomationsBridgeFailure.swift in Sources */,

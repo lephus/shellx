@@ -1,5 +1,6 @@
 import CMUXMobileCore
 import Foundation
+import SwiftUI
 
 /// Host-supplied dependency the package's ``AccountSection`` uses to
 /// render and drive the sign-in / sign-out flow.
@@ -94,6 +95,9 @@ public protocol AccountFlow: AccountTeamManagement {
     /// Who bills the signed-in account's personal plan, or `nil` while it is
     /// unknown. Defaults to `nil` for hosts that do not report it.
     var planBillingSource: AccountPlanBillingSource? { get }
+
+    /// Host rows under the identity row (ShellX: sign-in methods). Nil shows nothing.
+    var accountDetailContent: AnyView? { get }
 }
 
 /// Who bills a personal plan, for the Settings plan row's billing line.
@@ -112,4 +116,6 @@ extension AccountFlow {
     public var planTier: CmuxPlanTier? { isProActive ? .pro : nil }
 
     public var planBillingSource: AccountPlanBillingSource? { nil }
+
+    public var accountDetailContent: AnyView? { nil }
 }
