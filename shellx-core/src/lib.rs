@@ -3,6 +3,7 @@
 //! The Mac app links the staticlib through one C function (`ffi`); the Windows
 //! app uses the rlib. Every method goes through [`Core::call`].
 
+pub mod account;
 pub mod api;
 pub mod auth;
 pub mod auth_google;
@@ -58,12 +59,14 @@ pub const KNOWN_METHODS: &[&str] = &[
     "phones.grants",
     "phones.revoke",
     "notify.phones",
+    "account.identities.list",
+    "account.identities.remove",
     "version.check",
 ];
 
 /// Methods that need `session.json` (Ruling R1: checked before dispatch).
 fn needs_session(method: &str) -> bool {
-    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("phones.") || method.starts_with("shares.") || method.starts_with("notify.")
+    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("phones.") || method.starts_with("shares.") || method.starts_with("notify.") || method.starts_with("account.")
 }
 
 #[derive(Default)]
@@ -192,6 +195,8 @@ impl Core {
             "phones.deny" => phones::deny(self.agent(), cfg, store, params),
             "phones.grants" => phones::grants(self.agent(), cfg, store),
             "phones.revoke" => phones::revoke(self.agent(), cfg, store, params),
+            "account.identities.list" => account::list_identities(self.agent(), cfg, store),
+            "account.identities.remove" => account::remove_identity(self.agent(), cfg, store, params),
             "notify.phones" => notify::phones(self.agent(), cfg, store, params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),
         }
