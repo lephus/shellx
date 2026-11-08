@@ -98,3 +98,13 @@ pub fn query(url: &str) -> std::collections::HashMap<String, String> {
     let q = url.split_once('?').map(|(_, q)| q).unwrap_or("");
     shellx_core::auth_google::parse_query(q).into_iter().collect()
 }
+
+/// begin -> fake Google in a browser thread -> finish; finish's result.
+pub fn google_sign_in(core: &Core, purpose: &str) -> Result<Value, shellx_core::CoreError> {
+    let begun = core.call("auth.google.begin", json!({"purpose": purpose}))?;
+    let url = begun["auth_url"].as_str().unwrap().to_string();
+    let browser = std::thread::spawn(move || shellx_fake_api::browse(&url));
+    let done = core.call("auth.google.finish", json!({"flow_id": begun["flow_id"]}));
+    let _ = browser.join();
+    done
+}
