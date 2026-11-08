@@ -164,7 +164,8 @@ final class TerminalCanvasView: UIView {
         context.textPosition = .zero
         CTLineDraw(line, context)
         context.restoreGState()
-        context.fill(CGRect(x: area.minX, y: area.minY + font.baseline + font.underlineOffset, width: width, height: 1))
+        // At the cell's bottom, below the font's underline position, so the dots under Vietnamese vowels (ạ, ệ) stay clear.
+        context.fill(CGRect(x: area.minX, y: area.maxY - 1, width: width, height: 1))
     }
 
     /// The marked text's first cell in this view's coordinates (the keyboard's caret and candidate bar, Task 9).
