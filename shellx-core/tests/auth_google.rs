@@ -310,3 +310,20 @@ fn google_secrets_never_reach_results_or_errors() {
     let _ = browser.join();
     assert!(!e.message.contains(&q["state"]) && !e.message.contains("wrong") && !e.message.contains(&q["nonce"]));
 }
+
+#[test]
+fn concurrent_begins_leave_one_live_listener() {
+    for _ in 0..5 {
+        let (core, _fake, _dir) = support::google_logged_out();
+        let (a, b) = std::thread::scope(|s| {
+            let x = s.spawn(|| core.call("auth.google.begin", json!({"purpose": "sign_in"})).unwrap());
+            let y = s.spawn(|| core.call("auth.google.begin", json!({"purpose": "sign_in"})).unwrap());
+            (x.join().unwrap(), y.join().unwrap())
+        });
+        let live = [a, b]
+            .iter()
+            .filter(|r| std::net::TcpStream::connect(("127.0.0.1", port_of(&redirect_of(r["auth_url"].as_str().unwrap())))).is_ok())
+            .count();
+        assert_eq!(live, 1);
+    }
+}
