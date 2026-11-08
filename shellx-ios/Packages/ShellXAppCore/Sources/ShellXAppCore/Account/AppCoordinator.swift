@@ -28,6 +28,10 @@ public final class AppCoordinator {
     @ObservationIgnored private let pendingWipeDefaults: UserDefaults
     private static let pendingWipeKey = "shellx.localWipePending"
     @ObservationIgnored private let makeHub: @MainActor () -> MachineHub
+    /// True while a switch to Google or an account deletion is on the relay: a 401 then answers the token the relay is
+    /// replacing or deleting, so `handleUnauthorized` only remembers it.
+    @ObservationIgnored private var accountChangeInProgress = false
+    @ObservationIgnored private var unauthorizedDuringChange = false
     @ObservationIgnored private let log = Logger(subsystem: "com.shellx.app", category: "account")
 
     public init(
@@ -240,21 +244,118 @@ public final class AppCoordinator {
                 log.notice("sign_out_logout_failed")
             }
         }
+        await forgetLocalData()
+        authMethod = nil
+        phase = .signedOut(expired: false)
+    }
+
+    /// The local part of signing out: the marker first, then the vault and every wiper. A failed wipe keeps the marker
+    /// and is retried before anyone signs in.
+    private func forgetLocalData() async {
         pendingWipeDefaults.set(true, forKey: Self.pendingWipeKey)
         do { try await vault.wipe() } catch {
             log.error("sign_out_wipe_failed")
         }
-        // Sign out regardless; a failed wipe keeps the marker and is retried before anyone signs in.
         if await runWipers() {
             pendingWipeDefaults.removeObject(forKey: Self.pendingWipeKey)
         }
+    }
+
+    /// S1 §6.3b: a password session becomes a Google one on this iPhone, keeping the account, its Macs and history.
+    public func switchToGoogle() async throws(SignInError) {
+        guard let stored = try? await vault.session(), stored.authMethod == .password else { return }
+        let nonce: String
+        let idToken: String
+        do {
+            nonce = try await relay.nonce()
+            idToken = try await identity.googleIDToken(nonce: nonce)
+        } catch {
+            throw SignInError(error)
+        }
+        beginAccountChange()
+        let signIn: AccountSignIn
+        do {
+            signIn = try await relay.linkGoogle(idToken: idToken, nonce: nonce, token: stored.token)
+        } catch {
+            throw await endFailedAccountChange(error)
+        }
+        do {
+            try await vault.setSession(
+                StoredSession(
+                    userID: signIn.session.userID, deviceID: signIn.session.deviceID, token: signIn.session.token,
+                    email: signIn.email, authMethod: .google))
+        } catch {
+            log.error("switch_store_failed")
+            accountChangeInProgress = false
+            throw .server(code: "keychain")
+        }
+        // A fresh hub: requests of the old one may carry the token the relay just replaced.
+        await stopHub()
+        authMethod = .google
+        phase = .signedIn(email: signIn.email)
+        await startHub()
+        accountChangeInProgress = false
+        unauthorizedDuringChange = false
+    }
+
+    /// S1 §6.8: sign in again with the account's provider, delete the account on the relay, then forget everything
+    /// local exactly as `signOut()` does (without unpairing or logging out: the account is gone).
+    public func deleteAccount() async throws(SignInError) {
+        guard let stored = try? await vault.session() else { throw .server(code: "signed_out") }
+        if stored.authMethod == .password { throw .switchToGoogleFirst }
+        let nonce: String
+        let idToken: String
+        do {
+            nonce = try await relay.nonce()
+            switch stored.authMethod {
+            case .apple:
+                idToken = try await identity.appleCredential(requestNonce: AuthCrypto.sha256Hex(nonce)).identityToken
+            default:
+                idToken = try await identity.googleIDToken(nonce: nonce)
+            }
+        } catch {
+            throw SignInError(error)
+        }
+        beginAccountChange()
+        do {
+            try await relay.deleteAccount(idToken: idToken, nonce: nonce, token: stored.token)
+        } catch {
+            throw await endFailedAccountChange(error)
+        }
+        await stopHub()
+        await forgetLocalData()
         authMethod = nil
         phase = .signedOut(expired: false)
+        accountChangeInProgress = false
+        unauthorizedDuringChange = false
+    }
+
+    private func beginAccountChange() {
+        accountChangeInProgress = true
+        unauthorizedDuringChange = false
+    }
+
+    /// A switch or deletion failed on the relay: the session and the hub stay, unless the stored token itself was
+    /// refused (or a 401 raced the call), which signs out as expired.
+    private func endFailedAccountChange(_ error: any Error) async -> SignInError {
+        accountChangeInProgress = false
+        let sawUnauthorized = unauthorizedDuringChange
+        unauthorizedDuringChange = false
+        if case RelayAPIError.http(401, "unauthorized") = error {
+            await handleUnauthorized()
+            return .server(code: "unauthorized")
+        }
+        if sawUnauthorized { await handleUnauthorized() }
+        return SignInError(error)
     }
 
     /// The relay refused the stored token: drop the session only. The phone key and the Macs stay,
     /// so signing in again as the same account needs no new pairing.
     public func handleUnauthorized() async {
+        if accountChangeInProgress {
+            unauthorizedDuringChange = true
+            return
+        }
         await stopHub()
         do { try await vault.clearSession() } catch {
             log.error("unauthorized_clear_failed")
