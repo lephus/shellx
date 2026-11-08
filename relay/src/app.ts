@@ -27,6 +27,7 @@ import type { PushGateway } from "./push/fcm.js";
 import type { AppleTokenGateway } from "./auth/apple-rest.js";
 import { type IdTokenVerifier, loadIdTokenVerifier } from "./auth/id-token.js";
 import { appleLinkRoutes } from "./routes/apple-link.js";
+import { identityRoutes } from "./routes/identities.js";
 import { signInRoutes } from "./routes/sign-in.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 import { readNativeLatest } from "./native-latest.js";
@@ -134,6 +135,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/auth", signInRoutes);
   app.route("/v1/auth/apple/link", appleLinkRoutes);
   app.route("/v1/account", accountRoutes);
+  app.route("/v1/account/identities", identityRoutes);
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);
   app.route("/v1/notifications", notificationRoutes);
