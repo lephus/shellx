@@ -36,6 +36,7 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, 
     private var nextAgentOutcome: WorkspaceControlOutcome?
     private var terminalCalls: [(workspaceId: String, terminalId: String)] = []
     private var nextTerminalOutcome: WorkspaceControlOutcome?
+    private var addedTerminals = 0
     private let sessions: FakeMacSessions
 
     /// `sessions` is the Mac's session list, where a closed agent turns `.ended`.
@@ -73,6 +74,26 @@ final class FakeMacWorkspaces: WorkspaceSource, WorkspaceControl, AgentControl, 
         lock.withLock {
             guard byId.removeValue(forKey: workspaceId) != nil else { return }
             broadcastLocked(upserted: [], removed: [workspaceId])
+        }
+    }
+
+    /// True when a workspace the Mac lists has the terminal `terminalId`.
+    func listsTerminal(_ terminalId: String) -> Bool {
+        lock.withLock { byId.values.contains { $0.terminals.contains { $0.terminalId == terminalId } } }
+    }
+
+    /// Appends LinkTerminal(terminalId: "<workspaceId>-new-<n>" (n = 1, 2, … over the Mac's life), title: "zsh",
+    /// order: the workspace's last order + 1, selected: false) and broadcasts the change; nil for a workspace it does not list.
+    func addTerminal(to workspaceId: String) -> String? {
+        lock.withLock {
+            guard var workspace = byId[workspaceId] else { return nil }
+            addedTerminals += 1
+            let id = "\(workspaceId)-new-\(addedTerminals)"
+            let order = (workspace.terminals.map(\.order).max() ?? -1) + 1
+            workspace.terminals.append(LinkTerminal(terminalId: id, title: "zsh", order: order, selected: false))
+            byId[workspaceId] = workspace
+            broadcastLocked(upserted: [workspace], removed: [])
+            return id
         }
     }
 
