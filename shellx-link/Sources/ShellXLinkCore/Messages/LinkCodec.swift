@@ -36,6 +36,11 @@ public enum LinkCodec {
         static let workspaceClose = "workspace.close", workspaceCloseResult = "workspace.close.result"
         static let agentClose = "agent.close", agentCloseResult = "agent.close.result"
         static let terminalClose = "terminal.close", terminalCloseResult = "terminal.close.result"
+        static let terminalViewOpen = "terminal.view.open", terminalViewOpenResult = "terminal.view.open.result"
+        static let terminalViewInput = "terminal.view.input", terminalViewResize = "terminal.view.resize"
+        static let terminalViewResync = "terminal.view.resync", terminalViewClose = "terminal.view.close"
+        static let terminalViewEnded = "terminal.view.ended"
+        static let terminalCreate = "terminal.create", terminalCreateResult = "terminal.create.result"
     }
 
     // Per-message bodies (keys are snake_case on the wire).
@@ -84,6 +89,19 @@ public enum LinkCodec {
     private struct TerminalClose: Codable { var callId: String; var workspaceId: String; var terminalId: String }
     /// `workspace.rename.result`, `workspace.close.result`, `agent.close.result` and `terminal.close.result`.
     private struct WorkspaceOutcome: Codable { var callId: String; var outcome: WorkspaceControlOutcome }
+
+    private struct TerminalViewOpen: Codable { var callId: String; var terminalId: String; var cols: Int; var rows: Int }
+    private struct TerminalViewOpenResult: Codable { var callId: String; var outcome: TerminalViewOpenOutcome }
+    private struct TerminalViewInput: Codable { var terminalId: String; var units: [TerminalInputUnit] }
+    private struct TerminalViewSize: Codable { var terminalId: String; var cols: Int; var rows: Int }
+    /// `terminal.view.resync` and `terminal.view.close`.
+    private struct TerminalRef: Codable { var terminalId: String }
+    private struct TerminalViewEnded: Codable { var terminalId: String; var reason: TerminalViewEndReason }
+    private struct TerminalCreate: Codable { var callId: String; var workspaceId: String }
+    /// `terminal_id` is omitted when nil: the host sets it only when `outcome` is `ok`.
+    private struct TerminalCreateResult: Codable {
+        var callId: String; var outcome: WorkspaceControlOutcome; var terminalId: String?
+    }
 
     private struct Envelope { var v: Int; var t: String }
 
@@ -236,6 +254,26 @@ public enum LinkCodec {
             case let .terminalCloseResult(callId, outcome):
                 try requireValid(callId)
                 data = try enc(T.terminalCloseResult, WorkspaceOutcome(callId: callId, outcome: outcome))
+            case let .terminalViewOpen(callId, terminalId, cols, rows):
+                try requireValid(callId)
+                data = try enc(T.terminalViewOpen, TerminalViewOpen(callId: callId, terminalId: terminalId, cols: cols, rows: rows))
+            case let .terminalViewOpenResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.terminalViewOpenResult, TerminalViewOpenResult(callId: callId, outcome: outcome))
+            case let .terminalViewInput(terminalId, units):
+                data = try enc(T.terminalViewInput, TerminalViewInput(terminalId: terminalId, units: units))
+            case let .terminalViewResize(terminalId, cols, rows):
+                data = try enc(T.terminalViewResize, TerminalViewSize(terminalId: terminalId, cols: cols, rows: rows))
+            case let .terminalViewResync(terminalId): data = try enc(T.terminalViewResync, TerminalRef(terminalId: terminalId))
+            case let .terminalViewClose(terminalId): data = try enc(T.terminalViewClose, TerminalRef(terminalId: terminalId))
+            case let .terminalViewEnded(terminalId, reason):
+                data = try enc(T.terminalViewEnded, TerminalViewEnded(terminalId: terminalId, reason: reason))
+            case let .terminalCreate(callId, workspaceId):
+                try requireValid(callId)
+                data = try enc(T.terminalCreate, TerminalCreate(callId: callId, workspaceId: workspaceId))
+            case let .terminalCreateResult(callId, outcome, terminalId):
+                try requireValid(callId)
+                data = try enc(T.terminalCreateResult, TerminalCreateResult(callId: callId, outcome: outcome, terminalId: terminalId))
             case .unknown: throw LinkCodecError.cannotEncodeUnknown
             }
         } catch let e as LinkCodecError {
@@ -373,6 +411,29 @@ public enum LinkCodec {
         case T.terminalCloseResult:
             let b = try call(WorkspaceOutcome.self, \.callId)
             return .terminalCloseResult(callId: b.callId, outcome: b.outcome)
+        case T.terminalViewOpen:
+            let b = try call(TerminalViewOpen.self, \.callId)
+            return .terminalViewOpen(callId: b.callId, terminalId: b.terminalId, cols: b.cols, rows: b.rows)
+        case T.terminalViewOpenResult:
+            let b = try call(TerminalViewOpenResult.self, \.callId)
+            return .terminalViewOpenResult(callId: b.callId, outcome: b.outcome)
+        case T.terminalViewInput:
+            let b = try body(TerminalViewInput.self)
+            return .terminalViewInput(terminalId: b.terminalId, units: b.units)
+        case T.terminalViewResize:
+            let b = try body(TerminalViewSize.self)
+            return .terminalViewResize(terminalId: b.terminalId, cols: b.cols, rows: b.rows)
+        case T.terminalViewResync: return .terminalViewResync(terminalId: try body(TerminalRef.self).terminalId)
+        case T.terminalViewClose: return .terminalViewClose(terminalId: try body(TerminalRef.self).terminalId)
+        case T.terminalViewEnded:
+            let b = try body(TerminalViewEnded.self)
+            return .terminalViewEnded(terminalId: b.terminalId, reason: b.reason)
+        case T.terminalCreate:
+            let b = try call(TerminalCreate.self, \.callId)
+            return .terminalCreate(callId: b.callId, workspaceId: b.workspaceId)
+        case T.terminalCreateResult:
+            let b = try call(TerminalCreateResult.self, \.callId)
+            return .terminalCreateResult(callId: b.callId, outcome: b.outcome, terminalId: b.terminalId)
         default: return .unknown(type: env.t, callId: readCallId(d))
         }
     }

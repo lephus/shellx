@@ -844,9 +844,41 @@ final class LinkCodecTests: XCTestCase {
                 callId: try s("call_id"), workspaceId: try s("workspace_id"), terminalId: try s("terminal_id"))
         case "terminal_close_result":
             return .terminalCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
+        case "terminal_view_open":
+            return .terminalViewOpen(callId: try s("call_id"), terminalId: try s("terminal_id"),
+                                     cols: try n("cols").intValue, rows: try n("rows").intValue)
+        case "terminal_view_open_result":
+            return .terminalViewOpenResult(callId: try s("call_id"), outcome: TerminalViewOpenOutcome(wire: try s("outcome")))
+        case "terminal_view_input": return .terminalViewInput(terminalId: try s("terminal_id"), units: try terminalUnits(m["units"]))
+        case "terminal_view_resize":
+            return .terminalViewResize(terminalId: try s("terminal_id"), cols: try n("cols").intValue, rows: try n("rows").intValue)
+        case "terminal_view_resync": return .terminalViewResync(terminalId: try s("terminal_id"))
+        case "terminal_view_close": return .terminalViewClose(terminalId: try s("terminal_id"))
+        case "terminal_view_ended":
+            return .terminalViewEnded(terminalId: try s("terminal_id"), reason: TerminalViewEndReason(wire: try s("reason")))
+        case "terminal_create": return .terminalCreate(callId: try s("call_id"), workspaceId: try s("workspace_id"))
+        case "terminal_create_result":
+            return .terminalCreateResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")),
+                                         terminalId: m["terminal_id"] as? String)
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)
+        }
+    }
+
+    static func terminalUnits(_ o: Any?) throws -> [TerminalInputUnit] {
+        let arr = try XCTUnwrap(o as? [[String: Any]])
+        return try arr.map { u in
+            let k = try XCTUnwrap(u["k"] as? String)
+            switch k {
+            case "text": return .text(try XCTUnwrap(u["text"] as? String))
+            case "key":
+                let mods = (u["mods"] as? [String] ?? []).map(TerminalModifier.init(wire:))
+                return .key(TerminalKey(wire: try XCTUnwrap(u["key"] as? String)), mods: mods)
+            case "paste": return .paste(try XCTUnwrap(u["text"] as? String))
+            case "scroll": return .scroll(lines: try XCTUnwrap(u["lines"] as? Int))
+            default: return .other(kind: k)
+            }
         }
     }
 }

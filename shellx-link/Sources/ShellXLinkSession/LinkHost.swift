@@ -426,9 +426,16 @@ public actor LinkHost {
                     let outcome = await terminalControl.closeTerminal(workspaceId: workspaceId, terminalId: terminalId)
                     try? await channel.send(.terminalCloseResult(callId: callId, outcome: outcome))
                 }
+            case let .terminalViewOpen(callId, _, _, _):
+                await Self.sendError(on: channel, "unsupported", "this host offers no terminal views", callId: callId)
+            case let .terminalCreate(callId, _):
+                await Self.sendError(on: channel, "unsupported", "this host takes no terminal creation", callId: callId)
+            case .terminalViewInput, .terminalViewResize, .terminalViewResync, .terminalViewClose:
+                break
             case .pong, .unknown, .error:
                 break
-            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged:
+            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged,
+                 .terminalViewEnded:
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
             case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
@@ -436,7 +443,8 @@ public actor LinkHost {
                  let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
                  let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
                  let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
-                 let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _):
+                 let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _),
+                 let .terminalViewOpenResult(callId, _), let .terminalCreateResult(callId, _, _):
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }

@@ -1732,6 +1732,272 @@
         "call_id": "c91",
         "outcome": "not_found"
       }
+    },
+    {
+      "name": "terminal_view_open",
+      "message": {
+        "case": "terminal_view_open",
+        "call_id": "c100",
+        "terminal_id": "t-1",
+        "cols": 46,
+        "rows": 30
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open",
+        "call_id": "c100",
+        "terminal_id": "t-1",
+        "cols": 46,
+        "rows": 30
+      }
+    },
+    {
+      "name": "terminal_view_open_result_ok",
+      "message": {
+        "case": "terminal_view_open_result",
+        "call_id": "c100",
+        "outcome": "ok"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open.result",
+        "call_id": "c100",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "terminal_view_open_result_busy",
+      "message": {
+        "case": "terminal_view_open_result",
+        "call_id": "c100",
+        "outcome": "busy"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open.result",
+        "call_id": "c100",
+        "outcome": "busy"
+      }
+    },
+    {
+      "name": "terminal_view_open_result_not_found",
+      "message": {
+        "case": "terminal_view_open_result",
+        "call_id": "c100",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open.result",
+        "call_id": "c100",
+        "outcome": "not_found"
+      }
+    },
+    {
+      "name": "terminal_view_input_text_and_enter",
+      "message": {
+        "case": "terminal_view_input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "text",
+            "text": "ls -la"
+          },
+          {
+            "k": "key",
+            "key": "enter"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "text",
+            "text": "ls -la"
+          },
+          {
+            "k": "key",
+            "key": "enter"
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_input_ctrl_c",
+      "message": {
+        "case": "terminal_view_input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key",
+            "key": "c",
+            "mods": [
+              "ctrl"
+            ]
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key",
+            "key": "c",
+            "mods": [
+              "ctrl"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_input_paste_and_scroll",
+      "message": {
+        "case": "terminal_view_input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "paste",
+            "text": "echo a\necho b"
+          },
+          {
+            "k": "scroll",
+            "lines": -3
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "paste",
+            "text": "echo a\necho b"
+          },
+          {
+            "k": "scroll",
+            "lines": -3
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_resize",
+      "message": {
+        "case": "terminal_view_resize",
+        "terminal_id": "t-1",
+        "cols": 80,
+        "rows": 24
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.resize",
+        "terminal_id": "t-1",
+        "cols": 80,
+        "rows": 24
+      }
+    },
+    {
+      "name": "terminal_view_resync",
+      "message": {
+        "case": "terminal_view_resync",
+        "terminal_id": "t-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.resync",
+        "terminal_id": "t-1"
+      }
+    },
+    {
+      "name": "terminal_view_close",
+      "message": {
+        "case": "terminal_view_close",
+        "terminal_id": "t-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.close",
+        "terminal_id": "t-1"
+      }
+    },
+    {
+      "name": "terminal_view_ended_gone",
+      "message": {
+        "case": "terminal_view_ended",
+        "terminal_id": "t-1",
+        "reason": "gone"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.ended",
+        "terminal_id": "t-1",
+        "reason": "gone"
+      }
+    },
+    {
+      "name": "terminal_view_ended_not_open",
+      "message": {
+        "case": "terminal_view_ended",
+        "terminal_id": "t-2",
+        "reason": "not_open"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.ended",
+        "terminal_id": "t-2",
+        "reason": "not_open"
+      }
+    },
+    {
+      "name": "terminal_create",
+      "message": {
+        "case": "terminal_create",
+        "call_id": "c101",
+        "workspace_id": "ws-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.create",
+        "call_id": "c101",
+        "workspace_id": "ws-1"
+      }
+    },
+    {
+      "name": "terminal_create_result_ok",
+      "message": {
+        "case": "terminal_create_result",
+        "call_id": "c101",
+        "outcome": "ok",
+        "terminal_id": "t-9"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.create.result",
+        "call_id": "c101",
+        "outcome": "ok",
+        "terminal_id": "t-9"
+      }
+    },
+    {
+      "name": "terminal_create_result_refused",
+      "message": {
+        "case": "terminal_create_result",
+        "call_id": "c101",
+        "outcome": "refused"
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.create.result",
+        "call_id": "c101",
+        "outcome": "refused"
+      }
     }
   ],
   "decode_only": [
@@ -2046,6 +2312,122 @@
         "session_id": "s-1",
         "text": "hi"
       }
+    },
+    {
+      "name": "terminal_view_open_result_unknown_outcome",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open.result",
+        "call_id": "c100",
+        "outcome": "later"
+      },
+      "message": {
+        "case": "terminal_view_open_result",
+        "call_id": "c100",
+        "outcome": "later"
+      }
+    },
+    {
+      "name": "terminal_view_ended_unknown_reason",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.ended",
+        "terminal_id": "t-1",
+        "reason": "evicted"
+      },
+      "message": {
+        "case": "terminal_view_ended",
+        "terminal_id": "t-1",
+        "reason": "evicted"
+      }
+    },
+    {
+      "name": "terminal_view_input_unknown_unit_kind",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "gesture",
+            "dx": 1
+          },
+          {
+            "k": "text",
+            "text": "a"
+          }
+        ]
+      },
+      "message": {
+        "case": "terminal_view_input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "gesture"
+          },
+          {
+            "k": "text",
+            "text": "a"
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_input_unknown_key_and_modifier",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key",
+            "key": "f13",
+            "mods": [
+              "hyper",
+              "ctrl"
+            ]
+          }
+        ]
+      },
+      "message": {
+        "case": "terminal_view_input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key",
+            "key": "f13",
+            "mods": [
+              "hyper",
+              "ctrl"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_input_empty_mods",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key",
+            "key": "tab",
+            "mods": []
+          }
+        ]
+      },
+      "message": {
+        "case": "terminal_view_input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key",
+            "key": "tab"
+          }
+        ]
+      }
     }
   ],
   "decode_errors": [
@@ -2303,6 +2685,92 @@
       },
       "error": "bad_json",
       "call_id": "c73"
+    },
+    {
+      "name": "terminal_view_open_without_call_id",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open",
+        "terminal_id": "t-1",
+        "cols": 46,
+        "rows": 30
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_open_missing_rows",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.open",
+        "call_id": "c102",
+        "terminal_id": "t-1",
+        "cols": 46
+      },
+      "error": "bad_json",
+      "call_id": "c102"
+    },
+    {
+      "name": "terminal_view_input_key_without_key",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "key"
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_input_text_not_a_string",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "k": "text",
+            "text": 5
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_input_unit_without_k",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.input",
+        "terminal_id": "t-1",
+        "units": [
+          {
+            "text": "a"
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_create_missing_workspace_id",
+      "json": {
+        "v": 1,
+        "t": "terminal.create",
+        "call_id": "c103"
+      },
+      "error": "bad_json",
+      "call_id": "c103"
+    },
+    {
+      "name": "terminal_create_result_missing_outcome",
+      "json": {
+        "v": 1,
+        "t": "terminal.create.result",
+        "call_id": "c104"
+      },
+      "error": "bad_json",
+      "call_id": "c104"
     }
   ],
   "boundary_frames": {

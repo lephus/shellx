@@ -53,6 +53,18 @@ public enum LinkMessage: Equatable, Sendable {
     case agentCloseResult(callId: String, outcome: WorkspaceControlOutcome)
     case terminalClose(callId: String, workspaceId: String, terminalId: String)
     case terminalCloseResult(callId: String, outcome: WorkspaceControlOutcome)
+    /// Starts a view of a terminal at the size the phone can show (PROTOCOL.md section 11.1).
+    case terminalViewOpen(callId: String, terminalId: String, cols: Int, rows: Int)
+    case terminalViewOpenResult(callId: String, outcome: TerminalViewOpenOutcome)
+    case terminalViewInput(terminalId: String, units: [TerminalInputUnit])
+    case terminalViewResize(terminalId: String, cols: Int, rows: Int)
+    case terminalViewResync(terminalId: String)
+    case terminalViewClose(terminalId: String)
+    case terminalViewEnded(terminalId: String, reason: TerminalViewEndReason)
+    /// Opens a terminal tab in a workspace (PROTOCOL.md section 11.9).
+    case terminalCreate(callId: String, workspaceId: String)
+    /// `terminalId` is the new terminal, present only when `outcome` is `ok`.
+    case terminalCreateResult(callId: String, outcome: WorkspaceControlOutcome, terminalId: String?)
     /// Decode-only: a well-formed frame whose `t` this version does not know. `callId` is the frame's `call_id`
     /// when it is a valid one (1 to 64 UTF-8 bytes): such a frame is a call of a later version, which a host
     /// answers `error` `unsupported` (PROTOCOL.md section 3).
