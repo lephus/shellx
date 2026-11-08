@@ -35,11 +35,13 @@ try {
 }
 
 // Push is optional (push spec §5): without a usable FCM_SERVICE_ACCOUNT the relay runs as before.
+// The one FCM client serves POST /v1/notifications and the Android app's data messages.
 const push = loadPush(process.env);
 if (push.gateway === null) logMeta("push_disabled", { reason: push.reason });
 else logMeta("push_enabled", { project: push.projectId });
 // APNs for the native iPhone app is optional as well: without APNS_KEY_PATH, APNS_KEY_ID and
-// APNS_TEAM_ID (and a readable .p8 key) POST /v2/notifications answers 503.
+// APNS_TEAM_ID (and a readable .p8 key) POST /v2/notifications reaches Android phones only
+// (503 only when FCM is off too).
 const apns = loadApns(process.env);
 if (apns.gateway === null) logMeta("apns_disabled", { reason: apns.reason });
 else logMeta("apns_enabled");
@@ -56,7 +58,7 @@ else logMeta("relay_v2_disabled", { reason: config.relayV2DisabledReason });
 
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
-  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, apns: apns.gateway },
+  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, fcm: push.gateway, apns: apns.gateway },
   { host: config.host, port: config.port },
 ).catch((err: unknown) => fail(`cannot listen on ${config.host}:${config.port} (${errorKind(err)})`));
 logMeta("relay_started", { port: relay.port });

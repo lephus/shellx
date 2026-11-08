@@ -182,7 +182,7 @@ export type ApnsSetup = { gateway: ApnsGateway } | { gateway: null; reason: Apns
 /**
  * `APNS_KEY_PATH` (the `.p8` file, mounted read-only), `APNS_KEY_ID` and `APNS_TEAM_ID`. Any missing,
  * or a file that is not a key: push to iPhones is off, the relay keeps running and
- * `POST /v2/notifications` answers 503 `push_unavailable`.
+ * `POST /v2/notifications` reaches Android phones only (503 `push_unavailable` when FCM is off too).
  */
 export function loadApns(
   env: Readonly<Record<string, string | undefined>>, options: { readFile?: (path: string) => string } = {},

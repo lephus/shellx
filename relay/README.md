@@ -44,7 +44,8 @@ stops the relay with one line on stderr and exit status 1.
 | `HOST` | `0.0.0.0` | Listening address (`npm run dev` uses `127.0.0.1`) |
 | `DB_PATH` | `/data/relay.db` | SQLite file; its directory is created if missing |
 | `RATE_LIMITS_ENABLED` | on | Only the exact value `false` turns the login/register/upgrade/notification limits off |
-| `FCM_SERVICE_ACCOUNT` | unset | Path of the Firebase service account JSON key (push notifications). Unset, unreadable or invalid → push is off, the relay runs normally, logs `push_disabled` with the reason once, and `POST /v1/notifications` answers 503 `push_unavailable` |
+| `FCM_SERVICE_ACCOUNT` | unset | Path of the Firebase service account JSON key (push through FCM: `POST /v1/notifications`, and the Android phones of `POST /v2/notifications`). Unset, unreadable or invalid → FCM push is off, the relay runs normally, logs `push_disabled` with the reason once, `POST /v1/notifications` answers 503 `push_unavailable` and `POST /v2/notifications` reaches iPhones only (503 when APNs is off too) |
+| `APNS_KEY_PATH`, `APNS_KEY_ID`, `APNS_TEAM_ID` | unset | The APNs provider key (`.p8` file path), its key id and the Apple team id (push to the native iPhone app through `POST /v2/notifications`). Any unset, or a file that is not a key → iPhone push is off, the relay runs normally and logs `apns_disabled` with the reason once; `POST /v2/notifications` then reaches Android phones only (503 `push_unavailable` when FCM is off too) |
 | `ADMIN_HOST` | `admin.shellx.pro` | Host name of the admin dashboard (see "Admin dashboard" below); a value that is not a bare host name stops the relay |
 | `ADMIN_PASSWORD` | unset | The admin dashboard's password. Unset or shorter than 16 characters → admin is off (`admin_disabled` logged once with the reason, never the password) and the relay runs normally |
 | `FCM_ENDPOINT`, `FCM_TOKEN_ENDPOINT` | Google | **Tests only:** base URL of the FCM API and the OAuth token URL, e.g. a fake FCM server. Honoured only for loopback `http(s)://127.0.0.1`/`localhost`/`[::1]` URLs, ignored otherwise |
@@ -186,13 +187,32 @@ Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.
   tokens FCM reports `UNREGISTERED`/`INVALID_ARGUMENT` are deleted; other FCM errors are logged by
   kind and not retried. 120 per agent per hour (`429 rate_limited`). 503 `push_unavailable` without
   configuration.
+- `POST /v2/notifications {kind, request_id, agent?, workspace_title?}` (native desktops with a
+  registered machine: `403 desktop_only` otherwise, `404` without a machine): `kind` is `needs_you`
+  (with `agent`, 1..64 characters, and an optional `workspace_title` up to 200) or `resolved`;
+  `request_id` is 1..64 bytes. Recipients are the phones granted this machine with a live sign-in.
+  iPhones (a token with `apns_topic`) get APNs: for `needs_you` an alert in the phone's own words
+  (`push.needsYou[.workspace]`), priority 10, `apns-collapse-id` = `request_id`, kept 24 h; for
+  `resolved` a background push. Android phones (device `platform` `android`, a token without
+  `apns_topic`) get an FCM data-only message (no `notification` block): `data` is `{kind,
+  machine_id, request_id}`, plus `agent` and `workspace_title` (`""` when none) for `needs_you`;
+  `android.priority` is `high` for `needs_you` and `normal` for `resolved`; both carry
+  `android.ttl` `86400s` and `android.collapse_key` = `request_id`, so a `resolved` replaces a
+  `needs_you` that has not been delivered yet. Nothing the agent asks is ever sent. Answers
+  `202 {sent}` once every send has finished; one phone's failure never stops the others; tokens
+  APNs or FCM report as gone are deleted. `503 push_unavailable` only when neither APNs nor FCM is
+  configured (with one of them, the other platform's phones are skipped). A valid `needs_you`
+  counts once against the Mac's notification limit (120 per hour, `429 rate_limited`); `resolved`
+  never does. The `v2_notification` log line has the kind and counts (`recipients`,
+  `fcm_recipients`, `sent`, `tokens_removed`), never the agent, the workspace, the request id or a
+  token.
 - `src/push/fcm.ts` talks to FCM HTTP v1 with an OAuth token from a JWT (RS256, `node:crypto`)
   signed with the service account key; the token is cached until a minute before it expires.
 - Logs never contain titles, bodies or tokens (only counts and the agent's `device_id`).
 - **Local test against a fake FCM server:** `npm run fake-fcm-account -- .data/fake-fcm.json`, then
   `FCM_SERVICE_ACCOUNT=.data/fake-fcm.json FCM_ENDPOINT=http://127.0.0.1:8788
   FCM_TOKEN_ENDPOINT=http://127.0.0.1:8788/token npm run dev` (environment variables win over
-  `dev.env`). `packages/shellx_e2e/test/push_e2e_test.dart` runs that fake server on port 8788.
+  `dev.env`). `test/server.test.ts` ("push configuration") runs the relay process against such a fake server for `POST /v1/notifications` and for `POST /v2/notifications` to an Android phone.
 
 ## Admin dashboard
 
