@@ -30,7 +30,7 @@ struct RootView: View {
             if let hub = coordinator.hub, hub.isLoaded, let scope = graph.scopes.scope(for: hub) {
                 SignedInView(
                     scope: scope, email: email, inbox: inbox, pushTaps: pushTaps, push: graph.push,
-                    signOut: { await coordinator.signOut() })
+                    account: AccountActions(coordinator: coordinator))
                     .id(ObjectIdentifier(hub))
             } else {
                 LaunchView()

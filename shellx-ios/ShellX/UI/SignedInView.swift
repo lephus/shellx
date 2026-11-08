@@ -16,9 +16,13 @@ struct SignedInView: View {
     let pushTaps: PushTapInbox
     /// The relay's copy of this phone's APNs token; nil in the demo.
     let push: PushRegistration?
-    let signOut: () async -> Void
+    /// What Settings and the banner can do for the account; nil in the demo.
+    let account: AccountActions?
 
     @State private var path = NavigationPath()
+    @AppStorage("shellx.switchToGoogleBannerDismissed") private var bannerDismissed = false
+    @State private var bannerSwitching = false
+    @State private var bannerError: String?
     @State private var showsPairing = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -42,12 +46,19 @@ struct SignedInView: View {
                     WorkspaceListView(scope: scope, open: { path.append($0) })
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if SwitchToGoogleBanner.isShown(authMethod: account?.authMethod, dismissed: bannerDismissed) {
+                    SwitchToGoogleBanner(
+                        switching: bannerSwitching, error: bannerError, switchNow: switchNow,
+                        dismiss: { bannerDismissed = true })
+                }
+            }
             .navigationDestination(for: HomeRoute.self) { route in
                 switch route {
                 case .machines:
                     MachinesView(hub: hub, pair: openPairing)
                 case .settings:
-                    SettingsView(email: email, signOut: signOut)
+                    SettingsView(email: email, account: account)
                 case .pending:
                     PendingListView(hub: hub, center: scope.decisions)
                 case let .pendingIn(machineID, workspaceId):
@@ -102,6 +113,19 @@ struct SignedInView: View {
     private func takePushTap() {
         guard !hub.machines.isEmpty, pushTaps.take() else { return }
         path = NavigationPath([HomeRoute.pending])
+    }
+
+    /// "Switch" on the banner; a success restarts the hub, which brings these screens back at the home.
+    private func switchNow() {
+        guard let account, !bannerSwitching else { return }
+        bannerSwitching = true
+        bannerError = nil
+        Task {
+            do { try await account.switchToGoogle() } catch {
+                if let failure = error as? SignInError { bannerError = SignInErrorText.message(for: failure) }
+            }
+            bannerSwitching = false
+        }
     }
 
     private func openPairing() {

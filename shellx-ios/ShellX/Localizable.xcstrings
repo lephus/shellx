@@ -4765,6 +4765,168 @@
           }
         }
       }
+    },
+    "settings.account.switchToGoogle": {
+      "comment": "Settings › Account row and banner title for a password session (S1 §6.3b); same words as the Mac's `remote.signin.switch.title` (plan 1B).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Google sign-in"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang đăng nhập Google"
+          }
+        }
+      }
+    },
+    "settings.account.switchToGoogle.detail": {
+      "comment": "Footer of the Account section and text of the banner for a password session.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password sign-in is going away. Switching keeps your Macs and history."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sắp bỏ đăng nhập bằng mật khẩu. Chuyển sang Google vẫn giữ các Mac và lịch sử của bạn."
+          }
+        }
+      }
+    },
+    "settings.account.delete": {
+      "comment": "Destructive Settings › Account row; opens the confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Account…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá tài khoản…"
+          }
+        }
+      }
+    },
+    "settings.account.delete.title": {
+      "comment": "Title of the account deletion sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete your ShellX account?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá tài khoản ShellX?"
+          }
+        }
+      }
+    },
+    "settings.account.delete.message": {
+      "comment": "What deleting the account does (S1 §6.8).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This deletes your ShellX account for good. Every Mac and phone signed in to it is signed out, its pairings and shared sessions end, and this iPhone's history is removed. To confirm, you sign in once more."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thao tác này xoá vĩnh viễn tài khoản ShellX của bạn. Mọi Mac và điện thoại đang đăng nhập bị đăng xuất, các ghép cặp và phiên chia sẻ kết thúc, lịch sử trên iPhone này bị xoá. Để xác nhận, bạn đăng nhập lại một lần."
+          }
+        }
+      }
+    },
+    "settings.account.delete.button": {
+      "comment": "Destructive button of the deletion sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Account"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá tài khoản"
+          }
+        }
+      }
+    },
+    "settings.account.delete.deleting": {
+      "comment": "While the account is being deleted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleting…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang xoá…"
+          }
+        }
+      }
+    },
+    "switchToGoogle.banner.switch": {
+      "comment": "Banner button: switch to Google sign-in now.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển"
+          }
+        }
+      }
+    },
+    "switchToGoogle.banner.later": {
+      "comment": "Banner button: hide the banner for good (Settings keeps the row).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Now"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Để sau"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
