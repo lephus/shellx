@@ -45,7 +45,7 @@ final class TerminalVectorTests: XCTestCase {
 
     func testInputChecks() throws {
         let checks = try XCTUnwrap(try Self.vectors()["input_checks"] as? [[String: Any]])
-        XCTAssertEqual(checks.count, 27)
+        XCTAssertEqual(checks.count, 28)
         for check in checks {
             let name = check["name"] as? String ?? "?"
             let frame: [String: Any] = ["v": 1, "t": "terminal.view.input", "terminal_id": "t-1", "units": try XCTUnwrap(check["units"])]
