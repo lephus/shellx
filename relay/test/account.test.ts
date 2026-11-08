@@ -3,9 +3,10 @@ import { passwords, type PasswordHasher } from "../src/auth/password.js";
 import type { HubRegistry } from "../src/hub/registry.js";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
-  call, connect, CountingLimiter, db, deviceBody, errorCode, FakeSocket, hex, hubs, loginDevice, makeApp, newPairingId,
-  pair, registerAccount, type TestSocket, unlimited,
+  appleIdToken, call, connect, CountingLimiter, db, deviceBody, errorCode, FakeSocket, googleIdToken, googleSession, hex, hubs,
+  linkAppleIdByQr, loginDevice, makeApp, newPairingId, pair, registerAccount, registerMachine, type TestApp, type TestSocket, unlimited,
 } from "./helpers.js";
+import { FakeAppleTokens } from "./fake-idp.js";
 
 const NEW_PASSWORD = "brand new password";
 
@@ -211,6 +212,7 @@ describe("DELETE /v1/account", () => {
     expect(await errorCode(res)).toBe("invalid_credentials");
     const missing = await call(app, "DELETE", "/v1/account", { token: account.agent.token, body: {} });
     expect(missing.status).toBe(401);
+    expect(await errorCode(missing)).toBe("reauth_required");
     expect(countRows("SELECT COUNT(*) AS n FROM users WHERE id = ?", account.agent.userId)).toBe(1);
   });
 
@@ -409,5 +411,53 @@ describe("agent logout: safe notify-then-delete order and queue purge", () => {
     const output = lines.join("\n");
     expect(output).toContain("agent_purge_failed");
     expect(output).not.toContain("hub is down");
+  });
+});
+
+describe("DELETE /v1/account with a fresh sign-in (S1 §6.8)", () => {
+  const del = (app: TestApp, token: string, body: Record<string, unknown>) => call(app, "DELETE", "/v1/account", { token, body });
+  const gone = (userId: string) => db().get("SELECT COUNT(*) AS n FROM users WHERE id = ?", userId);
+
+  it("deletes for a fresh Google token of the account's own Google account", async () => {
+    const app = makeApp();
+    const s = await googleSession(app);
+    expect((await del(app, s.token, await googleIdToken(app, { sub: s.sub }))).status).toBe(204);
+    expect(gone(s.userId)).toEqual({ n: 0 });
+    expect(db().get("SELECT COUNT(*) AS n FROM identities")).toEqual({ n: 0 });
+  });
+
+  it("deletes for a fresh Apple token and asks Apple to revoke the stored refresh token, even when Apple refuses", async () => {
+    const tokens = new FakeAppleTokens();
+    tokens.revokeOk = false;
+    const app = makeApp({ appleTokens: tokens });
+    const desk = await googleSession(app, { kind: "desktop" });
+    const machine = await registerMachine(app, desk.token);
+    const apple = await linkAppleIdByQr(app, desk.token, machine.machine_id);
+    const { identity_token, nonce } = await appleIdToken(app, { sub: apple.sub });
+    expect((await del(app, apple.session.token, { id_token: identity_token, nonce })).status).toBe(204);
+    expect(tokens.revokes).toEqual([{ clientId: "com.shellx.dev", refreshToken: "apple-refresh-token-1" }]);
+    expect(gone(desk.userId)).toEqual({ n: 0 });
+  });
+
+  it("refuses (401 invalid_credentials, nothing deleted) a token over 300 s old, another account's token and a reused nonce", async () => {
+    const app = makeApp();
+    const s = await googleSession(app);
+    const other = await googleSession(app);
+    const old = await googleIdToken(app, { sub: s.sub, claims: { iat: Math.floor(Date.now() / 1000) - 301 } });
+    const foreign = await googleIdToken(app, { sub: other.sub });
+    for (const body of [old, foreign]) {
+      const res = await del(app, s.token, body);
+      expect([res.status, await errorCode(res)]).toEqual([401, "invalid_credentials"]);
+    }
+    const used = await googleIdToken(app, { sub: other.sub });
+    expect((await del(app, other.token, used)).status).toBe(204);
+    expect((await del(app, s.token, used)).status).toBe(401);
+    expect(gone(s.userId)).toEqual({ n: 1 });
+  });
+
+  it("answers 401 reauth_required to an empty body and to a password for a Google account", async () => {
+    const app = makeApp();
+    const s = await googleSession(app);
+    for (const body of [{}, { password: "anything at all" }]) expect(await errorCode(await del(app, s.token, body))).toBe("reauth_required");
   });
 });
