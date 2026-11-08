@@ -13,6 +13,14 @@ struct LoginReply: Decodable, Sendable {
     let device_id: String
 }
 
+/// `auth.session` → the signed-in account as the core stored it (local, no network).
+struct SessionReply: Decodable, Sendable {
+    let user_id: String
+    let device_id: String
+    let email: String?
+    let auth_method: String
+}
+
 /// `machines.register` → `{machine_id, slot, link_slot}`; `link_slot` is null (or absent) from a relay that
 /// predates the ShellX Link lane.
 struct RegisterReply: Decodable, Sendable {
