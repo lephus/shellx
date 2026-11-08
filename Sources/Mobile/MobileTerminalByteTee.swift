@@ -89,6 +89,7 @@ final class MobileTerminalByteTee {
     ] = [:]
     nonisolated private let laneSubscriberCount = OSAllocatedUnfairLock(initialState: 0)
     nonisolated private let laneDemand = AtomicBooleanGate(false)
+    nonisolated private let frameSinkDemand = AtomicBooleanGate(false)
     private let replayBudget: Int = 256 * 1024
     /// Serial queue so fan-out preserves byte order even though the
     /// upstream callback runs off the main thread.
@@ -101,6 +102,20 @@ final class MobileTerminalByteTee {
     // properties (no main-actor work), so the `nonisolated(unsafe) static let
     // shared` can construct it without hopping to the main actor.
     nonisolated private init() {}
+
+    /// Whether PTY output must reach `publishFromMain`: an iroh `terminal.bytes` or `terminal.render_grid` subscriber,
+    /// an iroh terminal lane, or a frame sink. Read on Ghostty's IO thread.
+    nonisolated var hasOutputDemand: Bool {
+        MobileHostService.hasEventSubscribers(topic: "terminal.bytes")
+            || MobileHostService.hasEventSubscribers(topic: "terminal.render_grid")
+            || laneDemand.loadAcquire()
+            || frameSinkDemand.loadAcquire()
+    }
+
+    /// The render observer turns this on with its first frame sink and off with its last.
+    nonisolated func setFrameSinkDemand(_ active: Bool) {
+        frameSinkDemand.storeRelease(active)
+    }
 
     /// Non-isolated entry point called from the C tee trampoline. Safe
     /// to invoke from any thread.
@@ -117,13 +132,7 @@ final class MobileTerminalByteTee {
         // the render-grid stream too: it advances `seq` (read as `stateSeq`)
         // and calls `noteTerminalBytes` to schedule the post-parse tick.
         // Iroh application-lane demand keeps its lock-free gate.
-        guard
-            MobileHostService.hasEventSubscribers(topic: "terminal.bytes")
-                || MobileHostService.hasEventSubscribers(topic: "terminal.render_grid")
-                || laneDemand.loadAcquire()
-        else {
-            return
-        }
+        guard hasOutputDemand else { return }
         guard let base = bytes.baseAddress, bytes.count > 0 else { return }
         let copy = Data(bytes: base, count: bytes.count)
         publishQueue.async { [weak self] in

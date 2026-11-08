@@ -560,6 +560,75 @@ struct ShellXLinkWorkspaceSourceTests {
         }
     }
 
+    // MARK: - Terminal create
+
+    /// A tab opens in a listed workspace, and the new terminal's id comes back.
+    @Test func createTerminalOpensATabInAListedWorkspace() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: UUID())]
+
+        let result = await source.createTerminal(workspaceId: workspace.uuidString)
+
+        #expect(result.outcome == .ok && result.terminalId == "T-NEW")
+        #expect(mac.terminalCreates == [workspace])
+    }
+
+    /// Only a workspace the list holds: a name that is not a UUID and an unlisted workspace are not found, and the Mac
+    /// is asked nothing.
+    @Test func createTerminalOutsideTheListIsNotFound() async {
+        let (mac, source) = Self.makeSource()
+        mac.workspaces = [Self.agentWorkspace(UUID(), terminal: UUID())]
+
+        let named = await source.createTerminal(workspaceId: "ws-a")
+        let unlisted = await source.createTerminal(workspaceId: UUID().uuidString)
+
+        #expect(named.outcome == .notFound && named.terminalId == nil)
+        #expect(unlisted.outcome == .notFound && unlisted.terminalId == nil)
+        #expect(mac.terminalCreates.isEmpty)
+    }
+
+    @Test func createTerminalBlockedIsRefused() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: UUID())]
+        mac.blocked = true
+
+        let result = await source.createTerminal(workspaceId: workspace.uuidString)
+
+        #expect(result.outcome == .refused && result.terminalId == nil)
+        #expect(mac.terminalCreates.isEmpty)
+    }
+
+    @Test(arguments: [
+        ("not_found", WorkspaceControlOutcome.notFound),
+        ("protected", WorkspaceControlOutcome.refused),
+        ("invalid_state", WorkspaceControlOutcome.refused),
+        ("internal_error", WorkspaceControlOutcome.failed),
+        ("unavailable", WorkspaceControlOutcome.failed),
+    ])
+    func createTerminalErrorMapsToOutcome(code: String, outcome: WorkspaceControlOutcome) async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: UUID())]
+        mac.createTerminalResult = .err(code: code, message: "", data: nil)
+
+        let result = await source.createTerminal(workspaceId: workspace.uuidString)
+
+        #expect(result.outcome == outcome && result.terminalId == nil)
+    }
+
+    @Test func createTerminalOkWithoutAnIdIsOkWithoutId() async {
+        let (mac, source) = Self.makeSource()
+        let workspace = UUID()
+        mac.workspaces = [Self.agentWorkspace(workspace, terminal: UUID())]
+        mac.createTerminalResult = .ok([String: Any]())
+
+        let result = await source.createTerminal(workspaceId: workspace.uuidString)
+
+        #expect(result.outcome == .ok && result.terminalId == nil)
+    }
+
     // MARK: - Terminal close
 
     /// One tab of a listed workspace closes, in the workspace the phone named.
@@ -887,10 +956,12 @@ private final class FakeMac {
     /// tab moves) and its surface. A session missing here is not a live agent.
     var agentSurfaces: [String: (workspaceId: UUID, surfaceId: UUID)] = [:]
     var closeSurfaceResult: TerminalController.V2CallResult = .ok([String: Any]())
+    var createTerminalResult: TerminalController.V2CallResult = .ok(["created_terminal_id": "T-NEW"] as [String: Any])
     private(set) var creates = 0
     private(set) var renames: [(workspaceId: String, title: String)] = []
     private(set) var closes: [String] = []
     private(set) var surfaceCloses: [(workspaceId: UUID, surfaceId: UUID)] = []
+    private(set) var terminalCreates: [UUID] = []
     /// How often the source read the list, and asked for an agent's terminal.
     private(set) var snapshotReads = 0
     private(set) var agentSurfaceLookups = 0
@@ -927,6 +998,10 @@ private final class FakeMac {
             closeSurface: { [self] workspaceId, surfaceId in
                 surfaceCloses.append((workspaceId, surfaceId))
                 return closeSurfaceResult
+            },
+            createTerminal: { [self] workspaceId in
+                terminalCreates.append(workspaceId)
+                return createTerminalResult
             },
             isBlocked: { [self] in blocked }
         )
