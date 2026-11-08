@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
 import { requestIp } from "../auth/client-ip.js";
+import { APPLE_LINK_TTL_MS, createAppleLink, purgeAppleLinks } from "../auth/apple-links.js";
 import { parseDevice } from "../auth/device.js";
 import { accountEmail, dropPasswordAccess, identityFromToken, insertIdentity, matchAccount, replaceDeviceToken, signInDevice } from "../auth/identity.js";
 import { ID_TOKEN_MAX_AGE_SEC } from "../auth/id-token.js";
@@ -129,4 +130,84 @@ signInRoutes.post("/google/link", requireAuth, jsonBodyLimit, async (c) => {
 
   logMeta("google_linked", { device_id: auth.deviceId });
   return c.json({ user_id: auth.userId, device_id: auth.deviceId, token, email });
+});
+
+/**
+ * POST /v1/auth/apple {identity_token, authorization_code, nonce, device} — sign in with Apple on an
+ * iPhone. An Apple ID that matches an account signs in; one that matches none (or only an account that
+ * still has a password) gets 202 `link_required` with a link token, to be approved on a Mac (S1 §6.4).
+ */
+signInRoutes.post("/apple", jsonBodyLimit, async (c) => {
+  if (!(await c.get("limiters").loginIp.limit(requestIp(c)))) throw Errors.rateLimited();
+  const body = await readJsonObject(c.req.raw);
+  const device = parseDevice(body.device);
+  if (device === null || device.kind !== "mobile" || device.platform !== "ios") throw Errors.invalidDevice();
+  const db = c.get("db");
+  const now = c.get("now")();
+  const verified = await c.get("idTokens").verify(body.identity_token, {
+    providers: ["apple"], nonce: typeof body.nonce === "string" ? body.nonce : "", maxAgeSec: ID_TOKEN_MAX_AGE_SEC, nowMs: now,
+  });
+  if (verified === null) throw Errors.invalidCredentials();
+  if (!(await consumeNonce(db, body.nonce, now))) {
+    logMeta("sign_in_refused", { provider: "apple", reason: "nonce" });
+    throw Errors.invalidCredentials();
+  }
+  const code = typeof body.authorization_code === "string" && body.authorization_code !== "" ? body.authorization_code : null;
+  const passwordLogin = c.get("config").passwordLogin;
+  // `switch_required` is treated like `none`: the QR link proves ownership through the Mac's Allow and
+  // attaches the Apple ID to the Mac's account, never to the email-matched one (decision 2026-11-07).
+  const pre = matchAccount(db, verified, passwordLogin);
+
+  const gateway = c.get("appleTokens");
+  let refresh: string | null = null;
+  if (gateway !== null && code !== null) {
+    let wanted = pre.kind !== "identity";
+    if (pre.kind === "identity") {
+      const stored = db.get<{ apple_refresh_token: string | null; apple_client_id: string | null }>(
+        "SELECT apple_refresh_token, apple_client_id FROM identities WHERE id = ?", pre.identityId,
+      );
+      wanted = stored?.apple_refresh_token == null || stored.apple_client_id !== verified.audience;
+    }
+    if (wanted) refresh = await gateway.exchangeCode(verified.audience, code);
+  }
+
+  purgeAppleLinks(db, now);
+  if (pre.kind === "none" || pre.kind === "switch_required") {
+    const linkToken = await createAppleLink(db, {
+      subject: verified.subject, email: verified.email, isPrivateEmail: verified.isPrivateEmail, appleClientId: verified.audience,
+      appleRefreshToken: refresh, deviceName: device.name, devicePublicKey: device.publicKey,
+    }, now);
+    logMeta("apple_link_required", {});
+    return c.json({ status: "link_required", link_token: linkToken, expires_in: APPLE_LINK_TTL_MS / 1000 }, 202);
+  }
+
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
+  let dropped = 0;
+  let via: "identity" | "email" = "identity";
+  const result = db.transaction(() => {
+    const match = matchAccount(db, verified, passwordLogin);
+    if (match.kind === "switch_required" || match.kind === "none") throw Errors.invalidCredentials();
+    let identityId: string;
+    if (match.kind === "identity") {
+      identityId = match.identityId;
+      db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", now, identityId);
+      if (refresh !== null) {
+        db.run("UPDATE identities SET apple_refresh_token = ?, apple_client_id = ? WHERE id = ?", refresh, verified.audience, identityId);
+      }
+    } else {
+      dropped = dropPasswordAccess(db, match.userId);
+      identityId = insertIdentity(db, match.userId, {
+        ...identityFromToken(verified), appleRefreshToken: refresh, appleClientId: refresh === null ? null : verified.audience,
+      }, now);
+      via = "email";
+    }
+    const deviceId = signInDevice(db, match.userId, device, tokenHash, "apple", identityId, now);
+    return { userId: match.userId, deviceId, email: accountEmail(db, match.userId) };
+  });
+
+  recordAppVersion(db, result.deviceId, c.req.header(CLIENT_VERSION_HEADER));
+  logMeta("sign_in", { device_id: result.deviceId, provider: "apple", via });
+  if (dropped > 0) logMeta("password_access_dropped", { sessions: dropped });
+  return c.json({ user_id: result.userId, device_id: result.deviceId, token, email: result.email });
 });

@@ -13,7 +13,7 @@ import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import type { HubSocket } from "../src/hub/user-hub.js";
-import { fakeGoogle, fakeTestIdp, googleClaims, testClaims, testIdTokens } from "./fake-idp.js";
+import { appleClaims, fakeApple, fakeGoogle, fakeTestIdp, googleClaims, testClaims, testIdTokens } from "./fake-idp.js";
 import { type ListenOptions, startRelay, type RunningRelay } from "../src/relay.js";
 
 // ---- configuration used by every test relay ---------------------------------------------------
@@ -356,6 +356,39 @@ export async function googleSession(app: TestApp, options: GoogleSignInOptions =
   if (res.status !== 200) throw new Error(`google sign-in failed: ${res.status} ${await res.text()}`);
   const body = await res.json<{ user_id: string; device_id: string; token: string; email: string }>();
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey, sub, email: body.email };
+}
+
+// ---- Apple sign-in ------------------------------------------------------------------------------
+
+export interface AppleSignInOptions {
+  sub?: string;
+  email?: string;
+  isPrivateEmail?: boolean;
+  publicKey?: string;
+  name?: string;
+  /** `null` leaves authorization_code out. */
+  authorizationCode?: string | null;
+  claims?: Record<string, unknown>;
+  ip?: string;
+}
+
+export async function appleIdToken(app: TestApp, options: AppleSignInOptions = {}): Promise<{ identity_token: string; nonce: string }> {
+  const nonce = await newNonce(app, options.ip);
+  const nowSec = Math.floor((app.now ?? Date.now)() / 1000);
+  const identity_token = await fakeApple.sign(appleClaims({
+    nonce, nowSec, sub: options.sub, email: options.email, isPrivateEmail: options.isPrivateEmail, extra: options.claims,
+  }));
+  return { identity_token, nonce };
+}
+
+export async function signInApple(app: TestApp, options: AppleSignInOptions = {}): Promise<TestResponse> {
+  const { identity_token, nonce } = await appleIdToken(app, options);
+  const overrides: Record<string, unknown> = {};
+  if (options.name !== undefined) overrides.name = options.name;
+  if (options.publicKey !== undefined) overrides.public_key = options.publicKey;
+  const body: Record<string, unknown> = { identity_token, nonce, device: deviceBody("mobile", overrides) };
+  if (options.authorizationCode !== null) body.authorization_code = options.authorizationCode ?? `code-${crypto.randomUUID()}`;
+  return call(app, "POST", "/v1/auth/apple", { ip: options.ip, body });
 }
 
 /** Logs in an additional device (new key unless `publicKey` is given). */

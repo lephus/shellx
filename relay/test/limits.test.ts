@@ -77,6 +77,7 @@ describe("request body limit (16 KiB) on the JSON routes", () => {
     ["POST /v1/auth/nonce", { method: "POST", path: () => "/v1/auth/nonce", token: "none" }],
     ["POST /v1/auth/google", { method: "POST", path: () => "/v1/auth/google", token: "none" }],
     ["POST /v1/auth/google/link", { method: "POST", path: () => "/v1/auth/google/link", token: "agent" }],
+    ["POST /v1/auth/apple", { method: "POST", path: () => "/v1/auth/apple", token: "none" }],
     ["POST /v1/pairings", { method: "POST", path: () => "/v1/pairings", token: "agent" }],
   ];
 
