@@ -5161,6 +5161,168 @@
           }
         }
       }
+    },
+    "terminal.key.escape": {
+      "comment": "VoiceOver label of the esc key on the key bar over the keyboard.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escape"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phím Esc"
+          }
+        }
+      }
+    },
+    "terminal.key.tab": {
+      "comment": "VoiceOver label of the tab key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phím Tab"
+          }
+        }
+      }
+    },
+    "terminal.key.ctrl": {
+      "comment": "VoiceOver label of the ctrl key on the key bar: it holds Control for the next key.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phím Control"
+          }
+        }
+      }
+    },
+    "terminal.key.ctrl.latched": {
+      "comment": "VoiceOver value of the ctrl key while it is held for the next key.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On for the next key"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bật cho phím kế tiếp"
+          }
+        }
+      }
+    },
+    "terminal.key.left": {
+      "comment": "VoiceOver label of the left arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên trái"
+          }
+        }
+      }
+    },
+    "terminal.key.up": {
+      "comment": "VoiceOver label of the up arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên lên"
+          }
+        }
+      }
+    },
+    "terminal.key.down": {
+      "comment": "VoiceOver label of the down arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Down Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên xuống"
+          }
+        }
+      }
+    },
+    "terminal.key.right": {
+      "comment": "VoiceOver label of the right arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên phải"
+          }
+        }
+      }
+    },
+    "terminal.key.hideKeyboard": {
+      "comment": "The key at the end of the key bar: hides the keyboard.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Keyboard"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ẩn bàn phím"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

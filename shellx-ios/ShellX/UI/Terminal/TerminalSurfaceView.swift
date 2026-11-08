@@ -34,6 +34,23 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
     /// delegate, and answering for that pan would change how UIKit scrolls.
     private lazy var simultaneous = SimultaneousGestures { [unowned self] in self.panGestureRecognizer }
 
+    // MARK: Text input (the extension in TerminalSurfaceView+TextInput.swift)
+
+    /// Where Paste reads from: `.general`; tests set a named one.
+    var pasteboard: UIPasteboard = .general
+    weak var inputDelegate: UITextInputDelegate?
+    /// The caret in the marked text (a UTF-16 offset), as the keyboard last placed it.
+    var markedSelection = 0
+    /// The marked text as the keyboard believes it is; when the model's differs, the keyboard is told to start again.
+    private var keyboardMarked = ""
+    private var keyboardResetPending = false
+    /// Hardware presses sent as named keys, kept from UIKit's text system until they end.
+    private var sentPresses: Set<ObjectIdentifier> = []
+    private(set) lazy var inputTokenizer: UITextInputTokenizer = UITextInputStringTokenizer(textInput: self)
+    private lazy var tap = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+    private lazy var longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPressed(_:)))
+    private lazy var editMenu = UIEditMenuInteraction(delegate: nil)
+
     init(model: TerminalViewModel, font: TerminalFont = .standard) {
         self.model = model
         self.font = font
@@ -52,6 +69,10 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
         alternatePan.delegate = simultaneous
         alternatePan.maximumNumberOfTouches = 1
         addGestureRecognizer(alternatePan)
+        addGestureRecognizer(tap)
+        longPress.minimumPressDuration = 0.5
+        addGestureRecognizer(longPress)
+        addInteraction(editMenu)
         isAccessibilityElement = true
         accessibilityTraits = .allowsDirectInteraction
         accessibilityIdentifier = "terminal.surface"
@@ -89,9 +110,141 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
         canvas.setNeedsDisplay()
     }
 
-    /// Hook for the text input (Task 9): the marked text or the ctrl latch changed.
+    /// The marked text or the ctrl latch changed: redraw, and reset the keyboard when the marked text changed without
+    /// it (a key bar or hardware key committed the word).
     func typingChanged() {
         canvas.setNeedsDisplay()
+        syncKeyboard()
+    }
+
+    // MARK: - Keyboard
+
+    /// After a call from the keyboard: `keyboardMarked` is what it now believes is composed.
+    func inputHappened(keyboardMarked marked: String) {
+        keyboardMarked = marked
+        canvas.setNeedsDisplay()
+        syncKeyboard()
+    }
+
+    /// When the model's marked text differs from the keyboard's (a key committed it, ctrl took the first composed
+    /// letter), tell the keyboard on the next main-queue turn, so it drops its composition.
+    private func syncKeyboard() {
+        guard model.typing.markedText != keyboardMarked else { return }
+        keyboardMarked = model.typing.markedText
+        markedSelection = min(markedSelection, (keyboardMarked as NSString).length)
+        guard !keyboardResetPending else { return }
+        keyboardResetPending = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            keyboardResetPending = false
+            inputDelegate?.selectionWillChange(self)
+            inputDelegate?.textWillChange(self)
+            inputDelegate?.textDidChange(self)
+            inputDelegate?.selectionDidChange(self)
+        }
+    }
+
+    // MARK: - Focus
+
+    override var canBecomeFirstResponder: Bool {
+        model.phase == .live || model.phase == .connecting
+    }
+
+    @discardableResult
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { tellFocus(true) }
+        return became
+    }
+
+    @discardableResult
+    override func resignFirstResponder() -> Bool {
+        let wasFirst = isFirstResponder
+        let resigned = super.resignFirstResponder()
+        if resigned && wasFirst { tellFocus(false) }
+        return resigned
+    }
+
+    private func tellFocus(_ focused: Bool) {
+        Task { @MainActor [weak self] in self?.onFocusChange(focused) }
+    }
+
+    @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
+        if recognizer.state == .ended { becomeFirstResponder() }
+    }
+
+    /// A long press opens the edit menu at the touch: Paste, when the pasteboard holds text.
+    @objc private func longPressed(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began else { return }
+        becomeFirstResponder()
+        let point = recognizer.location(in: self)
+        editMenu.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: point))
+    }
+
+    // MARK: - Paste
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        action == #selector(UIResponderStandardEditActions.paste(_:)) && pasteboard.hasStrings
+    }
+
+    override func paste(_ sender: Any?) {
+        guard let text = pasteboard.string else { return }
+        model.paste(text)
+        canvas.setNeedsDisplay()
+    }
+
+    // MARK: - Hardware keys
+
+    /// Esc, tab, arrows, home, end, page up and down, forward delete and ctrl+letter go out as named keys; the rest
+    /// (letters, Return, Backspace, ⌘ shortcuts, anything while composing) go on to UIKit's text system.
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        var rest = Set<UIPress>()
+        for press in presses {
+            guard let key = press.key,
+                  case let .send(name, mods) = TerminalHardwareKeys.action(
+                      usage: key.keyCode.rawValue, modifiers: Self.modifiers(key.modifierFlags),
+                      composing: !model.typing.markedText.isEmpty)
+            else {
+                rest.insert(press)
+                continue
+            }
+            sentPresses.insert(ObjectIdentifier(press))
+            model.press(name, mods: mods)
+        }
+        if rest.count != presses.count {
+            canvas.setNeedsDisplay()
+            syncKeyboard()
+        }
+        if !rest.isEmpty { super.pressesBegan(rest, with: event) }
+    }
+
+    override func pressesChanged(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let rest = presses.filter { !sentPresses.contains(ObjectIdentifier($0)) }
+        if !rest.isEmpty { super.pressesChanged(rest, with: event) }
+    }
+
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let rest = finish(presses)
+        if !rest.isEmpty { super.pressesEnded(rest, with: event) }
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        let rest = finish(presses)
+        if !rest.isEmpty { super.pressesCancelled(rest, with: event) }
+    }
+
+    /// The presses UIKit saw begin; the ones sent as named keys are forgotten.
+    private func finish(_ presses: Set<UIPress>) -> Set<UIPress> {
+        presses.filter { sentPresses.remove(ObjectIdentifier($0)) == nil }
+    }
+
+    private static func modifiers(_ flags: UIKeyModifierFlags) -> TerminalHardwareModifiers {
+        var modifiers: TerminalHardwareModifiers = []
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        if flags.contains(.control) { modifiers.insert(.control) }
+        if flags.contains(.alternate) { modifiers.insert(.alternate) }
+        if flags.contains(.command) { modifiers.insert(.command) }
+        return modifiers
     }
 
     // MARK: - Layout

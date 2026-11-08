@@ -21,17 +21,28 @@ struct TerminalPane: View {
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 14, style: .continuous) }
 
     var body: some View {
-        content
-            .onChange(of: model.pasteTooLarge) { _, _ in
-                let text = String(localized: "terminal.paste.tooLarge")
-                notice = AgentScreen.Notice(text: text)
-                AccessibilityNotification.Announcement(text).post()
+        VStack(spacing: 0) {
+            content
+            if (focused || showsKeyBar) && model.terminalId == terminalId {
+                TerminalKeyBar(ctrlLatched: model.typing.ctrlLatched) { item in
+                    Self.perform(item, on: model) { focused = false }
+                }
             }
-            .task(id: notice?.id) {
-                guard notice != nil else { return }
-                do { try await Task.sleep(for: AgentView.noticeDuration) } catch { return }
-                notice = nil
-            }
+        }
+        // A page that is not the one shown never keeps the keyboard.
+        .onChange(of: model.terminalId) { _, shown in
+            if shown != terminalId { focused = false }
+        }
+        .onChange(of: model.pasteTooLarge) { _, _ in
+            let text = String(localized: "terminal.paste.tooLarge")
+            notice = AgentScreen.Notice(text: text)
+            AccessibilityNotification.Announcement(text).post()
+        }
+        .task(id: notice?.id) {
+            guard notice != nil else { return }
+            do { try await Task.sleep(for: AgentView.noticeDuration) } catch { return }
+            notice = nil
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -59,6 +70,16 @@ struct TerminalPane: View {
             default:
                 surfacePage(phase)
             }
+        }
+    }
+
+    /// What a key bar button does: a key → `model.press(key)`; ctrl → `model.toggleCtrl()`; hide keyboard → `hideKeyboard()`.
+    static func perform(_ item: TerminalKeyBarItem, on model: TerminalViewModel, hideKeyboard: () -> Void) {
+        switch item {
+        case let .key(barKey):
+            if let key = barKey.key { model.press(key) } else { model.toggleCtrl() }
+        case .hideKeyboard:
+            hideKeyboard()
         }
     }
 
