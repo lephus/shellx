@@ -76,8 +76,9 @@ public actor LinkClient {
     /// capability only when it is here: for `ShellXLink.attachmentsFeature`, `uploadAttachment` and
     /// `chatSend(attachments:)`; for `ShellXLink.workspacesFeature`, `workspaces()` and `workspaceChanges`; for
     /// `ShellXLink.workspaceControlFeature`, `createWorkspace`, `renameWorkspace` and `closeWorkspace`; for
-    /// `ShellXLink.agentCloseFeature`, `closeAgent`; for `ShellXLink.terminalCloseFeature`, `closeTerminal`. A string
-    /// this version does not know is kept, and ignored.
+    /// `ShellXLink.agentCloseFeature`, `closeAgent`; for `ShellXLink.terminalCloseFeature`, `closeTerminal`;
+    /// for `ShellXLink.terminalViewFeature`, the terminal view calls and `terminalPushes`; for
+    /// `ShellXLink.terminalCreateFeature`, `createTerminal`. A string this version does not know is kept, and ignored.
     public nonisolated let hostFeatures: Set<String>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
@@ -388,6 +389,17 @@ public actor LinkClient {
             throw LinkClientError.unexpectedAnswer
         }
         return (outcome, workspaceId)
+    }
+
+    /// Opens a terminal tab in a workspace (PROTOCOL.md 11.9). `terminalId` is the new terminal when the outcome is
+    /// `.ok`, and nil otherwise. Call it only when ``hostFeatures`` lists `ShellXLink.terminalCreateFeature`. Not safe
+    /// to repeat: after a timeout or a lost connection it is unknown whether the Mac acted, so read the workspace list
+    /// instead. Throws `.remote(code: "unsupported", ...)` when the host takes no terminal creation, `.timedOut` after
+    /// the request timeout, and `.sessionClosed` when the session ends first.
+    public func createTerminal(workspaceId: String) async throws -> (outcome: WorkspaceControlOutcome, terminalId: String?) {
+        let answer = try await call { .terminalCreate(callId: $0, workspaceId: workspaceId) }
+        guard case let .terminalCreateResult(_, outcome, terminalId) = answer else { throw LinkClientError.unexpectedAnswer }
+        return (outcome, terminalId)
     }
 
     /// Renames a workspace. `title` is at most `ShellXLink.maxWorkspaceTitleBytes` UTF-8 bytes. An id the Mac does

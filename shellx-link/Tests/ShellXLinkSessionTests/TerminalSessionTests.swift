@@ -34,6 +34,43 @@ final class TerminalSessionTests: TerminalSessionTestCase {
         try await expectError(raw, "bad_request", callId: nil)
     }
 
+    // MARK: - terminal.create
+
+    func testWelcomeListsTerminalCreateOnlyWithACreator() async throws {
+        let withCreator = try await welcomeFeatures(makeHost(terminalCreator: FakeTerminalCreator()))
+        XCTAssertEqual(withCreator, ["terminal_create"])
+        let without = try await welcomeFeatures(makeHost())
+        XCTAssertEqual(without, [])
+    }
+
+    func testCreateReachesTheCreator() async throws {
+        let creator = FakeTerminalCreator()
+        creator.setCreate(.ok, terminalId: "t-9")
+        let client = try await connect(makeHost(terminalCreator: creator))
+        let created = try await within { try await client.createTerminal(workspaceId: "ws-1") }
+        XCTAssertEqual(created.outcome, .ok)
+        XCTAssertEqual(created.terminalId, "t-9")
+        for outcome in [WorkspaceControlOutcome.notFound, .refused, .failed, .other("busy")] {
+            creator.setCreate(outcome, terminalId: "t-ignored")
+            let answer = try await within { try await client.createTerminal(workspaceId: "ws-1") }
+            XCTAssertEqual(answer.outcome, outcome)
+            XCTAssertNil(answer.terminalId, "terminal_id only with ok")
+        }
+        XCTAssertEqual(creator.calls, Array(repeating: "ws-1", count: 5))
+    }
+
+    func testSlowCreateDoesNotBlockTheSession() async throws {
+        let creator = FakeTerminalCreator()
+        let gate = Gate()
+        creator.hold(until: gate)
+        let client = try await connect(makeHost(terminalCreator: creator))
+        let pending = Task { try await client.createTerminal(workspaceId: "ws-1") }
+        _ = try await within { try await client.snapshot() }     // answered while the create waits
+        gate.open()
+        let created = try await pending.value
+        XCTAssertEqual(created.outcome, .ok)
+    }
+
     func expectError(_ raw: SecureChannel, _ code: String, callId: String?,
                      file: StaticString = #filePath, line: UInt = #line) async throws {
         let message = try await within { try await raw.receive() }

@@ -19,6 +19,7 @@ public actor LinkHost {
     private nonisolated let workspaceControl: (any WorkspaceControl)?
     private nonisolated let agentControl: (any AgentControl)?
     private nonisolated let terminalControl: (any TerminalControl)?
+    private nonisolated let terminalCreator: (any TerminalCreator)?
     private nonisolated let hostVersion: String
     private nonisolated let machineName: String
     private nonisolated let timings: LinkTimings
@@ -39,17 +40,21 @@ public actor LinkHost {
     ///     `agent.close` is answered `unsupported`.
     ///   - terminalControl: closing one terminal tab of a listed workspace; with it the host offers the
     ///     `terminal_close` feature, without it `terminal.close` is answered `unsupported`.
+    ///   - terminalCreator: opening a terminal tab in a listed workspace; with it the host offers the
+    ///     `terminal_create` feature, without it `terminal.create` is answered `unsupported`.
     public init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
         workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
         agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
+        terminalCreator: (any TerminalCreator)? = nil,
         hostVersion: String, machineName: String
     ) {
         self.init(
             key: key, trustedClients: trustedClients, feed: feed, sessions: sessions, chat: chat,
             workspaces: workspaces, workspaceControl: workspaceControl, agentControl: agentControl,
-            terminalControl: terminalControl, hostVersion: hostVersion, machineName: machineName, timings: .standard)
+            terminalControl: terminalControl, terminalCreator: terminalCreator, hostVersion: hostVersion,
+            machineName: machineName, timings: .standard)
     }
 
     init(
@@ -57,6 +62,7 @@ public actor LinkHost {
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)?, chat: (any AgentChatSource)?,
         workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
         agentControl: (any AgentControl)? = nil, terminalControl: (any TerminalControl)? = nil,
+        terminalCreator: (any TerminalCreator)? = nil,
         hostVersion: String, machineName: String, timings: LinkTimings
     ) {
         self.key = key
@@ -68,6 +74,7 @@ public actor LinkHost {
         self.workspaceControl = workspaceControl
         self.agentControl = agentControl
         self.terminalControl = terminalControl
+        self.terminalCreator = terminalCreator
         self.hostVersion = hostVersion
         self.machineName = machineName
         self.timings = timings
@@ -163,6 +170,7 @@ public actor LinkHost {
         if workspaceControl != nil { features.append(ShellXLink.workspaceControlFeature) }
         if agentControl != nil { features.append(ShellXLink.agentCloseFeature) }
         if terminalControl != nil { features.append(ShellXLink.terminalCloseFeature) }
+        if terminalCreator != nil { features.append(ShellXLink.terminalCreateFeature) }
         do {
             try await channel.send(.welcome(
                 protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName,
@@ -228,6 +236,7 @@ public actor LinkHost {
         let workspaceControl = self.workspaceControl
         let agentControl = self.agentControl
         let terminalControl = self.terminalControl
+        let terminalCreator = self.terminalCreator
         // The uploads of this session: an id means nothing in another one, and they end with this scope.
         var uploads = AttachmentUploads(now: timings.now)
         while true {
@@ -428,8 +437,18 @@ public actor LinkHost {
                 }
             case let .terminalViewOpen(callId, _, _, _):
                 await Self.sendError(on: channel, "unsupported", "this host offers no terminal views", callId: callId)
-            case let .terminalCreate(callId, _):
-                await Self.sendError(on: channel, "unsupported", "this host takes no terminal creation", callId: callId)
+            case let .terminalCreate(callId, workspaceId):
+                guard let terminalCreator else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no terminal creation", callId: callId)
+                    continue
+                }
+                // Adding a tab may take a while; keep reading meanwhile.
+                group.addTask {
+                    let created = await terminalCreator.createTerminal(workspaceId: workspaceId)
+                    // The new id goes out only with `ok`.
+                    try? await channel.send(.terminalCreateResult(
+                        callId: callId, outcome: created.outcome, terminalId: created.outcome == .ok ? created.terminalId : nil))
+                }
             case .terminalViewInput, .terminalViewResize, .terminalViewResync, .terminalViewClose:
                 break
             case .pong, .unknown, .error:
