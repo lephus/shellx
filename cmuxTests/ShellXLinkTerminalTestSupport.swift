@@ -177,3 +177,70 @@ extension TerminalScreen {
         if case let .frame(frame) = event { apply(frame) }
     }
 }
+
+// MARK: - A fake Mac for the terminal view source
+
+@MainActor
+final class FakeLinkMac {
+    struct Prepare: Equatable {
+        let workspace: UUID
+        let terminal: UUID
+    }
+
+    struct Attach: Equatable {
+        let clientID: String
+        let cols: Int
+        let rows: Int
+    }
+
+    /// Listed terminals and the workspace each is listed in.
+    var listed: [UUID: UUID] = [:]
+    /// What `prepare` answers, by terminal.
+    var surfaces: [UUID: UUID] = [:]
+    var blocked = false
+    /// The real terminal the views read; without one a view has no surface.
+    var terminal: ScrollbackTestTerminal?
+    private(set) var prepares: [Prepare] = []
+    private(set) var attaches: [Attach] = []
+    /// The sizing recorder of each opened view, in open order.
+    private(set) var sizings: [RecordingSizing] = []
+    private var listeners: [UUID: @MainActor () -> Void] = [:]
+
+    var listenerCount: Int { listeners.count }
+
+    func fireListChange() {
+        for listener in listeners.values { listener() }
+    }
+
+    var mac: ShellXLinkTerminalViewSource.Mac {
+        ShellXLinkTerminalViewSource.Mac(
+            listedWorkspace: { [self] terminal in listed[terminal] },
+            prepare: { [self] workspace, terminal in
+                prepares.append(Prepare(workspace: workspace, terminal: terminal))
+                return surfaces[terminal]
+            },
+            terminal: { [self] _ in
+                terminal?.linkTerminal ?? ShellXLinkTerminalView.Terminal(
+                    surface: { nil }, type: { _ in }, press: { _ in false }, paste: { _ in }, scroll: { _, _, _ in }
+                )
+            },
+            sizing: { [self] _, clientID in
+                let recorder = RecordingSizing()
+                sizings.append(recorder)
+                var sizing = recorder.sizing
+                let attach = sizing.attach
+                sizing.attach = { [self] cols, rows in
+                    attaches.append(Attach(clientID: clientID, cols: cols, rows: rows))
+                    return attach(cols, rows)
+                }
+                return sizing
+            },
+            isBlocked: { [self] in blocked },
+            listChanges: { [self] onChange in
+                let id = UUID()
+                listeners[id] = onChange
+                return { [weak self] in self?.listeners[id] = nil }
+            }
+        )
+    }
+}
