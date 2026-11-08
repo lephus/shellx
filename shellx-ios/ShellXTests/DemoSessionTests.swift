@@ -54,4 +54,15 @@ final class DemoSessionTests: XCTestCase {
             XCTFail("the demo's hub still runs")
         } catch { XCTAssertEqual(error as? MachineHub.AddError, .notSignedIn) }
     }
+
+    /// Review finding I1: the demo must not retry (and so clear) the real app's "local wipe pending" marker.
+    func testDemoLeavesTheRealWipePendingMarkerAlone() async throws {
+        let key = "shellx.localWipePending"
+        UserDefaults.standard.set(true, forKey: key)
+        addTeardownBlock { UserDefaults.standard.removeObject(forKey: key) }
+        let session = makeSession()
+        await session.start()
+        await session.exit()
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: key), "the demo cleared the real marker")
+    }
 }
