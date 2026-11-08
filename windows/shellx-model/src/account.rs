@@ -376,6 +376,7 @@ impl AccountFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core_api::{GoogleBegin, GoogleSignIn, SessionInfo, SignInMethod};
 
     fn m(id: &str, this: bool) -> MachineInfo {
         MachineInfo {
@@ -948,5 +949,312 @@ mod tests {
         let acts = f.on(ev, 0);
         assert!(!format!("{acts:?}").contains("hunter2"));
         assert!(!format!("{f:?}").contains("hunter2"));
+    }
+
+    // ----- Google sign-in, switch, session, sign-in methods, server sign-out -----
+
+    fn begun(purpose: GooglePurpose, id: &str) -> AccountEvent {
+        AccountEvent::GoogleBegun {
+            purpose,
+            result: Ok(GoogleBegin {
+                flow_id: id.into(),
+                auth_url: "https://accounts.google.com/x".into(),
+            }),
+        }
+    }
+
+    fn google_done(email: &str, method: &str) -> GoogleSignIn {
+        GoogleSignIn {
+            user_id: "u".into(),
+            device_id: "d".into(),
+            device_public_key_b64: "k".into(),
+            fingerprint: "f".into(),
+            email: email.into(),
+            auth_method: method.into(),
+        }
+    }
+
+    fn finished(id: &str, r: Result<GoogleSignIn, CoreErr>) -> AccountEvent {
+        AccountEvent::GoogleFinished {
+            flow_id: id.into(),
+            result: r,
+        }
+    }
+
+    fn session(email: Option<&str>, method: &str) -> AccountEvent {
+        AccountEvent::SessionResult(Ok(SessionInfo {
+            user_id: "u".into(),
+            device_id: "d".into(),
+            email: email.map(String::from),
+            auth_method: method.into(),
+        }))
+    }
+
+    fn logged_out() -> AccountFlow {
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+            1,
+        );
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        f
+    }
+
+    #[test]
+    fn google_sign_in_runs_begin_browser_finish_then_lists() {
+        let mut f = logged_out();
+        assert_eq!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2),
+            vec![AccountAction::CallGoogleBegin(GooglePurpose::SignIn)]
+        );
+        assert_eq!(f.state(), &AccountState::LoggingIn);
+        assert!(f.login_in_flight());
+        assert_eq!(f.google_in_flight(), Some(GooglePurpose::SignIn));
+        assert_eq!(
+            f.on(begun(GooglePurpose::SignIn, "f1"), 3),
+            vec![
+                AccountAction::OpenBrowser("https://accounts.google.com/x".into()),
+                AccountAction::CallGoogleFinish("f1".into())
+            ]
+        );
+        assert_eq!(
+            f.on(finished("f1", Ok(google_done("g@x", "google"))), 4),
+            vec![AccountAction::CallList]
+        );
+        let acts = f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 5);
+        assert!(!acts.contains(&AccountAction::CallSession), "{acts:?}");
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert_eq!(f.email(), Some("g@x"));
+        assert_eq!(f.auth_method(), Some("google"));
+        assert_eq!(f.google_in_flight(), None);
+    }
+
+    #[test]
+    fn google_cancel_while_waiting_cancels_and_returns_to_signed_out() {
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "f1"), 3);
+        assert_eq!(
+            f.on(AccountEvent::GoogleCancelRequested, 4),
+            vec![AccountAction::CallGoogleCancel("f1".into())]
+        );
+        assert!(
+            f.on(finished("f1", Err(CoreErr::new("google_cancelled", ""))), 5)
+                .is_empty()
+        );
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.google_in_flight(), None);
+    }
+
+    #[test]
+    fn google_cancel_before_begin_answers_cancels_the_returned_flow() {
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        assert!(f.on(AccountEvent::GoogleCancelRequested, 3).is_empty());
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(
+            f.on(begun(GooglePurpose::SignIn, "f1"), 4),
+            vec![AccountAction::CallGoogleCancel("f1".into())]
+        );
+    }
+
+    #[test]
+    fn google_failure_is_an_error_and_can_be_retried() {
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "f1"), 3);
+        let e = CoreErr::new("switch_from_signed_in_device", "x");
+        f.on(finished("f1", Err(e.clone())), 4);
+        assert_eq!(f.state(), &AccountState::Error(e));
+        assert_eq!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 5),
+            vec![AccountAction::CallGoogleBegin(GooglePurpose::SignIn)]
+        );
+    }
+
+    #[test]
+    fn a_second_google_request_while_one_runs_is_ignored() {
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        assert!(f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 3).is_empty());
+        assert!(f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 3).is_empty());
+    }
+
+    #[test]
+    fn a_stale_google_finish_is_ignored() {
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "f1"), 3);
+        assert!(f.on(finished("f0", Ok(google_done("g@x", "google"))), 4).is_empty());
+        assert_eq!(f.state(), &AccountState::LoggingIn);
+        assert_eq!(f.email(), None);
+    }
+
+    #[test]
+    fn switch_to_google_keeps_the_session_and_updates_the_method() {
+        let mut f = logged_in();
+        f.on(session(Some("old@x"), "password"), 1_100);
+        assert!(f.needs_google_switch());
+        assert_eq!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200),
+            vec![AccountAction::CallGoogleBegin(GooglePurpose::Link)]
+        );
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert!(f.on(AccountEvent::Tick(16_000), 16_000).contains(&AccountAction::CallList));
+        assert_eq!(
+            f.on(begun(GooglePurpose::Link, "f1"), 16_100),
+            vec![
+                AccountAction::OpenBrowser("https://accounts.google.com/x".into()),
+                AccountAction::CallGoogleFinish("f1".into())
+            ]
+        );
+        assert_eq!(
+            f.on(finished("f1", Ok(google_done("new@x", "google"))), 17_000),
+            vec![AccountAction::CallListSignInMethods]
+        );
+        assert_eq!(f.email(), Some("new@x"));
+        assert_eq!(f.auth_method(), Some("google"));
+        assert!(!f.needs_google_switch());
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+    }
+
+    #[test]
+    fn switch_failure_keeps_the_session_and_sets_the_notice() {
+        let mut f = logged_in();
+        f.on(session(Some("old@x"), "password"), 1_100);
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200);
+        f.on(begun(GooglePurpose::Link, "f1"), 1_300);
+        f.on(finished("f1", Err(CoreErr::new("email_in_use", "x"))), 1_400);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert_eq!(f.notice().map(|e| e.code.as_str()), Some("email_in_use"));
+        assert!(f.needs_google_switch());
+        // a cancelled link leaves no notice
+        let mut g = logged_in();
+        g.on(session(Some("old@x"), "password"), 1_100);
+        g.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200);
+        g.on(begun(GooglePurpose::Link, "f1"), 1_300);
+        g.on(finished("f1", Err(CoreErr::new("google_cancelled", ""))), 1_400);
+        assert!(g.notice().is_none());
+    }
+
+    #[test]
+    fn link_is_refused_unless_signed_in_with_a_password() {
+        let mut f = logged_out();
+        assert!(f.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 2).is_empty());
+        let mut g = logged_in();
+        g.on(session(Some("g@x"), "google"), 1_100);
+        assert!(g.on(AccountEvent::GoogleRequested(GooglePurpose::Link), 1_200).is_empty());
+    }
+
+    #[test]
+    fn entering_logged_in_asks_the_session_once() {
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        let acts = f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 0);
+        assert!(acts.contains(&AccountAction::CallSession), "{acts:?}");
+        f.on(AccountEvent::Tick(16_000), 16_000);
+        let acts = f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 16_000);
+        assert!(!acts.contains(&AccountAction::CallSession));
+        f.on(AccountEvent::SessionResult(Err(net())), 16_100);
+        assert_eq!(f.email(), None);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        f.on(session(Some("a@b.c"), "password"), 16_200);
+        assert_eq!(f.email(), Some("a@b.c"));
+    }
+
+    #[test]
+    fn server_sign_out_shows_sign_in() {
+        for code in ["unauthorized", "http_401", "not_logged_in"] {
+            let mut f = logged_in();
+            f.on(AccountEvent::Tick(16_000), 16_000);
+            f.on(AccountEvent::ListResult(Err(CoreErr::new(code, ""))), 16_000);
+            assert_eq!(f.state(), &AccountState::LoggedOut, "{code}");
+            assert!(f.take_signed_out_by_server(), "{code}");
+            assert!(!f.take_signed_out_by_server(), "{code}");
+        }
+        let mut f = logged_in();
+        f.on(AccountEvent::LogoutRequested, 2_000);
+        f.on(AccountEvent::LogoutResult(Ok(())), 2_100);
+        assert!(!f.take_signed_out_by_server());
+        // not_logged_in outside LoggedIn keeps today's behaviour: signed out, no flag
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        f.on(AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))), 1);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(!f.take_signed_out_by_server());
+    }
+
+    fn method(id: &str, provider: &str) -> SignInMethod {
+        SignInMethod {
+            identity_id: id.into(),
+            provider: provider.into(),
+            email: "x@y".into(),
+            is_private_email: false,
+            linked_via_device_name: None,
+            created_at_unix: 1,
+        }
+    }
+
+    #[test]
+    fn sign_in_methods_list_and_remove() {
+        let mut out = logged_out();
+        assert!(out.on(AccountEvent::SignInMethodsRequested, 2).is_empty());
+        let mut f = logged_in();
+        assert_eq!(
+            f.on(AccountEvent::SignInMethodsRequested, 1_100),
+            vec![AccountAction::CallListSignInMethods]
+        );
+        f.on(
+            AccountEvent::SignInMethodsResult(Ok(vec![method("g1", "google"), method("a1", "apple")])),
+            1_200,
+        );
+        assert_eq!(f.sign_in_methods().map(<[_]>::len), Some(2));
+        assert_eq!(
+            f.on(AccountEvent::RemoveSignInMethodRequested("a1".into()), 1_300),
+            vec![AccountAction::CallRemoveSignInMethod("a1".into())]
+        );
+        assert_eq!(f.removing_sign_in_method(), Some("a1"));
+        assert!(f.on(AccountEvent::RemoveSignInMethodRequested("a2".into()), 1_310).is_empty());
+        assert_eq!(
+            f.on(
+                AccountEvent::SignInMethodRemoved { identity_id: "a1".into(), result: Ok(()) },
+                1_400
+            ),
+            vec![AccountAction::CallListSignInMethods]
+        );
+        assert_eq!(f.removing_sign_in_method(), None);
+        f.on(AccountEvent::RemoveSignInMethodRequested("a1".into()), 1_500);
+        f.on(
+            AccountEvent::SignInMethodRemoved { identity_id: "a1".into(), result: Err(net()) },
+            1_600,
+        );
+        assert_eq!(f.notice(), Some(&net()));
+    }
+
+    #[test]
+    fn logout_clears_email_method_and_methods() {
+        let mut f = logged_in();
+        f.on(session(Some("a@b.c"), "password"), 1_100);
+        f.on(AccountEvent::SignInMethodsResult(Ok(vec![method("g1", "google")])), 1_200);
+        f.on(AccountEvent::LogoutRequested, 1_300);
+        f.on(AccountEvent::LogoutResult(Ok(())), 1_400);
+        assert_eq!((f.email(), f.auth_method()), (None, None));
+        assert!(f.sign_in_methods().is_none());
+    }
+
+    #[test]
+    fn google_urls_and_emails_never_in_debug() {
+        let a = AccountAction::OpenBrowser("https://accounts.google.com/x?state=S".into());
+        assert!(!format!("{a:?}").contains("state=S"));
+        let e = finished("f1", Ok(google_done("g@x", "google")));
+        assert!(!format!("{e:?}").contains("g@x"));
+        let s = session(Some("g@x"), "google");
+        assert!(!format!("{s:?}").contains("g@x"));
+    }
+
+    #[test]
+    fn delete_account_url_is_the_privacy_page() {
+        assert_eq!(DELETE_ACCOUNT_URL, "https://shellx.pro/privacy#delete-account");
     }
 }
