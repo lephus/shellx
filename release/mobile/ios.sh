@@ -27,8 +27,9 @@ set -euo pipefail
 
 TEAM_ID=W4RF3W4VTZ
 BUNDLE_ID=com.shellx.prod
-# Names that exist only in Debug builds: the demo, its fake Mac and account, the test fakes.
-DEBUG_ONLY_NAMES='FakeMac|FakeRelayAccount|DemoComposition|DemoScript|InMemorySecretStore|SHELLX_DEMO|ShellXAppTestSupport'
+# Names that exist only in Debug builds: the test fakes and the Debug demo's launch switch. The in-app demo
+# (ShellXDemo: FakeMac, DemoRelay, DemoComposition) ships on purpose ("Try without an account").
+DEBUG_ONLY_NAMES='FakeRelayAccount|FakeIdentityProvider|InMemorySecretStore|FakeTranscriber|FakeVoicePermissions|SHELLX_DEMO|ShellXAppTestSupport'
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 IOS_DIR="$REPO_ROOT/shellx-ios"
@@ -163,10 +164,9 @@ check_app() {
     fi
   fi
 
-  # The Debug demo and the test fakes stay out of the App Store build: Release.xcconfig leaves
-  # ShellXAppTestSupport out of the link, and the app's own demo code is under #if DEBUG. Swift keeps
-  # type names in a stripped binary, so every Mach-O file in the bundle (the executable, dylibs,
-  # frameworks, plug-ins) is searched for them.
+  # The test fakes stay out of the App Store build because Release.xcconfig leaves ShellXAppTestSupport out of
+  # the link and the SHELLX_DEMO switch is under #if DEBUG; Swift keeps type names in a stripped binary, so every
+  # Mach-O file in the bundle (the executable, dylibs, frameworks, plug-ins) is searched for them.
   executable="$(plist_value CFBundleExecutable "$info" || true)"
   if [ -z "$executable" ] || [ ! -f "$app/$executable" ]; then
     fail+=("has no executable (CFBundleExecutable is '$executable')")

@@ -1,13 +1,12 @@
-#if DEBUG
 import Foundation
 import ShellXAppCore
-import ShellXAppTestSupport
+import ShellXDemo
 import UIKit
 
-/// The Debug demo (`SHELLX_DEMO=1`, `dev.sh sim --demo`): the app runs without a relay or the
-/// Keychain, signed in to a fake account and paired with "Mac giả", an in-process `FakeMac` running
-/// `DemoScript`. A second fake Mac, "Mac giả 2", is not paired: its (fake) pairing code is put on
-/// the pasteboard, so "Paste Pairing Code" pairs it; the fake relay approves after `approvalDelay`.
+/// The demo ("Try without an account" in every build, and `SHELLX_DEMO=1` / `dev.sh sim --demo` in Debug): the app runs
+/// without a relay or the Keychain, signed in to a fake account and paired with "Mac giả", an in-process `FakeMac` running
+/// `DemoScript`. A second fake Mac, "Mac giả 2", is not paired: when `pasteboard` is given its (fake) pairing code is put
+/// there, so "Paste Pairing Code" pairs it; the demo relay approves after `approvalDelay`.
 ///
 /// The agents' chat copies are kept in `Application Support/ShellXDemo`, apart from a real run's, and
 /// the fake Macs keep fixed ids, so they survive a relaunch of the demo.
@@ -20,13 +19,14 @@ enum DemoComposition {
     /// `pasteboard` receives the second Mac's code; `runsScript` false keeps the first Mac still
     /// (tests); `history` holds the agents' chat copies.
     static func make(
-        approvalDelay: Duration = .seconds(2), pasteboard: UIPasteboard = .general, runsScript: Bool = true,
+        approvalDelay: Duration = .seconds(2), pasteboard: UIPasteboard? = .general, runsScript: Bool = true,
         history historyDirectory: URL = defaultHistory
     ) -> AppGraph {
-        let vault = AccountVault(store: InMemorySecretStore())
-        let relay = FakeRelayAccount()
+        let vault = AccountVault(store: DemoSecretStore())
         let first = FakeMac(name: firstName, id: "demo-1")
         let second = FakeMac(name: secondName, id: "demo-2")
+        let relay = DemoRelay(
+            paired: [first.machine], pairableMachineIDs: [second.machine.machineID], approvalDelay: approvalDelay)
         let connector = FakeMacFleet([first, second], phoneKey: { try await vault.phoneKey() })
         let latency = LatencyLog()
         let launch = LaunchMark(latency: latency)
@@ -60,20 +60,22 @@ enum DemoComposition {
                 do {
                     try await vault.setSession(
                         StoredSession(
-                            userID: "demo", deviceID: "demo-iphone", token: "demo-token", email: "demo@shellx.pro"))
+                            userID: "demo", deviceID: "demo-iphone", token: "demo-token", email: "demo@shellx.pro", authMethod: .google))
                     try await vault.setMachines([first.machine], owner: "demo")
                 } catch {
                     assertionFailure("the in-memory store does not fail")
                 }
-                await relay.addGrant(for: first.machine)
-                await relay.setApprovalDelay(approvalDelay)
                 let code = await second.pairingCode()
-                pasteboard.string = code
+                pasteboard?.string = code
                 if runsScript {
                     await script.start()
                     // The Mac's sidebar as the design shows it, over the script's two sessions.
                     await first.setWorkspaces(Self.workspaces)
                 }
+            },
+            teardown: {
+                await script.stop()
+                await coordinator.hub?.stopAll()
             })
     }
 
@@ -111,4 +113,3 @@ private final class Once {
         return !done
     }
 }
-#endif

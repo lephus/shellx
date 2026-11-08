@@ -4927,6 +4927,96 @@
           }
         }
       }
+    },
+    "signin.demo": {
+      "comment": "Text button of the sign-in screen: opens the demo with a sample Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try without an account"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem thử không cần tài khoản"
+          }
+        }
+      }
+    },
+    "firstMac.demo": {
+      "comment": "Text button of the first-Mac screen: opens the demo.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try with a sample Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem thử với một Mac mẫu"
+          }
+        }
+      }
+    },
+    "demo.banner.title": {
+      "comment": "Banner over every demo screen. Same word in Vietnamese.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo"
+          }
+        }
+      }
+    },
+    "demo.banner.exit": {
+      "comment": "Banner button: leaves the demo.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exit"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thoát"
+          }
+        }
+      }
+    },
+    "demo.banner.label": {
+      "comment": "VoiceOver label of the demo banner.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo with a sample Mac. Nothing is sent."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bản xem thử với một Mac mẫu. Không gửi gì đi."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

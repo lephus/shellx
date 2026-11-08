@@ -12,8 +12,10 @@ struct AppGraph {
     let scopes: SignedInScope.Slot
     /// Measures `launchToHome`.
     let launch: LaunchMark
-    /// Runs once before `coordinator.launch()`; the Debug demo seeds its fake account here.
+    /// Runs once before `coordinator.launch()`; the demo seeds its fake account here.
     var prepare: @MainActor () async -> Void = {}
+    /// Undoes `prepare` when the graph is dropped (the demo's Exit).
+    var teardown: @MainActor () async -> Void = {}
     /// Offers a newer App Store version; nil in Debug builds, which are not on the store.
     var updatePrompt: UpdatePrompt?
     /// Keeps the relay holding this phone's APNs token; nil in the demo and previews.

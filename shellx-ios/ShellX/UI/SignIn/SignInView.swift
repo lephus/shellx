@@ -6,6 +6,7 @@ struct SignInView: View {
     let coordinator: AppCoordinator
     let expired: Bool
     let notice: SignInNotice?
+    let startDemo: (() -> Void)?
 
     @State private var error: SignInError?
     @State private var running: Provider?
@@ -14,10 +15,14 @@ struct SignInView: View {
 
     private enum Provider { case google, apple }
 
-    init(coordinator: AppCoordinator, expired: Bool, notice: SignInNotice? = nil, initialError: SignInError? = nil) {
+    init(
+        coordinator: AppCoordinator, expired: Bool, notice: SignInNotice? = nil, startDemo: (() -> Void)? = nil,
+        initialError: SignInError? = nil
+    ) {
         self.coordinator = coordinator
         self.expired = expired
         self.notice = notice
+        self.startDemo = startDemo
         _error = State(initialValue: initialError)
     }
 
@@ -61,6 +66,15 @@ struct SignInView: View {
                         .frame(height: 44)
                 }
                 .disabled(running != nil)
+
+                if let startDemo {
+                    Button(action: startDemo) {
+                        Text(LocalizedStringResource("signin.demo"))
+                            .foregroundStyle(Color("AccentText"))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .accessibilityIdentifier("signin.demo")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)

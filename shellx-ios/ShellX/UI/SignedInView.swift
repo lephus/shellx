@@ -18,6 +18,8 @@ struct SignedInView: View {
     let push: PushRegistration?
     /// What Settings and the banner can do for the account; nil in the demo.
     let account: AccountActions?
+    /// "Try with a sample Mac" on the first-Mac screen; nil in the demo.
+    var startDemo: (() -> Void)? = nil
 
     @State private var path = NavigationPath()
     @AppStorage("shellx.switchToGoogleBannerDismissed") private var bannerDismissed = false
@@ -32,7 +34,7 @@ struct SignedInView: View {
         NavigationStack(path: $path) {
             Group {
                 if hub.machines.isEmpty {
-                    FirstMacView(pair: openPairing)
+                    FirstMacView(pair: openPairing, tryDemo: startDemo)
                         .toolbar {
                             // Where the list has it.
                             ToolbarItem(placement: .topBarTrailing) {

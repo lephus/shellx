@@ -9,6 +9,8 @@ struct RootView: View {
     let inbox: PairingInbox
     /// Taps on a "needs you" alert, opened once signed in.
     var pushTaps = PushTapInbox()
+    /// "Try without an account": opens the demo. Nil inside the demo.
+    var startDemo: (() -> Void)? = nil
 
     private var coordinator: AppCoordinator { graph.coordinator }
 
@@ -17,7 +19,7 @@ struct RootView: View {
         case .launching:
             LaunchView()
         case let .signedOut(expired):
-            SignInView(coordinator: coordinator, expired: expired, notice: coordinator.signInNotice)
+            SignInView(coordinator: coordinator, expired: expired, notice: coordinator.signInNotice, startDemo: startDemo)
         case .linkingApple:
             if let link = coordinator.appleLink {
                 PairingSheet(
@@ -30,7 +32,8 @@ struct RootView: View {
             if let hub = coordinator.hub, hub.isLoaded, let scope = graph.scopes.scope(for: hub) {
                 SignedInView(
                     scope: scope, email: email, inbox: inbox, pushTaps: pushTaps, push: graph.push,
-                    account: AccountActions(coordinator: coordinator))
+                    account: AccountActions(coordinator: coordinator),
+                    startDemo: startDemo)
                     .id(ObjectIdentifier(hub))
             } else {
                 LaunchView()

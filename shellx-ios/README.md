@@ -68,8 +68,7 @@ shellx-ios/scripts/dev.sh clean              # delete the private simulator and 
 - **Release check.** `build-release` (run by `test release` and `test all`) builds Release for a
   generic iPhone without signing, so no Apple account is involved, then runs
   `release/mobile/ios.sh --check-app --unsigned` on it: bundle id `com.shellx.prod`, the version in
-  `Config/Version.xcconfig`, no embedded framework, and no Debug-only code (the demo, `FakeMac`,
-  `FakeRelayAccount`, `InMemorySecretStore`, anything from `ShellXAppTestSupport`) in any Mach-O
+  `Config/Version.xcconfig`, no embedded framework, and no Debug-only code (the test fakes such as `FakeRelayAccount`, `FakeIdentityProvider` and `InMemorySecretStore`, anything from `ShellXAppTestSupport`, the `SHELLX_DEMO` switch) in any Mach-O
   file. A leak shows up there long before release day.
 - **API server.** Release builds always use `https://relay.shellx.pro`. Debug builds take
   `SHELLX_API_BASE` (`sim --api <url>`) when it is `https`, or `http` to the loopback host, so a
@@ -83,9 +82,7 @@ App Store Connect answers. The privacy manifest is `ShellX/PrivacyInfo.xcprivacy
 
 ## Demo mode
 
-`dev.sh sim --demo` (or `device --demo`) launches a Debug build with `SHELLX_DEMO=1`: the app skips
-sign-in and is paired with a fake Mac running inside the app, with pending requests, agent sessions
-and chat, so the UI can be worked on without a real Mac. Release builds contain none of it.
+"Try without an account" (sign-in screen) and "Try with a sample Mac" (first-Mac screen) open the demo in every build, App Store builds included: a fake account paired with "Mac giả", a Mac running inside the app (`Packages/ShellXAppCore/Sources/ShellXDemo`), with pending requests, agent sessions and chat. A "Demo · Exit" banner stays on top. The demo never calls the relay or the Keychain and keeps its history in `Application Support/ShellXDemo`. `dev.sh sim --demo` (or `device --demo`) launches a Debug build straight into it with `SHELLX_DEMO=1`, without the banner.
 
 ## Strings
 
