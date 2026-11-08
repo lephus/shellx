@@ -8,7 +8,7 @@ import { Db } from "../src/db/db.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import {
   call, CountingLimiter, db, deviceBody, errorCode, loginDevice, makeApp, PASSWORD, randomEmail, randomPublicKey,
-  registerAccount, tempDir, unlimited,
+  registerAccount, seedUser, tempDir, unlimited,
 } from "./helpers.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -154,6 +154,15 @@ describe("production rate limits (createRateLimiters, keyed by X-Real-IP)", () =
 });
 
 describe("POST /v1/auth/login", () => {
+  it("refuses an account without a password, even with the dummy password, and adds no device to it", async () => {
+    const app = makeApp();
+    const email = randomEmail();
+    const userId = await seedUser(email, null);
+    const res = await call(app, "POST", "/v1/auth/login", { body: { email, password: "shellx-dummy-password", device: deviceBody("mobile") } });
+    expect([res.status, await errorCode(res)]).toEqual([401, "invalid_credentials"]);
+    expect(db().get("SELECT COUNT(*) AS n FROM devices WHERE user_id = ?", userId)).toEqual({ n: 0 });
+  });
+
   it("logs in with a differently-cased, padded email and creates a new device for a new key", async () => {
     const app = makeApp();
     const account = await registerAccount(app);

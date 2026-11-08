@@ -89,14 +89,15 @@ authRoutes.post("/login", passwordLoginOn, jsonBodyLimit, async (c) => {
   }
 
   const db = c.get("db");
-  const user = db.get<{ id: string; password_hash: string }>("SELECT id, password_hash FROM users WHERE email = ?", email);
+  const user = db.get<{ id: string; password_hash: string | null }>("SELECT id, password_hash FROM users WHERE email = ?", email);
   const passwords = c.get("passwords");
   const passwordOk = await passwords.verify(password, user?.password_hash ?? (await dummyHash(passwords)));
-  if (user === undefined || !passwordOk) {
+  if (user === undefined || user.password_hash === null || !passwordOk) {
     logMeta("login_failed");
     throw Errors.invalidCredentials();
   }
 
+  const verifiedHash = user.password_hash;
   const now = c.get("now")();
   // Same public key in the same account → same device_id (spec §5.2); name/platform refreshed.
   const deviceId = db.get<{ id: string }>(
@@ -113,8 +114,8 @@ authRoutes.post("/login", passwordLoginOn, jsonBodyLimit, async (c) => {
   // (M1) must neither get a token minted under the old password nor sign this device out.
   const unchanged = "(SELECT password_hash FROM users WHERE id = ?) = ?";
   const inserted = db.transaction(() => {
-    db.run(`DELETE FROM tokens WHERE device_id = ? AND ${unchanged}`, deviceId, user.id, user.password_hash);
-    return insertTokenIfPasswordUnchanged(db, tokenHash, deviceId, now, user.id, user.password_hash);
+    db.run(`DELETE FROM tokens WHERE device_id = ? AND ${unchanged}`, deviceId, user.id, verifiedHash);
+    return insertTokenIfPasswordUnchanged(db, tokenHash, deviceId, now, user.id, verifiedHash);
   });
   if (inserted !== 1) {
     logMeta("login_failed", { device_id: deviceId });

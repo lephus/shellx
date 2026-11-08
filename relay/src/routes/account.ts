@@ -17,10 +17,14 @@ accountRoutes.delete("/", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   const body = await readJsonObject(c.req.raw);
   const db = c.get("db");
-  const user = db.get<{ email: string; password_hash: string }>("SELECT email, password_hash FROM users WHERE id = ?", auth.userId);
+  const user = db.get<{ email: string; password_hash: string | null }>("SELECT email, password_hash FROM users WHERE id = ?", auth.userId);
   if (user === undefined) throw Errors.unauthorized();
   if (!(await c.get("limiters").loginEmail.limit(user.email))) throw Errors.rateLimited();
   if (!c.get("config").passwordLogin) {
+    logMeta("account_delete_denied", { device_id: auth.deviceId });
+    throw Errors.reauthRequired();
+  }
+  if (user.password_hash === null) {
     logMeta("account_delete_denied", { device_id: auth.deviceId });
     throw Errors.reauthRequired();
   }

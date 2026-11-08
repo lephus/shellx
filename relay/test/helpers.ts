@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { afterEach, expect } from "vitest";
 import { WebSocket } from "ws";
 import type { AppDeps } from "../src/app.js";
-import type { Argon2Backend } from "../src/auth/password.js";
+import { normalizeEmail } from "../src/auth/email.js";
+import { type Argon2Backend, passwords } from "../src/auth/password.js";
 import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
 import type { Config } from "../src/config.js";
 import { Db } from "../src/db/db.js";
@@ -132,6 +133,8 @@ afterEach(async () => {
 /** A relay listening on a random 127.0.0.1 port; started in the background by `makeApp`. */
 export interface TestApp {
   readonly ready: Promise<RunningRelay>;
+  /** The app's clock (`deps.now`, else `Date.now`); absent for `remote(port)` apps. */
+  readonly now?: () => number;
 }
 
 /**
@@ -149,7 +152,7 @@ export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptio
     relay.server.closeAllConnections();
     await new Promise<void>((resolve) => relay.server.close(() => resolve()));
   });
-  return { ready };
+  return { ready, now: deps.now ?? Date.now };
 }
 
 /** A buffered HTTP response (`json<T>()` is generic, like the Workers `Response` the tests were written for). */
@@ -234,6 +237,17 @@ async function request(
 }
 
 export const PASSWORD = "correct horse battery";
+
+/** Inserts a `users` row straight into the test database (registration is closed); returns its id. */
+export async function seedUser(email: string, password: string | null, nowMs: number = Date.now()): Promise<string> {
+  const id = crypto.randomUUID();
+  const hash = password === null ? null : await passwords.hash(password);
+  db().run(
+    "INSERT INTO users (id, email, password_hash, password_changed_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    id, normalizeEmail(email), hash, nowMs, nowMs,
+  );
+  return id;
+}
 
 export function randomEmail(): string {
   return `user-${crypto.randomUUID()}@example.com`;

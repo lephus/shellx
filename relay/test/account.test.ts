@@ -192,6 +192,15 @@ describe("POST /v1/auth/logout", () => {
 });
 
 describe("DELETE /v1/account", () => {
+  it("answers 401 reauth_required to a password for an account that has none, and deletes nothing", async () => {
+    const app = makeApp();
+    const account = await registerAccount(app);
+    db().run("UPDATE users SET password_hash = NULL WHERE id = ?", account.agent.userId);
+    const res = await call(app, "DELETE", "/v1/account", { token: account.agent.token, body: { password: account.password } });
+    expect([res.status, await errorCode(res)]).toEqual([401, "reauth_required"]);
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE id = ?", account.agent.userId)?.n).toBe(1);
+  });
+
   const countRows = (sql: string, id: string) => db().get<{ n: number }>(sql, id)?.n;
 
   it("refuses a wrong password with 401 invalid_credentials and deletes nothing", async () => {
