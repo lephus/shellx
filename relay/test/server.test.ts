@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createTestIssuer, testIdTokenClaims } from "../scripts/test-idp.js";
 import { passwords, type PasswordHasher } from "../src/auth/password.js";
 import { Db } from "../src/db/db.js";
 import { HubRegistry } from "../src/hub/registry.js";
@@ -396,5 +397,30 @@ describe("admin configuration (ADMIN_PASSWORD, ADMIN_HOST)", () => {
       expect(result.code).toBe(0);
       if ("ADMIN_PASSWORD" in extra) expect(result.stdout).not.toContain(extra.ADMIN_PASSWORD);
     }
+  });
+});
+
+describe("test identity provider (TEST_IDP_ISSUER, TEST_IDP_JWKS_PATH)", () => {
+  it("signs in with a token of the configured test issuer and logs it; an unreadable JWKS file stops the relay", async () => {
+    const issuer = "https://test-idp.shellx.invalid";
+    const idp = await createTestIssuer(issuer);
+    const jwksFile = join(tempDir(), "test-idp.json");
+    writeFileSync(jwksFile, JSON.stringify(idp.jwks));
+    const env = { ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false", TEST_IDP_ISSUER: issuer };
+    const server = startServer({ ...env, TEST_IDP_JWKS_PATH: jwksFile });
+    onCleanup(() => server.child.kill("SIGKILL"));
+    const app = remote(await waitForListening(server.output));
+    expect(server.output()).toContain('"event":"test_idp_enabled"');
+    expect(server.output()).toContain('"event":"google_sign_in_disabled"');
+    const { nonce } = await (await call(app, "POST", "/v1/auth/nonce", { body: {} })).json<{ nonce: string }>();
+    const id_token = await idp.sign(testIdTokenClaims(issuer, { sub: "t-1", email: "e2e@example.com", nonce }));
+    const res = await call(app, "POST", "/v1/auth/google", { body: { id_token, nonce, device: deviceBody("desktop") } });
+    expect(res.status).toBe(200);
+    expect(db().get("SELECT auth_method FROM tokens WHERE device_id = ?", (await res.json<{ device_id: string }>()).device_id)).toEqual({ auth_method: "test" });
+    server.child.kill("SIGTERM");
+    expect((await server.exit).code).toBe(0);
+
+    const broken = await startServer({ ...env, TEST_IDP_JWKS_PATH: join(tempDir(), "missing.json") }).exit;
+    expect([broken.code, broken.stderr]).toEqual([1, "relay: TEST_IDP_JWKS_PATH is not a readable JWKS file\n"]);
   });
 });

@@ -13,6 +13,7 @@ import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import type { HubSocket } from "../src/hub/user-hub.js";
+import { fakeGoogle, fakeTestIdp, googleClaims, testClaims, testIdTokens } from "./fake-idp.js";
 import { type ListenOptions, startRelay, type RunningRelay } from "../src/relay.js";
 
 // ---- configuration used by every test relay ---------------------------------------------------
@@ -144,7 +145,7 @@ export interface TestApp {
  */
 export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptions> = {}): TestApp {
   const ready = startRelay(
-    { config: { ...TEST_CONFIG, nativeManifestDir: join(tempDir(), "desktop") }, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
+    { config: { ...TEST_CONFIG, nativeManifestDir: join(tempDir(), "desktop") }, db: db(), hubs: hubs(), limiters: unlimited, idTokens: testIdTokens(), ...deps },
     { ...listen, host: "127.0.0.1", port: 0 },
   );
   onCleanup(async () => {
@@ -303,6 +304,58 @@ export async function registerAccount(app: TestApp, email = randomEmail(), passw
     password,
     agent: { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey: device.public_key as string },
   };
+}
+
+// ---- Google sign-in (the fake issuers of fake-idp.ts) -----------------------------------------------
+
+export interface GoogleSignInOptions {
+  idp?: "google" | "test";
+  sub?: string;
+  email?: string;
+  kind?: "desktop" | "mobile";
+  publicKey?: string;
+  claims?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  ip?: string;
+}
+
+/** A fresh nonce and an ID token carrying it, `iat` taken from the app's clock. */
+export async function googleIdToken(app: TestApp, options: GoogleSignInOptions = {}): Promise<{ id_token: string; nonce: string }> {
+  const nonce = await newNonce(app, options.ip);
+  const nowSec = Math.floor((app.now ?? Date.now)() / 1000);
+  const input = {
+    nonce, nowSec, extra: options.claims,
+    sub: options.sub ?? (options.idp === "test" ? `t-${crypto.randomUUID()}` : `g-${crypto.randomUUID()}`),
+    email: options.email ?? randomEmail(),
+  };
+  const id_token = options.idp === "test" ? await fakeTestIdp.sign(testClaims(input)) : await fakeGoogle.sign(googleClaims(input));
+  return { id_token, nonce };
+}
+
+export async function signInGoogle(app: TestApp, options: GoogleSignInOptions = {}): Promise<TestResponse> {
+  const sub = options.sub ?? (options.idp === "test" ? `t-${crypto.randomUUID()}` : `g-${crypto.randomUUID()}`);
+  const email = options.email ?? randomEmail();
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const { id_token, nonce } = await googleIdToken(app, { ...options, sub, email });
+  return call(app, "POST", "/v1/auth/google", {
+    ip: options.ip, headers: options.headers,
+    body: { id_token, nonce, device: deviceBody(options.kind ?? "desktop", { public_key: publicKey }) },
+  });
+}
+
+export interface GoogleSession extends Session {
+  sub: string;
+  email: string;
+}
+
+/** Signs in with Google; throws unless 200. `sub` and `publicKey` are the ones used, `email` the response's. */
+export async function googleSession(app: TestApp, options: GoogleSignInOptions = {}): Promise<GoogleSession> {
+  const sub = options.sub ?? (options.idp === "test" ? `t-${crypto.randomUUID()}` : `g-${crypto.randomUUID()}`);
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const res = await signInGoogle(app, { ...options, sub, publicKey });
+  if (res.status !== 200) throw new Error(`google sign-in failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ user_id: string; device_id: string; token: string; email: string }>();
+  return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey, sub, email: body.email };
 }
 
 /** Logs in an additional device (new key unless `publicKey` is given). */

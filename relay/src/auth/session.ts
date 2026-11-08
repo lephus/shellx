@@ -19,8 +19,15 @@ interface TokenRow {
   kind: DeviceKind;
 }
 
-export function insertToken(db: Db, tokenHash: ArrayBuffer, deviceId: string, now: number): void {
-  db.run("INSERT INTO tokens (token_hash, device_id, created_at, last_used_at) VALUES (?, ?, ?, ?)", tokenHash, deviceId, now, now);
+export type AuthMethod = "password" | "google" | "apple" | "test";
+
+export function insertToken(
+  db: Db, tokenHash: ArrayBuffer, deviceId: string, now: number, authMethod: AuthMethod = "password", identityId: string | null = null,
+): void {
+  db.run(
+    "INSERT INTO tokens (token_hash, device_id, created_at, last_used_at, auth_method, identity_id) VALUES (?, ?, ?, ?, ?, ?)",
+    tokenHash, deviceId, now, now, authMethod, identityId,
+  );
 }
 
 /**
