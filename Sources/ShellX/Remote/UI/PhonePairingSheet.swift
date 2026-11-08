@@ -13,7 +13,7 @@ struct PhonePairingSheet: View {
     @State private var qrCache = PhonePairingQRCache()
 
     static var title: String {
-        String(localized: "remote.phonePairing.title", defaultValue: "Pair iPhone")
+        String(localized: "remote.phonePairing.title", defaultValue: "Pair Phone")
     }
 
     var body: some View {
@@ -62,7 +62,7 @@ struct PhonePairingSheet: View {
     private var notReady: some View {
         Text(coordinator.needsSignIn
             ? String(localized: "remote.phonePairing.signInFirst",
-                     defaultValue: "Sign in under Settings › Account to pair an iPhone with this Mac.")
+                     defaultValue: "Sign in under Settings › Account to pair a phone with this Mac.")
             : String(localized: "remote.phonePairing.notReady", defaultValue: "This Mac is not ready to serve phones yet"))
             .font(.system(size: 12))
             .foregroundColor(ShellXPalette.text.color)
@@ -87,13 +87,21 @@ struct PhonePairingSheet: View {
                     .controlSize(.small)
                     .frame(width: 184, height: 184)
             }
-            Text(String(localized: "remote.phonePairing.scan", defaultValue: "Scan this code with the ShellX app on your iPhone"))
+            Text(String(localized: "remote.phonePairing.scan", defaultValue: "Scan this code with the ShellX app on your phone"))
                 .font(.system(size: 12))
                 .foregroundColor(ShellXPalette.text.color)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// The warning for a request that also links an Apple ID to this account; nil for a normal request.
+    static func appleLinkNotice(for candidate: ShellXPhonePairingCoordinator.Candidate) -> String? {
+        guard candidate.linksAppleID else { return nil }
+        return String(
+            localized: "remote.phonePairing.appleLink",
+            defaultValue: "Allowing lets this Apple ID sign in to your ShellX account and manage it, including deleting the account.")
     }
 
     private func candidateCard(_ candidate: ShellXPhonePairingCoordinator.Candidate) -> some View {
@@ -113,6 +121,12 @@ struct PhonePairingSheet: View {
                 .lineLimit(3)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
+            }
+            if let notice = Self.appleLinkNotice(for: candidate) {
+                Text(notice)
+                    .font(.system(size: 12))
+                    .foregroundColor(ShellXPalette.text.color)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 Spacer(minLength: 0)

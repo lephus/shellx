@@ -2566,7 +2566,7 @@ private struct NotificationsPopoverView: View {
                 Text(
                     String(
                         localized: "notifications.forwardToPhone.title",
-                        defaultValue: "Forward notifications to my iPhone"
+                        defaultValue: "Forward notifications to my phone"
                     )
                 )
                 .cmuxFont(size: 12, weight: .medium)
@@ -2582,7 +2582,7 @@ private struct NotificationsPopoverView: View {
         .safeHelp(
             String(
                 localized: "notifications.forwardToPhone.subtitle",
-                defaultValue: "Send local agent notifications to ShellX on your iPhone. Enabled by default; turn this off to stop this Mac from forwarding them."
+                defaultValue: "Send local agent notifications to ShellX on your phone. Enabled by default; turn this off to stop this Mac from forwarding them."
             )
         )
     }
