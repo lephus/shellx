@@ -123,6 +123,23 @@ class TerminalSessionTestCase: XCTestCase {
         return (client, views.views[0], pushes)
     }
 
+    /// Returns once no push arrived for `quiet`, or after 5 s.
+    func waitUntilQuiet(_ pushes: Collector<TerminalViewPush>, quiet: Duration = .milliseconds(300)) async {
+        let deadline = ContinuousClock.now + .seconds(5)
+        var count = pushes.items.count
+        var since = ContinuousClock.now
+        while ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+            let now = pushes.items.count
+            if now != count {
+                count = now
+                since = .now
+            } else if ContinuousClock.now - since >= quiet {
+                return
+            }
+        }
+    }
+
     /// `XCTAssertEqual` for an expression that awaits (XCTest's autoclosure cannot).
     func assertEqual<T: Equatable>(
         _ actual: @autoclosure () async throws -> T, _ expected: @autoclosure () -> T, _ message: String = "",
