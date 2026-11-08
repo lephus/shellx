@@ -88,6 +88,8 @@ final class Collector<Element: Sendable>: @unchecked Sendable {
     private var subscribers: [UUID: AsyncStream<TerminalHubEvent>.Continuation] = [:]
 
     var latencies: [LatencyMetric] { samples.map(\.metric) }
+    /// How many `terminalEvents()` streams are still read: 1 once a model's `run()` has started.
+    var subscriberCount: Int { subscribers.count }
     /// The terminal ids of the open calls.
     var opens: [String] {
         calls.compactMap { if case let .open(id, _, _) = $0 { return id } else { return nil } }

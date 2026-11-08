@@ -79,6 +79,7 @@ final class TerminalViewModelTests: XCTestCase {
 
     func testFastSwitchesNeverShowAnotherTerminalsFrames() async {   // Review Focus 1
         let link = ScriptedTerminalLink(); let model = makeModel(link)
+        _ = await eventually { link.subscriberCount == 1 }   // run() has started: both shows reach the Mac
         model.setPhoneGrid(cols: 50, rows: 20); model.show("t1"); model.show("t2")
         let ordered = await eventually {
             link.calls == [.open("t1", cols: 50, rows: 20), .close("t1"), .open("t2", cols: 50, rows: 20)]
