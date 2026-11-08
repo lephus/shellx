@@ -254,10 +254,7 @@ fn login_records_password_and_the_email_in_the_session() {
 #[test]
 fn auth_session_reads_old_files_as_password() {
     let (core, fake, dir) = support::logged_out();
-    std::fs::create_dir_all(&*dir).unwrap();
-    // Opening the store (any call) creates the dir with the right mode; write via the core's store path.
-    let _ = core.call("auth.session", json!({}));
-    std::fs::write(dir.join("session.json"), br#"{"token":"t","user_id":"u","device_id":"d"}"#).unwrap();
+    StateStore::open(&dir).unwrap().write_secret("session.json", br#"{"token":"t","user_id":"u","device_id":"d"}"#).unwrap();
     let info = core.call("auth.session", json!({})).unwrap();
     assert_eq!(info, json!({"user_id":"u","device_id":"d","email":null,"auth_method":"password"}));
     assert!(fake.requests().is_empty());

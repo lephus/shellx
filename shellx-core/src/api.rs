@@ -46,6 +46,11 @@ pub struct SessionFile {
     pub token: String,
     pub user_id: String,
     pub device_id: String,
+    /// "password" | "google"; absent in files written before Google sign-in (read as password).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_method: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
 }
 
 impl fmt::Debug for SessionFile {
@@ -53,8 +58,73 @@ impl fmt::Debug for SessionFile {
         f.debug_struct("SessionFile")
             .field("user_id", &self.user_id)
             .field("device_id", &self.device_id)
+            .field("auth_method", &self.auth_method)
+            .field("email", &self.email.as_ref().map(|_| "<redacted>"))
             .field("token", &format_args!("<{} bytes>", self.token.len()))
             .finish()
+    }
+}
+
+/// `POST /v1/auth/nonce` 201 response. `Debug` hides the nonce.
+#[derive(Deserialize)]
+pub struct NonceResponse {
+    pub nonce: String,
+    #[serde(default)]
+    pub expires_in: u64,
+}
+
+impl fmt::Debug for NonceResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NonceResponse").field("nonce", &"<redacted>").field("expires_in", &self.expires_in).finish()
+    }
+}
+
+/// `POST /v1/auth/google` body. Not `Debug` (holds the id_token).
+#[derive(Serialize)]
+pub struct GoogleSignInRequest<'a> {
+    pub id_token: &'a str,
+    pub nonce: &'a str,
+    pub device: LoginDevice<'a>,
+}
+
+/// `POST /v1/auth/google/link` body. Not `Debug`.
+#[derive(Serialize)]
+pub struct GoogleLinkRequest<'a> {
+    pub id_token: &'a str,
+    pub nonce: &'a str,
+}
+
+/// 200 response of `/v1/auth/google` and `/v1/auth/google/link`. `Debug` redacts token and email.
+#[derive(Deserialize)]
+pub struct GoogleAuthResponse {
+    pub user_id: String,
+    pub device_id: String,
+    pub token: String,
+    #[serde(default)]
+    pub email: String,
+}
+
+impl fmt::Debug for GoogleAuthResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GoogleAuthResponse")
+            .field("user_id", &self.user_id)
+            .field("device_id", &self.device_id)
+            .field("token", &format_args!("<{} bytes>", self.token.len()))
+            .field("email", &"<redacted>")
+            .finish()
+    }
+}
+
+/// Google's token endpoint answer (other fields ignored). `Debug` redacts.
+#[derive(Deserialize)]
+pub struct GoogleTokenResponse {
+    #[serde(default)]
+    pub id_token: String,
+}
+
+impl fmt::Debug for GoogleTokenResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GoogleTokenResponse").field("id_token", &"<redacted>").finish()
     }
 }
 
@@ -168,7 +238,7 @@ mod tests {
 
     #[test]
     fn debug_redacts_tokens() {
-        let s = SessionFile { token: "tok_SECRET".into(), user_id: "u".into(), device_id: "d".into() };
+        let s = SessionFile { token: "tok_SECRET".into(), user_id: "u".into(), device_id: "d".into(), auth_method: None, email: None };
         assert!(!format!("{s:?}").contains("tok_SECRET"));
         let r: LoginResponse = serde_json::from_str(r#"{"user_id":"u","device_id":"d","token":"tok_SECRET"}"#).unwrap();
         assert!(!format!("{r:?}").contains("tok_SECRET"));

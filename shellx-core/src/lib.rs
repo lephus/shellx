@@ -5,6 +5,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod auth_google;
 pub mod config;
 pub mod envelope;
 pub mod ffi;
@@ -34,6 +35,8 @@ pub const KNOWN_METHODS: &[&str] = &[
     "config.set",
     "auth.login",
     "auth.logout",
+    "auth.session",
+    "auth.google.begin",
     "machines.register",
     "machines.list",
     "machines.heartbeat",
@@ -73,6 +76,8 @@ pub struct Core {
     /// (Ruling R14, see `pairing`). Public keys' fingerprints only, no secrets.
     /// Cleared by `config.set`, `auth.login` and `auth.logout`.
     shown_fingerprints: Mutex<HashMap<String, String>>,
+    /// Google sign-in flows waiting for their browser callback.
+    google_flows: auth_google::Flows,
 }
 
 impl Core {
@@ -127,12 +132,7 @@ impl Core {
     /// as before: only logout or a login as another account drops it). A session
     /// replaced meanwhile by a concurrent `auth.login` is left alone.
     fn forget_refused_session(&self, store: &StateStore, used: &str) {
-        let _g = self.auth_lock.lock().unwrap_or_else(|p| p.into_inner());
-        if let Ok(Some(current)) = auth::load_session(store)
-            && current.token == used
-        {
-            let _ = store.remove(auth::SESSION_FILE);
-        }
+        auth::forget_session_if(store, used, &self.auth_lock);
     }
 
     fn forget_shown_fingerprints(&self) {
@@ -151,6 +151,8 @@ impl Core {
                 self.forget_shown_fingerprints();
                 auth::logout(self.agent(), cfg, store)
             }
+            "auth.session" => auth::session_info(store),
+            "auth.google.begin" => auth_google::begin(self.agent(), cfg, store, &self.google_flows, params),
             "machines.register" => machines::register(self.agent(), cfg, store, params),
             "machines.list" => machines::list(self.agent(), cfg, store),
             "machines.heartbeat" => machines::heartbeat(self.agent(), cfg, store),
