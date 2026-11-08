@@ -3419,6 +3419,7 @@
 		524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */; };
 		2D3310D1326CB0E8DAA04227 /* ShellXLinkTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */; };
 		4A35B4DAAD9E15FD6411887C /* ShellXLinkTerminalViewFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */; };
+		1F7A85ED3876DAEE4D105874 /* ShellXLinkTerminalViewInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */; };
 		786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */; };
 		83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */; };
 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
@@ -8105,6 +8106,7 @@
 		395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalTestSupport.swift"; sourceTree = "<group>"; };
 		552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkTerminalView.swift; sourceTree = "<group>"; };
 		F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewFrameTests.swift"; sourceTree = "<group>"; };
+		2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewInputTests.swift"; sourceTree = "<group>"; };
 		8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkWorkspaceSource.swift; sourceTree = "<group>"; };
 		0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkWorkspaceSourceTests.swift"; sourceTree = "<group>"; };
 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
@@ -14362,6 +14364,7 @@
 				5C57E9E27EC8BB88F8F989FA /* ShellXLinkSizingTests.swift */,
 				58B4628FD22D364A57CB6F67 /* ShellXLinkFramePacingTests.swift */,
 				F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */,
+				2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19446,6 +19449,7 @@
 				BD19B23E88E0C06763AE841E /* ShellXLinkSizingTests.swift in Sources */,
 				524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */,
 				4A35B4DAAD9E15FD6411887C /* ShellXLinkTerminalViewFrameTests.swift in Sources */,
+				1F7A85ED3876DAEE4D105874 /* ShellXLinkTerminalViewInputTests.swift in Sources */,
 				83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */,
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
