@@ -3401,6 +3401,7 @@
 		5E11A10000000000000000C1 /* ShellXLinkCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A1 /* ShellXLinkCore */; };
 		7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */; };
 		2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */; };
+		D3E26CFAD865F8525B2CC953 /* ShellXLinkGridConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */; };
 		528E3F48C5F1339CB8436D74 /* ShellXLinkGridConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */; };
 		1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */; };
 		593001A30A7C992F6A0507BA /* ShellXLinkHostPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */; };
@@ -8083,6 +8084,7 @@
 		717290D6E8F1BA131C1A049C /* ShellXLinkChatSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkChatSourceTests.swift"; sourceTree = "<group>"; };
 		213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkFeedSource.swift; sourceTree = "<group>"; };
 		8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkFeedSourceTests.swift"; sourceTree = "<group>"; };
+		FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkGridConverter.swift; sourceTree = "<group>"; };
 		7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkGridConverterTests.swift"; sourceTree = "<group>"; };
 		FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkHostController.swift; sourceTree = "<group>"; };
 		DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkHostPolicyTests.swift"; sourceTree = "<group>"; };
@@ -12719,6 +12721,7 @@
 				7D6C2AF2DBDB0F61BF624FDA /* ShellXRoutineRunLauncher.swift */,
 				D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */,
 				C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */,
+				FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -17024,6 +17027,7 @@
 				8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */,
 				F5D85DDFB6D8D06F86818A00 /* ShellXLinkChatSource.swift in Sources */,
 				7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */,
+				D3E26CFAD865F8525B2CC953 /* ShellXLinkGridConverter.swift in Sources */,
 				1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */,
 				4F01552EA2EEE386C3CD1C23 /* ShellXLinkKeyStore.swift in Sources */,
 				A7C3D91E5B2F48A6908E1D01 /* ShellXLinkSecretStorage.swift in Sources */,
