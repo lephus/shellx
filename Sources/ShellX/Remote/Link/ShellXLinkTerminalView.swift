@@ -79,6 +79,8 @@ final class ShellXLinkTerminalView: TerminalView, MobileTerminalFrameSink {
     private var nextWaitID: UInt64 = 0
     private var captureRevision: UInt64 = 0
     private var policyObserver: NSObjectProtocol?
+    private(set) var wakeCountForTesting = 0
+    private(set) var deepCaptureCountForTesting = 0
 
     init(
         surfaceID: UUID, terminal: Terminal, sizing: Sizing, frameSinks: any MobileTerminalFrameSinkRegistry,
@@ -168,8 +170,9 @@ final class ShellXLinkTerminalView: TerminalView, MobileTerminalFrameSink {
                     fencePassed = true
                     continue
                 }
-                guard pacing.holdEnded(now: ContinuousClock.now) else { continue }
+                // A hold is one-shot: clear it before asking the pacer, or a passed deadline would wake us forever.
                 heldUntil = nil
+                guard pacing.holdEnded(now: ContinuousClock.now) else { continue }
             case .changed:
                 if needsSnapshot { continue }
                 switch pacing.changeArrived(now: ContinuousClock.now, inputSequence: inputSequence) {
@@ -271,6 +274,7 @@ final class ShellXLinkTerminalView: TerminalView, MobileTerminalFrameSink {
             return .changed
         }
         nextWaitID &+= 1
+        wakeCountForTesting += 1
         let id = nextWaitID
         return await withTaskCancellationHandler {
             await withCheckedContinuation { (continuation: CheckedContinuation<Wake, Never>) in
@@ -316,17 +320,23 @@ final class ShellXLinkTerminalView: TerminalView, MobileTerminalFrameSink {
 
     private func captureSnapshot(now: ContinuousClock.Instant) -> Capture {
         guard let surface = terminal.surface() else { return .gone }
-        guard let grid = capture(surface, history: ShellXLink.terminalHistoryRowBudget) else { return .notYet }
-        if !fencePassed, let expected = expectedGrid, (grid.columns, grid.rows) != expected {
-            fenceUntil = fenceUntil ?? now + Self.firstSnapshotFence
-            if let fence = fenceUntil, now < fence { return .notYet }
+        if !fencePassed, let expected = expectedGrid {
+            // While the grid the sizing decided has not arrived, probe cheaply; the deep capture waits for it.
+            guard let probe = capture(surface, history: 0) else { return .notYet }
+            if (probe.columns, probe.rows) != expected {
+                fenceUntil = fenceUntil ?? now + Self.firstSnapshotFence
+                if let fence = fenceUntil, now < fence { return .notYet }
+            }
         }
+        deepCaptureCountForTesting += 1
+        guard let grid = capture(surface, history: ShellXLink.terminalHistoryRowBudget) else { return .notYet }
         fencePassed = true
         fenceUntil = nil
         expectedGrid = nil
         baseline = grid.emissionState
         generation = surface.runtimeSurfaceGeneration
         needsSnapshot = false
+        heldUntil = nil
         converter = ShellXLinkGridConverter(theme: grid.terminalTheme ?? TerminalTheme.currentMacTerminalThemeSnapshot())
         remember(grid)
         pacing.noteSnapshot(now: now, inputSequence: inputSequence)

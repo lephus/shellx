@@ -198,7 +198,7 @@ struct ShellXLinkGridConverter {
         }
         return TerminalPalette(
             fg: canonical(theme.foreground), bg: canonical(theme.background),
-            cursor: linkColor(theme.cursor), colors: colors
+            cursor: TerminalTheme.rgbComponents(theme.cursor) == nil ? nil : canonical(theme.cursor), colors: colors
         )
     }
 
