@@ -244,14 +244,3 @@ private final class Reported: @unchecked Sendable {
     var requestsSoFar: Int? { lock.withLock { values.requestsSoFar } }
     func set(_ id: String, requestsSoFar: Int) { lock.withLock { values = (id, requestsSoFar) } }
 }
-
-private final class PollCounter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var count = 0
-    func next() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        defer { count += 1 }
-        return count
-    }
-}
