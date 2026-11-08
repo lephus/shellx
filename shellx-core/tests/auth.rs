@@ -1,6 +1,6 @@
 mod support;
 
-use serde_json::json;
+use serde_json::{Value, json};
 use shellx_core::Core;
 use shellx_core::store::StateStore;
 use support::{header, requests_to};
@@ -237,4 +237,35 @@ fn concurrent_first_use_creates_one_device_key() {
         let stored = shellx_core::auth::device_public(&StateStore::open(&dir).unwrap()).unwrap();
         assert!(keys.iter().all(|k| *k == stored), "every first caller sees the one stored key");
     }
+}
+
+#[test]
+fn login_records_password_and_the_email_in_the_session() {
+    let (core, _fake, dir) = support::logged_out();
+    core.call("auth.login", json!({"email": " a@b.c ", "password": "pw"})).unwrap();
+    let s: Value = serde_json::from_slice(&std::fs::read(dir.join("session.json")).unwrap()).unwrap();
+    assert_eq!((s["auth_method"].as_str(), s["email"].as_str()), (Some("password"), Some("a@b.c")));
+    let info = core.call("auth.session", json!({})).unwrap();
+    assert_eq!((info["auth_method"].as_str(), info["email"].as_str()), (Some("password"), Some("a@b.c")));
+    assert_eq!(info["user_id"], s["user_id"]);
+    assert_eq!(info["device_id"], s["device_id"]);
+}
+
+#[test]
+fn auth_session_reads_old_files_as_password() {
+    let (core, fake, dir) = support::logged_out();
+    std::fs::create_dir_all(&*dir).unwrap();
+    // Opening the store (any call) creates the dir with the right mode; write via the core's store path.
+    let _ = core.call("auth.session", json!({}));
+    std::fs::write(dir.join("session.json"), br#"{"token":"t","user_id":"u","device_id":"d"}"#).unwrap();
+    let info = core.call("auth.session", json!({})).unwrap();
+    assert_eq!(info, json!({"user_id":"u","device_id":"d","email":null,"auth_method":"password"}));
+    assert!(fake.requests().is_empty());
+}
+
+#[test]
+fn auth_session_without_a_session_is_not_logged_in() {
+    let (core, fake, _dir) = support::logged_out();
+    assert_eq!(core.call("auth.session", json!({})).unwrap_err().code, "not_logged_in");
+    assert!(fake.requests().is_empty());
 }

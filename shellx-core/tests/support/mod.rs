@@ -73,3 +73,28 @@ pub fn mode(p: impl AsRef<Path>) -> u32 {
     use std::os::unix::fs::MetadataExt;
     std::fs::metadata(p).unwrap().mode() & 0o7777
 }
+
+/// config.set extras pointing Google at the fake (`/fake-google/*`) with the fake's client.
+pub fn google(fake: &FakeApi) -> Value {
+    json!({
+        "google_auth_url": format!("{}/fake-google/auth", fake.base_url),
+        "google_token_url": format!("{}/fake-google/token", fake.base_url),
+        "google_client_id": "fake-desktop-client",
+        "google_client_secret": "fake-desktop-secret",
+    })
+}
+
+/// Like `logged_out`, configured with `google(&fake)`.
+pub fn google_logged_out() -> (Core, FakeApi, Dir) {
+    let fake = fake();
+    let dir = state_dir();
+    let core = Core::new();
+    configure(&core, &fake.base_url, &dir, google(&fake));
+    (core, fake, dir)
+}
+
+/// Query of `url` as a map (through `shellx_core::auth_google::parse_query`).
+pub fn query(url: &str) -> std::collections::HashMap<String, String> {
+    let q = url.split_once('?').map(|(_, q)| q).unwrap_or("");
+    shellx_core::auth_google::parse_query(q).into_iter().collect()
+}
