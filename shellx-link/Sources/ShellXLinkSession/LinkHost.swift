@@ -471,8 +471,27 @@ public actor LinkHost {
                     try? await channel.send(.terminalCreateResult(
                         callId: callId, outcome: created.outcome, terminalId: created.outcome == .ok ? created.terminalId : nil))
                 }
-            case .terminalViewInput, .terminalViewResize, .terminalViewResync:
-                break
+            case let .terminalViewInput(terminalId, units):
+                guard let terminalSlot else { continue }
+                do throws(TerminalInputError) {
+                    try TerminalInputCheck.check(units)
+                } catch {
+                    await Self.sendError(on: channel, "bad_request", "invalid terminal input: " + error.reason)
+                    continue
+                }
+                await terminalSlot.input(terminalId: terminalId, units: units)
+            case let .terminalViewResize(terminalId, cols, rows):
+                guard let terminalSlot else { continue }
+                guard cols >= 1, rows >= 1 else {
+                    await Self.sendError(on: channel, "bad_request", "cols and rows must be at least 1")
+                    continue
+                }
+                await terminalSlot.resize(
+                    terminalId: terminalId,
+                    cols: min(max(cols, ShellXLink.terminalColumns.lowerBound), ShellXLink.terminalColumns.upperBound),
+                    rows: min(max(rows, ShellXLink.terminalRows.lowerBound), ShellXLink.terminalRows.upperBound))
+            case let .terminalViewResync(terminalId):
+                await terminalSlot?.resync(terminalId: terminalId)
             case .pong, .unknown, .error:
                 break
             case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged,

@@ -107,6 +107,22 @@ class TerminalSessionTestCase: XCTestCase {
         }
     }
 
+    /// Connects a host with a fresh `FakeTerminalViewSource`, opens `t-1` at 46 x 30 and returns the client and the view.
+    func openedView() async throws -> (LinkClient, FakeTerminalView) {
+        let (client, view, _) = try await openedViewWithPushes()
+        return (client, view)
+    }
+
+    /// As `openedView()`, with the pushes collected from before the open.
+    func openedViewWithPushes() async throws -> (LinkClient, FakeTerminalView, Collector<TerminalViewPush>) {
+        let views = FakeTerminalViewSource()
+        let client = try await connect(makeHost(terminalViews: views))
+        let pushes = collect(client.terminalPushes)
+        let outcome = try await within { try await client.openTerminalView(terminalId: "t-1", cols: 46, rows: 30) }
+        XCTAssertEqual(outcome, .ok)
+        return (client, views.views[0], pushes)
+    }
+
     /// `XCTAssertEqual` for an expression that awaits (XCTest's autoclosure cannot).
     func assertEqual<T: Equatable>(
         _ actual: @autoclosure () async throws -> T, _ expected: @autoclosure () -> T, _ message: String = "",

@@ -194,6 +194,123 @@ final class TerminalSessionTests: TerminalSessionTestCase {
         XCTAssertEqual(assembled(pushes.items).screen.screenText(), ["c", "d"])
     }
 
+    // MARK: - input, resize, resync
+
+    func testInputReachesTheViewInOrder() async throws {
+        let (client, view) = try await openedView()
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.text("ls")])
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.key(.enter, mods: [])])
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.key(.letter("c"), mods: [.ctrl])])
+        let all = await eventually { view.calls.count == 3 }
+        XCTAssertTrue(all)
+        XCTAssertEqual(view.calls, [.input([.text("ls")]), .input([.key(.enter, mods: [])]), .input([.key(.letter("c"), mods: [.ctrl])])])
+    }
+
+    func testInvalidInputIsBadRequestAndNotApplied() async throws {
+        let views = FakeTerminalViewSource()
+        let raw = try await rawSession(makeHost(terminalViews: views))
+        try await raw.send(.terminalViewOpen(callId: "c1", terminalId: "t-1", cols: 46, rows: 30))
+        _ = try await within { try await raw.receive() }
+        try await raw.send(.terminalViewInput(terminalId: "t-1", units: [.text("ls\n")]))
+        try await expectError(raw, "bad_request", callId: nil)
+        XCTAssertEqual(views.views[0].calls, [])
+    }
+
+    func testClientRefusesTypedNewlineBeforeSending() async throws {   // Review Focus 2
+        let (client, view) = try await openedView()
+        do {
+            try await client.sendTerminalInput(terminalId: "t-1", units: [.text("ls\n")])
+            XCTFail("a newline must be key enter")
+        } catch let error as TerminalInputError {
+            XCTAssertFalse(error.reason.contains("ls"))
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(view.calls, [])
+    }
+
+    func testInputResizeAndResyncForAnotherTerminalAreNotOpen() async throws {
+        let (client, view, pushes) = try await openedViewWithPushes()
+        try await client.sendTerminalInput(terminalId: "t-2", units: [.text("x")])
+        try await client.resizeTerminalView(terminalId: "t-2", cols: 80, rows: 24)
+        try await client.resyncTerminalView(terminalId: "t-2")
+        let three = await waitFor(pushes) { $0.filter { $0 == .ended(terminalId: "t-2", reason: .notOpen) }.count == 3 }
+        XCTAssertTrue(three)
+        XCTAssertEqual(view.calls, [])
+    }
+
+    func testInputAfterCloseIsNotOpen() async throws {
+        let (client, _, pushes) = try await openedViewWithPushes()
+        try await client.closeTerminalView(terminalId: "t-1")
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.text("x")])
+        let ended = await waitFor(pushes) { $0.contains(.ended(terminalId: "t-1", reason: .notOpen)) }
+        XCTAssertTrue(ended)
+    }
+
+    func testResizeIsClampedAndKeepsOrderWithInput() async throws {
+        let (client, view) = try await openedView()
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.text("a")])
+        try await client.resizeTerminalView(terminalId: "t-1", cols: 10, rows: 2)
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.text("b")])
+        try await client.resizeTerminalView(terminalId: "t-1", cols: 999, rows: 999)
+        let all = await eventually { view.calls.count == 4 }
+        XCTAssertTrue(all)
+        XCTAssertEqual(view.calls, [.input([.text("a")]), .resize(cols: 20, rows: 5), .input([.text("b")]), .resize(cols: 300, rows: 120)])
+    }
+
+    func testInputBeforeCloseIsStillApplied() async throws {   // Review Focus 3
+        let (client, view) = try await openedView()
+        let gate = Gate()
+        view.holdInput(until: gate)
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.text("ls")])
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.key(.enter, mods: [])])
+        try await client.closeTerminalView(terminalId: "t-1")
+        try await Task.sleep(for: .milliseconds(100))
+        gate.open()
+        let closed = await eventually { view.calls.last == .close }
+        XCTAssertTrue(closed)
+        XCTAssertEqual(view.calls, [.input([.text("ls")]), .input([.key(.enter, mods: [])]), .close])
+    }
+
+    func testQueuedInputIsBounded() async throws {
+        let (client, view) = try await openedView()
+        let gate = Gate()
+        view.holdInput(until: gate)
+        try await client.sendTerminalInput(terminalId: "t-1", units: [.text("0")])
+        let started = await eventually { view.inputsStarted == 1 }
+        XCTAssertTrue(started)
+        for i in 1...70 { try await client.sendTerminalInput(terminalId: "t-1", units: [.text("\(i)")]) }
+        _ = try await within { try await client.snapshot() }       // the host has read all 71
+        gate.open()
+        let applied = await eventually { view.calls.count == 65 }
+        XCTAssertTrue(applied)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(view.calls, (0...64).map { .input([.text("\($0)")]) })
+    }
+
+    func testResyncSendsOneSnapshotAndDropsStaleDeltas() async throws {
+        let views = FakeTerminalViewSource()
+        let answer = Gate()
+        views.onOpen("t-1") { view, _ in
+            view.emit(.frame(snapshotFrame(cols: 20, rows: 1, text: ["one"])))
+            view.answerSnapshotRequests(after: answer) {
+                [.frame(deltaFrame(cols: 20, rows: 1, replacing: [0: "stale"])), .frame(snapshotFrame(cols: 20, rows: 1, text: ["again"]))]
+            }
+        }
+        let client = try await connect(makeHost(terminalViews: views))
+        let pushes = collect(client.terminalPushes)
+        _ = try await within { try await client.openTerminalView(terminalId: "t-1", cols: 20, rows: 5) }
+        let first = await waitFor(pushes) { assembled($0).revisions == [1] }
+        XCTAssertTrue(first)
+        for _ in 0..<3 { try await client.resyncTerminalView(terminalId: "t-1") }
+        _ = try await within { try await client.snapshot() }       // the host has read all three resyncs
+        answer.open()
+        let again = await waitFor(pushes) { assembledText($0) == ["again"] }
+        XCTAssertTrue(again)
+        XCTAssertEqual(views.views[0].snapshotRequests, 1, "resyncs before the snapshot share it")
+        XCTAssertEqual(assembled(pushes.items).kinds, [.snapshot, .snapshot])
+        XCTAssertEqual(assembled(pushes.items).revisions, [1, 2])
+    }
+
     func expectError(_ raw: SecureChannel, _ code: String, callId: String?,
                      file: StaticString = #filePath, line: UInt = #line) async throws {
         let message = try await within { try await raw.receive() }

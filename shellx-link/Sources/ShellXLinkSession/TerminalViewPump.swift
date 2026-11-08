@@ -54,6 +54,15 @@ actor TerminalViewPump {
         }
     }
 
+    /// The phone missed part of the stream (PROTOCOL.md 11.7, 11.8): the next frame sent is a snapshot. Frames that are
+    /// not snapshots are dropped until then, and resyncs that arrive before it share it.
+    func resync() async {
+        guard !waitingForSnapshot else { return }
+        waitingForSnapshot = true
+        snapshotRequested = true
+        await view.requestSnapshot()
+    }
+
     /// Ends both tasks and waits for them. Nothing is sent after it returns.
     func stop() async {
         let puller = self.puller, sender = self.sender

@@ -423,6 +423,27 @@ public actor LinkClient {
         try await post(.terminalViewClose(terminalId: terminalId))
     }
 
+    /// Checks `units` with `TerminalInputCheck` (throws `TerminalInputError` and sends nothing when they break a rule),
+    /// then sends `terminal.view.input`. Text an input method is still composing stays on the phone: send committed
+    /// text only. A Return key is `.key(.enter, mods: [])`, never a newline in `.text`. Throws
+    /// `LinkClientError.sessionClosed` when the session ended.
+    public func sendTerminalInput(terminalId: String, units: [TerminalInputUnit]) async throws {
+        try TerminalInputCheck.check(units)
+        try await post(.terminalViewInput(terminalId: terminalId, units: units))
+    }
+
+    /// Reports the size the phone can show (`terminal.view.resize`); the host clamps it. Throws
+    /// `LinkClientError.sessionClosed` when the session ended.
+    public func resizeTerminalView(terminalId: String, cols: Int, rows: Int) async throws {
+        try await post(.terminalViewResize(terminalId: terminalId, cols: cols, rows: rows))
+    }
+
+    /// Asks for a new snapshot (`terminal.view.resync`) after a gap. Send it once per gap, as
+    /// `TerminalFrameAssembler` says. Throws `LinkClientError.sessionClosed` when the session ended.
+    public func resyncTerminalView(terminalId: String) async throws {
+        try await post(.terminalViewResync(terminalId: terminalId))
+    }
+
     /// Sends a message that expects no answer.
     func post(_ message: LinkMessage) async throws {
         try checkOpen()
