@@ -2699,6 +2699,7 @@
 		5FBEE7A11EE7A11EE7A10001 /* MobileTerminalByteTeeAppendCostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBEE7A11EE7A11EE7A10002 /* MobileTerminalByteTeeAppendCostTests.swift */; };
 		5FBEE7A31EE7A31EE7A30001 /* MobileTerminalFramePacer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBEE7A31EE7A31EE7A30002 /* MobileTerminalFramePacer.swift */; };
 		AEF5CBAAC4D67800B57B0250 /* MobileTerminalFramePacerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B32678EFAC31EA6D25F35B9 /* MobileTerminalFramePacerTests.swift */; };
+		37296C03D59FED47F9A853C5 /* MobileTerminalFrameSinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */; };
 		D5B6C2EA337442FF589FC85C /* MobileTerminalInputRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484CB271A3C1390F5A544FBF /* MobileTerminalInputRoutingTests.swift */; };
 		580DAA428E6092CBBC496E6E /* MobileTerminalRenderGridAnchorRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DABF0FECE726AD90156499 /* MobileTerminalRenderGridAnchorRegistry.swift */; };
 		C9CFB398DF94D6DDEAF42D67 /* MobileTerminalRenderObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51B54FAD18160281FC1C2B6 /* MobileTerminalRenderObserver.swift */; };
@@ -7393,6 +7394,7 @@
 		5FBEE7A11EE7A11EE7A10002 /* MobileTerminalByteTeeAppendCostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileTerminalByteTeeAppendCostTests.swift; sourceTree = "<group>"; };
 		5FBEE7A31EE7A31EE7A30002 /* MobileTerminalFramePacer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileTerminalFramePacer.swift; sourceTree = "<group>"; };
 		8B32678EFAC31EA6D25F35B9 /* MobileTerminalFramePacerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileTerminalFramePacerTests.swift"; sourceTree = "<group>"; };
+		5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileTerminalFrameSinkTests.swift"; sourceTree = "<group>"; };
 		484CB271A3C1390F5A544FBF /* MobileTerminalInputRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileTerminalInputRoutingTests.swift"; sourceTree = "<group>"; };
 		E8DABF0FECE726AD90156499 /* MobileTerminalRenderGridAnchorRegistry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileTerminalRenderGridAnchorRegistry.swift; sourceTree = "<group>"; };
 		F51B54FAD18160281FC1C2B6 /* MobileTerminalRenderObserver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileTerminalRenderObserver.swift; sourceTree = "<group>"; };
@@ -14329,6 +14331,7 @@
 				405DEE2125C3F6CB4C4504C7 /* ShellXAutomationsOpenQueueTests.swift */,
 				884A8E5586F9A760EF0CA377 /* ShellXRoutineRunLauncherTests.swift */,
 				B4686D5E954A2598CCA6CB56 /* ShellXAutomationsWebHostTests.swift */,
+				5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19178,6 +19181,7 @@
 				F5A700000000000000000001 /* MobileTaskFilesystemJobQuotaTests.swift in Sources */,
 				5FBEE7A11EE7A11EE7A10001 /* MobileTerminalByteTeeAppendCostTests.swift in Sources */,
 				AEF5CBAAC4D67800B57B0250 /* MobileTerminalFramePacerTests.swift in Sources */,
+				37296C03D59FED47F9A853C5 /* MobileTerminalFrameSinkTests.swift in Sources */,
 				D5B6C2EA337442FF589FC85C /* MobileTerminalInputRoutingTests.swift in Sources */,
 				07C0EE882BF0E02B3397205A /* MobileTerminalReplayHibernationTests.swift in Sources */,
 				5FBEE7A21EE7A21EE7A20003 /* MobileViewportApplyGovernorTests.swift in Sources */,
