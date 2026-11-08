@@ -109,6 +109,11 @@ public final class TerminalViewModel {
     /// keeps a scrolled-up view in place by it.
     public private(set) var topShift = 0
     public private(set) var typing = TerminalTyping()
+    /// Raised by one for every input message queued (typing, keys, paste, scroll): the surface goes back to the bottom.
+    public private(set) var sentInputs = 0
+    /// Raised by one each time a paste is refused for its size (R12: `TerminalInputBatcher.pasteFits` is false); nothing
+    /// is sent, and the pane shows `terminal.paste.tooLarge`.
+    public private(set) var pasteTooLarge = 0
 
     private struct GridSize: Equatable {
         var cols: Int
@@ -151,6 +156,18 @@ public final class TerminalViewModel {
     @ObservationIgnored private var retryToken = 0
     /// The first-screen clock (R2, R7): running from a show or a reopen until a snapshot is applied.
     @ObservationIgnored private var firstScreenStart: ContinuousClock.Instant?
+    /// The resize waiting out `resizeDelay` after the last grid change (R11).
+    @ObservationIgnored private var resizeWait: Task<Void, Never>?
+    @ObservationIgnored private var resizeToken = 0
+    /// Alternate-screen scrolling summed until `scrollCoalescing` has passed (R12).
+    @ObservationIgnored private var scrollSum = 0
+    @ObservationIgnored private var scrollWait: Task<Void, Never>?
+    @ObservationIgnored private var scrollToken = 0
+    /// The echo clock (R10): from the first message of typed text or a key to the next frame applied, at most
+    /// `echoTimeout`.
+    @ObservationIgnored private var echoStart: ContinuousClock.Instant?
+    @ObservationIgnored private var echoWait: Task<Void, Never>?
+    @ObservationIgnored private var echoToken = 0
 
     /// `sleep` waits out every delay (tests pass a `ManualSleeper`); `now` times the latencies.
     public init(
@@ -220,6 +237,7 @@ public final class TerminalViewModel {
         topShift = 0
         screenRevision += 1
         restoreBudgets()
+        dropEcho()
         waitingForMac = false
         phase = .connecting
         firstScreenStart = terminalId == nil ? nil : now()
@@ -229,8 +247,14 @@ public final class TerminalViewModel {
     /// R11: the size that fits the pane. Values below 1 are ignored.
     public func setPhoneGrid(cols: Int, rows: Int) {
         guard cols >= 1, rows >= 1 else { return }
-        grid = GridSize(cols: cols, rows: rows)
+        let grid = GridSize(cols: cols, rows: rows)
+        self.grid = grid
         reconcile()
+        guard let view, grid != view.size else {
+            cancelResize()
+            return
+        }
+        scheduleResize()
     }
 
     /// The app went to the background: the view closes, the screen stays.
@@ -245,8 +269,9 @@ public final class TerminalViewModel {
         reconcile()
     }
 
-    /// Try Again.
+    /// Try Again. Nothing to do while a view is open.
     public func retry() {
+        guard view == nil else { return }
         restoreBudgets()
         waitingForMac = false
         phase = .connecting
@@ -287,8 +312,15 @@ public final class TerminalViewModel {
         }
     }
 
+    /// The view's waits go with it: a resize or scroll for it never reaches the next view.
     private func forgetView() {
         view = nil
+        cancelResize()
+        scrollWait?.cancel()
+        scrollWait = nil
+        scrollToken += 1
+        scrollSum = 0
+        dropEcho()
     }
 
     private func restoreBudgets() {
@@ -317,6 +349,76 @@ public final class TerminalViewModel {
             self.retryWait = nil
             self.reconcile()
         }
+    }
+
+    // MARK: - R10-R12
+
+    /// R10: `units` as input messages to the view, after any queued open; dropped without a view.
+    private func send(_ units: [TerminalInputUnit]) {
+        guard let view, !units.isEmpty else { return }
+        for message in TerminalInputBatcher.messages(units) {
+            outbox.send(.input(view.terminalId, message))
+            sentInputs += 1
+            if echoStart == nil, message.contains(where: Self.isTyped) { startEcho() }
+        }
+    }
+
+    private static func isTyped(_ unit: TerminalInputUnit) -> Bool {
+        switch unit {
+        case .text, .key: true
+        default: false
+        }
+    }
+
+    private func flushScroll(_ token: Int) {
+        guard token == scrollToken else { return }
+        scrollWait = nil
+        let total = scrollSum
+        scrollSum = 0
+        send(TerminalInputBatcher.scrollUnits(total))
+    }
+
+    private func startEcho() {
+        echoStart = now()
+        echoToken += 1
+        let token = echoToken
+        let sleep = sleep
+        echoWait?.cancel()
+        echoWait = Task { [weak self] in
+            do { try await sleep(TerminalViewModel.echoTimeout) } catch { return }
+            guard let self, self.echoToken == token else { return }
+            self.echoStart = nil
+            self.echoWait = nil
+        }
+    }
+
+    private func dropEcho() {
+        echoStart = nil
+        echoToken += 1
+        echoWait?.cancel()
+        echoWait = nil
+    }
+
+    /// R11: the grid goes out `resizeDelay` after its last change, unless it is the size last sent.
+    private func scheduleResize() {
+        resizeWait?.cancel()
+        resizeToken += 1
+        let token = resizeToken
+        let sleep = sleep
+        resizeWait = Task { [weak self] in
+            do { try await sleep(TerminalViewModel.resizeDelay) } catch { return }
+            guard let self, self.resizeToken == token else { return }
+            self.resizeWait = nil
+            guard let view = self.view, let grid = self.grid, grid != view.size else { return }
+            self.outbox.send(.resize(view.terminalId, cols: grid.cols, rows: grid.rows))
+            self.view?.size = grid
+        }
+    }
+
+    private func cancelResize() {
+        resizeWait?.cancel()
+        resizeWait = nil
+        resizeToken += 1
     }
 
     // MARK: - R3
@@ -441,6 +543,10 @@ public final class TerminalViewModel {
             break
         }
         link.recordLatency(.terminalFrameApply, now() - started)
+        if let start = echoStart {
+            link.recordLatency(.terminalKeyEcho, now() - start)
+            dropEcho()
+        }
     }
 
     /// R8.
@@ -455,6 +561,44 @@ public final class TerminalViewModel {
             return
         }
         reconcile()
+    }
+}
+
+// MARK: - Typing, paste, scrolling and resizing (R10-R12)
+
+extension TerminalViewModel {
+    public func insertText(_ text: String) { send(typing.insert(text)) }
+
+    public func setMarkedText(_ text: String) { send(typing.setMarked(text)) }
+
+    public func unmarkText() { send(typing.unmark()) }
+
+    public func deleteBackward() { send(typing.deleteBackward()) }
+
+    public func press(_ key: TerminalKey, mods: [TerminalModifier] = []) { send(typing.key(key, mods: mods)) }
+
+    public func toggleCtrl() { typing.toggleCtrl() }
+
+    /// R12: refused whole when it does not fit (`pasteTooLarge`), else sent in paste-sized messages.
+    public func paste(_ text: String) {
+        guard TerminalInputBatcher.pasteFits(text) else {
+            pasteTooLarge += 1
+            return
+        }
+        send(TerminalInputBatcher.pasteUnits(text))
+    }
+
+    /// R12: alternate-screen scrolling (positive: toward older content), summed for `scrollCoalescing`.
+    public func scroll(lines: Int) {
+        guard view != nil, screen.alt, lines != 0 else { return }
+        scrollSum += lines
+        guard scrollWait == nil else { return }
+        let token = scrollToken
+        let sleep = sleep
+        scrollWait = Task { [weak self] in
+            do { try await sleep(TerminalViewModel.scrollCoalescing) } catch { return }
+            self?.flushScroll(token)
+        }
     }
 }
 
