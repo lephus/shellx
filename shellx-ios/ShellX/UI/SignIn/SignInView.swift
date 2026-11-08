@@ -107,6 +107,8 @@ struct SignInView: View {
         case .network: String(localized: "signin.error.network")
         case .server: String(localized: "signin.error.server")
         case .localWipePending: String(localized: "signin.error.localWipePending")
+        // Task 9 replaces this screen; until then the new provider errors read as a server error.
+        default: String(localized: "signin.error.server")
         }
     }
 

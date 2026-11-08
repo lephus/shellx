@@ -18,6 +18,8 @@ struct RootView: View {
             LaunchView()
         case let .signedOut(expired):
             SignInView(coordinator: coordinator, expired: expired)
+        case .linkingApple:
+            LaunchView()
         case let .signedIn(email):
             if let hub = coordinator.hub, hub.isLoaded, let scope = graph.scopes.scope(for: hub) {
                 SignedInView(

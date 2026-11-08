@@ -46,6 +46,7 @@ struct CoordinatorRig {
 
 /// The error a sign-in, a switch or a deletion threw; nil when it succeeded.
 @MainActor
-func signInError(_ body: () async throws(SignInError) -> Void) async -> SignInError? {
-    do { try await body(); return nil } catch { return error }
+func signInError(_ body: () async throws -> Void) async -> SignInError? {
+    // Swift 6.0 does not infer a typed throw for a closure literal, so the body throws `any Error`.
+    do { try await body(); return nil } catch { return error as? SignInError }
 }
