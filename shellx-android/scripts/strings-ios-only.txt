@@ -1,0 +1,2 @@
+# iPhone catalog keys the Android app never shows (an iPhone-only feature, such as Sign in with Apple).
+# import-strings.py leaves them out of strings.xml. One key per line, exactly as in Localizable.xcstrings.
