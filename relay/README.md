@@ -186,6 +186,25 @@ Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.
   tokens FCM reports `UNREGISTERED`/`INVALID_ARGUMENT` are deleted; other FCM errors are logged by
   kind and not retried. 120 per agent per hour (`429 rate_limited`). 503 `push_unavailable` without
   configuration.
+- `POST /v2/notifications {kind, request_id, agent?, workspace_title?}` (native desktops with a
+  registered machine: `403 desktop_only` otherwise, `404` without a machine): `kind` is `needs_you`
+  (with `agent`, 1..64 characters, and an optional `workspace_title` up to 200) or `resolved`;
+  `request_id` is 1..64 bytes. Recipients are the phones granted this machine with a live sign-in.
+  iPhones (a token with `apns_topic`) get APNs: for `needs_you` an alert in the phone's own words
+  (`push.needsYou[.workspace]`), priority 10, `apns-collapse-id` = `request_id`, kept 24 h; for
+  `resolved` a background push. Android phones (device `platform` `android`, a token without
+  `apns_topic`) get an FCM data-only message (no `notification` block): `data` is `{kind,
+  machine_id, request_id}`, plus `agent` and `workspace_title` (`""` when none) for `needs_you`;
+  `android.priority` is `high` for `needs_you` and `normal` for `resolved`; both carry
+  `android.ttl` `86400s` and `android.collapse_key` = `request_id`, so a `resolved` replaces a
+  `needs_you` that has not been delivered yet. Nothing the agent asks is ever sent. Answers
+  `202 {sent}` once every send has finished; one phone's failure never stops the others; tokens
+  APNs or FCM report as gone are deleted. `503 push_unavailable` only when neither APNs nor FCM is
+  configured (with one of them, the other platform's phones are skipped). A valid `needs_you`
+  counts once against the Mac's notification limit (120 per hour, `429 rate_limited`); `resolved`
+  never does. The `v2_notification` log line has the kind and counts (`recipients`,
+  `fcm_recipients`, `sent`, `tokens_removed`), never the agent, the workspace, the request id or a
+  token.
 - `src/push/fcm.ts` talks to FCM HTTP v1 with an OAuth token from a JWT (RS256, `node:crypto`)
   signed with the service account key; the token is cached until a minute before it expires.
 - Logs never contain titles, bodies or tokens (only counts and the agent's `device_id`).
