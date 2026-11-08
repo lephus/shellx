@@ -98,4 +98,15 @@ final class TerminalRenderTests: XCTestCase {
         }
         XCTAssertEqual(Set(firsts.compactMap { $0 }).count, states.count, "each state looks different")
     }
+
+    func testRendersTheKeyBarWithCtrlLatched() throws {
+        let typing = TerminalTyping(markedText: "việ", ctrlLatched: true)
+        let model = TerminalViewModel.fixed(terminalId: "t-zsh", screen: Self.screen(DemoTerminalScreens.shell), typing: typing)
+        try assertRenders(page(model, showsKeyBar: true), name: "terminal-key-bar-ctrl")
+        let plain = try SnapshotWriter().write(
+            page(.fixed(terminalId: "t-zsh", screen: Self.screen(DemoTerminalScreens.shell)), showsKeyBar: true),
+            name: "terminal-key-bar", settle: 0.2)
+        let latched = try SnapshotWriter().write(page(model, showsKeyBar: true), name: "terminal-key-bar-ctrl", settle: 0.2)
+        XCTAssertNotEqual(plain.first?.pngData(), latched.first?.pngData(), "the latch and the marked text show")
+    }
 }
