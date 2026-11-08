@@ -102,3 +102,5 @@ Vietnamese text is meant to equal the English (a product name) goes in `scripts/
 rounds the corners itself), with the alpha channel removed because App Store Connect refuses it.
 `Logo` is the same SVG as a 96 pt vector PDF, used by the launch screen and the first screen. The
 colour sets (`AccentColor`, `AccentText`, `Status*`) have a darker variant for the light appearance.
+
+`GoogleG` is Google's official "G", cropped unchanged (20 × 20 pt) from the Light, no-text, Square iOS icons of Google's sign-in bundle (https://developers.google.com/static/identity/images/signin-assets.zip, linked from https://developers.google.com/identity/branding-guidelines). `Fonts/GoogleSans.ttf` is Google Sans (SIL OFL 1.1, `Fonts/GoogleSans-OFL.txt`) from github.com/google/fonts. Both serve only the Continue with Google button, which follows that page. Never replace them with a Google logo from `ios/`, `Packages/` or `Sources/`, or with a drawn one.

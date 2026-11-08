@@ -119,6 +119,18 @@ check_app() {
       note "$label: ShellXGoogleClientID is not a Google iOS client id yet ('$value'): Continue with Google cannot work in this build"
     fi
   fi
+  # Google's branding guidelines want the official "G" (asset GoogleG) and Google Sans on the Continue with Google
+  # button (contracts §11); without them the button shows its text only.
+  local google_mark="" google_font=""
+  if [ -f "$app/Assets.car" ] && assetutil --info "$app/Assets.car" 2>/dev/null | grep -Eq '"Name" *: *"GoogleG"'; then google_mark=yes; fi
+  if [ -f "$app/GoogleSans.ttf" ]; then google_font=yes; fi
+  if [ -z "$google_mark" ] || [ -z "$google_font" ]; then
+    if [ "$mode" = "signed" ]; then
+      fail+=("lacks Google's sign-in branding (the GoogleG asset or GoogleSans.ttf); see shellx-ios/README.md, Assets")
+    else
+      note "$label: no Google “G” mark or Google Sans yet: Continue with Google shows its text-only fallback"
+    fi
+  fi
 
   if [ "$mode" = "signed" ]; then
     local entitlements="$WORK/entitlements.plist"

@@ -1,29 +1,24 @@
 import ShellXAppCore
 import SwiftUI
 
-/// Email and password sign-in. Email and password carry the AutoFill content types, so the system
-/// can offer saved credentials.
+/// Sign in with Google or Apple. There is no password field.
 struct SignInView: View {
     let coordinator: AppCoordinator
     let expired: Bool
+    let notice: SignInNotice?
 
-    @State private var email = ""
-    @State private var password = ""
     @State private var error: SignInError?
-    @State private var isSigningIn = false
-    @FocusState private var focus: Field?
+    @State private var running: Provider?
+    @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .largeTitle) private var logoSize: CGFloat = 64
 
-    private enum Field { case email, password }
+    private enum Provider { case google, apple }
 
-    init(coordinator: AppCoordinator, expired: Bool, initialError: SignInError? = nil) {
+    init(coordinator: AppCoordinator, expired: Bool, notice: SignInNotice? = nil, initialError: SignInError? = nil) {
         self.coordinator = coordinator
         self.expired = expired
+        self.notice = notice
         _error = State(initialValue: initialError)
-    }
-
-    private var canSubmit: Bool {
-        !email.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty && !isSigningIn
     }
 
     var body: some View {
@@ -46,93 +41,54 @@ struct SignInView: View {
                         .foregroundStyle(Color("StatusNeedsYou"))
                         .accessibilityIdentifier("signin.expired")
                 }
-
-                field {
-                    TextField(String(localized: "signin.email"), text: $email)
-                        .textContentType(.username)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.next)
-                        .focused($focus, equals: .email)
-                        .onSubmit { focus = .password }
+                if let notice {
+                    Text(SignInErrorText.message(for: notice))
+                        .font(.callout)
+                        .foregroundStyle(Color("StatusNeedsYou"))
+                        .accessibilityIdentifier("signin.notice")
                 }
-                field {
-                    SecureField(String(localized: "signin.password"), text: $password)
-                        .textContentType(.password)
-                        .submitLabel(.go)
-                        .focused($focus, equals: .password)
-                        .onSubmit(submit)
-                }
-
-                if let error {
-                    Text(message(for: error))
+                if let error, let text = SignInErrorText.message(for: error) {
+                    Text(text)
                         .font(.callout)
                         .foregroundStyle(Color("StatusError"))
                         .accessibilityIdentifier("signin.error")
                 }
 
-                Button(action: submit) {
-                    HStack {
-                        if isSigningIn { ProgressView() }
-                        Text(LocalizedStringResource("signin.button"))
-                            .font(.headline)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                VStack(spacing: 12) {
+                    GoogleSignInButton(busy: running == .google) { run(.google) }
+                    AppleSignInButton { run(.apple) }
+                        .id(colorScheme)
+                        .frame(height: 44)
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(!canSubmit)
+                .disabled(running != nil)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
-        .scrollDismissesKeyboard(.interactively)
         .background(Color.appBackground)
     }
 
-    private func field<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        content()
-            .font(.body)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func message(for error: SignInError) -> String {
-        switch error {
-        case .invalidCredentials: String(localized: "signin.error.invalidCredentials")
-        case .rateLimited: String(localized: "signin.error.rateLimited")
-        case .network: String(localized: "signin.error.network")
-        case .server: String(localized: "signin.error.server")
-        case .localWipePending: String(localized: "signin.error.localWipePending")
-        // Task 9 replaces this screen; until then the new provider errors read as a server error.
-        default: String(localized: "signin.error.server")
-        }
-    }
-
-    private func submit() {
-        guard canSubmit else { return }
-        isSigningIn = true
+    private func run(_ provider: Provider) {
+        guard running == nil else { return }
+        running = provider
         error = nil
-        let address = email.trimmingCharacters(in: .whitespaces)
-        let secret = password
         Task {
             do {
-                try await coordinator.signIn(email: address, password: secret)
+                switch provider {
+                case .google: try await coordinator.signInWithGoogle()
+                case .apple: try await coordinator.signInWithApple()
+                }
             } catch {
                 let failure = error as? SignInError ?? .server(code: "unknown")
-                self.error = failure
-                AccessibilityNotification.Announcement(message(for: failure)).post()
+                // Closing Google's or Apple's sheet is not an error: nothing is shown.
+                if let text = SignInErrorText.message(for: failure) {
+                    self.error = failure
+                    AccessibilityNotification.Announcement(text).post()
+                }
             }
-            isSigningIn = false
+            running = nil
         }
     }
 }
-
-#if DEBUG
-#Preview {
-    SignInView(coordinator: .preview(), expired: false)
-}
-#endif

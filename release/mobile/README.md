@@ -30,6 +30,7 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
    - it has `aps-environment` with a value other than `production`;
    - its `ShellXGoogleClientID` is not a Google iOS client id (`SHELLX_GOOGLE_IOS_CLIENT` in `shellx-ios/Config/Release.xcconfig` still holds the placeholder);
    - it lacks the Sign in with Apple entitlement `com.apple.developer.applesignin`;
+   - it lacks Google's sign-in branding: the `GoogleG` asset (in `Assets.car`) or `GoogleSans.ttf`;
    - it embeds a `.framework` in `Frameworks/` (P3 links everything statically);
    - any Mach-O file in it contains Debug-only code: the demo (`SHELLX_DEMO`), `FakeMac`,
      `FakeRelayAccount`, `InMemorySecretStore` or anything from `ShellXAppTestSupport`.

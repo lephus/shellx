@@ -3236,24 +3236,6 @@
         }
       }
     },
-    "signin.button": {
-      "comment": "Primary button of the sign-in screen.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign in"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Đăng nhập"
-          }
-        }
-      }
-    },
     "signin.email": {
       "comment": "Label of the email field, also the email row in Settings.",
       "extractionState": "manual",
@@ -3273,19 +3255,19 @@
       }
     },
     "signin.error.invalidCredentials": {
-      "comment": "Sign-in error: credentials refused.",
+      "comment": "Sign-in error: the relay refused the Google or Apple sign-in.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wrong email or password."
+            "value": "ShellX couldn't confirm this sign-in. Try again."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Email hoặc mật khẩu không đúng."
+            "value": "ShellX không xác nhận được lần đăng nhập này. Thử lại."
           }
         }
       }
@@ -3380,24 +3362,6 @@
         }
       }
     },
-    "signin.password": {
-      "comment": "Label of the password field.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Password"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mật khẩu"
-          }
-        }
-      }
-    },
     "signin.subtitle": {
       "comment": "Explains which account to use on the sign-in screen.",
       "extractionState": "manual",
@@ -3405,13 +3369,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use the ShellX account you signed in with on your Mac."
+            "value": "Use the Google account you use with ShellX on your Mac, or sign in with Apple and link this iPhone to your Mac once."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dùng tài khoản ShellX bạn đã đăng nhập trên Mac."
+            "value": "Dùng tài khoản Google bạn dùng với ShellX trên Mac, hoặc đăng nhập bằng Apple rồi nối iPhone này với Mac một lần."
           }
         }
       }
@@ -4564,6 +4528,204 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gỡ khỏi điện thoại"
+          }
+        }
+      }
+    },
+    "signin.google": {
+      "comment": "Button of the sign-in screen: Google's sign-in.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue with Google"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếp tục với Google"
+          }
+        }
+      }
+    },
+    "signin.error.switchFromSignedInDevice": {
+      "comment": "Sign-in error: the email belongs to an account that still has a password (S1 §6.3). Same text as the Mac's `remote.signin.error.switchFromSignedInDevice` (plan 1B).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài khoản › Chuyển sang đăng nhập Google, rồi thử lại."
+          }
+        }
+      }
+    },
+    "signin.error.emailInUse": {
+      "comment": "Switch to Google failed: the Google email belongs to another account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another ShellX account already uses that Google account's email."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một tài khoản ShellX khác đã dùng email của tài khoản Google đó."
+          }
+        }
+      }
+    },
+    "signin.error.identityInUse": {
+      "comment": "Switch to Google failed: the Google account is linked elsewhere, or this account already has another Google account (relay plan 1A).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That Google account already signs in to another ShellX account, or this account already uses another Google account."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tài khoản Google đó đã đăng nhập vào một tài khoản ShellX khác, hoặc tài khoản này đã dùng một tài khoản Google khác."
+          }
+        }
+      }
+    },
+    "signin.error.reauthRequired": {
+      "comment": "Delete Account: the fresh sign-in was another account or too old.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with the Google or Apple account this ShellX account uses, then try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy đăng nhập bằng tài khoản Google hoặc Apple mà tài khoản ShellX này dùng, rồi thử lại."
+          }
+        }
+      }
+    },
+    "signin.error.providerUnavailable": {
+      "comment": "The build has no Google client ID.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This way of signing in isn't available in this build."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bản này chưa dùng được cách đăng nhập này."
+          }
+        }
+      }
+    },
+    "signin.error.providerFailed": {
+      "comment": "Google or Apple did not finish the sign-in.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sign-in didn't finish. Try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập chưa xong. Thử lại."
+          }
+        }
+      }
+    },
+    "signin.apple.linkDenied": {
+      "comment": "Back on sign-in after Deny on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac declined, so this Apple ID isn't linked."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đã từ chối nên Apple ID này chưa được liên kết."
+          }
+        }
+      }
+    },
+    "signin.apple.linkExpired": {
+      "comment": "Back on sign-in after the link request or its token expired.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linking took too long. Sign in with Apple again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liên kết quá lâu. Hãy đăng nhập bằng Apple lại."
+          }
+        }
+      }
+    },
+    "signin.apple.linkFailed": {
+      "comment": "Back on sign-in when the approved link could not be saved.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linking didn't finish. Sign in with Apple again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liên kết chưa xong. Hãy đăng nhập bằng Apple lại."
+          }
+        }
+      }
+    },
+    "settings.account.delete.switchFirst": {
+      "comment": "Delete Account on a password session.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch this iPhone to Google sign-in first, then delete the account here."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy chuyển iPhone này sang đăng nhập Google trước, rồi xoá tài khoản tại đây."
           }
         }
       }

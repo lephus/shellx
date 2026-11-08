@@ -17,7 +17,7 @@ struct RootView: View {
         case .launching:
             LaunchView()
         case let .signedOut(expired):
-            SignInView(coordinator: coordinator, expired: expired)
+            SignInView(coordinator: coordinator, expired: expired, notice: coordinator.signInNotice)
         case .linkingApple:
             LaunchView()
         case let .signedIn(email):

@@ -64,7 +64,6 @@ final class AccountRenderTests: XCTestCase {
         XCTAssertTrue(GoogleSignInButton.labelFont().fontName.hasPrefix("GoogleSans"), GoogleSignInButton.labelFont().fontName)
         XCTAssertEqual(GoogleSignInButton.labelFont().pointSize, 14)
     }
-    ```
 
     func testSignInExpiredRenders() throws {
         try assertRenders(SignInView(coordinator: .preview(), expired: true), name: "signin-expired")
