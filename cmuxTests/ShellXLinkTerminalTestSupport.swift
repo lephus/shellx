@@ -122,9 +122,12 @@ extension ScrollbackTestTerminal {
     }
 
     func openLinkView(
-        cols: Int, rows: Int, sizing: RecordingSizing = RecordingSizing(),
-        registry: RecordingFrameSinkRegistry = RecordingFrameSinkRegistry(), policy: TestPolicy = TestPolicy()
+        cols: Int, rows: Int, sizing: RecordingSizing? = nil, registry: RecordingFrameSinkRegistry? = nil,
+        policy: TestPolicy? = nil
     ) -> ShellXLinkTerminalView {
+        let sizing = sizing ?? RecordingSizing()
+        let registry = registry ?? RecordingFrameSinkRegistry()
+        let policy = policy ?? TestPolicy()
         let view = ShellXLinkTerminalView(
             surfaceID: surface.id, terminal: linkTerminal, sizing: sizing.sizing, frameSinks: registry,
             isBlocked: { policy.blocked }, notificationCenter: policy.center

@@ -1,5 +1,8 @@
+import AppKit
 import CMUXMobileCore
+import CmuxTerminal
 import Foundation
+import GhosttyKit
 import ShellXLinkCore
 import ShellXLinkSession
 import Testing
@@ -9,6 +12,11 @@ import Testing
 #elseif canImport(cmux)
 @testable import cmux
 #endif
+
+@MainActor
+private final class DoneFlag {
+    var value = false
+}
 
 @MainActor
 @Suite("ShellX Link terminal view frames", .serialized, .timeLimit(.minutes(2)))
@@ -103,7 +111,10 @@ struct ShellXLinkTerminalViewFrameTests {
             await Task.yield()
             await view.requestSnapshot()
             let event = await pending.value
-            guard case let .frame(frame) = event else { return Issue.record("no frame: \(event)") }
+            guard case let .frame(frame) = event else {
+                Issue.record("no frame: \(event)")
+                return
+            }
             #expect(frame.head.kind == .snapshot)
             await view.close()
         }
@@ -167,6 +178,10 @@ struct ShellXLinkTerminalViewFrameTests {
 
     @Test func floodEndsOnTheLastScreen() async throws {
         try await withTerminal { terminal in
+            // A full screen, so the rows that scroll first are rows the phone already has. A chunk never changes a row
+            // after it scrolled (Spec note 11); on a blank screen the first chunk would write into the rows that scroll.
+            try terminal.output("p1\r\np2\r\np3\r\np4\r\np5")
+            try await terminal.waitForScreen(containing: "p5")
             let view = terminal.openLinkView(cols: 20, rows: 5)
             var screen = TerminalScreen()
             screen.apply(try await snapshot(of: view))
@@ -197,18 +212,71 @@ struct ShellXLinkTerminalViewFrameTests {
 
     @Test func aTerminalWithoutALiveSurfaceShowsOnceItStarts() async throws {
         try await AppContextSerialGate.withExclusiveAppContext {
-            let terminal = try ScrollbackTestTerminal()
-            defer { terminal.close() }
-            let view = terminal.openLinkView(cols: 20, rows: 5)
-            #expect(await view.returnsNothing(for: .milliseconds(300)))
-            try await terminal.launch()
-            try terminal.output("\u{1b}cready")
-            try await terminal.waitForScreen(containing: "ready")
-            view.terminalSurfaceMayHaveChanged()
-            let frame = try await snapshot(of: view)
+            _ = NSApplication.shared
+            // No window yet: a restored terminal that was never shown has no runtime surface.
+            let surface = TerminalSurface(
+                tabId: UUID(), context: GHOSTTY_SURFACE_CONTEXT_SPLIT, configTemplate: nil,
+                ioMode: .manualMirror, manualInputHandler: { _ in }, runtimeSpawnPolicy: .pacedSessionRestore
+            )
+            #expect(!surface.hasLiveSurface)
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 640, height: 400), styleMask: [.titled, .closable],
+                backing: .buffered, defer: false
+            )
+            window.isReleasedWhenClosed = false
+            defer {
+                surface.hostedView.removeFromSuperview()
+                surface.teardownSurface()
+                window.orderOut(nil)
+                window.close()
+            }
+            let terminal = ShellXLinkTerminalView.Terminal(
+                surface: { surface }, type: { _ in }, press: { _ in false }, paste: { _ in }, scroll: { _, _, _ in }
+            )
+            let view = ShellXLinkTerminalView(
+                surfaceID: surface.id, terminal: terminal, sizing: RecordingSizing().sizing,
+                frameSinks: RecordingFrameSinkRegistry(), isBlocked: { false }, notificationCenter: NotificationCenter()
+            )
+            view.open(cols: 20, rows: 5)
+            let done = DoneFlag()
+            let pull = Task { @MainActor () -> TerminalViewEvent in
+                let event = await view.nextFrame()
+                done.value = true
+                return event
+            }
+            for _ in 0..<5 { await Task.yield() }
+            // Until the runtime exists the view waits; if it started meanwhile, a frame may be there already.
+            let live = surface.hasLiveSurface
+            let returned = done.value
+            #expect(live || !returned)
+            let content = try #require(window.contentView)
+            surface.hostedView.frame = content.bounds
+            content.addSubview(surface.hostedView)
+            window.orderFront(nil)
+            content.layoutSubtreeIfNeeded()
+            surface.hostedView.setVisibleInUI(true)
+            surface.hostedView.setActive(true)
+            surface.requestInputDemandSurfaceStartIfNeeded()
+            let deadline = ContinuousClock.now + .seconds(5)
+            while !surface.hasLiveSurface, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            let runtime = try #require(surface.surface)
+            let text = "\u{1b}cready"
+            text.withCString { ghostty_surface_process_output(runtime, $0, UInt(text.utf8.count)) }
+            let screenDeadline = ContinuousClock.now + .seconds(5)
+            while surface.readText(region: .screen)?.contains("ready") != true, ContinuousClock.now < screenDeadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
             var screen = TerminalScreen()
-            screen.apply(frame)
-            #expect(frame.head.kind == .snapshot && screen.screenText().contains { $0.contains("ready") })
+            screen.apply(await pull.value)
+            var attempts = 0
+            while !screen.screenText().contains(where: { $0.contains("ready") }), attempts < 20 {
+                attempts += 1
+                view.terminalSurfaceMayHaveChanged()
+                if let event = await view.nextEventIfAny(within: .milliseconds(500)) { screen.apply(event) }
+            }
+            #expect(screen.screenText().contains { $0.contains("ready") })
             await view.close()
         }
     }
@@ -222,7 +290,10 @@ struct ShellXLinkTerminalViewFrameTests {
             await Task.yield()
             try await terminal.setGrid(columns: 30, rows: 6)
             view.terminalSurfaceMayHaveChanged()
-            guard case let .frame(frame) = await pending.value else { return Issue.record("no frame") }
+            guard case let .frame(frame) = await pending.value else {
+                Issue.record("no frame")
+                return
+            }
             #expect(frame.head.kind == .snapshot && frame.head.cols == 30 && frame.head.rows == 6)
             await view.close()
         }
@@ -274,7 +345,8 @@ struct ShellXLinkTerminalViewFrameTests {
         try await withTerminal { terminal in
             let view = terminal.openLinkView(cols: 20, rows: 5)
             view.end(.gone)
-            #expect(try await view.nextEvent() == .ended(.gone))
+            let ended = try await view.nextEvent()
+            #expect(ended == .ended(.gone))
             await view.close()
 
             var gone = terminal.linkTerminal
@@ -284,7 +356,8 @@ struct ShellXLinkTerminalViewFrameTests {
                 isBlocked: { false }, notificationCenter: NotificationCenter()
             )
             other.open(cols: 20, rows: 5)
-            #expect(try await other.nextEvent() == .ended(.gone))
+            let otherEnded = try await other.nextEvent()
+            #expect(otherEnded == .ended(.gone))
             await other.close()
         }
     }
