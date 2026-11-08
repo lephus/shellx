@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { JSONWebKeySet, JWTHeaderParameters, JWTPayload, JWTVerifyGetKey } from "jose";
 import { createTestIssuer, type TestIssuer, testIdTokenClaims } from "../scripts/test-idp.js";
+import type { AppleTokenGateway } from "../src/auth/apple-rest.js";
 import { createIdTokenVerifier, type IdTokenVerifier, sha256Hex } from "../src/auth/id-token.js";
 import { APPLE_ISSUER, DEFAULT_APPLE_CLIENT_IDS } from "../src/auth/providers.js";
 
@@ -79,4 +80,22 @@ export function testIdTokens(): IdTokenVerifier {
     googleKeys: fakeGoogle.keys,
     appleKeys: fakeApple.keys,
   });
+}
+
+/** Records every Apple REST call and answers the configured values. */
+export class FakeAppleTokens implements AppleTokenGateway {
+  readonly exchanges: { clientId: string; code: string }[] = [];
+  readonly revokes: { clientId: string; refreshToken: string }[] = [];
+  refreshToken: string | null = "apple-refresh-token-1";
+  revokeOk = true;
+
+  async exchangeCode(clientId: string, code: string): Promise<string | null> {
+    this.exchanges.push({ clientId, code });
+    return this.refreshToken;
+  }
+
+  async revoke(clientId: string, refreshToken: string): Promise<boolean> {
+    this.revokes.push({ clientId, refreshToken });
+    return this.revokeOk;
+  }
 }

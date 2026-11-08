@@ -1,5 +1,6 @@
 // Entry point of the relay container: `node dist/server.js` (dev: `npm run dev`).
 import { adminStatus } from "./admin/app.js";
+import { loadAppleSiwa } from "./auth/apple-rest.js";
 import { type IdTokenVerifier, loadIdTokenVerifier } from "./auth/id-token.js";
 import { createRateLimiters } from "./auth/rate-limit.js";
 import { ConfigError, loadConfig, type Config } from "./config.js";
@@ -38,6 +39,12 @@ if (config.googleClientIds.length === 0) logMeta("google_sign_in_disabled");
 if (config.testIdp !== null) logMeta("test_idp_enabled");
 if (!config.passwordLogin) logMeta("password_login_off");
 
+// Sign in with Apple's REST side (refresh-token exchange and revocation) is optional: without the key
+// the Apple sign-in itself works, but no refresh token is stored and nothing is revoked.
+const siwa = loadAppleSiwa(process.env);
+if (siwa.gateway === null) logMeta("apple_siwa_disabled", { reason: siwa.reason });
+else logMeta("apple_siwa_enabled");
+
 let db: Db;
 try {
   db = Db.open(config.dbPath);
@@ -68,7 +75,7 @@ else logMeta("relay_v2_disabled", { reason: config.relayV2DisabledReason });
 
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
-  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, apns: apns.gateway, idTokens },
+  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, apns: apns.gateway, idTokens, appleTokens: siwa.gateway },
   { host: config.host, port: config.port },
 ).catch((err: unknown) => fail(`cannot listen on ${config.host}:${config.port} (${errorKind(err)})`));
 logMeta("relay_started", { port: relay.port });

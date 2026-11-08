@@ -24,6 +24,7 @@ import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import { phoneGrantRoutes, phonePairingRoutes } from "./v2/phones.js";
 import type { ApnsGateway } from "./push/apns.js";
 import type { PushGateway } from "./push/fcm.js";
+import type { AppleTokenGateway } from "./auth/apple-rest.js";
 import { type IdTokenVerifier, loadIdTokenVerifier } from "./auth/id-token.js";
 import { signInRoutes } from "./routes/sign-in.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
@@ -46,6 +47,8 @@ export interface AppDeps {
   apns?: ApnsGateway | null;
   /** Google / Apple / test ID-token verifier; defaults to `loadIdTokenVerifier(config)` (cached remote JWKS). */
   idTokens?: IdTokenVerifier;
+  /** Apple REST (code exchange, revoke); null or absent when Sign in with Apple's key is not configured. */
+  appleTokens?: AppleTokenGateway | null;
   /** Directory of the admin UI (index.html, admin.css, admin.js); defaults to `relay/admin/`. */
   adminStaticDir?: string;
   /** The 6-digit code of a new /v2 pairing; defaults to `randomInt(0, 1_000_000)` zero-padded. Injectable for tests. */
@@ -66,6 +69,7 @@ export interface AppVariables {
   pairingCode: () => string;
   shareSlot: () => string;
   idTokens: IdTokenVerifier;
+  appleTokens: AppleTokenGateway | null;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
 }
@@ -104,6 +108,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("passwords", deps.passwords ?? defaultPasswords);
     c.set("now", deps.now ?? Date.now);
     c.set("idTokens", idTokens);
+    c.set("appleTokens", deps.appleTokens ?? null);
     c.set("push", deps.push ?? null);
     c.set("apns", deps.apns ?? null);
     c.set("pairingCode", deps.pairingCode ?? randomPairingCode);
