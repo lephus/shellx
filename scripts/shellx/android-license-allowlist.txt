@@ -15,3 +15,13 @@
 androidx.*:*                 ship  Apache-2.0
 org.jetbrains.kotlin:*       ship  Apache-2.0
 org.jetbrains.kotlinx:*      ship  Apache-2.0
+org.jetbrains:annotations                  ship  Apache-2.0  # The Apache Software License, Version 2.0
+org.junit.jupiter:junit-jupiter            test  EPL-2.0     # Eclipse Public License v2.0
+org.junit.jupiter:junit-jupiter-api        test  EPL-2.0     # Eclipse Public License v2.0
+org.junit.jupiter:junit-jupiter-engine     test  EPL-2.0     # Eclipse Public License v2.0
+org.junit.jupiter:junit-jupiter-params     test  EPL-2.0     # Eclipse Public License v2.0
+org.junit.platform:junit-platform-commons  test  EPL-2.0     # Eclipse Public License v2.0
+org.junit.platform:junit-platform-engine   test  EPL-2.0     # Eclipse Public License v2.0
+org.junit.platform:junit-platform-launcher test  EPL-2.0     # Eclipse Public License v2.0
+org.junit:junit-bom                        test  EPL-2.0     # Eclipse Public License v2.0
+org.opentest4j:opentest4j                  test  Apache-2.0  # The Apache License, Version 2.0
