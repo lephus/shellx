@@ -183,6 +183,7 @@ async function startApi(secretFile, relayPort, dir) {
     relayV2DisabledReason: null, relayIssuer: ISSUER,
     relayV2Url: `ws://127.0.0.1:${relayPort}/v1/relay`,
     shareAllowedOrigin: ORIGIN,
+    googleClientIds: [], appleClientIds: ['com.shellx.prod', 'com.shellx.dev'], passwordLogin: true, testIdp: null,
   };
   const limiters = Object.fromEntries(
     ['loginIp', 'loginEmail', 'registerIp', 'upgradeIp', 'notifyAgent', 'ticketMint', 'pairingCreate', 'shareCreate', 'shareTicket']

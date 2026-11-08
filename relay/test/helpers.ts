@@ -37,6 +37,10 @@ export const TEST_CONFIG: Config = {
   relayIssuer: "shellx-relay",
   relayV2Url: "ws://127.0.0.1:1/v1/relay",
   shareAllowedOrigin: "https://shellx.pro",
+  googleClientIds: [],
+  appleClientIds: ["com.shellx.prod", "com.shellx.dev"],
+  passwordLogin: true,
+  testIdp: null,
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };

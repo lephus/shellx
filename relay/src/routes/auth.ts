@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app.js";
 import { requestIp } from "../auth/client-ip.js";
 import { parseDevice } from "../auth/device.js";
@@ -27,6 +28,12 @@ function dummyHash(passwords: PasswordHasher): Promise<string> {
   });
   return dummyPhc;
 }
+
+/** PASSWORD_LOGIN=off (S1 §6.9): password sign-in and password change answer 410. */
+const passwordLoginOn: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!c.get("config").passwordLogin) throw Errors.passwordSignInRemoved();
+  await next();
+};
 
 authRoutes.post("/register", jsonBodyLimit, async (c) => {
   if (!(await c.get("limiters").registerIp.limit(requestIp(c)))) throw Errors.rateLimited();
@@ -66,7 +73,7 @@ authRoutes.post("/register", jsonBodyLimit, async (c) => {
   return c.json({ user_id: userId, device_id: deviceId, token }, 201);
 });
 
-authRoutes.post("/login", jsonBodyLimit, async (c) => {
+authRoutes.post("/login", passwordLoginOn, jsonBodyLimit, async (c) => {
   const limiters = c.get("limiters");
   if (!(await limiters.loginIp.limit(requestIp(c)))) throw Errors.rateLimited();
   const body = await readJsonObject(c.req.raw);
@@ -170,7 +177,7 @@ authRoutes.post("/logout", requireAuth, async (c) => {
  * The sockets are closed by the hub from its own live list once the change has committed; a socket
  * that lands in the hub only after this runs is caught by the ws route's post-upgrade re-check.
  */
-authRoutes.post("/password", requireAuth, jsonBodyLimit, async (c) => {
+authRoutes.post("/password", passwordLoginOn, requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   if (auth.kind !== "agent") throw Errors.agentOnly();
   const body = await readJsonObject(c.req.raw);

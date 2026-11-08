@@ -20,6 +20,10 @@ accountRoutes.delete("/", requireAuth, jsonBodyLimit, async (c) => {
   const user = db.get<{ email: string; password_hash: string }>("SELECT email, password_hash FROM users WHERE id = ?", auth.userId);
   if (user === undefined) throw Errors.unauthorized();
   if (!(await c.get("limiters").loginEmail.limit(user.email))) throw Errors.rateLimited();
+  if (!c.get("config").passwordLogin) {
+    logMeta("account_delete_denied", { device_id: auth.deviceId });
+    throw Errors.reauthRequired();
+  }
   const password = typeof body.password === "string" ? body.password : "";
   // Over 128 code points can never match; refuse it before argon2 sees it (final review I2).
   if (isOverlongPassword(password) || !(await c.get("passwords").verify(password, user.password_hash))) {
