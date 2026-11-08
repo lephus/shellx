@@ -81,7 +81,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | --- | --- | --- | --- | --- |
 | `ShellX_Dev_API_26` (emulator) | Pixel 5 profile | 8.0 (26) | lowest supported version | no |
 | `ShellX_Dev_API_36` (emulator) | Pixel 5 profile | 16 (36) | newest version | no |
-| The user's phone | pending (USER) | pending (USER) | camera, voice, notifications, Vietnamese keyboard | pending (USER) |
+| The user's phone | vsmart Live | 10 (29) | camera, voice, notifications, Vietnamese keyboard | no |
 
 ## iPhone changes since the reference
 
