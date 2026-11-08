@@ -310,6 +310,45 @@ struct ShellXLinkTerminalViewFrameTests {
         }
     }
 
+    @Test func aSnapshotThatReplacesAHoldDoesNotLeaveTheViewSpinning() async throws {
+        try await withTerminal { terminal in
+            let view = terminal.openLinkView(cols: 20, rows: 5)
+            _ = try await snapshot(of: view)
+            try terminal.output("x")
+            try await terminal.waitForScreen(containing: "x")
+            view.terminalSurfaceMayHaveChanged()
+            let pending = Task { @MainActor in await view.nextFrame() }
+            await Task.yield()
+            await view.requestSnapshot()
+            guard case .frame(let frame) = await pending.value else {
+                Issue.record("no snapshot")
+                return
+            }
+            #expect(frame.head.kind == .snapshot)
+            let before = view.wakeCountForTesting
+            let quiet = await view.returnsNothing(for: .milliseconds(400))
+            #expect(quiet)
+            #expect(view.wakeCountForTesting - before < 10)
+            await view.close()
+        }
+    }
+
+    @Test func theFenceDoesNotCaptureDeepHistoryOnEveryChange() async throws {
+        try await withTerminal { terminal in
+            let sizing = RecordingSizing()
+            sizing.expectedGrid = (30, 6)
+            let view = terminal.openLinkView(cols: 30, rows: 6, sizing: sizing)
+            let pending = Task { @MainActor in await view.nextFrame() }
+            for _ in 0..<20 {
+                await Task.yield()
+                view.terminalSurfaceMayHaveChanged()
+            }
+            #expect(view.deepCaptureCountForTesting <= 1)
+            guard case .frame = await pending.value else { return }
+            await view.close()
+        }
+    }
+
     @Test func closeEndsAWaitingViewAndLeavesOnce() async throws {
         try await withTerminal { terminal in
             let sizing = RecordingSizing()
