@@ -295,9 +295,9 @@ From 1A:
 - Macs see Apple-link requests only with `GET /v2/phone-pairings?role=target&apple_links=1` (old Macs never
   show one without the Apple warning). shellx-core `phones.pending` sends it (1B).
 - Approving an Apple-link pairing can answer 409 `identity_in_use` or 410 `pairing_expired` (1B maps both).
-- `POST /v1/auth/apple` never answers `switch_from_signed_in_device`: an Apple email matching an account
-  that still has a password gets 202 `link_required` (the QR link attaches the Apple ID to the Mac's
-  account). `POST /v1/auth/apple/link` can answer 400 `bad_request`.
+- `POST /v1/auth/apple` never answers `switch_from_signed_in_device` and never links by email: an Apple ID
+  with no identity yet gets 202 `link_required` whatever account its email matches, with or without a
+  password (user decision 2026-11-08; the QR link attaches the Apple ID to the Mac's account). `POST /v1/auth/apple/link` can answer 400 `bad_request`.
 - `POST /v1/auth/google/link` 409 `identity_in_use` also means "this account already has another Google
   identity".
 - The approved Apple-link status hands the session out **once** (minted then). A lost answer is recovered by
