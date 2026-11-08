@@ -732,24 +732,27 @@ accepts a pairing request for a machine of the phone's own account.
 
 ## 10. Phone commands
 
-A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt it,
-close the terminal it runs in, close any terminal tab of a listed workspace, and make, rename or close a workspace.
-This section is the safety analysis for those commands. It follows the rules a remote command channel must meet: deny by default, allow only the
-calls a product flow needs, scope every call to objects the caller may touch, and never let a call execute
-or open arbitrary content on the Mac.
+A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt it, close the
+terminal it runs in, close any terminal tab of a listed workspace, make, rename or close a workspace, open a new
+terminal tab in a listed workspace, and view one terminal of a listed workspace and type into it. This section is the
+safety analysis for those commands. It follows the rules a remote command channel must meet: deny by default, allow
+only the calls a product flow needs, scope every call to objects the caller may touch, and never let a call execute
+or open arbitrary content on the Mac. Typing into a terminal the user opened on the phone is the one place where what
+the phone sends runs as the user's input, on purpose (Terminal views below).
 
 **Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
 call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
 ignored, and a host frame type sent by a client is ignored or answered `bad_request` (section 7). No
-field of any message names a command line, a program, a directory or other path on the host, or a URL for
-the host to open or run, and none names a terminal to type into (`chat.send` and `chat.interrupt` name an
-agent session, and the host types only into that session's terminal: see Shell fall-through below). A call
-names a workspace only to rename or close one that the host's own list holds (`workspace.rename`,
-`workspace.close`), or to find a tab in it (`terminal.close`), and `workspace.create` names nothing: the host
-chooses where the new workspace goes.
-`agent.close` names an agent session and nothing else, and the host closes only the terminal that
-session is bound to (Agents below). `terminal.close` names a workspace and one of its terminals in the host's own
-list, to close that tab and for nothing else (Tabs below).
+field of any message names a command line, a program, a directory or other path on the host, an environment variable,
+or a URL for the host to open or run. Only `terminal.view.input` names a terminal to type into, and only the one
+terminal its session opened with `terminal.view.open` (Terminal views below); `chat.send` and `chat.interrupt` name an
+agent session, and the host types only into that session's terminal (Shell fall-through below). A call names a
+workspace only to rename or close one that the host's own list holds (`workspace.rename`, `workspace.close`), to find a
+tab in it (`terminal.close`), or to add a terminal tab to it (`terminal.create`), and `workspace.create` names nothing:
+the host chooses where the new workspace goes. `agent.close` names an agent session and nothing else, and the host
+closes only the terminal that session is bound to (Agents below). `terminal.close` names a workspace and one of its
+terminals in the host's own list, to close that tab and for nothing else (Tabs below). `terminal.view.open` names a
+terminal of the host's own list, to show it and for nothing else.
 (`attach.begin.name` is a label that the host sanitises, never a path: see Attachments below.)
 
 **Allowed calls.**
@@ -767,16 +770,21 @@ list, to close that tab and for nothing else (Tabs below).
 | `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rules: it refuses to close a pinned workspace or the last workspace of a window, and refuses every control call while device management blocks remote control | One local workspace in the host's list, by `workspace_id` |
 | `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. A tab pinned on the Mac is `refused`, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes. The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
 | `terminal.close` | Closes that terminal tab, without asking, ending what runs in it, whether or not an agent runs there. A tab pinned on the Mac is `refused`, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes, and the Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a window). The Mac refuses while device management blocks remote control | One terminal of a local workspace in the host's list, by `workspace_id` and `terminal_id`; `not_found` for any other pair |
+| `terminal.view.open` | Starts sending that terminal's screen and its history (at most 4 000 rows) to the phone, and counts the phone among the parties of the terminal's size (section 11.3). Changes no selection, focus or window order on the Mac | One terminal of a local workspace in the host's list, by `terminal_id`; `not_found` for any other id; at most one per session (`busy`) |
+| `terminal.view.input` | Types text, presses keys from a fixed list (no ⌘), pastes text, or turns the mouse wheel (alternate screen only) in that terminal, as the user at the Mac's keyboard would: whatever runs there gets it | Only the terminal this session views; for any other `terminal_id` nothing is typed and the answer is `terminal.view.ended` `not_open`. At most 4 096 bytes of typed text and 16 384 of pasted text per message, no control characters in typed text |
+| `terminal.view.resize`, `terminal.view.resync`, `terminal.view.close` | Reports the phone's size, which the terminal takes while the phone is the last to use it; sends a new snapshot; ends the view (the terminal goes back to the Mac's size) | The terminal this session views |
+| `terminal.create` | Opens a new terminal tab in that workspace's selected pane, running the user's default shell, as the Mac's add-tab button does. Changes no selection, focus or window order | One local workspace in the host's list, by `workspace_id`; `not_found` otherwise. The call carries nothing else: no command, path, directory, program or environment |
 | `ping` | None | |
 
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
-local workspaces. `session_id`, `request_id`, `workspace_id` and `terminal_id` are looked up in the host's own
-lists; an id it does not have is `not_found` (`unknown` for a reply). A phone cannot name a workspace that is not
-in the list (an SSH or other remote workspace never is), nor a file, machine or account, nor a terminal outside
-those workspaces; `terminal.close` reaches a terminal of a listed workspace by its `terminal_id`, and `agent.close`
-reaches a terminal only through a live agent session the host lists in one of those local workspaces. Only a
-phone the Mac trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac
-showed, and allowed by the user on that Mac (section 9).
+local workspaces with their terminals. `session_id`, `request_id`, `workspace_id` and `terminal_id` are looked up in
+the host's own lists; an id it does not have is `not_found` (`unknown` for a reply). A phone cannot name a workspace
+that is not in the list (an SSH or other remote workspace never is), nor a file, machine or account, nor a terminal
+outside those workspaces; `terminal.close` and `terminal.view.open` reach a terminal of a listed workspace by its
+`terminal_id`, `terminal.view.input` reaches only the terminal its session opened, and `agent.close` reaches a
+terminal only through a live agent session the host lists in one of those local workspaces. Only a phone the Mac
+trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac showed, and allowed by
+the user on that Mac (section 9).
 
 **Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in, and
 `agent.close` closes it. Once the agent has exited, that terminal runs the user's shell or whatever started
@@ -791,7 +799,7 @@ never sends the text to, or closes, another terminal. What remains is the moment
 typing: an agent that exits within it can still let one message reach the terminal, the same window the
 Mac's own remote-control path has. For `agent.close` the same moment lets a terminal that has just turned
 into the user's shell be closed. `terminal.close` is not bound by this rule: it closes a tab the user picked,
-whatever runs there (Tabs, below).
+whatever runs there (Tabs, below). Typing into a shell is what a terminal view is for, but only into a terminal the user opened as one on the phone (`terminal.view.input`, Terminal views below); `chat.send` and `chat.interrupt` stay bound to live agents.
 
 **Attachments.** `attach.*` lets a phone put files on the Mac, so what it may choose is narrow. The phone
 never picks a path: the host names the directory, the file name and the file mode. An image is saved the
@@ -834,14 +842,11 @@ its prompt, and a paired phone is trusted like the user (below). The host never 
 bytes. The cmux socket method `mobile.chat.send` does not accept files (it
 answers `invalid_params`); only ShellX Link does.
 
-**Workspaces.** `workspace.*` is the one place where a phone makes the Mac start something, so it answers the
-three questions a remote command channel must answer, one by one.
+**Workspaces.** `workspace.create` starts something on the Mac (so does `terminal.create`, Terminal views below), so `workspace.*` answers the three questions a remote command channel must answer, one by one.
 
 - Does it run commands or open content on the Mac? Only `workspace.create` starts anything: a workspace whose
   terminal starts the user's default shell when it is first shown, in a directory the Mac chooses, exactly as
-  when the user presses the add button on the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no
-  call types into that shell: `chat.send` still reaches only the terminal of a live agent (Shell fall-through
-  above). The phone does not select the new workspace on the Mac, nor bring a window forward.
+  when the user presses the add button on the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no workspace call types into that shell: `chat.send` still reaches only the terminal of a live agent (Shell fall-through above), and only a terminal view the user opened types into a shell (Terminal views below). The phone does not select the new workspace on the Mac, nor bring a window forward.
 - Does it change or destroy what the phone does not own? The only objects are this Mac's own local workspaces,
   found by `workspace_id` in the host's list; any other id is `not_found`, and SSH or other remote workspaces
   are not listed, so they can be neither renamed nor closed. `workspace.close` keeps the Mac's rules: the Mac
@@ -892,13 +897,43 @@ three questions a remote command channel must answer, one by one.
 - Does it read state the phone has no business seeing? No. The answer is an `outcome` and nothing else, and the
   host never logs a workspace id, a terminal id or a title for it.
 
+**Terminal views.** `terminal.view.*` and `terminal.create` let a phone use the Mac's terminals, so they answer the
+same three questions.
+
+- Does it run commands or open content on the Mac? Yes, on purpose: `terminal.view.input` types into the one terminal
+  the session opened, exactly as the user at the Mac's keyboard could, so whatever runs there (a shell, an editor, an
+  agent) gets what the phone types and acts on it. Nothing else is reachable. No message carries a command line, path,
+  directory, environment variable, URL or program name for the host to run or open. Typed text cannot hold control
+  characters, so no escape sequence reaches the Mac's terminal (the Mac turns typed text into key presses, and would
+  hand an escape sequence in it to its display parser rather than to the program); keys come from a fixed list with
+  `ctrl`, `alt` and `shift` only, so the Mac app's ⌘ shortcuts cannot be pressed (a key the user bound to a terminal
+  action in the terminal's own configuration does what it does at the Mac); pasted text goes through the Mac's paste
+  path and may hold only tabs and line breaks as control characters; the mouse wheel acts only on the alternate
+  screen. `terminal.create` starts the user's default shell in a new tab, in a directory the Mac chooses, and types
+  nothing into it.
+- Does it change or destroy what the phone does not own? It reaches only terminals of the Mac's own local workspaces,
+  by ids the host looks up in its own list; SSH and other remote workspaces are not listed, so `not_found`. Input goes
+  only to the terminal its session opened, never to another (`not_open`), and a view ends with its session, its
+  terminal or device management. The phone's size applies to that terminal only while the phone is the last to use
+  it, and the terminal goes back to the Mac's size when the view ends (closed, another terminal opened, session
+  ended, phone removed). None of these calls changes the Mac's selection or focus or brings a window to the front.
+  `terminal.create` adds a tab and closes nothing.
+- Does it read state the phone has no business seeing? It reads the screen of the terminal the phone opened, at most
+  4 000 rows (and 262 144 bytes) of its history, and the terminal's colors: what the user sees in that terminal on the
+  Mac. It reads no other terminal, no file, no environment variable and no setting beyond the terminal's colors. One
+  view per session, one frame per view waiting to be sent, and bounded input queues keep what a phone can make the
+  Mac capture and hold small (section 11.8).
+
 More rules: a Mac whose device management (MDM) blocks remote control does not run a Link host at all, and a
 host that sees that policy change during a session answers every `workspace.create`, `workspace.rename`,
-`workspace.close`, `agent.close` and `terminal.close` with `refused` without acting. Removing a phone on the Mac
-closes its sessions at once (above). A control call, `agent.close` and `terminal.close` included, runs on its own,
-so a slow Mac does not hold up the session's other calls. The host never logs a workspace title, directory, branch or tab title, nor the
-title of an agent session. These are ShellX Link calls, not cmux socket methods: the allowlist of the `cmux ssh`
-relay does not change.
+`workspace.close`, `agent.close`, `terminal.close`, `terminal.create` and `terminal.view.open` with `refused` without
+acting, and ends an open view with `terminal.view.ended` `refused` (input that arrives after that is not applied).
+Removing a phone on the Mac closes its sessions at once (above), and with them its view. A control call,
+`agent.close`, `terminal.close` and `terminal.create` included, runs on its own, so a slow Mac does not hold up the
+session's other calls; the input of a view is applied in order without holding them up either. The host never logs a
+workspace title, directory, branch or tab title, the title of an agent session, terminal content, or text and keys a
+phone typed or pasted. These are ShellX Link calls, not cmux socket methods: the allowlist of the `cmux ssh` relay
+does not change.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
@@ -906,13 +941,14 @@ that trust nor widen it (section 9). Removing the phone on the Mac untrusts its 
 sessions close and its next handshake is refused. Removing it on the phone deletes the grant, so the relay
 mints it no new connect ticket, and the Mac drops the key when it next checks the grants. Within that
 trust, typing into the user's own agent session, stopping it, closing its terminal or any of its tabs, answering
-its requests, and making, renaming and closing its workspaces are what the user could do at the keyboard; the
-allowed calls limit *which objects* a phone reaches (this Mac's live agent sessions and their pending requests,
-and its local workspaces with their terminal tabs), not what the user may do with them. Out of reach for a phone
-in this version: spawning or respawning terminals (a new workspace's first terminal apart), keys or text for anything but a live agent,
-opening URLs or files, the Mac's settings, the `bypass` modes, other machines and other accounts. The host
-never logs message text, attachment names or bytes, tool inputs, workspace or tab names, keys, tickets or
-tokens.
+its requests, making, renaming and closing its workspaces, opening terminal tabs in them, and watching and typing
+into one of their terminals are what the user could do at the keyboard; the allowed calls limit *which objects* a
+phone reaches (this Mac's live agent sessions and their pending requests, and its local workspaces with their
+terminal tabs), not what the user may do with them. Out of reach for a phone in this version: spawning or respawning
+terminals other than a new workspace's first terminal and the new tab of `terminal.create`, keys or text for a
+terminal its session has not opened, the Mac app's ⌘ shortcuts, opening URLs or files, the Mac's settings, the
+`bypass` modes, other machines and other accounts. The host never logs message text, attachment names or bytes, tool
+inputs, workspace or tab names, terminal content, typed keys or text, tickets or tokens.
 
 ## 11. Terminal views
 
