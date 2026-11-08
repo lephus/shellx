@@ -4,7 +4,10 @@
 //! the app opens it in the system browser. Secrets (state, verifier, nonce) live in the `Flow`,
 //! never in a result, an error message or a `Debug`.
 
-use crate::api::NonceResponse;
+use crate::api::{
+    GoogleAuthResponse, GoogleLinkRequest, GoogleSignInRequest, GoogleTokenResponse, LoginDevice, NonceResponse, SessionFile,
+};
+use crate::fingerprint::fingerprint;
 use crate::config::Config;
 use crate::envelope::CoreError;
 use crate::http::{self, Method};
@@ -14,6 +17,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -167,6 +171,239 @@ pub fn begin(agent: &ureq::Agent, cfg: &Config, store: &StateStore, flows: &Flow
     };
     flows.lock().unwrap_or_else(|p| p.into_inner()).insert(flow_id.clone(), Arc::new(flow));
     Ok(json!({"flow_id": flow_id, "auth_url": auth_url}))
+}
+
+pub const DONE_PAGE: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>ShellX</title></head><body style=\"font-family:-apple-system,'Segoe UI',sans-serif;text-align:center;margin-top:20vh\"><p>You can close this tab and return to ShellX.</p><p lang=\"vi\">Bạn có thể đóng tab này và quay lại ShellX.</p></body></html>";
+pub const FAILED_PAGE: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>ShellX</title></head><body style=\"font-family:-apple-system,'Segoe UI',sans-serif;text-align:center;margin-top:20vh\"><p>Sign-in did not finish. Return to ShellX and try again.</p><p lang=\"vi\">Đăng nhập chưa hoàn tất. Hãy quay lại ShellX và thử lại.</p></body></html>";
+
+fn respond(stream: &mut std::net::TcpStream, status: &str, body: &str) {
+    let msg = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let _ = stream.write_all(msg.as_bytes());
+    let _ = stream.flush();
+}
+
+/// Read one request head (at most 8 KiB, 2 s); `(method, target)` of its request line.
+fn read_request(stream: &mut std::net::TcpStream) -> Option<(String, String)> {
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    let mut buf = Vec::with_capacity(1024);
+    let mut chunk = [0u8; 1024];
+    while buf.len() < 8192 && !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            Err(_) => return None,
+        }
+    }
+    let head = String::from_utf8_lossy(&buf).into_owned();
+    let line = head.lines().next()?;
+    let mut parts = line.split_whitespace();
+    Some((parts.next()?.to_string(), parts.next()?.to_string()))
+}
+
+/// Accepts on `listener` (non-blocking, polled every 50 ms) until a GET of `CALLBACK_PATH` arrives,
+/// the deadline passes (`google_timeout`) or `cancelled` is set (`google_cancelled`). Returns `code`.
+pub fn wait_for_callback(
+    listener: &TcpListener,
+    expected_state: &str,
+    deadline: Instant,
+    cancelled: &AtomicBool,
+) -> Result<Zeroizing<String>, CoreError> {
+    loop {
+        if cancelled.load(Ordering::SeqCst) {
+            return Err(CoreError::new("google_cancelled", "Google sign-in was cancelled"));
+        }
+        if Instant::now() >= deadline {
+            return Err(CoreError::new("google_timeout", "Google sign-in timed out"));
+        }
+        let mut stream = match listener.accept() {
+            Ok((s, _)) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+            Err(_) => {
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+        };
+        // macOS hands accepted sockets the listener's non-blocking flag.
+        let _ = stream.set_nonblocking(false);
+        let Some((method, target)) = read_request(&mut stream) else { continue };
+        if method != "GET" {
+            respond(&mut stream, "405 Method Not Allowed", "");
+            continue;
+        }
+        let (path, query) = target.split_once('?').unwrap_or((target.as_str(), ""));
+        if path != CALLBACK_PATH {
+            respond(&mut stream, "404 Not Found", "");
+            continue;
+        }
+        let q = parse_query(query);
+        let get = |k: &str| q.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
+        let fail = |stream: &mut std::net::TcpStream, code: &str, msg: &str| {
+            respond(stream, "200 OK", FAILED_PAGE);
+            Err(CoreError::new(code, msg))
+        };
+        if get("state") != Some(expected_state) {
+            return fail(&mut stream, "google_state_mismatch", "the sign-in response did not match this request");
+        }
+        if get("error").is_some() {
+            return fail(&mut stream, "google_cancelled", "Google sign-in was cancelled");
+        }
+        let Some(code) = get("code").filter(|c| !c.is_empty()) else {
+            return fail(&mut stream, "google_state_mismatch", "the sign-in response had no code");
+        };
+        let code = Zeroizing::new(code.to_string());
+        respond(&mut stream, "200 OK", DONE_PAGE);
+        return Ok(code);
+    }
+}
+
+/// `auth.google.cancel {flow_id}` → `{}` (also for an unknown flow).
+pub fn cancel(flows: &Flows, params: &Value) -> Result<Value, CoreError> {
+    let id = params
+        .get("flow_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| CoreError::invalid_params("flow_id is required and must be a string"))?;
+    if let Some(f) = flows.lock().unwrap_or_else(|p| p.into_inner()).get(id) {
+        f.cancelled.store(true, Ordering::SeqCst);
+        *f.listener.lock().unwrap_or_else(|p| p.into_inner()) = None;
+    }
+    Ok(json!({}))
+}
+
+/// `auth.google.finish {flow_id}`: wait for the browser, exchange the code, sign in or link.
+pub fn finish(
+    agent: &ureq::Agent,
+    cfg: &Config,
+    store: &StateStore,
+    flows: &Flows,
+    params: &Value,
+    auth_lock: &Mutex<()>,
+) -> Result<Value, CoreError> {
+    let id = params
+        .get("flow_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| CoreError::invalid_params("flow_id is required and must be a string"))?
+        .to_string();
+    let flow = flows
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get(&id)
+        .cloned()
+        .ok_or_else(|| CoreError::invalid_params("unknown flow_id"))?;
+    let result = run_flow(agent, cfg, store, &flow, auth_lock);
+    flows.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
+    result
+}
+
+fn run_flow(agent: &ureq::Agent, cfg: &Config, store: &StateStore, flow: &Flow, auth_lock: &Mutex<()>) -> Result<Value, CoreError> {
+    if flow.cancelled.load(Ordering::SeqCst) {
+        return Err(CoreError::new("google_cancelled", "Google sign-in was cancelled"));
+    }
+    let listener = flow.listener.lock().unwrap_or_else(|p| p.into_inner()).take();
+    let Some(listener) = listener else {
+        return Err(if flow.cancelled.load(Ordering::SeqCst) {
+            CoreError::new("google_cancelled", "Google sign-in was cancelled")
+        } else {
+            CoreError::invalid_params("this flow is already finishing")
+        });
+    };
+    let code = wait_for_callback(&listener, &flow.state, flow.deadline, &flow.cancelled)?;
+    drop(listener);
+
+    let reply = http::post_form(
+        agent,
+        cfg,
+        &cfg.google_token_url,
+        &[
+            ("code", code.as_str()),
+            ("client_id", cfg.google_client_id.as_str()),
+            ("client_secret", cfg.google_client_secret.as_str()),
+            ("redirect_uri", flow.redirect_uri.as_str()),
+            ("grant_type", "authorization_code"),
+            ("code_verifier", flow.verifier.as_str()),
+        ],
+        None,
+    )?;
+    if !(200..300).contains(&reply.status) {
+        return Err(CoreError::new("invalid_credentials", format!("Google token exchange failed ({})", reply.status)));
+    }
+    let tok: GoogleTokenResponse = serde_json::from_slice(&reply.body)
+        .map_err(|_| CoreError::new("server", "Google token endpoint: unexpected response"))?;
+    if tok.id_token.is_empty() {
+        return Err(CoreError::new("server", "Google token endpoint: no id_token"));
+    }
+
+    let old = crate::auth::load_session(store).ok().flatten();
+    let previous_user = old.as_ref().map(|s| s.user_id.clone());
+    let public = crate::auth::device_public(store)?;
+    let public_b64 = URL_SAFE_NO_PAD.encode(public);
+    let resp: GoogleAuthResponse = match flow.purpose {
+        Purpose::SignIn => {
+            drop(old);
+            const PATH: &str = "/v1/auth/google";
+            let name = crate::auth::device_name(cfg);
+            let body = Zeroizing::new(
+                serde_json::to_vec(&GoogleSignInRequest {
+                    id_token: &tok.id_token,
+                    nonce: &flow.nonce,
+                    device: LoginDevice { kind: "desktop", name: &name, platform: &cfg.platform, public_key: &public_b64 },
+                })
+                .map_err(|_| CoreError::new("io", "sign-in body is not serializable"))?,
+            );
+            let reply = http::send(agent, cfg, None, Method::Post, PATH, Some(&body), None)?;
+            http::parse_json(PATH, &reply)?
+        }
+        Purpose::Link => {
+            const PATH: &str = "/v1/auth/google/link";
+            let Some(session) = old else {
+                return Err(CoreError::new("not_logged_in", "auth.login has not been called"));
+            };
+            let used = Zeroizing::new(session.token.clone());
+            drop(session);
+            let body = Zeroizing::new(
+                serde_json::to_vec(&GoogleLinkRequest { id_token: &tok.id_token, nonce: &flow.nonce })
+                    .map_err(|_| CoreError::new("io", "link body is not serializable"))?,
+            );
+            let outcome = http::send(agent, cfg, Some(&used), Method::Post, PATH, Some(&body), None)
+                .and_then(|reply| http::parse_json::<GoogleAuthResponse>(PATH, &reply));
+            match outcome {
+                Ok(r) => r,
+                Err(e) => {
+                    if e.code == "unauthorized" || e.code == "http_401" {
+                        crate::auth::forget_session_if(store, &used, auth_lock);
+                    }
+                    return Err(e);
+                }
+            }
+        }
+    };
+    if resp.token.is_empty() || resp.user_id.is_empty() || resp.device_id.is_empty() || resp.email.is_empty() {
+        return Err(CoreError::new("server", "Google sign-in response is missing token, user_id, device_id or email"));
+    }
+    {
+        let _g = auth_lock.lock().unwrap_or_else(|p| p.into_inner());
+        let session = SessionFile {
+            token: resp.token.clone(),
+            user_id: resp.user_id.clone(),
+            device_id: resp.device_id.clone(),
+            auth_method: Some("google".to_string()),
+            email: Some(resp.email.clone()),
+        };
+        crate::auth::save_session(store, &session, previous_user.as_deref())?;
+    }
+    Ok(json!({
+        "user_id": resp.user_id,
+        "device_id": resp.device_id,
+        "device_public_key_b64": public_b64,
+        "fingerprint": fingerprint(&public),
+        "email": resp.email,
+        "auth_method": "google",
+    }))
 }
 
 #[cfg(test)]

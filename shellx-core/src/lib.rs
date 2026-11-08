@@ -37,6 +37,8 @@ pub const KNOWN_METHODS: &[&str] = &[
     "auth.logout",
     "auth.session",
     "auth.google.begin",
+    "auth.google.finish",
+    "auth.google.cancel",
     "machines.register",
     "machines.list",
     "machines.heartbeat",
@@ -153,6 +155,14 @@ impl Core {
             }
             "auth.session" => auth::session_info(store),
             "auth.google.begin" => auth_google::begin(self.agent(), cfg, store, &self.google_flows, params),
+            "auth.google.finish" => {
+                let r = auth_google::finish(self.agent(), cfg, store, &self.google_flows, params, &self.auth_lock);
+                if r.is_ok() {
+                    self.forget_shown_fingerprints();
+                }
+                r
+            }
+            "auth.google.cancel" => auth_google::cancel(&self.google_flows, params),
             "machines.register" => machines::register(self.agent(), cfg, store, params),
             "machines.list" => machines::list(self.agent(), cfg, store),
             "machines.heartbeat" => machines::heartbeat(self.agent(), cfg, store),
