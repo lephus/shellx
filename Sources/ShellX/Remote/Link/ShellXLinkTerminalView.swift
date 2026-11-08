@@ -193,9 +193,52 @@ final class ShellXLinkTerminalView: TerminalView, MobileTerminalFrameSink {
         resumeWaiter(.snapshotRequested)
     }
 
-    func input(_ units: [TerminalInputUnit]) async {}
+    /// Applies the phone's units in order through the Mac's own input paths, as the phone's activity for sizing.
+    /// A unit, key or modifier the Mac does not know is skipped.
+    func input(_ units: [TerminalInputUnit]) async {
+        if closed || endReason != nil { return }
+        if isBlocked() {
+            end(.refused)
+            return
+        }
+        var applied = false
+        sizing.input { [self] in
+            for unit in units {
+                if apply(unit) { applied = true }
+            }
+        }
+        if applied {
+            // The next change is then the echo of this input, which the pacer never holds.
+            inputSequence = (inputSequence ?? 0) &+ 1
+        }
+    }
 
-    func resize(cols: Int, rows: Int) async {}
+    func resize(cols: Int, rows: Int) async {
+        if closed || endReason != nil { return }
+        sizing.resize(cols, rows)
+    }
+
+    private func apply(_ unit: TerminalInputUnit) -> Bool {
+        switch unit {
+        case .text(let text):
+            terminal.type(text)
+            return true
+        case .key(let key, let mods):
+            guard let chord = ShellXLinkKeyChord(key: key, mods: mods) else { return false }
+            return terminal.press(chord.macKeyName)
+        case .paste(let text):
+            terminal.paste(text)
+            return true
+        case .scroll(let lines):
+            // The wheel acts only on the alternate screen; the main screen's history is the phone's own. A positive
+            // count means toward older content, like Ghostty's positive wheel delta.
+            guard alternate else { return false }
+            terminal.scroll(lines, lastCursor.x, lastCursor.y)
+            return true
+        case .other:
+            return false
+        }
+    }
 
     func close() async {
         guard !closed else { return }
