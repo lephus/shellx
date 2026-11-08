@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
 import { requestIp } from "../auth/client-ip.js";
 import { parseDevice } from "../auth/device.js";
-import { accountEmail, dropPasswordAccess, identityFromToken, insertIdentity, matchAccount, signInDevice } from "../auth/identity.js";
+import { accountEmail, dropPasswordAccess, identityFromToken, insertIdentity, matchAccount, replaceDeviceToken, signInDevice } from "../auth/identity.js";
 import { ID_TOKEN_MAX_AGE_SEC } from "../auth/id-token.js";
 import { consumeNonce, issueNonce, NONCE_TTL_MS } from "../auth/nonces.js";
+import { requireAuth } from "../auth/session.js";
 import { generateToken, hashToken } from "../auth/tokens.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { Errors, readJsonObject } from "../http/errors.js";
@@ -80,4 +81,52 @@ signInRoutes.post("/google", jsonBodyLimit, async (c) => {
   logMeta("sign_in", { device_id: result.deviceId, provider: verified.provider, via });
   if (dropped > 0) logMeta("password_access_dropped", { sessions: dropped });
   return c.json({ user_id: result.userId, device_id: result.deviceId, token, email: result.email });
+});
+
+/**
+ * POST /v1/auth/google/link {id_token, nonce} — a signed-in device (any kind) adds a Google sign-in to
+ * its account in place (S1 §6.3b). The email of the account becomes Google's; the password and the
+ * other devices are untouched; only this device gets a new `google` token.
+ */
+signInRoutes.post("/google/link", requireAuth, jsonBodyLimit, async (c) => {
+  const auth = c.get("auth");
+  const body = await readJsonObject(c.req.raw);
+  const db = c.get("db");
+  const now = c.get("now")();
+  const verified = await c.get("idTokens").verify(body.id_token, {
+    providers: ["google", "test"], nonce: typeof body.nonce === "string" ? body.nonce : "", maxAgeSec: ID_TOKEN_MAX_AGE_SEC, nowMs: now,
+  });
+  if (verified === null) throw Errors.invalidCredentials();
+  if (!(await consumeNonce(db, body.nonce, now))) {
+    logMeta("sign_in_refused", { provider: verified.provider, reason: "nonce" });
+    throw Errors.invalidCredentials();
+  }
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
+
+  const email = db.transaction(() => {
+    const existing = db.get<{ id: string; user_id: string }>(
+      "SELECT id, user_id FROM identities WHERE provider = ? AND subject = ?", verified.provider, verified.subject,
+    );
+    if (existing !== undefined && existing.user_id !== auth.userId) throw Errors.identityInUse();
+    let identityId: string;
+    if (existing === undefined) {
+      if (db.get("SELECT 1 FROM identities WHERE user_id = ? AND provider != 'apple'", auth.userId) !== undefined) {
+        throw Errors.identityInUse();
+      }
+      if (verified.email !== accountEmail(db, auth.userId)) {
+        if (db.get("SELECT 1 FROM users WHERE email = ? AND id != ?", verified.email, auth.userId) !== undefined) throw Errors.emailInUse();
+        db.run("UPDATE users SET email = ? WHERE id = ?", verified.email, auth.userId);
+      }
+      identityId = insertIdentity(db, auth.userId, identityFromToken(verified), now);
+    } else {
+      identityId = existing.id;
+      db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", now, identityId);
+    }
+    replaceDeviceToken(db, auth.deviceId, tokenHash, verified.provider, identityId, now);
+    return accountEmail(db, auth.userId);
+  });
+
+  logMeta("google_linked", { device_id: auth.deviceId });
+  return c.json({ user_id: auth.userId, device_id: auth.deviceId, token, email });
 });
