@@ -215,6 +215,32 @@ class VietnameseCatalogTests(unittest.TestCase):
         for key, (en, vi) in expected.items():
             self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
 
+    def test_account_settings_strings_read_naturally(self):
+        expected = {
+            "settings.account.methods.title": ("Sign-in methods", "Cách đăng nhập"),
+            "settings.account.methods.google": ("Google account", "Tài khoản Google"),
+            "settings.account.methods.apple": ("Apple ID", "ID Apple"),
+            "settings.account.methods.addedFrom": ("Added from %@", "Thêm từ %@"),
+            "settings.account.deleteAccount": ("Delete Account…", "Xóa tài khoản…"),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+
+    def test_phone_pairing_says_phone(self):
+        expected = {  # the eight keys of the "phone" table: (en new, vi new)
+            "remote.phonePairing.menu": ("Pair Phone…", "Ghép cặp điện thoại…"),
+            "remote.phonePairing.title": ("Pair Phone", "Ghép cặp điện thoại"),
+            "remote.phonePairing.scan": ("Scan this code with the ShellX app on your phone", "Quét mã này bằng app ShellX trên điện thoại"),
+            "remote.phonePairing.signInFirst": ("Sign in under Settings › Account to pair a phone with this Mac.", "Hãy đăng nhập trong Cài đặt › Tài khoản để ghép cặp điện thoại với Mac này."),
+            "notifications.forwardToPhone.title": ("Forward notifications to my phone", "Chuyển tiếp thông báo tới điện thoại của tôi"),
+            "notifications.forwardToPhone.subtitle": ("Send local agent notifications to ShellX on your phone. Enabled by default; turn this off to stop this Mac from forwarding them.", "Gửi thông báo agent cục bộ tới ShellX trên điện thoại của bạn. Được bật theo mặc định; hãy tắt để Mac này ngừng chuyển tiếp."),
+            "settings.mobile.pairIPhone": ("Pair Phone", "Ghép cặp điện thoại"),
+            "settings.mobile.pairIPhone.subtitle": ("Scan the QR code with ShellX on your phone, then allow the phone here on this Mac.", "Quét mã QR bằng ShellX trên điện thoại, rồi cho phép điện thoại ngay trên Mac này."),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+            self.assertNotIn("iPhone", en, key)
+
     def test_every_covered_catalog_is_checked(self):
         self.assertIn(MAIN_CATALOG, self.catalogs)
         self.assertIn("Resources/InfoPlist.xcstrings", self.catalogs)
