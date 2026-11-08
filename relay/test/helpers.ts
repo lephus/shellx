@@ -6,6 +6,8 @@ import { afterEach, expect } from "vitest";
 import { WebSocket } from "ws";
 import type { AppDeps } from "../src/app.js";
 import { normalizeEmail } from "../src/auth/email.js";
+import { insertToken } from "../src/auth/session.js";
+import { generateToken, hashToken } from "../src/auth/tokens.js";
 import { type Argon2Backend, passwords } from "../src/auth/password.js";
 import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
 import type { Config } from "../src/config.js";
@@ -47,7 +49,7 @@ export const TEST_CONFIG: Config = {
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
-  loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
+  loginIp: allowAll, loginEmail: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
   ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll,
 };
 
@@ -293,17 +295,22 @@ export interface Account {
   agent: Session;
 }
 
-/** Registers a fresh account whose first device is an agent. */
+/**
+ * Creates a fresh account whose first device is an agent, straight in the database (registration is
+ * closed): the account has a password and a password session. Goes through no route and no limiter.
+ */
 export async function registerAccount(app: TestApp, email = randomEmail(), password = PASSWORD): Promise<Account> {
+  const now = (app.now ?? Date.now)();
   const device = deviceBody("agent");
-  const res = await call(app, "POST", "/v1/auth/register", { body: { email, password, device } });
-  if (res.status !== 201) throw new Error(`register failed: ${res.status} ${await res.text()}`);
-  const body = await res.json<{ user_id: string; device_id: string; token: string }>();
-  return {
-    email,
-    password,
-    agent: { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey: device.public_key as string },
-  };
+  const userId = await seedUser(email, password, now);
+  const deviceId = crypto.randomUUID();
+  db().run(
+    "INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES (?, ?, 'agent', ?, ?, ?, ?)",
+    deviceId, userId, device.name as string, device.platform as string, Buffer.from(device.public_key as string, "base64url"), now,
+  );
+  const token = generateToken();
+  insertToken(db(), await hashToken(token), deviceId, now);
+  return { email, password, agent: { userId, deviceId, token, publicKey: device.public_key as string } };
 }
 
 // ---- Google sign-in (the fake issuers of fake-idp.ts) -----------------------------------------------

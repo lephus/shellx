@@ -23,6 +23,9 @@ const PKG_DIR = join(ROOT, 'Packages/Shared/ShellXBrand');
 const ORIGIN = 'https://shellx.pro';
 const ISSUER = 'shellx-relay';
 const BUILD = !process.argv.includes('--no-build');
+// Accounts are created by signing in with the test identity provider (registration is closed).
+const TEST_ISSUER = 'https://test-idp.shellx.invalid';
+const testIdp = await createTestIssuer(TEST_ISSUER);
 
 const requireRelay = createRequire(join(RELAY_DIR, 'package.json'));
 const fileUrl = (p) => pathToFileURL(p).href;
@@ -39,6 +42,8 @@ const { startRelay } = await import(fileUrl(join(RELAY_DIR, 'src/relay.ts')));
 const { Db } = await import(fileUrl(join(RELAY_DIR, 'src/db/db.ts')));
 const { migrate } = await import(fileUrl(join(RELAY_DIR, 'src/db/migrate.ts')));
 const { HubRegistry } = await import(fileUrl(join(RELAY_DIR, 'src/hub/registry.ts')));
+const { createTestIssuer, testIdTokenClaims } = await import(fileUrl(join(RELAY_DIR, 'scripts/test-idp.ts')));
+const { createIdTokenVerifier } = await import(fileUrl(join(RELAY_DIR, 'src/auth/id-token.ts')));
 const { createSession } = await import(fileUrl(join(ROOT, 'web/src/share/session.mjs')));
 const wire = await import(fileUrl(join(ROOT, 'web/src/share/wire.mjs')));
 
@@ -186,11 +191,12 @@ async function startApi(secretFile, relayPort, dir) {
     googleClientIds: [], appleClientIds: ['com.shellx.prod', 'com.shellx.dev'], passwordLogin: true, testIdp: null,
   };
   const limiters = Object.fromEntries(
-    ['loginIp', 'loginEmail', 'registerIp', 'upgradeIp', 'notifyAgent', 'ticketMint', 'pairingCreate', 'shareCreate', 'shareTicket']
+    ['loginIp', 'loginEmail', 'nonceIp', 'upgradeIp', 'notifyAgent', 'ticketMint', 'pairingCreate', 'shareCreate', 'shareTicket']
       .map((k) => [k, allow]));
   const relay = await startRelay(
     {
       config, db, hubs, limiters,
+      idTokens: createIdTokenVerifier({ googleClientIds: [], appleClientIds: [], testIdp: { issuer: TEST_ISSUER, keys: testIdp.keys } }),
       // The one test hook: a shiftable clock (expiry). Share ids are proposed by the client, as in the app.
       now: () => Date.now() + clock.offsetMs,
     },
@@ -220,12 +226,13 @@ const device = (kind) => ({
 
 async function desktopAccount(base) {
   const email = `share-e2e-${randomBytes(6).toString('hex')}@example.com`;
-  const password = 'correct horse battery';
-  const reg = await api(base, 'POST', '/v1/auth/register', { body: { email, password, device: device('agent') } });
-  if (reg.status !== 201) throw new Error(`register: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const login = await api(base, 'POST', '/v1/auth/login', { body: { email, password, device: device('desktop') } });
-  if (login.status !== 200) throw new Error(`login: ${login.status} ${JSON.stringify(login.body)}`);
-  return login.body.token;
+  const nonceRes = await api(base, 'POST', '/v1/auth/nonce', { body: {} });
+  if (nonceRes.status !== 201) throw new Error(`nonce: ${nonceRes.status} ${JSON.stringify(nonceRes.body)}`);
+  const { nonce } = nonceRes.body;
+  const id_token = await testIdp.sign(testIdTokenClaims(TEST_ISSUER, { sub: email, email, nonce }));
+  const res = await api(base, 'POST', '/v1/auth/google', { body: { id_token, nonce, device: device('desktop') } });
+  if (res.status !== 200) throw new Error(`google sign-in: ${res.status} ${JSON.stringify(res.body)}`);
+  return res.body.token;
 }
 
 /**

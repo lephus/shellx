@@ -245,10 +245,7 @@ describe("DELETE /v1/account", () => {
     expect(countRows("SELECT COUNT(*) AS n FROM pairings WHERE agent_id = ?", account.agent.deviceId)).toBe(0);
     expect((await call(app, "GET", "/v1/devices", { token: account.agent.token })).status).toBe(401);
 
-    const again = await call(app, "POST", "/v1/auth/register", {
-      body: { email: account.email, password: "a fresh password", device: deviceBody("agent") },
-    });
-    expect(again.status).toBe(201);
+    expect(db().get("SELECT 1 AS x FROM users WHERE email = ?", account.email)).toBeUndefined();
   });
 
   it("rate limits password attempts per account email", async () => {

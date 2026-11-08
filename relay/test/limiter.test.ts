@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clientIp } from "../src/auth/client-ip.js";
 import {
-  createRateLimiters, LOGIN_PER_EMAIL, LOGIN_PER_IP, NONCES_PER_IP, NOTIFICATIONS_PER_AGENT, NOTIFICATIONS_WINDOW_MS, RATE_WINDOW_MS, REGISTER_PER_IP, SlidingWindowLimiter, UPGRADES_PER_IP,
+  createRateLimiters, LOGIN_PER_EMAIL, LOGIN_PER_IP, NONCES_PER_IP, NOTIFICATIONS_PER_AGENT, NOTIFICATIONS_WINDOW_MS, RATE_WINDOW_MS, SlidingWindowLimiter, UPGRADES_PER_IP,
 } from "../src/auth/rate-limit.js";
 
 function clock(start = 1_800_000_000_000) {
@@ -72,8 +72,8 @@ describe("SlidingWindowLimiter", () => {
 });
 
 describe("createRateLimiters (production wiring)", () => {
-  it("enforces login 10/IP, login 5/email and register 3/IP", async () => {
-    expect([LOGIN_PER_IP, LOGIN_PER_EMAIL, REGISTER_PER_IP, RATE_WINDOW_MS]).toEqual([10, 5, 3, 60_000]);
+  it("enforces login 10/IP and login 5/email", async () => {
+    expect([LOGIN_PER_IP, LOGIN_PER_EMAIL, RATE_WINDOW_MS]).toEqual([10, 5, 60_000]);
     const t = clock();
     const limiters = createRateLimiters({ rateLimitsEnabled: true }, t.now);
     const count = async (limiter: { limit(k: string): Promise<boolean> }) => {
@@ -83,7 +83,6 @@ describe("createRateLimiters (production wiring)", () => {
     };
     expect(await count(limiters.loginIp)).toBe(10);
     expect(await count(limiters.loginEmail)).toBe(5);
-    expect(await count(limiters.registerIp)).toBe(3);
   });
 
   it("limits POST /v1/auth/nonce to 30 per IP per 60 s", async () => {
@@ -126,7 +125,6 @@ describe("createRateLimiters (production wiring)", () => {
     for (let i = 0; i < 20; i++) {
       expect(await limiters.loginIp.limit("k")).toBe(true);
       expect(await limiters.loginEmail.limit("k")).toBe(true);
-      expect(await limiters.registerIp.limit("k")).toBe(true);
       expect(await limiters.nonceIp.limit("k")).toBe(true);
     }
     for (let i = 0; i < 100; i++) expect(await limiters.upgradeIp.limit("k")).toBe(true);

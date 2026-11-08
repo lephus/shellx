@@ -70,7 +70,6 @@ describe("request body limit (16 KiB) on the JSON routes", () => {
     token: "none" | "agent";
   }
   const routes: [string, Route][] = [
-    ["POST /v1/auth/register", { method: "POST", path: () => "/v1/auth/register", token: "none" }],
     ["POST /v1/auth/login", { method: "POST", path: () => "/v1/auth/login", token: "none" }],
     ["POST /v1/auth/password", { method: "POST", path: () => "/v1/auth/password", token: "agent" }],
     ["DELETE /v1/account", { method: "DELETE", path: () => "/v1/account", token: "agent" }],

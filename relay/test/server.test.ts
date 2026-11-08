@@ -187,17 +187,17 @@ describe("graceful shutdown (spec §4.3)", () => {
     const server = startServer({ ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false" });
     onCleanup(() => server.child.kill("SIGKILL"));
     const port = await waitForListening(server.output);
-    const body = Buffer.from(JSON.stringify({ email: randomEmail(), password: PASSWORD, device: deviceBody("agent") }), "utf8");
+    const body = Buffer.from(JSON.stringify({ email: randomEmail(), password: PASSWORD, device: deviceBody("mobile") }), "utf8");
 
-    // A registration whose body is still arriving: the relay is inside the route, awaiting the rest.
+    // A sign-in whose body is still arriving: the relay is inside the route, awaiting the rest.
     // `Expect: 100-continue` makes the relay confirm it has dispatched the request before we go on.
     let sendRest: () => void = () => {};
     let dispatched: () => void = () => {};
     const inRoute = new Promise<void>((resolve) => (dispatched = resolve));
-    const registered = new Promise<number>((resolve, reject) => {
+    const answered = new Promise<number>((resolve, reject) => {
       const req = httpRequest(
         {
-          host: "127.0.0.1", port, method: "POST", path: "/v1/auth/register", agent: false,
+          host: "127.0.0.1", port, method: "POST", path: "/v1/auth/login", agent: false,
           headers: { "Content-Type": "application/json", "Content-Length": String(body.length), Expect: "100-continue" },
         },
         (res) => {
@@ -223,7 +223,7 @@ describe("graceful shutdown (spec §4.3)", () => {
     expect(server.child.signalCode).toBeNull();
 
     sendRest();
-    expect(await registered).toBe(201);
+    expect(await answered).toBe(401); // completed normally
     const result = await server.exit;
     expect(result.code).toBe(0);
     expect(result.stdout.match(/"event":"relay_stopping"/g)).toHaveLength(1);

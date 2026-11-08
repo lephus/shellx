@@ -3,10 +3,10 @@ import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app.js";
 import { requestIp } from "../auth/client-ip.js";
 import { parseDevice } from "../auth/device.js";
-import { checkEmail, normalizeEmail } from "../auth/email.js";
+import { normalizeEmail } from "../auth/email.js";
 import type { PasswordHasher } from "../auth/password.js";
 import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy.js";
-import { insertToken, insertTokenIfPasswordUnchanged, requireAuth } from "../auth/session.js";
+import { insertTokenIfPasswordUnchanged, requireAuth } from "../auth/session.js";
 import { generateToken, hashToken, parseBearer } from "../auth/tokens.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { Errors, readJsonObject } from "../http/errors.js";
@@ -35,42 +35,9 @@ const passwordLoginOn: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
-authRoutes.post("/register", jsonBodyLimit, async (c) => {
-  if (!(await c.get("limiters").registerIp.limit(requestIp(c)))) throw Errors.rateLimited();
-  const body = await readJsonObject(c.req.raw);
-  const email = checkEmail(body.email);
-  if (!email.ok) throw email.code === "invalid_email" ? Errors.invalidEmail() : Errors.disposableEmail();
-  if (!isAcceptablePassword(body.password)) throw Errors.weakPassword();
-  const device = parseDevice(body.device);
-  if (device === null) throw Errors.invalidDevice();
-
-  const db = c.get("db");
-  if (db.get("SELECT 1 FROM users WHERE email = ?", email.email) !== undefined) throw Errors.emailTaken();
-  const now = c.get("now")();
-  const userId = crypto.randomUUID();
-  const deviceId = crypto.randomUUID();
-  const passwordHash = await c.get("passwords").hash(body.password);
-  const token = generateToken();
-  const tokenHash = await hashToken(token);
-  try {
-    db.transaction(() => {
-      db.run(
-        "INSERT INTO users (id, email, password_hash, password_changed_at, created_at) VALUES (?, ?, ?, ?, ?)",
-        userId, email.email, passwordHash, now, now,
-      );
-      db.run(
-        "INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        deviceId, userId, device.kind, device.name, device.platform, device.publicKey, now,
-      );
-      insertToken(db, tokenHash, deviceId, now);
-    });
-  } catch (err) {
-    if (String(err).includes("UNIQUE constraint failed: users.email")) throw Errors.emailTaken();
-    throw err;
-  }
-  recordAppVersion(db, deviceId, c.req.header(CLIENT_VERSION_HEADER));
-  logMeta("register", { device_id: deviceId });
-  return c.json({ user_id: userId, device_id: deviceId, token }, 201);
+/** Registration is closed (S1 §7): accounts are created by signing in with Google or Apple. */
+authRoutes.post("/register", () => {
+  throw Errors.registrationClosed();
 });
 
 authRoutes.post("/login", passwordLoginOn, jsonBodyLimit, async (c) => {

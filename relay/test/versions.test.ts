@@ -41,15 +41,8 @@ describe("GET /v1/version with admin overrides", () => {
 });
 
 describe("X-ShellX-Version is recorded on the device", () => {
-  it("at register and login, only once the request succeeded", async () => {
+  it("at login, only once the request succeeded", async () => {
     const app = makeApp();
-    const email = randomEmail();
-    const res = await call(app, "POST", "/v1/auth/register", {
-      body: { email, password: PASSWORD, device: deviceBody("agent") }, headers: { "X-ShellX-Version": "1.2.3" },
-    });
-    const agentId = (await res.json<{ device_id: string }>()).device_id;
-    expect(appVersionOf(agentId)).toBe("1.2.3");
-
     const account = await registerAccount(app);
     expect(appVersionOf(account.agent.deviceId)).toBeNull(); // no header: an older build
 
