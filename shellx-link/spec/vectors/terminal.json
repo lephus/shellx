@@ -332,7 +332,1971 @@
     "alt",
     "shift"
   ],
-  "screens": [],
+  "screens": [
+    {
+      "name": "snapshot_basic",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 3,
+            "alt": false,
+            "cursor": {
+              "x": 2,
+              "y": 2,
+              "shape": "bar",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette",
+            "history": 2
+          },
+          "lines": [
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "old 1"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "old 2"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "hello"
+                }
+              ]
+            },
+            {
+              "y": 2,
+              "runs": [
+                {
+                  "t": "$ "
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 1,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 3,
+        "alt": false,
+        "cursor": {
+          "x": 2,
+          "y": 2,
+          "shape": "bar",
+          "visible": true,
+          "blink": false
+        },
+        "screen": [
+          "hello",
+          "",
+          "$"
+        ],
+        "history": [
+          "old 1",
+          "old 2"
+        ]
+      }
+    },
+    {
+      "name": "two_parts_then_delta",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 2,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 3,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "styles": [
+            {
+              "id": 1,
+              "fg": 1,
+              "attrs": [
+                "bold"
+              ]
+            }
+          ],
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "top",
+                  "s": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 1,
+          "parts": 2,
+          "lines": [
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "middle"
+                }
+              ]
+            },
+            {
+              "y": 2,
+              "runs": [
+                {
+                  "t": "bottom"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 3,
+            "alt": false,
+            "cursor": {
+              "x": 3,
+              "y": 1,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "MID"
+                }
+              ]
+            },
+            {
+              "y": 2
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 2,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 3,
+        "alt": false,
+        "cursor": {
+          "x": 3,
+          "y": 1,
+          "shape": "block",
+          "visible": true,
+          "blink": false
+        },
+        "screen": [
+          "top",
+          "MID",
+          ""
+        ],
+        "history": [],
+        "cells": [
+          {
+            "x": 0,
+            "y": 0,
+            "kind": "glyph",
+            "t": "t",
+            "w": 1,
+            "style": {
+              "fg": 1,
+              "attrs": [
+                "bold"
+              ]
+            }
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "kind": "glyph",
+            "t": "M",
+            "w": 1
+          },
+          {
+            "x": 3,
+            "y": 1,
+            "kind": "blank"
+          }
+        ]
+      }
+    },
+    {
+      "name": "delta_scroll",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 3,
+            "alt": false,
+            "cursor": {
+              "x": 1,
+              "y": 2,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette",
+            "history": 1
+          },
+          "lines": [
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h0"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "a"
+                }
+              ]
+            },
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "b"
+                }
+              ]
+            },
+            {
+              "y": 2,
+              "runs": [
+                {
+                  "t": "c"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 3,
+            "alt": false,
+            "cursor": {
+              "x": 1,
+              "y": 2,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "scroll": 1
+          },
+          "lines": [
+            {
+              "y": 2,
+              "runs": [
+                {
+                  "t": "d"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 2,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 3,
+        "alt": false,
+        "screen": [
+          "b",
+          "c",
+          "d"
+        ],
+        "history": [
+          "h0",
+          "a"
+        ]
+      }
+    },
+    {
+      "name": "delta_burst",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 1,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "r1"
+                }
+              ]
+            },
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "r2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 1,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "history": 2,
+            "scroll": 5
+          },
+          "lines": [
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "r4"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "r5"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "r6"
+                }
+              ]
+            },
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "r7"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 2,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 2,
+        "alt": false,
+        "screen": [
+          "r6",
+          "r7"
+        ],
+        "history": [
+          "r1",
+          "r2",
+          "r4",
+          "r5"
+        ]
+      }
+    },
+    {
+      "name": "wide_and_combining",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 8,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "a"
+                },
+                {
+                  "t": "\u4e2d",
+                  "w": 2
+                },
+                {
+                  "t": "e\u0301",
+                  "w": 1
+                },
+                {
+                  "t": "\ud83c\uddfb\ud83c\uddf3",
+                  "w": 2
+                },
+                {
+                  "t": "z"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 1,
+        "resyncs": 0,
+        "cols": 8,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "a\u4e2de\u0301\ud83c\uddfb\ud83c\uddf3z"
+        ],
+        "history": [],
+        "cells": [
+          {
+            "x": 1,
+            "y": 0,
+            "kind": "glyph",
+            "t": "\u4e2d",
+            "w": 2
+          },
+          {
+            "x": 2,
+            "y": 0,
+            "kind": "continuation"
+          },
+          {
+            "x": 3,
+            "y": 0,
+            "kind": "glyph",
+            "t": "e\u0301",
+            "w": 1
+          },
+          {
+            "x": 4,
+            "y": 0,
+            "kind": "glyph",
+            "t": "\ud83c\uddfb\ud83c\uddf3",
+            "w": 2
+          },
+          {
+            "x": 5,
+            "y": 0,
+            "kind": "continuation"
+          },
+          {
+            "x": 6,
+            "y": 0,
+            "kind": "glyph",
+            "t": "z",
+            "w": 1
+          },
+          {
+            "x": 7,
+            "y": 0,
+            "kind": "blank"
+          }
+        ]
+      }
+    },
+    {
+      "name": "runs_without_x_and_split_rows",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 2,
+          "head": {
+            "kind": "snapshot",
+            "cols": 12,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "x": 2,
+                  "t": "ab"
+                },
+                {
+                  "t": "\u4e2d",
+                  "w": 2
+                },
+                {
+                  "t": "cd"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 1,
+          "parts": 2,
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "x": 10,
+                  "t": "e"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 1,
+        "resyncs": 0,
+        "cols": 12,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "  ab\u4e2dcd  e"
+        ],
+        "history": [],
+        "cells": [
+          {
+            "x": 4,
+            "y": 0,
+            "kind": "glyph",
+            "t": "\u4e2d",
+            "w": 2
+          },
+          {
+            "x": 8,
+            "y": 0,
+            "kind": "blank"
+          },
+          {
+            "x": 10,
+            "y": 0,
+            "kind": "glyph",
+            "t": "e",
+            "w": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "gap_asks_one_resync",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "one"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 3,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "three"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 4,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "four"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 5,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "five"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 6,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "six"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 6,
+        "resyncs": 1,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "six"
+        ],
+        "history": []
+      }
+    },
+    {
+      "name": "missing_part_asks_resync",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 2,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "b"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 3,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "fresh"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 3,
+        "resyncs": 1,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "fresh"
+        ],
+        "history": []
+      }
+    },
+    {
+      "name": "stale_frames_are_ignored",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "b"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "c"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "d"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 2,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "b"
+        ],
+        "history": []
+      }
+    },
+    {
+      "name": "delta_of_another_size_asks_resync",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "x"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 12,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "y"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 1,
+        "resyncs": 1,
+        "cols": 10,
+        "rows": 2,
+        "alt": false,
+        "screen": [
+          "x",
+          ""
+        ],
+        "history": []
+      }
+    },
+    {
+      "name": "history_frames_grow_upward",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette",
+            "history": 2
+          },
+          "lines": [
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "h3"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h4"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "screen"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "history",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "history": 2
+          },
+          "lines": [
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "h1"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h2"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 3,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "history",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "history": 1
+          },
+          "lines": [
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h0"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 3,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "screen"
+        ],
+        "history": [
+          "h0",
+          "h1",
+          "h2",
+          "h3",
+          "h4"
+        ]
+      }
+    },
+    {
+      "name": "alternate_screen",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette",
+            "history": 1
+          },
+          "lines": [
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "$"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": true,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "vim"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 3,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": true,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "vim2"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 3,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 1,
+        "alt": true,
+        "screen": [
+          "vim2"
+        ],
+        "history": []
+      }
+    },
+    {
+      "name": "lenient_clipping",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 5,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 9,
+              "y": 9,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "abcdefg"
+                }
+              ]
+            },
+            {
+              "y": 5,
+              "runs": [
+                {
+                  "t": "ignored"
+                }
+              ]
+            },
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "x": 4,
+                  "t": "\u4e2d",
+                  "w": 2
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 1,
+        "resyncs": 0,
+        "cols": 5,
+        "rows": 2,
+        "alt": false,
+        "cursor": {
+          "x": 4,
+          "y": 1,
+          "shape": "block",
+          "visible": true,
+          "blink": false
+        },
+        "screen": [
+          "abcde",
+          ""
+        ],
+        "history": []
+      }
+    },
+    {
+      "name": "styles_resolve_per_frame",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "styles": [
+            {
+              "id": 7,
+              "fg": 2,
+              "bg_rgb": "#336699",
+              "attrs": [
+                "italic",
+                "underline"
+              ]
+            }
+          ],
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "ab",
+                  "s": 7
+                },
+                {
+                  "t": "c",
+                  "s": 99
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 1,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "abc"
+        ],
+        "history": [],
+        "cells": [
+          {
+            "x": 0,
+            "y": 0,
+            "kind": "glyph",
+            "t": "a",
+            "w": 1,
+            "style": {
+              "fg": 2,
+              "bg_rgb": "#336699",
+              "attrs": [
+                "italic",
+                "underline"
+              ]
+            }
+          },
+          {
+            "x": 1,
+            "y": 0,
+            "kind": "glyph",
+            "t": "b",
+            "w": 1,
+            "style": {
+              "fg": 2,
+              "bg_rgb": "#336699",
+              "attrs": [
+                "italic",
+                "underline"
+              ]
+            }
+          },
+          {
+            "x": 2,
+            "y": 0,
+            "kind": "glyph",
+            "t": "c",
+            "w": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "trimmed_history_stops_the_fill",
+      "max_history_rows": 3,
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette",
+            "history": 2
+          },
+          "lines": [
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "h3"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h4"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "s0"
+                }
+              ]
+            },
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "s1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 2,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "scroll": 2
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "n0"
+                }
+              ]
+            },
+            {
+              "y": 1,
+              "runs": [
+                {
+                  "t": "n1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 3,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "history",
+            "cols": 10,
+            "rows": 2,
+            "alt": false,
+            "history": 2
+          },
+          "lines": [
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "h1"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h2"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 3,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 2,
+        "alt": false,
+        "screen": [
+          "n0",
+          "n1"
+        ],
+        "history": [
+          "h4",
+          "s0",
+          "s1"
+        ]
+      }
+    },
+    {
+      "name": "fill_beyond_the_limit_keeps_the_newest",
+      "max_history_rows": 3,
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette",
+            "history": 1
+          },
+          "lines": [
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "h2"
+                }
+              ]
+            },
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "x"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "history",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "history": 3
+          },
+          "lines": [
+            {
+              "y": -3,
+              "runs": [
+                {
+                  "t": "a"
+                }
+              ]
+            },
+            {
+              "y": -2,
+              "runs": [
+                {
+                  "t": "b"
+                }
+              ]
+            },
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "c"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 3,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "history",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "history": 1
+          },
+          "lines": [
+            {
+              "y": -1,
+              "runs": [
+                {
+                  "t": "z"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 3,
+        "resyncs": 0,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "x"
+        ],
+        "history": [
+          "b",
+          "c",
+          "h2"
+        ]
+      }
+    },
+    {
+      "name": "delta_before_the_first_snapshot",
+      "frames": [
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 1,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "delta",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            }
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "x"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "v": 1,
+          "t": "terminal.view.frame",
+          "terminal_id": "t-1",
+          "revision": 2,
+          "part": 0,
+          "parts": 1,
+          "head": {
+            "kind": "snapshot",
+            "cols": 10,
+            "rows": 1,
+            "alt": false,
+            "cursor": {
+              "x": 0,
+              "y": 0,
+              "shape": "block",
+              "visible": true,
+              "blink": false
+            },
+            "palette": "@palette"
+          },
+          "lines": [
+            {
+              "y": 0,
+              "runs": [
+                {
+                  "t": "s"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "revision": 2,
+        "resyncs": 1,
+        "cols": 10,
+        "rows": 1,
+        "alt": false,
+        "screen": [
+          "s"
+        ],
+        "history": []
+      }
+    }
+  ],
   "input_checks": [
     {
       "name": "text_ascii",

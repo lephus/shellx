@@ -67,4 +67,61 @@ final class TerminalVectorTests: XCTestCase {
         XCTAssertEqual(ShellXLink.terminalViewFeature, "terminal_view")
         XCTAssertEqual(ShellXLink.terminalCreateFeature, "terminal_create")
     }
+
+    func testScreens() throws {
+        let file = try Self.vectors()
+        let palette = try XCTUnwrap(file["palette"])
+        let screens = try XCTUnwrap(file["screens"] as? [[String: Any]])
+        XCTAssertEqual(screens.count, 17)
+        for entry in screens {
+            let name = entry["name"] as? String ?? "?"
+            var assembler = TerminalFrameAssembler()
+            var screen = TerminalScreen(maxHistoryRows: entry["max_history_rows"] as? Int ?? TerminalScreen.defaultMaxHistoryRows)
+            var resyncs = 0
+            for var frame in try XCTUnwrap(entry["frames"] as? [[String: Any]]) {
+                if var head = frame["head"] as? [String: Any], head["palette"] as? String == "@palette" {
+                    head["palette"] = palette
+                    frame["head"] = head
+                }
+                let message = try LinkCodec.decode(try JSONSerialization.data(withJSONObject: frame))
+                guard case let .terminalViewFrame("t-1", part) = message else {
+                    XCTFail("\(name): not a frame"); continue
+                }
+                let result = assembler.receive(part)
+                if let applied = result.frame { screen.apply(applied) }
+                if result.resync { resyncs += 1 }
+            }
+            let expect = try XCTUnwrap(entry["expect"] as? [String: Any], name)
+            XCTAssertEqual(assembler.revision, expect["revision"] as? Int, name)
+            XCTAssertEqual(resyncs, expect["resyncs"] as? Int, name)
+            XCTAssertEqual(screen.cols, expect["cols"] as? Int, name)
+            XCTAssertEqual(screen.rows, expect["rows"] as? Int, name)
+            XCTAssertEqual(screen.alt, expect["alt"] as? Bool, name)
+            if let cursor = expect["cursor"] as? [String: Any] {
+                XCTAssertEqual(screen.cursor, TerminalCursor(
+                    x: try XCTUnwrap(cursor["x"] as? Int), y: try XCTUnwrap(cursor["y"] as? Int),
+                    shape: TerminalCursorShape(wire: try XCTUnwrap(cursor["shape"] as? String)),
+                    visible: try XCTUnwrap(cursor["visible"] as? Bool), blink: try XCTUnwrap(cursor["blink"] as? Bool)), name)
+            }
+            XCTAssertEqual(screen.screenText(), expect["screen"] as? [String], name)
+            XCTAssertEqual(screen.historyText(), expect["history"] as? [String], name)
+            for cell in expect["cells"] as? [[String: Any]] ?? [] {
+                let x = try XCTUnwrap(cell["x"] as? Int), y = try XCTUnwrap(cell["y"] as? Int)
+                let expected: TerminalCell
+                switch cell["kind"] as? String {
+                case "blank": expected = .blank
+                case "continuation": expected = .continuation
+                default:
+                    let style = cell["style"] as? [String: Any]
+                    expected = .glyph(
+                        text: try XCTUnwrap(cell["t"] as? String), width: try XCTUnwrap(cell["w"] as? Int),
+                        style: TerminalCellStyle(
+                            fg: style?["fg"] as? Int, fgRgb: style?["fg_rgb"] as? String, bg: style?["bg"] as? Int,
+                            bgRgb: style?["bg_rgb"] as? String,
+                            attrs: (style?["attrs"] as? [String] ?? []).map(TerminalAttribute.init(wire:))))
+                }
+                XCTAssertEqual(screen.cell(x: x, y: y), expected, "\(name) (\(x),\(y))")
+            }
+        }
+    }
 }
