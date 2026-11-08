@@ -1998,6 +1998,162 @@
         "call_id": "c101",
         "outcome": "refused"
       }
+    },
+    {
+      "name": "terminal_view_frame_delta",
+      "message": {
+        "case": "terminal_view_frame",
+        "terminal_id": "t-1",
+        "revision": 7,
+        "part": 0,
+        "parts": 1,
+        "head": {
+          "kind": "delta",
+          "cols": 46,
+          "rows": 30,
+          "alt": false,
+          "cursor": {
+            "x": 4,
+            "y": 29,
+            "shape": "block",
+            "visible": true,
+            "blink": true
+          },
+          "scroll": 1
+        },
+        "styles": [
+          {
+            "id": 1,
+            "fg": 2,
+            "attrs": [
+              "bold"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "y": 29,
+            "runs": [
+              {
+                "t": "$ ",
+                "s": 1
+              },
+              {
+                "t": "ls"
+              }
+            ]
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 7,
+        "part": 0,
+        "parts": 1,
+        "head": {
+          "kind": "delta",
+          "cols": 46,
+          "rows": 30,
+          "alt": false,
+          "cursor": {
+            "x": 4,
+            "y": 29,
+            "shape": "block",
+            "visible": true,
+            "blink": true
+          },
+          "scroll": 1
+        },
+        "styles": [
+          {
+            "id": 1,
+            "fg": 2,
+            "attrs": [
+              "bold"
+            ]
+          }
+        ],
+        "lines": [
+          {
+            "y": 29,
+            "runs": [
+              {
+                "t": "$ ",
+                "s": 1
+              },
+              {
+                "t": "ls"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_frame_later_part",
+      "message": {
+        "case": "terminal_view_frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "styles": [
+          {
+            "id": 2,
+            "fg_rgb": "#336699",
+            "bg": 0
+          }
+        ],
+        "lines": [
+          {
+            "y": -1,
+            "runs": [
+              {
+                "x": 2,
+                "t": "\u4e2d",
+                "w": 2,
+                "s": 2
+              }
+            ]
+          },
+          {
+            "y": 3
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "styles": [
+          {
+            "id": 2,
+            "fg_rgb": "#336699",
+            "bg": 0
+          }
+        ],
+        "lines": [
+          {
+            "y": -1,
+            "runs": [
+              {
+                "x": 2,
+                "t": "\u4e2d",
+                "w": 2,
+                "s": 2
+              }
+            ]
+          },
+          {
+            "y": 3
+          }
+        ]
+      }
     }
   ],
   "decode_only": [
@@ -2428,6 +2584,98 @@
           }
         ]
       }
+    },
+    {
+      "name": "terminal_view_frame_empty_arrays",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 2,
+        "part": 1,
+        "parts": 2,
+        "styles": [],
+        "lines": [
+          {
+            "y": 0,
+            "runs": []
+          }
+        ]
+      },
+      "message": {
+        "case": "terminal_view_frame",
+        "terminal_id": "t-1",
+        "revision": 2,
+        "part": 1,
+        "parts": 2,
+        "lines": [
+          {
+            "y": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "terminal_view_frame_unknown_enums",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 3,
+        "part": 0,
+        "parts": 1,
+        "head": {
+          "kind": "sparkle",
+          "cols": 2,
+          "rows": 1,
+          "alt": false,
+          "cursor": {
+            "x": 0,
+            "y": 0,
+            "shape": "heart",
+            "visible": true,
+            "blink": false
+          }
+        },
+        "styles": [
+          {
+            "id": 1,
+            "attrs": [
+              "bold",
+              "glow"
+            ]
+          }
+        ]
+      },
+      "message": {
+        "case": "terminal_view_frame",
+        "terminal_id": "t-1",
+        "revision": 3,
+        "part": 0,
+        "parts": 1,
+        "head": {
+          "kind": "sparkle",
+          "cols": 2,
+          "rows": 1,
+          "alt": false,
+          "cursor": {
+            "x": 0,
+            "y": 0,
+            "shape": "heart",
+            "visible": true,
+            "blink": false
+          }
+        },
+        "styles": [
+          {
+            "id": 1,
+            "attrs": [
+              "bold",
+              "glow"
+            ]
+          }
+        ]
+      }
     }
   ],
   "decode_errors": [
@@ -2771,6 +3019,217 @@
       },
       "error": "bad_json",
       "call_id": "c104"
+    },
+    {
+      "name": "terminal_view_frame_part_not_below_parts",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 1
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_revision_zero",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 0,
+        "part": 1,
+        "parts": 2
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_parts_over_256",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 257
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_bad_rgb",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "styles": [
+          {
+            "id": 1,
+            "bg_rgb": "#12345"
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_palette_index_256",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "styles": [
+          {
+            "id": 1,
+            "fg": 256
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_fg_and_fg_rgb",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "styles": [
+          {
+            "id": 1,
+            "fg": 1,
+            "fg_rgb": "#ffffff"
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_style_id_zero",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "styles": [
+          {
+            "id": 0
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_cell_width_3",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "lines": [
+          {
+            "y": 0,
+            "runs": [
+              {
+                "t": "x",
+                "w": 3
+              }
+            ]
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_empty_run_text",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 1,
+        "parts": 2,
+        "lines": [
+          {
+            "y": 0,
+            "runs": [
+              {
+                "t": ""
+              }
+            ]
+          }
+        ]
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_palette_without_256_colors",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 0,
+        "parts": 1,
+        "head": {
+          "kind": "snapshot",
+          "cols": 2,
+          "rows": 1,
+          "alt": false,
+          "cursor": {
+            "x": 0,
+            "y": 0,
+            "shape": "block",
+            "visible": true,
+            "blink": false
+          },
+          "palette": {
+            "fg": "#ffffff",
+            "bg": "#000000",
+            "colors": [
+              "#000000"
+            ]
+          }
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "terminal_view_frame_negative_history",
+      "json": {
+        "v": 1,
+        "t": "terminal.view.frame",
+        "terminal_id": "t-1",
+        "revision": 1,
+        "part": 0,
+        "parts": 1,
+        "head": {
+          "kind": "delta",
+          "cols": 2,
+          "rows": 1,
+          "alt": false,
+          "cursor": {
+            "x": 0,
+            "y": 0,
+            "shape": "block",
+            "visible": true,
+            "blink": false
+          },
+          "history": -1
+        }
+      },
+      "error": "bad_json"
     }
   ],
   "boundary_frames": {

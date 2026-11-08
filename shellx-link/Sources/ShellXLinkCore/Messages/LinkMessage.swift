@@ -61,6 +61,8 @@ public enum LinkMessage: Equatable, Sendable {
     case terminalViewResync(terminalId: String)
     case terminalViewClose(terminalId: String)
     case terminalViewEnded(terminalId: String, reason: TerminalViewEndReason)
+    /// One part of one frame of the open view (PROTOCOL.md section 11.4).
+    case terminalViewFrame(terminalId: String, frame: TerminalFramePart)
     /// Opens a terminal tab in a workspace (PROTOCOL.md section 11.9).
     case terminalCreate(callId: String, workspaceId: String)
     /// `terminalId` is the new terminal, present only when `outcome` is `ok`.

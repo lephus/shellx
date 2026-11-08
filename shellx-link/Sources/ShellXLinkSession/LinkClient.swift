@@ -582,7 +582,7 @@ public actor LinkClient {
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
              .chatInterrupt, .attachBegin, .attachChunk, .attachEnd, .workspacesGet, .workspaceCreate,
              .workspaceRename, .workspaceClose, .agentClose, .terminalClose, .terminalViewOpen, .terminalViewInput,
-             .terminalViewResize, .terminalViewResync, .terminalViewClose, .terminalViewEnded, .terminalCreate:
+             .terminalViewResize, .terminalViewResync, .terminalViewClose, .terminalViewEnded, .terminalViewFrame, .terminalCreate:
             break
         }
         return true

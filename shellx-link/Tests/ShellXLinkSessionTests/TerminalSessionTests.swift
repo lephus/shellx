@@ -28,6 +28,12 @@ final class TerminalSessionTests: TerminalSessionTestCase {
         try await expectError(raw, "bad_request", callId: nil)
     }
 
+    func testFramesFromAClientAreBadRequest() async throws {
+        let raw = try await rawSession(makeHost())
+        try await raw.send(.terminalViewFrame(terminalId: "t-1", frame: TerminalFramePart(revision: 1, part: 1, parts: 2)))
+        try await expectError(raw, "bad_request", callId: nil)
+    }
+
     func expectError(_ raw: SecureChannel, _ code: String, callId: String?,
                      file: StaticString = #filePath, line: UInt = #line) async throws {
         let message = try await within { try await raw.receive() }

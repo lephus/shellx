@@ -39,7 +39,7 @@ public enum LinkCodec {
         static let terminalViewOpen = "terminal.view.open", terminalViewOpenResult = "terminal.view.open.result"
         static let terminalViewInput = "terminal.view.input", terminalViewResize = "terminal.view.resize"
         static let terminalViewResync = "terminal.view.resync", terminalViewClose = "terminal.view.close"
-        static let terminalViewEnded = "terminal.view.ended"
+        static let terminalViewEnded = "terminal.view.ended", terminalViewFrame = "terminal.view.frame"
         static let terminalCreate = "terminal.create", terminalCreateResult = "terminal.create.result"
     }
 
@@ -97,6 +97,11 @@ public enum LinkCodec {
     /// `terminal.view.resync` and `terminal.view.close`.
     private struct TerminalRef: Codable { var terminalId: String }
     private struct TerminalViewEnded: Codable { var terminalId: String; var reason: TerminalViewEndReason }
+    /// Empty `styles` and `lines` are omitted (nil), and absent decodes to empty.
+    private struct TerminalFrameBody: Codable {
+        var terminalId: String; var revision: Int; var part: Int; var parts: Int
+        var head: TerminalFrameHead?; var styles: [TerminalStyle]?; var lines: [TerminalLine]?
+    }
     private struct TerminalCreate: Codable { var callId: String; var workspaceId: String }
     /// `terminal_id` is omitted when nil: the host sets it only when `outcome` is `ok`.
     private struct TerminalCreateResult: Codable {
@@ -268,6 +273,11 @@ public enum LinkCodec {
             case let .terminalViewClose(terminalId): data = try enc(T.terminalViewClose, TerminalRef(terminalId: terminalId))
             case let .terminalViewEnded(terminalId, reason):
                 data = try enc(T.terminalViewEnded, TerminalViewEnded(terminalId: terminalId, reason: reason))
+            case let .terminalViewFrame(terminalId, frame):
+                guard frame.isValid else { throw LinkCodecError.badJSON(callId: nil) }
+                data = try enc(T.terminalViewFrame, TerminalFrameBody(
+                    terminalId: terminalId, revision: frame.revision, part: frame.part, parts: frame.parts, head: frame.head,
+                    styles: frame.styles.isEmpty ? nil : frame.styles, lines: frame.lines.isEmpty ? nil : frame.lines))
             case let .terminalCreate(callId, workspaceId):
                 try requireValid(callId)
                 data = try enc(T.terminalCreate, TerminalCreate(callId: callId, workspaceId: workspaceId))
@@ -428,6 +438,12 @@ public enum LinkCodec {
         case T.terminalViewEnded:
             let b = try body(TerminalViewEnded.self)
             return .terminalViewEnded(terminalId: b.terminalId, reason: b.reason)
+        case T.terminalViewFrame:
+            let b = try body(TerminalFrameBody.self)
+            let frame = TerminalFramePart(
+                revision: b.revision, part: b.part, parts: b.parts, head: b.head, styles: b.styles ?? [], lines: b.lines ?? [])
+            guard frame.isValid else { throw LinkCodecError.badJSON(callId: nil) }
+            return .terminalViewFrame(terminalId: b.terminalId, frame: frame)
         case T.terminalCreate:
             let b = try call(TerminalCreate.self, \.callId)
             return .terminalCreate(callId: b.callId, workspaceId: b.workspaceId)
@@ -484,10 +500,19 @@ public enum LinkCodec {
         guard validCallId(callId) else { throw LinkCodecError.badJSON(callId: nil) }
     }
 
-    private static func enc<B: Encodable>(_ t: String, _ body: B) throws -> Data {
+    /// The encoded size of `value` with the encoder `encode` uses: what the frame splitter measures with.
+    static func encodedByteCount<B: Encodable>(_ value: B) throws -> Int {
+        try plainEncoder().encode(value).count
+    }
+
+    private static func plainEncoder() -> JSONEncoder {
         let e = JSONEncoder()
         e.keyEncodingStrategy = .convertToSnakeCase
         e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return try e.encode(Frame(t: t, body: body))
+        return e
+    }
+
+    private static func enc<B: Encodable>(_ t: String, _ body: B) throws -> Data {
+        try plainEncoder().encode(Frame(t: t, body: body))
     }
 }

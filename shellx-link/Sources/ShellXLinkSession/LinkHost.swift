@@ -435,7 +435,7 @@ public actor LinkHost {
             case .pong, .unknown, .error:
                 break
             case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged,
-                 .terminalViewEnded:
+                 .terminalViewEnded, .terminalViewFrame:
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
             case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
