@@ -46,6 +46,13 @@ final class LicenseBoundaryTests: XCTestCase {
         try ScriptRunner.run("bash", [script, "--root", root.path])
     }
 
+    func testDemoModuleImportPasses() throws {
+        let root = try makeCleanTree()
+        try ScriptRunner.write("import ShellXDemo\n", to: "shellx-ios/ShellX/Demo.swift", under: root)
+        let result = try check(root)
+        XCTAssertEqual(result.status, 0, result.output)
+    }
+
     func testRepositoryPasses() throws {
         let result = try ScriptRunner.run("bash", [script])
         XCTAssertEqual(result.status, 0, result.output)
