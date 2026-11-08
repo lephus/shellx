@@ -352,12 +352,15 @@ extension TerminalFramePart {
             for run in line.runs {
                 if run.text.isEmpty { return false }
                 if let w = run.width, !(1...2).contains(w) { return false }
-                if let x = run.x, x < 0 { return false }
-                if let s = run.style, s < 0 { return false }
+                if let x = run.x, !(0...Self.maxColumn).contains(x) { return false }
+                if let s = run.style, !(0...65_535).contains(s) { return false }
             }
         }
         return true
     }
+
+    /// Far above any grid, low enough that column arithmetic cannot overflow.
+    static let maxColumn = 1_000_000
 
     /// `#` followed by 6 hexadecimal digits, either case.
     static func isColor(_ text: String) -> Bool {

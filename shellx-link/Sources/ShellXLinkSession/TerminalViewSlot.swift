@@ -109,6 +109,7 @@ actor TerminalViewSlot {
         if active === view { active = nil }
         // What the phone typed before this is still applied.
         await view.lane.drain()
+        // Relies on `TerminalView.nextFrame()` returning promptly when its task is cancelled (see its contract).
         await view.pump?.stop()
         await closeOnce(view)
     }

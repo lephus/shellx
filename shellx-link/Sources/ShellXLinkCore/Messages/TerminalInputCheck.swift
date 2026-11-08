@@ -37,7 +37,8 @@ public enum TerminalInputCheck {
                     throw TerminalInputError(reason: "pasted text is over 16384 bytes")
                 }
             case let .scroll(lines):
-                if lines == 0 || abs(lines) > ShellXLink.terminalMaxScrollLines {
+                // No abs(): abs(Int.min) traps.
+                if lines == 0 || lines > ShellXLink.terminalMaxScrollLines || lines < -ShellXLink.terminalMaxScrollLines {
                     throw TerminalInputError(reason: "scroll lines must be 1 to 100 either way")
                 }
             case let .key(_, mods):
