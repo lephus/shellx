@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// What a shell chip shows in this version: the terminal itself comes later (viewing and typing), so
-/// it says so, in the place the terminal will have.
+/// The page of a shell chip on a Mac whose ShellX shows no terminals (no `terminal_view`): it asks for an
+/// update of ShellX on the Mac, in the place the terminal would have.
 struct ShellPanePlaceholder: View {
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 14, style: .continuous) }
 
@@ -11,7 +11,7 @@ struct ShellPanePlaceholder: View {
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Text(LocalizedStringResource("workspace.shell.placeholder"))
+            Text(LocalizedStringResource("terminal.needsUpdate"))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
