@@ -249,13 +249,27 @@ pub fn pairing_flow() -> Result<()> {
     let path = dir.join("links.json");
     let drive = |core: &FakeCore| {
         let clock = std::cell::Cell::new(0u64);
-        let mut svc = crate::pairing_service::PairingService::new(crate::links_store::LinksStore::new(path.clone()));
-        svc.run_blocking(core, "m1", "Mac", || clock.get(), |ms| clock.set(clock.get() + ms))
+        let mut svc = crate::pairing_service::PairingService::new(
+            crate::links_store::LinksStore::new(path.clone()),
+        );
+        svc.run_blocking(
+            core,
+            "m1",
+            "Mac",
+            || clock.get(),
+            |ms| clock.set(clock.get() + ms),
+        )
     };
     let core = FakeCore::new();
-    core.on("pair.request", Ok(json!({"pairing_id": "p1", "code": "123456", "fingerprint": "ab"})));
+    core.on(
+        "pair.request",
+        Ok(json!({"pairing_id": "p1", "code": "123456", "fingerprint": "ab"})),
+    );
     core.on("pair.poll", Ok(json!({"status": "denied"})));
-    ensure!(matches!(drive(&core), PairState::Denied) && !path.exists(), "denied must not save a link");
+    ensure!(
+        matches!(drive(&core), PairState::Denied) && !path.exists(),
+        "denied must not save a link"
+    );
     core.on_seq(
         "pair.poll",
         vec![
@@ -264,10 +278,18 @@ pub fn pairing_flow() -> Result<()> {
             Ok(json!({"status": "approved", "invite_path": "i.uri", "relay_route": "r", "relay_slot": "s", "daemon_fingerprint": "d"})),
         ],
     );
-    ensure!(matches!(drive(&core), PairState::Approved { .. }), "pairing did not approve");
+    ensure!(
+        matches!(drive(&core), PairState::Approved { .. }),
+        "pairing did not approve"
+    );
     let links = crate::links_store::LinksStore::new(path.clone()).load()?;
     let _ = std::fs::remove_dir_all(&dir);
-    ensure!(links.get("m1").is_some_and(|l| l.relay_slot == "s" && !l.enrolled), "link not saved");
+    ensure!(
+        links
+            .get("m1")
+            .is_some_and(|l| l.relay_slot == "s" && !l.enrolled),
+        "link not saved"
+    );
     println!("smoke-pairing: denied -> no link, approved -> link saved");
     Ok(())
 }
@@ -357,7 +379,10 @@ pub fn run() -> Result<()> {
         "default background is not TERM_BG"
     );
     let embedded = fonts::embedded();
-    ensure!(embedded.len() == 5, "expected 5 embedded fonts");
+    ensure!(
+        embedded.len() == 5 + usize::from(fonts::has_google_sans()),
+        "expected 5 embedded fonts (6 with Google Sans)"
+    );
     ensure!(
         embedded.iter().all(|f| fonts::has_font_magic(f)),
         "an embedded font lacks a TrueType/OpenType header"

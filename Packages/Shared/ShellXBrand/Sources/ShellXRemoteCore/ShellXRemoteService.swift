@@ -45,6 +45,9 @@ public final class ShellXRemoteService: ObservableObject {
     /// This Mac serving (its daemon).
     @Published public internal(set) var hostState: LinkState = .idle
     @Published public internal(set) var isSignedIn = false
+    /// Runs after a session ends because the relay refused the token or no session is left at launch;
+    /// never after `signOut()`. The account forgets its saved identity here.
+    public var onSessionEndedByServer: (@MainActor () -> Void)?
     /// Local workspaces showing a remote terminal, by machine.
     @Published public internal(set) var remoteWorkspaces: [UUID: RemoteMachine.ID] = [:]
 
@@ -156,10 +159,16 @@ public final class ShellXRemoteService: ObservableObject {
         guard !terminated else { return }
         try await ensureConfigured()
         let login = try await call("auth.login", ["email": .string(email), "password": .string(password)], as: LoginReply.self)
+        await beginSignedInSession(userID: login.user_id)
+    }
+
+    /// The core now holds a session for `userID` (after `auth.login` or a Google sign-in): adopts the
+    /// account and starts the remote session.
+    func beginSignedInSession(userID: String) async {
         guard !terminated else { return }
         if isSignedIn { await beginTeardown().value }   // another account: start over cleanly
         await teardown?.value                           // a 401's stops: an old link may still save its record
-        accountAdoptionFailed = !(await adoptAccount(login.user_id))
+        accountAdoptionFailed = !(await adoptAccount(userID))
         guard !terminated else { return }
         RemoteLog.service.info("signed in")
         startSession(list: nil)
@@ -247,6 +256,7 @@ public final class ShellXRemoteService: ObservableObject {
             let code = RemoteLog.code(error)
             if Self.isSignedOutCode(code) {
                 RemoteLog.service.info("not signed in")
+                onSessionEndedByServer?()
                 if let dev = env.devCredentials {
                     do { try await signIn(email: dev.email, password: dev.password) } catch {
                         RemoteLog.service.error("dev sign-in failed: \(RemoteLog.code(error), privacy: .public)")
@@ -509,6 +519,7 @@ public final class ShellXRemoteService: ObservableObject {
         guard isCurrent(gen), isSignedIn else { return }
         RemoteLog.service.notice("session ended by the server")
         beginTeardown()
+        onSessionEndedByServer?()
     }
 
     // MARK: - Timers

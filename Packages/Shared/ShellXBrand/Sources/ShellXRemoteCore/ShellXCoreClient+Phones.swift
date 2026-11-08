@@ -12,10 +12,13 @@ public struct PhonePairingRequest: Equatable, Sendable, CustomStringConvertible,
     /// The phone's 32-byte pairing proof.
     public let proof: Data
     public let createdAt: Date
+    /// Allowing this request also lets an Apple ID sign in to the account (relay `links_apple_id`).
+    public let linksAppleID: Bool
 
-    public init(id: String, deviceName: String, platform: String, clientKey: Data, proof: Data, createdAt: Date) {
+    public init(id: String, deviceName: String, platform: String, clientKey: Data, proof: Data, createdAt: Date,
+                linksAppleID: Bool = false) {
         self.id = id; self.deviceName = deviceName; self.platform = platform
-        self.clientKey = clientKey; self.proof = proof; self.createdAt = createdAt
+        self.clientKey = clientKey; self.proof = proof; self.createdAt = createdAt; self.linksAppleID = linksAppleID
     }
 
     public var description: String { "PhonePairingRequest(id: \(id), device: \(deviceName), platform: \(platform), <redacted>)" }
@@ -62,7 +65,7 @@ extension ShellXCoreClient {
     public func pendingPhonePairings() throws -> [PhonePairingRequest] {
         struct Item: Decodable {
             let pairing_id: String, device_name: String, platform: String
-            let client_key_b64: String, proof_b64: String, created_at_unix: Double
+            let client_key_b64: String, proof_b64: String, created_at_unix: Double, links_apple_id: Bool?
         }
         struct Reply: Decodable { let pairings: [Item] }
         return try call("phones.pending", as: Reply.self).pairings.map {
@@ -70,7 +73,7 @@ extension ShellXCoreClient {
                 id: $0.pairing_id, deviceName: $0.device_name, platform: $0.platform,
                 clientKey: try Self.phoneBytes($0.client_key_b64, what: "client key"),
                 proof: try Self.phoneBytes($0.proof_b64, what: "proof"),
-                createdAt: Date(timeIntervalSince1970: $0.created_at_unix))
+                createdAt: Date(timeIntervalSince1970: $0.created_at_unix), linksAppleID: $0.links_apple_id ?? false)
         }
     }
 

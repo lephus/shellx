@@ -546,14 +546,14 @@ public struct MobileSection: View {
 
     /// The ShellX Link pairing row's title, also its search entry's.
     nonisolated static var shellXLinkPairingTitle: String {
-        String(localized: "settings.mobile.pairIPhone", defaultValue: "Pair iPhone")
+        String(localized: "settings.mobile.pairIPhone", defaultValue: "Pair Phone")
     }
 
     /// The ShellX Link pairing row's subtitle, also its search entry's detail.
     nonisolated static var shellXLinkPairingSubtitle: String {
         String(
             localized: "settings.mobile.pairIPhone.subtitle",
-            defaultValue: "Scan the QR code with ShellX on your iPhone, then allow the phone here on this Mac."
+            defaultValue: "Scan the QR code with ShellX on your phone, then allow the phone here on this Mac."
         )
     }
 

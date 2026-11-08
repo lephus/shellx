@@ -13,6 +13,10 @@ IDENTITY="${SHELLX_SIGNING_IDENTITY:-Developer ID Application: Phu Le huu (W4RF3
 NOTARY_PROFILE="${SHELLX_NOTARY_PROFILE:-shellx-notary}"
 
 [[ $# -eq 3 ]] || { echo "usage: $0 <ShellX.app> <version> <out-dir>" >&2; exit 2; }
+# The sign-in button needs Google's official mark (scripts/shellx/fetch-google-branding.sh).
+branding_args=()
+[[ -z "${SHELLX_GOOGLE_BRANDING_ROOT:-}" ]] || branding_args=(--root "$SHELLX_GOOGLE_BRANDING_ROOT")
+python3 "$(dirname "$0")/../check-google-branding.py" ${branding_args[@]+"${branding_args[@]}"} >&2 || exit 1
 app="$1" version="$2" out_dir="$3"
 [[ -d "$app" ]] || { echo "error: app bundle not found at $app" >&2; exit 1; }
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "error: version '$version' is not X.Y.Z" >&2; exit 1; }

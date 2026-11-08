@@ -88,6 +88,7 @@ use crate::remote_session::RemoteSession;
 use crate::remote_tabs::{AccountWatch, RemoteTabs, open_want, split_target, start_app_session};
 use crate::shell_info::{remote_session_title, session_title, sidebar_machines, this_machine_id};
 use crate::workspace::{DIVIDER, PaneHost};
+use shellx_model::core_api::GooglePurpose;
 
 pub struct RootView {
     tabs: Tabs,
@@ -172,7 +173,12 @@ impl RootView {
                 window,
                 |this, _, event: &SettingsEvent, window, cx| match event {
                     SettingsEvent::Closed => this.after_focus_change(window, cx),
-                    SettingsEvent::SignInRequested => this.open_sign_in(window, cx),
+                    SettingsEvent::SignInRequested => {
+                        this.open_sign_in(GooglePurpose::SignIn, window, cx)
+                    }
+                    SettingsEvent::SwitchToGoogleRequested => {
+                        this.open_sign_in(GooglePurpose::Link, window, cx);
+                    }
                 },
             ),
             // `open_sign_in` checked the modal rule before the dialog opened.
@@ -377,6 +383,16 @@ impl RootView {
         self.remotes.machines_updated(account.machines());
         if close {
             self.close_all_remote(window, cx);
+        }
+        // The server ended the session: ask for sign-in again. A password account is offered the
+        // switch to Google once.
+        if self
+            .account
+            .update(cx, |a, _| a.take_signed_out_by_server())
+        {
+            self.open_sign_in(GooglePurpose::SignIn, window, cx);
+        } else if self.account.update(cx, |a, _| a.take_google_switch_offer()) {
+            self.open_sign_in(GooglePurpose::Link, window, cx);
         }
     }
 
@@ -771,7 +787,7 @@ impl RootView {
     /// there is no list to show, so it opens the sign-in dialog instead.
     pub fn toggle_machine_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !matches!(self.account.read(cx).state(), AccountState::LoggedIn { .. }) {
-            self.open_sign_in(window, cx);
+            self.open_sign_in(GooglePurpose::SignIn, window, cx);
             return;
         }
         self.pairing.update(cx, |panel, cx| panel.toggle_picker(cx));
@@ -781,13 +797,18 @@ impl RootView {
     /// Settings -> Account "Đăng nhập…" and the machines "+" while signed
     /// out: the "Sign in to ShellX" dialog, over Settings if that is open.
     /// Refused while the forced-update overlay is up (`Panels::may_open`).
-    pub fn open_sign_in(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_sign_in(
+        &mut self,
+        purpose: GooglePurpose,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.close_menus(cx);
         if !self.panels(cx).may_open(Panel::SignIn) {
             return;
         }
         self.sign_in
-            .update(cx, |dialog, cx| dialog.open(window, cx));
+            .update(cx, |dialog, cx| dialog.open(purpose, window, cx));
     }
 
     /// A click outside the "+" list closes it (the click itself still runs).

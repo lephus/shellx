@@ -76,6 +76,8 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         let platform: String
         /// The phone's 32-byte static public key.
         let clientKey: Data
+        /// Allowing also lets an Apple ID sign in to this account: the sheet says so.
+        var linksAppleID = false
     }
 
     nonisolated static let log = Logger(subsystem: "pro.shellx.desktop", category: "link-pairing")
@@ -327,7 +329,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         for request in requests where !handled.contains(request.id) && request.id != approvingID {
             if offer.verify(proof: request.proof, clientKey: request.clientKey) {
                 next.append(Candidate(id: request.id, deviceName: request.deviceName, platform: request.platform,
-                                      clientKey: request.clientKey))
+                                      clientKey: request.clientKey, linksAppleID: request.linksAppleID))
                 if answeredHost[request.id] == nil { answeredHost[request.id] = answered }
             } else {
                 mismatched.append(request.id)
@@ -553,6 +555,10 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         let code = (error as? ShellXCoreError)?.code ?? ShellXLinkHostController.keyErrorKind(error)
         if code == "network" {
             return String(localized: "remote.signin.error.network", defaultValue: "Can't reach relay.shellx.pro")
+        }
+        if code == "identity_in_use" {
+            return String(localized: "remote.phonePairing.error.appleIdInUse",
+                          defaultValue: "This Apple ID already signs in to another ShellX account.")
         }
         return String(format: String(localized: "remote.phonePairing.error", defaultValue: "Something went wrong (%@)"),
                       code)

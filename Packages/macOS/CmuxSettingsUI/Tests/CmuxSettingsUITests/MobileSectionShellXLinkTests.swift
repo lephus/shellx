@@ -192,7 +192,7 @@ struct MobileSectionShellXLinkTests {
         let mobile = index.entries.filter { $0.id.hasPrefix("setting:mobile:") }.map(\.id)
         #expect(mobile == ["setting:mobile:pairDevice"])
         let pairing = try #require(index.entries.first { $0.id == "setting:mobile:pairDevice" })
-        #expect(pairing.title == "Pair iPhone")
+        #expect(pairing.title == "Pair Phone")
         #expect(index.match("qr code").contains { $0.id == pairing.id })
         #expect(index.match("pair iphone").first?.id == pairing.id)
         #expect(!index.match("pairing port").contains { $0.id == "setting:mobile:iOSPairingPort" })

@@ -10,9 +10,9 @@ Rules this file keeps (lane L5 constraints):
 - Every process starts with an empty environment (the equivalent of `env -i`)
   plus HOME, TMPDIR, XDG_RUNTIME_DIR and CMUX_TUI_CONFIG inside the harness
   dir and a minimal PATH. The relay HMAC secret goes by environment only.
-  shellx-core-cli takes its params in argv, so the run's random fake-account
-  password (auth.login) and the invite (pair.approve) are in that short-lived
-  process's argv; the app calls the Core in-process instead.
+  shellx-core-cli takes its params in argv, so the invite (pair.approve) is in
+  that short-lived process's argv (sign-in goes through the fake Google, auth.google.e2e,
+  with no password); the app calls the Core in-process instead.
 - The relay HMAC secret is random per run. Tickets, invites and the secret are
   never printed or logged by the harness; its own log has method names and
   result codes only, and anything it copies from a failing command is
@@ -85,6 +85,8 @@ HERE = Path(__file__).resolve().parent
 FAKE_APP = HERE / "fake_app.py"
 ISSUER = "shellx-relay"
 EMAIL = "e2e@shellx.test"
+FAKE_GOOGLE_CLIENT_ID = "fake-desktop-client"
+FAKE_GOOGLE_CLIENT_SECRET = "fake-desktop-secret"
 MIN_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 # Stock cmux-relay serves /v1/relay and /ws (cmux-relay/src/relay.rs:244-245);
 # production K2 serves /v2/relay behind its own front end (D6).
@@ -392,6 +394,10 @@ class Machine:
             "os_version": "e2e",
             "platform": "macos",
             "device_name": self.session,
+            "google_auth_url": f"{harness.api_base}/fake-google/auth",
+            "google_token_url": f"{harness.api_base}/fake-google/token",
+            "google_client_id": FAKE_GOOGLE_CLIENT_ID,
+            "google_client_secret": FAKE_GOOGLE_CLIENT_SECRET,
         })
         self.machine_id = ""
         self.slot = ""
@@ -453,7 +459,8 @@ class Machine:
         raise CoreError(self.name, method, code, self.h.redact(str(error.get("message", ""))))
 
     def login(self) -> dict:
-        return self.core("auth.login", email=EMAIL, password=self.h.password)
+        """Signs in through the fake Google (no password): the CLI's `auth.google.e2e`."""
+        return self.core("auth.google.e2e", purpose="sign_in")
 
     def register(self) -> dict:
         reg = self.core("machines.register", name=self.session, platform="macos",
@@ -671,7 +678,8 @@ class Harness:
         self._stop(f"relay-{self.relay_runs}", signal.SIGKILL)
 
     def start_api(self) -> None:
-        env = self.env(None, {"CMUX_RELAY_HMAC_SECRET": self.secret, "SHELLX_FAKE_PASSWORD": self.password})
+        env = self.env(None, {"CMUX_RELAY_HMAC_SECRET": self.secret, "SHELLX_FAKE_PASSWORD": self.password,
+                               "SHELLX_FAKE_GOOGLE_EMAIL": EMAIL})
         argv = [str(self.core_bin / "shellx-fake-api"), "--bind", f"127.0.0.1:{self.api_port}",
                 "--relay-url", f"ws://127.0.0.1:{self.relay_port}{RELAY_PATH}",
                 "--ticket-ttl", str(self.ticket_ttl), "--issuer", ISSUER]

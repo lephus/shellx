@@ -20,4 +20,6 @@ public enum ShellXBrand {
     public static let updateFeedURL = URL(string: "https://download.shellx.pro/desktop/appcast.xml")!
     /// ShellX API and relay (K1). DEBUG builds may override it with `SHELLX_API_BASE` (app side only).
     public static let apiBaseURL = URL(string: "https://relay.shellx.pro")!
+    /// Where a person deletes their ShellX account (Settings › Account).
+    public static let deleteAccountURL = URL(string: "https://shellx.pro/privacy#delete-account")!
 }

@@ -27,6 +27,13 @@ private let proof = Data(repeating: 9, count: 32)
     #expect(!"\(pending[0])".contains(proof.base64EncodedString()))
 }
 
+@Test func pendingDecodesLinksAppleID() throws {
+    let k = key.base64EncodedString(), p = proof.base64EncodedString()
+    let (core, _) = client(#"{"ok":{"pairings":[{"pairing_id":"p1","device_name":"a","platform":"ios","client_key_b64":"\#(k)","proof_b64":"\#(p)","created_at_unix":1,"links_apple_id":true},{"pairing_id":"p2","device_name":"b","platform":"ios","client_key_b64":"\#(k)","proof_b64":"\#(p)","created_at_unix":2}]}}"#)
+    let pending = try core.pendingPhonePairings()
+    #expect(pending.map(\.linksAppleID) == [true, false])
+}
+
 @Test func testBadKeyLengthIsBadResponse() {
     let short = Data(repeating: 1, count: 31).base64EncodedString()
     let (core, _) = client(#"{"ok":{"pairings":[{"pairing_id":"p1","device_name":"iPhone","platform":"ios","client_key_b64":"\#(short)","proof_b64":"\#(proof.base64EncodedString())","created_at_unix":100}]}}"#)

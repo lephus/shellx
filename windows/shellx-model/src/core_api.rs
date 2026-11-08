@@ -127,6 +127,135 @@ pub struct VersionInfo {
     pub download_url: Option<String>,
 }
 
+/// Why a Google flow runs: a new session, or switching the current one in place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GooglePurpose {
+    SignIn,
+    Link,
+}
+
+impl GooglePurpose {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GooglePurpose::SignIn => "sign_in",
+            GooglePurpose::Link => "link",
+        }
+    }
+}
+
+/// `auth.google.begin`: the page to open and the id to finish or cancel with. `Debug` hides the URL.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+pub struct GoogleBegin {
+    pub flow_id: String,
+    pub auth_url: String,
+}
+
+impl fmt::Debug for GoogleBegin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GoogleBegin")
+            .field("flow_id", &self.flow_id)
+            .finish_non_exhaustive()
+    }
+}
+
+/// `auth.google.finish`. `Debug` hides the email.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+pub struct GoogleSignIn {
+    pub user_id: String,
+    pub device_id: String,
+    pub device_public_key_b64: String,
+    pub fingerprint: String,
+    pub email: String,
+    pub auth_method: String,
+}
+
+impl fmt::Debug for GoogleSignIn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GoogleSignIn")
+            .field("user_id", &self.user_id)
+            .field("auth_method", &self.auth_method)
+            .finish_non_exhaustive()
+    }
+}
+
+/// `auth.session`: who is signed in and how (local, no network). `Debug` hides the email.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+pub struct SessionInfo {
+    pub user_id: String,
+    pub device_id: String,
+    #[serde(default)]
+    pub email: Option<String>,
+    pub auth_method: String,
+}
+
+impl fmt::Debug for SessionInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SessionInfo")
+            .field("user_id", &self.user_id)
+            .field("auth_method", &self.auth_method)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One item of `account.identities.list`.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub struct SignInMethod {
+    pub identity_id: String,
+    pub provider: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default)]
+    pub is_private_email: bool,
+    #[serde(default)]
+    pub linked_via_device_name: Option<String>,
+    #[serde(default)]
+    pub created_at_unix: u64,
+}
+
+impl SignInMethod {
+    pub fn is_apple(&self) -> bool {
+        self.provider == "apple"
+    }
+}
+
+pub fn google_begin(core: &dyn CoreCall, purpose: GooglePurpose) -> Result<GoogleBegin, CoreErr> {
+    typed(
+        core,
+        "auth.google.begin",
+        json!({"purpose": purpose.as_str()}),
+    )
+}
+
+/// Blocks until the browser answers, the flow is cancelled or it times out (300 s).
+pub fn google_finish(core: &dyn CoreCall, flow_id: &str) -> Result<GoogleSignIn, CoreErr> {
+    typed(core, "auth.google.finish", json!({"flow_id": flow_id}))
+}
+
+pub fn google_cancel(core: &dyn CoreCall, flow_id: &str) -> Result<(), CoreErr> {
+    core.call("auth.google.cancel", json!({"flow_id": flow_id}))
+        .map(|_| ())
+}
+
+pub fn session_info(core: &dyn CoreCall) -> Result<SessionInfo, CoreErr> {
+    typed(core, "auth.session", json!({}))
+}
+
+pub fn list_sign_in_methods(core: &dyn CoreCall) -> Result<Vec<SignInMethod>, CoreErr> {
+    #[derive(Deserialize)]
+    struct Resp {
+        identities: Vec<SignInMethod>,
+    }
+    typed::<Resp>(core, "account.identities.list", json!({})).map(|r| r.identities)
+}
+
+pub fn remove_sign_in_method(core: &dyn CoreCall, identity_id: &str) -> Result<(), CoreErr> {
+    core.call(
+        "account.identities.remove",
+        json!({"identity_id": identity_id}),
+    )
+    .map(|_| ())
+}
+
 pub fn config_set(core: &dyn CoreCall, cfg: &CoreConfig) -> Result<(), CoreErr> {
     core.call(
         "config.set",
@@ -494,5 +623,98 @@ mod tests {
             CoreErr::new("network", "down")
         );
         assert_eq!(CoreErr::new("a", "b").to_string(), "a: b");
+    }
+
+    #[test]
+    fn google_calls_send_their_params_and_parse() {
+        let f = FakeCore::new();
+        f.on(
+            "auth.google.begin",
+            Ok(json!({"flow_id":"f1","auth_url":"https://accounts.google.com/x"})),
+        );
+        f.on(
+            "auth.google.finish",
+            Ok(json!({"user_id":"u","device_id":"d","device_public_key_b64":"AAA","fingerprint":"ff",
+                      "email":"g@x","auth_method":"google"})),
+        );
+        f.on("auth.google.cancel", Ok(json!({})));
+        f.on(
+            "auth.session",
+            Ok(json!({"user_id":"u","device_id":"d","email":null,"auth_method":"password"})),
+        );
+        f.on(
+            "account.identities.list",
+            Ok(json!({"identities":[
+                {"identity_id":"a1","provider":"apple","email":"x@privaterelay.appleid.com","is_private_email":true,
+                 "linked_via_device_name":"Phu's iPhone","created_at_unix":5},
+                {"identity_id":"g1","provider":"google","email":"g@x"}]})),
+        );
+        f.on("account.identities.remove", Ok(json!({})));
+        let b = google_begin(&f, GooglePurpose::Link).unwrap();
+        assert_eq!(
+            (b.flow_id.as_str(), b.auth_url.as_str()),
+            ("f1", "https://accounts.google.com/x")
+        );
+        let done = google_finish(&f, "f1").unwrap();
+        assert_eq!(
+            (done.email.as_str(), done.auth_method.as_str()),
+            ("g@x", "google")
+        );
+        google_cancel(&f, "f1").unwrap();
+        let s = session_info(&f).unwrap();
+        assert_eq!((s.email, s.auth_method.as_str()), (None, "password"));
+        let methods = list_sign_in_methods(&f).unwrap();
+        assert!(methods[0].is_apple() && methods[0].is_private_email);
+        assert_eq!(
+            methods[0].linked_via_device_name.as_deref(),
+            Some("Phu's iPhone")
+        );
+        assert!(!methods[1].is_apple() && methods[1].linked_via_device_name.is_none());
+        remove_sign_in_method(&f, "a1").unwrap();
+        let calls = f.calls();
+        assert_eq!(
+            calls[0],
+            ("auth.google.begin".into(), json!({"purpose":"link"}))
+        );
+        assert_eq!(
+            calls[1],
+            ("auth.google.finish".into(), json!({"flow_id":"f1"}))
+        );
+        assert_eq!(
+            calls[2],
+            ("auth.google.cancel".into(), json!({"flow_id":"f1"}))
+        );
+        assert_eq!(
+            calls[5],
+            (
+                "account.identities.remove".into(),
+                json!({"identity_id":"a1"})
+            )
+        );
+    }
+
+    #[test]
+    fn google_values_hide_urls_and_emails_in_debug() {
+        let b = GoogleBegin {
+            flow_id: "f1".into(),
+            auth_url: "https://x/?state=S".into(),
+        };
+        assert!(!format!("{b:?}").contains("state=S"));
+        let g = GoogleSignIn {
+            user_id: "u".into(),
+            device_id: "d".into(),
+            device_public_key_b64: "k".into(),
+            fingerprint: "ff".into(),
+            email: "g@x".into(),
+            auth_method: "google".into(),
+        };
+        assert!(!format!("{g:?}").contains("g@x"));
+        let s = SessionInfo {
+            user_id: "u".into(),
+            device_id: "d".into(),
+            email: Some("g@x".into()),
+            auth_method: "google".into(),
+        };
+        assert!(!format!("{s:?}").contains("g@x"));
     }
 }
