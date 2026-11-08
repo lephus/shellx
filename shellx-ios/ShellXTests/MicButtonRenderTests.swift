@@ -256,7 +256,7 @@ final class MicButtonRenderTests: XCTestCase {
         await server.service.refreshEngine()
         XCTAssertEqual(server.service.engine, .server)
         try assertRenders(
-            NavigationStack { SettingsView(email: "phu@example.com", signOut: {}) }.environment(server.service),
+            NavigationStack { SettingsView(email: "phu@example.com", account: nil) }.environment(server.service),
             name: "settings-voice-server")
 
         let none = try makeRig(capabilities: .none)
@@ -264,7 +264,7 @@ final class MicButtonRenderTests: XCTestCase {
         XCTAssertNil(none.service.engine)
         XCTAssertTrue(none.service.engineKnown)
         try assertRenders(
-            NavigationStack { SettingsView(email: "phu@example.com", signOut: {}) }.environment(none.service),
+            NavigationStack { SettingsView(email: "phu@example.com", account: nil) }.environment(none.service),
             name: "settings-voice-unavailable")
     }
 

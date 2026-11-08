@@ -12,6 +12,12 @@ import ShellXLinkCore
 public actor FakeRelayAccount: RelayAccountCalling {
     public enum Call: Equatable, Sendable {
         case login(email: String, deviceName: String, clientKey: Data)
+        case nonce
+        case signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: Data)
+        case linkGoogle(idToken: String, nonce: String, token: String)
+        case signInWithApple(identityToken: String, authorizationCode: String, nonce: String, deviceName: String, clientKey: Data)
+        case linkApple(offerURI: String, linkToken: String, clientKey: Data)
+        case deleteAccount(idToken: String, nonce: String, token: String)
         case logout(token: String)
         case machines(token: String)
         case unpair(grantID: String, token: String)
@@ -19,11 +25,24 @@ public actor FakeRelayAccount: RelayAccountCalling {
         case setPushToken(hexToken: String, topic: String, environment: APNsEnvironment, token: String)
     }
 
-    public enum Function: Sendable { case login, logout, machines, unpair, pair, setPushToken }
+    public enum Function: Sendable {
+        case login, logout, machines, unpair, pair, setPushToken
+        case nonce, signInWithGoogle, linkGoogle, signInWithApple, linkApple, deleteAccount
+    }
 
     public private(set) var calls: [Call] = []
     private var loginResult: Result<AccountSession, Error> = .success(
         AccountSession(userID: "user", deviceID: "device", token: "token"))
+    private var nonceValue = "nonce-1"
+    private var googleSignIn: Result<AccountSignIn, Error> = .success(
+        AccountSignIn(session: AccountSession(userID: "user", deviceID: "device", token: "token"), email: "user@example.com"))
+    private var linkGoogleResult: Result<AccountSignIn, Error> = .success(
+        AccountSignIn(session: AccountSession(userID: "user", deviceID: "device", token: "google-token"), email: "user@example.com"))
+    private var appleSignIn: Result<AppleSignInResult, Error> = .success(
+        .signedIn(AccountSignIn(session: AccountSession(userID: "user", deviceID: "device", token: "token"), email: "user@example.com")))
+    private var appleLinkSignIn = AccountSignIn(
+        session: AccountSession(userID: "user", deviceID: "device", token: "apple-token"), email: "user@example.com")
+    private var hooks: [Function: @Sendable () async -> Void] = [:]
     private var grants: [PairedMachineListing] = []
     private var errors: [Function: Error] = [:]
     /// nil: the machine described by the offer.
@@ -38,6 +57,13 @@ public actor FakeRelayAccount: RelayAccountCalling {
     }
 
     public func setLogin(_ result: Result<AccountSession, Error>) { loginResult = result }
+    public func setNonce(_ nonce: String) { nonceValue = nonce }
+    public func setGoogleSignIn(_ result: Result<AccountSignIn, Error>) { googleSignIn = result }
+    public func setLinkGoogle(_ result: Result<AccountSignIn, Error>) { linkGoogleResult = result }
+    public func setAppleSignIn(_ result: Result<AppleSignInResult, Error>) { appleSignIn = result }
+    public func setAppleLinkSignIn(_ signIn: AccountSignIn) { appleLinkSignIn = signIn }
+    /// Runs inside `function`'s call, after it is recorded and before it answers (a 401 racing a request).
+    public func setHook(_ hook: (@Sendable () async -> Void)?, for function: Function) { hooks[function] = hook }
     public func setGrants(_ grants: [PairedMachineListing]) { self.grants = grants }
     /// Lists `machine` in `machines(token:)`, as after pairing.
     public func addGrant(for machine: PairedMachine) {
@@ -63,6 +89,55 @@ public actor FakeRelayAccount: RelayAccountCalling {
         calls.append(.login(email: email, deviceName: deviceName, clientKey: clientKey))
         if let error = errors[.login] { throw error }
         return try loginResult.get()
+    }
+
+    private func enter(_ call: Call, _ function: Function) async throws {
+        calls.append(call)
+        if let hook = hooks[function] { await hook() }
+        if let error = errors[function] { throw error }
+    }
+
+    public func nonce() async throws -> String {
+        try await enter(.nonce, .nonce)
+        return nonceValue
+    }
+
+    public func signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: Data) async throws
+        -> AccountSignIn
+    {
+        try await enter(
+            .signInWithGoogle(idToken: idToken, nonce: nonce, deviceName: deviceName, clientKey: clientKey), .signInWithGoogle)
+        return try googleSignIn.get()
+    }
+
+    public func linkGoogle(idToken: String, nonce: String, token: String) async throws -> AccountSignIn {
+        try await enter(.linkGoogle(idToken: idToken, nonce: nonce, token: token), .linkGoogle)
+        return try linkGoogleResult.get()
+    }
+
+    public func signInWithApple(
+        identityToken: String, authorizationCode: String, nonce: String, deviceName: String, clientKey: Data
+    ) async throws -> AppleSignInResult {
+        try await enter(
+            .signInWithApple(
+                identityToken: identityToken, authorizationCode: authorizationCode, nonce: nonce, deviceName: deviceName,
+                clientKey: clientKey), .signInWithApple)
+        return try appleSignIn.get()
+    }
+
+    /// Like `pair`: parses the offer, waits `approvalDelay`, adds the Mac's grant.
+    public func linkApple(offerURI: String, linkToken: String, clientKey: Data) async throws -> AppleLinkApproval {
+        try await enter(.linkApple(offerURI: offerURI, linkToken: linkToken, clientKey: clientKey), .linkApple)
+        let offer = try PairingOffer(uri: offerURI)
+        if approvalDelay > .zero { try await sleep(approvalDelay) }
+        let machine = PairedMachine(
+            machineID: offer.machineID, name: offer.machineName, linkSlot: offer.linkSlot, hostKey: offer.hostKey)
+        addGrant(for: machine)
+        return AppleLinkApproval(signIn: appleLinkSignIn, machine: machine)
+    }
+
+    public func deleteAccount(idToken: String, nonce: String, token: String) async throws {
+        try await enter(.deleteAccount(idToken: idToken, nonce: nonce, token: token), .deleteAccount)
     }
 
     public func logout(token: String) async throws {

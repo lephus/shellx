@@ -4,6 +4,8 @@ import SwiftUI
 /// the scanner.
 struct FirstMacView: View {
     let pair: () -> Void
+    /// "Try with a sample Mac"; nil hides the button.
+    var tryDemo: (() -> Void)? = nil
     @ScaledMetric(relativeTo: .largeTitle) private var symbolSize: CGFloat = 64
 
     var body: some View {
@@ -44,6 +46,15 @@ struct FirstMacView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.top, 8)
                 .accessibilityIdentifier("firstMac.pair")
+
+                if let tryDemo {
+                    Button(action: tryDemo) {
+                        Text(LocalizedStringResource("firstMac.demo"))
+                            .foregroundStyle(Color("AccentText"))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .accessibilityIdentifier("firstMac.demo")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 24)

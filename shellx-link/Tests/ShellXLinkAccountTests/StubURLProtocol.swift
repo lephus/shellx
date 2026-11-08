@@ -99,3 +99,14 @@ func stubTicket(slot: String, permission: String = "connect", role: String = "cl
         .replacingOccurrences(of: "=", with: "")
     return "v2.\(payload).c2ln"
 }
+
+final class PollCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        defer { count += 1 }
+        return count
+    }
+}

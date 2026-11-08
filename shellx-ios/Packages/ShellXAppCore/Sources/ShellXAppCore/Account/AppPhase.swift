@@ -5,5 +5,7 @@ public enum AppPhase: Equatable, Sendable {
     case launching
     /// `expired` is true when the relay refused the stored token.
     case signedOut(expired: Bool)
+    /// Sign in with Apple found no account: "Connect to Your Mac" runs (`AppCoordinator.appleLink`).
+    case linkingApple
     case signedIn(email: String)
 }

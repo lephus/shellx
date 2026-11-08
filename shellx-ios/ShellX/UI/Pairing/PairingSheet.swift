@@ -4,9 +4,11 @@ import UIKit
 
 /// The "Pair a Mac" sheet: scan the Mac's QR code (or paste its code), confirm the Mac's name,
 /// wait for Allow on the Mac, done. Closing the sheet at any step cancels the attempt.
-struct PairingSheet: View {
-    let model: PairingModel
+struct PairingSheet<Flow: PairingFlow>: View {
+    let model: Flow
     let close: () -> Void
+    var title = String(localized: "pairing.title")
+    var intro: String? = nil
 
     @State private var camera = CameraAccess.current()
     @Environment(\.openURL) private var openURL
@@ -14,6 +16,7 @@ struct PairingSheet: View {
     var body: some View {
         PairingSheetContent(
             step: model.step, camera: camera,
+            title: title, intro: intro,
             actions: PairingSheetContent.Actions(
                 scanned: { model.begin(uri: $0) },
                 paste: { model.begin(uri: PairingPaste.take(from: .general)) },
@@ -55,6 +58,9 @@ struct PairingSheetContent: View {
 
     let step: PairingModel.Step
     let camera: CameraAccess
+    var title = String(localized: "pairing.title")
+    /// Body text at the top of the `.idle` step, above the camera.
+    var intro: String? = nil
     var actions = Actions()
 
     var body: some View {
@@ -67,7 +73,7 @@ struct PairingSheetContent: View {
                     .frame(maxWidth: .infinity)
             }
             .background(Color.appBackground)
-            .navigationTitle(String(localized: "pairing.title"))
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -81,7 +87,7 @@ struct PairingSheetContent: View {
     @ViewBuilder private var content: some View {
         switch step {
         case .idle:
-            PairingScanStep(camera: camera, actions: actions)
+            PairingScanStep(camera: camera, intro: intro, actions: actions)
         case let .confirm(machineName):
             PairingMessage(
                 symbol: "laptopcomputer.and.iphone", tint: Color("AccentText"),
@@ -170,6 +176,7 @@ struct PairingSheetContent: View {
 /// The first step: the camera (or why there is none), the instructions, and the paste fallback.
 private struct PairingScanStep: View {
     let camera: CameraAccess
+    let intro: String?
     let actions: PairingSheetContent.Actions
 
     /// Fresh each time the scanner shows, so the code that was just cancelled can be scanned again.
@@ -179,6 +186,12 @@ private struct PairingScanStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if let intro {
+                Text(intro)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("pairing.intro")
+            }
             switch camera {
             case .authorized, .notDetermined:
                 viewfinder

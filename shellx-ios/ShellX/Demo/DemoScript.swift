@@ -1,11 +1,10 @@
-#if DEBUG
 import Foundation
-import ShellXAppTestSupport
+import ShellXDemo
 
 /// Plays `FakeMacDemoScript` on the demo's "Mac giả" for as long as the app runs: two Claude Code
 /// sessions with every kind of chat entry and a permission request, a question and a plan waiting,
 /// then every 20 s another request in turn, while the sessions switch between working and idle
-/// (Debug, `SHELLX_DEMO=1` only).
+/// (the in-app demo and Debug's `SHELLX_DEMO=1`).
 @MainActor
 final class DemoScript {
     private let script: FakeMacDemoScript
@@ -27,5 +26,10 @@ final class DemoScript {
             await script.run(sleep: { try await Task.sleep(for: $0) }, setUp: false, from: played)
         }
     }
+
+    /// Stops the playing task.
+    func stop() {
+        task?.cancel()
+        task = nil
+    }
 }
-#endif

@@ -27,8 +27,9 @@ set -euo pipefail
 
 TEAM_ID=W4RF3W4VTZ
 BUNDLE_ID=com.shellx.prod
-# Names that exist only in Debug builds: the demo, its fake Mac and account, the test fakes.
-DEBUG_ONLY_NAMES='FakeMac|FakeRelayAccount|DemoComposition|DemoScript|InMemorySecretStore|SHELLX_DEMO|ShellXAppTestSupport'
+# Names that exist only in Debug builds: the test fakes and the Debug demo's launch switch. The in-app demo
+# (ShellXDemo: FakeMac, DemoRelay, DemoComposition) ships on purpose ("Try without an account").
+DEBUG_ONLY_NAMES='FakeRelayAccount|FakeIdentityProvider|InMemorySecretStore|FakeTranscriber|FakeVoicePermissions|SHELLX_DEMO|ShellXAppTestSupport'
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 IOS_DIR="$REPO_ROOT/shellx-ios"
@@ -109,6 +110,28 @@ check_app() {
   if [ "$(plist_value NSAppTransportSecurity:NSAllowsLocalNetworking "$info" || true)" = "true" ]; then
     fail+=("allows plain HTTP to the local network (NSAllowsLocalNetworking), which only Debug builds need")
   fi
+  # Google sign-in needs the real iOS OAuth client of com.shellx.prod (SHELLX_GOOGLE_IOS_CLIENT in
+  # Release.xcconfig); the placeholder only serves builds that never reach the store.
+  value="$(plist_value ShellXGoogleClientID "$info" || true)"
+  if ! [[ "$value" =~ ^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$ ]]; then
+    if [ "$mode" = "signed" ]; then
+      fail+=("ShellXGoogleClientID is '$value', not a Google iOS client id (set SHELLX_GOOGLE_IOS_CLIENT in shellx-ios/Config/Release.xcconfig)")
+    else
+      note "$label: ShellXGoogleClientID is not a Google iOS client id yet ('$value'): Continue with Google cannot work in this build"
+    fi
+  fi
+  # Google's branding guidelines want the official "G" (asset GoogleG) and Google Sans on the Continue with Google
+  # button (contracts §11); without them the button shows its text only.
+  local google_mark="" google_font=""
+  if [ -f "$app/Assets.car" ] && assetutil --info "$app/Assets.car" 2>/dev/null | grep -Eq '"Name" *: *"GoogleG"'; then google_mark=yes; fi
+  if [ -f "$app/GoogleSans.ttf" ]; then google_font=yes; fi
+  if [ -z "$google_mark" ] || [ -z "$google_font" ]; then
+    if [ "$mode" = "signed" ]; then
+      fail+=("lacks Google's sign-in branding (the GoogleG asset or GoogleSans.ttf); see shellx-ios/README.md, Assets")
+    else
+      note "$label: no Google “G” mark or Google Sans yet: Continue with Google shows its text-only fallback"
+    fi
+  fi
 
   if [ "$mode" = "signed" ]; then
     local entitlements="$WORK/entitlements.plist"
@@ -122,6 +145,10 @@ check_app() {
     # Push is optional until P4; when the entitlement is there it must point at production APNs.
     if value="$(plist_value aps-environment "$entitlements")" && [ "$value" != "production" ]; then
       fail+=("aps-environment is '$value', expected production")
+    fi
+    # Sign in with Apple (S1 §6.6).
+    if [ "$(plist_value com.apple.developer.applesignin:0 "$entitlements" || true)" != "Default" ]; then
+      fail+=("lacks the Sign in with Apple entitlement (com.apple.developer.applesignin = Default)")
     fi
   fi
 
@@ -137,10 +164,9 @@ check_app() {
     fi
   fi
 
-  # The Debug demo and the test fakes stay out of the App Store build: Release.xcconfig leaves
-  # ShellXAppTestSupport out of the link, and the app's own demo code is under #if DEBUG. Swift keeps
-  # type names in a stripped binary, so every Mach-O file in the bundle (the executable, dylibs,
-  # frameworks, plug-ins) is searched for them.
+  # The test fakes stay out of the App Store build because Release.xcconfig leaves ShellXAppTestSupport out of
+  # the link and the SHELLX_DEMO switch is under #if DEBUG; Swift keeps type names in a stripped binary, so every
+  # Mach-O file in the bundle (the executable, dylibs, frameworks, plug-ins) is searched for them.
   executable="$(plist_value CFBundleExecutable "$info" || true)"
   if [ -z "$executable" ] || [ ! -f "$app/$executable" ]; then
     fail+=("has no executable (CFBundleExecutable is '$executable')")

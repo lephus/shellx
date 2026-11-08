@@ -402,6 +402,26 @@ private struct HeldPairRelay: RelayAccountCalling {
     func login(email: String, password: String, deviceName: String, clientKey: Data) async throws -> AccountSession {
         try await base.login(email: email, password: password, deviceName: deviceName, clientKey: clientKey)
     }
+    func nonce() async throws -> String { try await base.nonce() }
+    func signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: Data) async throws -> AccountSignIn {
+        try await base.signInWithGoogle(idToken: idToken, nonce: nonce, deviceName: deviceName, clientKey: clientKey)
+    }
+    func linkGoogle(idToken: String, nonce: String, token: String) async throws -> AccountSignIn {
+        try await base.linkGoogle(idToken: idToken, nonce: nonce, token: token)
+    }
+    func signInWithApple(
+        identityToken: String, authorizationCode: String, nonce: String, deviceName: String, clientKey: Data
+    ) async throws -> AppleSignInResult {
+        try await base.signInWithApple(
+            identityToken: identityToken, authorizationCode: authorizationCode, nonce: nonce, deviceName: deviceName,
+            clientKey: clientKey)
+    }
+    func linkApple(offerURI: String, linkToken: String, clientKey: Data) async throws -> AppleLinkApproval {
+        try await base.linkApple(offerURI: offerURI, linkToken: linkToken, clientKey: clientKey)
+    }
+    func deleteAccount(idToken: String, nonce: String, token: String) async throws {
+        try await base.deleteAccount(idToken: idToken, nonce: nonce, token: token)
+    }
     func logout(token: String) async throws { try await base.logout(token: token) }
     func machines(token: String) async throws -> [PairedMachineListing] { try await base.machines(token: token) }
     func unpair(grantID: String, token: String) async throws { try await base.unpair(grantID: grantID, token: token) }
