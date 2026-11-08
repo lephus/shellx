@@ -44,5 +44,11 @@ final class ReleaseCheckTests: XCTestCase {
         XCTAssertEqual(result.status, 0, result.output)
         XCTAssertTrue(result.output.contains("ShellXGoogleClientID is not a Google iOS client id yet"), result.output)
     }
+
+    func testMissingGoogleBrandingIsOnlyNotedWhenUnsigned() throws {
+        let result = try check(try makeApp())   // no Assets.car, no font
+        XCTAssertEqual(result.status, 0, result.output)
+        XCTAssertTrue(result.output.contains("no Google “G” mark or Google Sans yet"), result.output)
+    }
 }
 #endif
