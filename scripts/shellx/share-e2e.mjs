@@ -25,7 +25,6 @@ const ISSUER = 'shellx-relay';
 const BUILD = !process.argv.includes('--no-build');
 // Accounts are created by signing in with the test identity provider (registration is closed).
 const TEST_ISSUER = 'https://test-idp.shellx.invalid';
-const testIdp = await createTestIssuer(TEST_ISSUER);
 
 const requireRelay = createRequire(join(RELAY_DIR, 'package.json'));
 const fileUrl = (p) => pathToFileURL(p).href;
@@ -46,6 +45,7 @@ const { createTestIssuer, testIdTokenClaims } = await import(fileUrl(join(RELAY_
 const { createIdTokenVerifier } = await import(fileUrl(join(RELAY_DIR, 'src/auth/id-token.ts')));
 const { createSession } = await import(fileUrl(join(ROOT, 'web/src/share/session.mjs')));
 const wire = await import(fileUrl(join(ROOT, 'web/src/share/wire.mjs')));
+const testIdp = await createTestIssuer(TEST_ISSUER);
 
 const log = (...a) => console.log(...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
