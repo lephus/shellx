@@ -109,9 +109,10 @@ struct ShellXLinkTerminalSessionTests {
         return Session(host: host, client: client, phoneKey: phoneKey, serving: serving)
     }
 
+    /// The client ends with its last reference; cancelling the host's loop ends the host side.
     private func finish(_ session: Session) async {
-        await session.client.close()
         session.serving.cancel()
+        await session.serving.value
     }
 
     @Test func theLinkHostOffersTerminalViewsAndCreationOnlyWithTheirSources() async throws {
