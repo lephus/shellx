@@ -169,7 +169,16 @@ pub fn begin(agent: &ureq::Agent, cfg: &Config, store: &StateStore, flows: &Flow
         deadline: Instant::now() + FLOW_TIMEOUT,
         cancelled: AtomicBool::new(false),
     };
-    flows.lock().unwrap_or_else(|p| p.into_inner()).insert(flow_id.clone(), Arc::new(flow));
+    {
+        // Cancel every other flow in the same critical section as the insert: two begins running
+        // at once must still leave one live listener.
+        let mut map = flows.lock().unwrap_or_else(|p| p.into_inner());
+        for f in map.values() {
+            f.cancelled.store(true, Ordering::SeqCst);
+            *f.listener.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        }
+        map.insert(flow_id.clone(), Arc::new(flow));
+    }
     Ok(json!({"flow_id": flow_id, "auth_url": auth_url}))
 }
 
