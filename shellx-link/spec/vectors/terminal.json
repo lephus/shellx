@@ -3096,6 +3096,16 @@
       "ok": false
     },
     {
+      "name": "scroll_int_min",
+      "units": [
+        {
+          "k": "scroll",
+          "lines": -9223372036854775808
+        }
+      ],
+      "ok": false
+    },
+    {
       "name": "repeated_modifier",
       "units": [
         {
