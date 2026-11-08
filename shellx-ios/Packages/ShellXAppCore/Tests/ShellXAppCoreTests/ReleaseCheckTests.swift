@@ -50,5 +50,20 @@ final class ReleaseCheckTests: XCTestCase {
         XCTAssertEqual(result.status, 0, result.output)
         XCTAssertTrue(result.output.contains("no Google “G” mark or Google Sans yet"), result.output)
     }
+
+    func testDemoIsPartOfTheRelease() throws {
+        let names = "FakeMac FakeMacFleet FakeMacDemoScript DemoComposition DemoScript DemoSession DemoRelay DemoSecretStore ShellXDemo"
+        let result = try check(try makeApp(names: names))
+        XCTAssertEqual(result.status, 0, result.output)
+    }
+
+    func testDebugOnlyNamesAreRefused() throws {
+        for name in ["FakeRelayAccount", "FakeIdentityProvider", "InMemorySecretStore", "FakeTranscriber", "FakeVoicePermissions", "SHELLX_DEMO", "ShellXAppTestSupport"] {
+            let result = try check(try makeApp(names: name))
+            XCTAssertEqual(result.status, 1, name)
+            XCTAssertTrue(result.output.contains("contains Debug-only code: \(name)"), result.output)
+        }
+    }
+    ```
 }
 #endif
