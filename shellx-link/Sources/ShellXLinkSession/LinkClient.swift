@@ -81,6 +81,13 @@ public actor LinkClient {
     /// `ShellXLink.terminalCreateFeature`, `createTerminal`. A string this version does not know is kept, and ignored.
     public nonisolated let hostFeatures: Set<String>
 
+    /// Every `terminal.view.frame` and `terminal.view.ended`, and `.opened` right before the first frame of a view this
+    /// client opened, in arrival order. Single consumer. It finishes when the session ends.
+    public nonisolated let terminalPushes: AsyncStream<TerminalViewPush>
+
+    private let terminalPushesContinuation: AsyncStream<TerminalViewPush>.Continuation
+    /// The `terminal_id` of each `terminal.view.open` still waiting for its answer, by `call_id`.
+    private var openingViews: [String: String] = [:]
     private let changesContinuation: AsyncStream<Change>.Continuation
     private let sessionChangesContinuation: AsyncStream<SessionChange>.Continuation
     private let workspaceChangesContinuation: AsyncStream<WorkspaceChange>.Continuation
@@ -140,6 +147,9 @@ public actor LinkClient {
         let (chatStream, chatContinuation) = AsyncStream.makeStream(of: ChatPush.self)
         chatEntries = chatStream
         chatEntriesContinuation = chatContinuation
+        let (terminalStream, terminalContinuation) = AsyncStream.makeStream(of: TerminalViewPush.self)
+        terminalPushes = terminalStream
+        terminalPushesContinuation = terminalContinuation
         self.channel = channel
         self.watchdog = watchdog
         pinger = Task { await runPings(on: channel, every: pingInterval) }
@@ -152,6 +162,7 @@ public actor LinkClient {
         sessionChangesContinuation.finish()
         workspaceChangesContinuation.finish()
         chatEntriesContinuation.finish()
+        terminalPushesContinuation.finish()
         let channel = self.channel
         Task { await channel.close() }
     }
@@ -391,6 +402,39 @@ public actor LinkClient {
         return (outcome, workspaceId)
     }
 
+    /// Opens a view of a terminal (`terminal.view.open`, PROTOCOL.md 11.1). On `.ok` it yields `.opened(terminalId:)` on
+    /// ``terminalPushes`` before it returns, and the view's frames follow. `cols` and `rows` are the grid the phone can
+    /// show; the host clamps them. Call it only when ``hostFeatures`` lists `ShellXLink.terminalViewFeature`.
+    ///
+    /// A session views one terminal: close the first before opening another (`.busy` otherwise). Throws
+    /// `.remote(code: "unsupported")` without the feature, `.remote(code: "bad_request")` for `cols` or `rows` below 1,
+    /// `.timedOut` after the request timeout (an `ok` that arrives later is not announced: send
+    /// ``closeTerminalView(terminalId:)``), and `.sessionClosed` when the session ends first.
+    public func openTerminalView(terminalId: String, cols: Int, rows: Int) async throws -> TerminalViewOpenOutcome {
+        let answer = try await call({ .terminalViewOpen(callId: $0, terminalId: terminalId, cols: cols, rows: rows) },
+                                    openingView: terminalId)
+        guard case let .terminalViewOpenResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
+    /// Sends `terminal.view.close` (no answer). The tab stays on the Mac. Throws `.sessionClosed` when the session
+    /// ended.
+    public func closeTerminalView(terminalId: String) async throws {
+        try await post(.terminalViewClose(terminalId: terminalId))
+    }
+
+    /// Sends a message that expects no answer.
+    func post(_ message: LinkMessage) async throws {
+        try checkOpen()
+        do {
+            try await channel.send(message)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw LinkClientError.sessionClosed
+        }
+    }
+
     /// Opens a terminal tab in a workspace (PROTOCOL.md 11.9). `terminalId` is the new terminal when the outcome is
     /// `.ok`, and nil otherwise. Call it only when ``hostFeatures`` lists `ShellXLink.terminalCreateFeature`. Not safe
     /// to repeat: after a timeout or a lost connection it is unknown whether the Mac acted, so read the workspace list
@@ -566,9 +610,19 @@ public actor LinkClient {
              let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
              let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _),
              let .agentCloseResult(callId, _), let .terminalCloseResult(callId, _),
-             let .terminalViewOpenResult(callId, _), let .terminalCreateResult(callId, _, _):
+             let .terminalCreateResult(callId, _, _):
             // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
             waiters.removeValue(forKey: callId)?.resume(returning: message)
+        case let .terminalViewOpenResult(callId, outcome):
+            // The `ok` is announced first, so every frame of the new view comes after `.opened` (PROTOCOL.md 11.1).
+            if outcome == .ok, waiters[callId] != nil, let terminalId = openingViews[callId] {
+                terminalPushesContinuation.yield(.opened(terminalId: terminalId))
+            }
+            waiters.removeValue(forKey: callId)?.resume(returning: message)
+        case let .terminalViewFrame(terminalId, frame):
+            terminalPushesContinuation.yield(.frame(terminalId: terminalId, part: frame))
+        case let .terminalViewEnded(terminalId, reason):
+            terminalPushesContinuation.yield(.ended(terminalId: terminalId, reason: reason))
         case let .sessionsChanged(revision, upserted, removed):
             sessionChangesContinuation.yield((revision, upserted, removed))
         case let .workspacesChanged(revision, upserted, removed):
@@ -594,7 +648,7 @@ public actor LinkClient {
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
              .chatInterrupt, .attachBegin, .attachChunk, .attachEnd, .workspacesGet, .workspaceCreate,
              .workspaceRename, .workspaceClose, .agentClose, .terminalClose, .terminalViewOpen, .terminalViewInput,
-             .terminalViewResize, .terminalViewResync, .terminalViewClose, .terminalViewEnded, .terminalViewFrame, .terminalCreate:
+             .terminalViewResize, .terminalViewResync, .terminalViewClose, .terminalCreate:
             break
         }
         return true
@@ -614,6 +668,7 @@ public actor LinkClient {
         sessionChangesContinuation.finish()
         workspaceChangesContinuation.finish()
         chatEntriesContinuation.finish()
+        terminalPushesContinuation.finish()
         pinger.cancel()
         watchdog.cancel()
         await channel.close()
@@ -627,10 +682,12 @@ public actor LinkClient {
     /// Sends the message `make` builds for a fresh `call_id` and waits for the one answer that carries
     /// that id (or an `error` that does). Generic over the message type: the answer is the raw
     /// `LinkMessage`, which the caller unpacks.
-    func call(_ make: @Sendable (String) -> LinkMessage) async throws -> LinkMessage {
+    func call(_ make: @Sendable (String) -> LinkMessage, openingView terminalId: String? = nil) async throws -> LinkMessage {
         try checkOpen()
         nextCallNumber += 1
         let callId = "c\(nextCallNumber)"
+        if let terminalId { openingViews[callId] = terminalId }
+        defer { openingViews[callId] = nil }
         let message = make(callId)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<LinkMessage, any Error>) in

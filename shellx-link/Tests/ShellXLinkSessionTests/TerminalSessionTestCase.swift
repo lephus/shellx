@@ -25,13 +25,15 @@ class TerminalSessionTestCase: XCTestCase {
         clients = []
     }
 
-    func makeHost(terminalCreator: (any TerminalCreator)? = nil) -> Rig {
+    func makeHost(
+        terminalViews: (any TerminalViewSource)? = nil, terminalCreator: (any TerminalCreator)? = nil
+    ) -> Rig {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
         let trusted: Set<Data> = [clientKey.publicKey]
         let host = LinkHost(
             key: hostKey, trustedClients: { trusted }, feed: FakeFeedSource(), sessions: nil, chat: nil,
-            terminalCreator: terminalCreator, hostVersion: "test-host", machineName: "Test Mac", timings: .standard)
+            terminalViews: terminalViews, terminalCreator: terminalCreator, hostVersion: "test-host", machineName: "Test Mac", timings: .standard)
         return Rig(host: host, hostKey: hostKey, clientKey: clientKey)
     }
 
@@ -117,4 +119,42 @@ class TerminalSessionTestCase: XCTestCase {
             XCTFail("threw \(error) \(message)", file: file, line: line)
         }
     }
+}
+
+// MARK: - Terminal push helpers
+
+/// The frames after the last `.opened(terminalId)` (all of them when there is none), put through a fresh assembler and
+/// screen: the screen the phone would show, the kinds and revisions of the frames it applied, and its resyncs.
+func assembled(
+    _ pushes: [TerminalViewPush], terminalId: String = "t-1"
+) -> (screen: TerminalScreen, kinds: [TerminalFrameKind], revisions: [Int], resyncs: Int) {
+    let start = pushes.lastIndex { $0 == .opened(terminalId: terminalId) }.map { $0 + 1 } ?? 0
+    var assembler = TerminalFrameAssembler()
+    var screen = TerminalScreen()
+    var kinds: [TerminalFrameKind] = []
+    var revisions: [Int] = []
+    var resyncs = 0
+    for push in pushes[start...] {
+        guard case let .frame(id, part) = push, id == terminalId else { continue }
+        let result = assembler.receive(part)
+        if let frame = result.frame {
+            screen.apply(frame)
+            kinds.append(frame.head.kind)
+            revisions.append(assembler.revision)
+        }
+        if result.resync { resyncs += 1 }
+    }
+    return (screen, kinds, revisions, resyncs)
+}
+
+func assembledText(_ pushes: [TerminalViewPush]) -> [String] {
+    assembled(pushes).screen.screenText()
+}
+
+/// Polls until `condition` holds for the pushes collected so far, or `within` has passed.
+func waitFor(
+    _ pushes: Collector<TerminalViewPush>, within timeout: Duration = .seconds(5),
+    _ condition: @escaping @Sendable ([TerminalViewPush]) -> Bool
+) async -> Bool {
+    await eventually(within: timeout) { condition(pushes.items) }
 }
