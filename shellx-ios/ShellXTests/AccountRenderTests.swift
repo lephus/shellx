@@ -69,9 +69,35 @@ final class AccountRenderTests: XCTestCase {
         try assertRenders(SignInView(coordinator: .preview(), expired: true), name: "signin-expired")
     }
 
+    private func actions(_ method: AccountAuthMethod) -> AccountActions {
+        AccountActions(authMethod: method, signOut: {}, switchToGoogle: {}, deleteAccount: {})
+    }
+
     func testSettingsRenders() throws {
+        try assertRenders(NavigationStack { SettingsView(email: "phu@example.com", account: actions(.google)) }, name: "settings")
+    }
+
+    func testSettingsOfAPasswordSessionOfferTheSwitch() throws {
+        try assertRenders(NavigationStack { SettingsView(email: "phu@example.com", account: actions(.password)) }, name: "settings-password")
+    }
+
+    func testSettingsInTheDemoShowOnlyTheEmail() throws {
+        try assertRenders(NavigationStack { SettingsView(email: "demo@shellx.pro", account: nil) }, name: "settings-demo")
+    }
+
+    func testSwitchBannerRenders() throws {
+        try assertRenders(VStack(spacing: 0) { SwitchToGoogleBanner(switchNow: {}, dismiss: {}); Spacer() }, name: "switch-banner")
         try assertRenders(
-            NavigationStack { SettingsView(email: "phu@example.com", signOut: {}) }, name: "settings")
+            VStack(spacing: 0) { SwitchToGoogleBanner(error: SignInErrorText.message(for: .emailInUse), switchNow: {}, dismiss: {}); Spacer() },
+            name: "switch-banner-error")
+    }
+
+    func testSwitchBannerShowsOnlyForPasswordSessionsUntilDismissed() {
+        XCTAssertTrue(SwitchToGoogleBanner.isShown(authMethod: .password, dismissed: false))
+        XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .password, dismissed: true))
+        XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .google, dismissed: false))
+        XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .apple, dismissed: false))
+        XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: nil, dismissed: false))
     }
 
     func testLicensesLinkToTheWebsiteAndShowItsHost() {
