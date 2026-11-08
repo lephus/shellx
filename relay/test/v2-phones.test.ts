@@ -158,7 +158,7 @@ describe("the target machine", () => {
     expect(await res.json()).toEqual({
       pairings: [{
         pairing_id: id, device_name: "iPhone 16", platform: "ios", client_key_b64: key, proof_b64: proof,
-        created_at_unix: Math.floor(T0 / 1000),
+        created_at_unix: Math.floor(T0 / 1000), links_apple_id: false,
       }],
     });
   });

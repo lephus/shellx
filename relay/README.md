@@ -48,13 +48,19 @@ stops the relay with one line on stderr and exit status 1.
 | `APNS_KEY_PATH`, `APNS_KEY_ID`, `APNS_TEAM_ID` | unset | The APNs provider key (`.p8` file path), its key id and the Apple team id (push to the native iPhone app through `POST /v2/notifications`). Any unset, or a file that is not a key → iPhone push is off, the relay runs normally and logs `apns_disabled` with the reason once; `POST /v2/notifications` then reaches Android phones only (503 `push_unavailable` when FCM is off too) |
 | `ADMIN_HOST` | `admin.shellx.pro` | Host name of the admin dashboard (see "Admin dashboard" below); a value that is not a bare host name stops the relay |
 | `ADMIN_PASSWORD` | unset | The admin dashboard's password. Unset or shorter than 16 characters → admin is off (`admin_disabled` logged once with the reason, never the password) and the relay runs normally |
+| `GOOGLE_CLIENT_IDS` | unset | Comma-separated allowed `aud` values of Google ID tokens (iOS, Web, Desktop clients). Unset → every Google sign-in answers 401 and `google_sign_in_disabled` is logged |
+| `APPLE_CLIENT_IDS` | `com.shellx.prod,com.shellx.dev` | Allowed `aud` values (bundle ids) of Apple identity tokens; an empty list stops the relay |
+| `APPLE_TEAM_ID`, `APPLE_SIWA_KEY_ID`, `APPLE_SIWA_KEY_PATH` | unset | The Sign in with Apple key (`.p8`) used to exchange authorization codes and revoke refresh tokens. Any missing, unreadable or not an EC P-256 key → `apple_siwa_disabled`; Apple sign-in itself keeps working |
+| `PASSWORD_LOGIN` | `on` | `off` answers 410 `password_sign_in_removed` to login and password change (logged once as `password_login_off`); anything but `on`/`off` stops the relay |
+| `TEST_IDP_ISSUER`, `TEST_IDP_JWKS_PATH` | unset | **Test relays only, never production.** A test identity provider: tokens of this issuer with `aud` `shellx-test-idp`, signed with a key of the JWKS file, are accepted as provider `test`. Both or neither; the issuer must not be a Google or Apple issuer; logs `test_idp_enabled`. Helper: `relay/scripts/test-idp.ts` |
 | `FCM_ENDPOINT`, `FCM_TOKEN_ENDPOINT` | Google | **Tests only:** base URL of the FCM API and the OAuth token URL, e.g. a fake FCM server. Honoured only for loopback `http(s)://127.0.0.1`/`localhost`/`[::1]` URLs, ignored otherwise |
 
 On startup the relay applies every `migrations/*.sql` not yet listed in `schema_migrations`, in
 file-name order, one transaction per file. There are no down-migrations: fix a mistake with a new
 file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub's
 `pairing_removed` tombstones; `0003_push_tokens.sql` holds the phones' FCM tokens; `0004_admin.sql`
-adds `devices.app_version` and the admin's `app_settings`.
+adds `devices.app_version` and the admin's `app_settings`; `0010_identities.sql` adds the sign-in tables
+(`identities`, `auth_nonces`, `apple_links`, `tokens.auth_method`) and makes `users.password_hash` nullable.
 
 ## Behaviour worth knowing
 
@@ -88,13 +94,13 @@ adds `devices.app_version` and the admin's `app_settings`.
   17th device is refused with 1013 "too many devices online" (logged as `account_device_cap` with its
   `device_id`) and retries with backoff; the 16 connected ones are untouched. A device that is
   already connected can always reconnect: its new socket replaces the old one.
-- **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, register 3/IP,
-  WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
+- **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, nonce 30/IP
+  (Google and Apple sign-in and Apple link requests share login 10/IP), WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
   upgrade is refused with HTTP 429 and clients retry with backoff). The IP is `X-Real-IP` when the
   TCP peer is a private or loopback address (nginx-proxy), otherwise the peer address; an IPv6
   address counts as its /64. IPs and e-mail addresses are never logged.
 - **argon2id:** m = 19456 KiB, t = 2, p = 1; at most 4 hashes run at once and up to 32 wait; beyond
-  that register, login and password change answer 429 `rate_limited`. The image sets
+  that login, password change and password account deletion answer 429 `rate_limited`. The image sets
   `UV_THREADPOOL_SIZE=8` so the 4 hashes never take the whole libuv thread pool.
 - **Refused upgrades:** a WebSocket upgrade with a bad token (401), over the upgrade limit (429) or
   with any other `Upgrade` (400) is answered and its socket destroyed after 5 s if the client does
@@ -240,6 +246,74 @@ no admin path answers on any other.
   http://admin.localhost:8787 (Chrome and Firefox resolve `*.localhost` to 127.0.0.1 and accept the
   Secure cookie there).
 
+## Sign-in (Google and Apple)
+
+Accounts are created by signing in with Google (desktop, Android, iPhone) or Apple (iPhone). Registration
+is closed: `POST /v1/auth/register` always answers 410 `registration_closed`.
+
+| Route | Auth | Body | Success | Errors |
+|---|---|---|---|---|
+| `POST /v1/auth/nonce` | none | `{}` | 201 `{nonce, expires_in}` (43-char base64url, 600) | 429 |
+| `POST /v1/auth/google` | none | `{id_token, nonce, device}` | 200 `{user_id, device_id, token, email}` | 401 `invalid_credentials`, 409 `switch_from_signed_in_device`, 400 `invalid_device`, 429 |
+| `POST /v1/auth/google/link` | bearer (any kind) | `{id_token, nonce}` | 200 `{user_id, device_id, token, email}` (new token; the old one is deleted) | 401, 409 `email_in_use`, 409 `identity_in_use` |
+| `POST /v1/auth/apple` | none | `{identity_token, authorization_code, nonce, device}` (mobile / ios) | 200 `{user_id, device_id, token, email}` or 202 `{status: "link_required", link_token, expires_in}` | 401, 400, 429 |
+| `POST /v1/auth/apple/link` | none | `{link_token, machine_id, client_key_b64, proof_b64}` | 201 `{pairing_id}` | 400, 401, 404 `machine_not_found`, 429 |
+| `POST /v1/auth/apple/link/status` | none | `{link_token, pairing_id}` | 200 `{status}` or `{status: "approved", session, machine}` | 401, 404 `pairing_not_found` |
+| `DELETE /v1/account` | bearer | `{id_token, nonce}` (`iat` at most 300 s), or `{password}` while `PASSWORD_LOGIN=on` and the account has one | 204 | 401 `reauth_required` / `invalid_credentials`, 429 |
+| `GET /v1/account/identities` | bearer | none | 200 `{identities: [...]}` | 401 |
+| `DELETE /v1/account/identities/:identity_id` | bearer | none | 204 | 404 `identity_not_found`, 409 `last_google_identity` |
+
+**ID-token checks** (any failure is 401 `invalid_credentials`, with no reason): the signature through
+the provider's JWKS (jose, cached); `iss` is the provider's issuer; `aud` is in the configured list;
+`exp` has not passed (60 s tolerance); `iat` at most 600 s old (300 s for account deletion) and at
+most 60 s ahead; the nonce was issued by the relay and is unused (Google and test tokens carry the
+raw nonce, Apple the `sha256_hex` of it); `email_verified` is true.
+
+**Account rules** (S1 §6.3): an identity `(provider, subject)` signs in to its account whatever its
+email says now. Otherwise the account with the same email (`trim` + lower case) decides: while
+`PASSWORD_LOGIN=on` and it still has a password, Google answers 409 `switch_from_signed_in_device`; with
+the password off (or never set) the Google account is linked, the password is removed and the
+account's password sessions are signed out. An account has one Google sign-in: a new Google account
+with the email of one that already has another is refused (401), never linked. No match creates a
+passwordless account.
+
+**Switch in place** (`google/link`): a signed-in device adds Google to its account; the account's email
+becomes Google's, the password and the other devices stay, and only this device gets a `google` token.
+
+**Apple link:** an Apple ID that matches no account (or only an account that still has a password)
+gets 202 `link_required` and a 10-minute link token. The iPhone sends it to `apple/link` with a Mac's
+machine id; the Mac lists the request with `GET /v2/phone-pairings?role=target&apple_links=1`
+(`links_apple_id: true`) and approves it, which attaches the Apple ID to the Mac's account and adds the
+iPhone with a grant. `apple/link/status` hands the approved session out exactly once; a lost answer is
+recovered by signing in with Apple again.
+
+**Identities:** removing an Apple ID signs out the devices that signed in with it, asks Apple to revoke
+its refresh token and keeps the Mac, the Google devices and the phone grant. The Google sign-in cannot
+be removed.
+
+**Deletion** needs a fresh Google or Apple token of one of the account's own sign-ins. The stored Apple
+refresh tokens are revoked after the delete; a failure is logged and never blocks it.
+
+**Test identity provider:** `relay/scripts/test-idp.ts` (`createTestIssuer`, `testIdTokenClaims`) makes
+tokens with `aud` `shellx-test-idp` for a relay started with `TEST_IDP_ISSUER` / `TEST_IDP_JWKS_PATH`.
+
+## Password cut-over
+
+After the apps sign in with Google and Apple, on the VPS (see `deploy/README.md`):
+
+```bash
+docker compose exec relay npm run -s password-cutover            # dry run: counts only
+docker compose exec relay npm run -s password-cutover -- --yes   # remove every password and password session
+```
+
+It refuses unless the relay runs with `PASSWORD_LOGIN=off`. Google, Apple and test sessions stay.
+
+## Smoke token
+
+`docker compose exec -T relay npm run -s mint-smoke-token` prints a session token of a dedicated
+passwordless smoke account (one fixed desktop device; each mint replaces the previous token).
+`SHELLX_SMOKE_TOKEN=<token> npm run relay2:smoke` uses it.
+
 ## Healthcheck
 
 Compose runs `node dist/scripts/healthcheck.js` in the container. It exits 0 and prints nothing
@@ -247,7 +321,7 @@ when `GET http://127.0.0.1:$PORT/v1/version` answers 200 within 3 s and the data
 opens read-only (it is never created) and answers `SELECT 1`. Otherwise it prints one line such as
 `healthcheck: version ECONNREFUSED; database SQLITE_CANTOPEN` (error kinds only) and exits 1.
 
-## Emergency password reset (spec §5.2)
+## Emergency password reset (spec §5.2, until the password cut-over)
 
 On the VPS, inside the running container (it uses the same `DB_PATH`):
 

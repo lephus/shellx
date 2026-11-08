@@ -8,7 +8,7 @@ import { Db } from "../src/db/db.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import {
   call, CountingLimiter, db, deviceBody, errorCode, loginDevice, makeApp, PASSWORD, randomEmail, randomPublicKey,
-  registerAccount, tempDir, unlimited,
+  registerAccount, seedUser, tempDir, unlimited,
 } from "./helpers.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -17,120 +17,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("POST /v1/auth/register", () => {
-  it("creates user, device and token; stores only hashes", async () => {
-    const app = makeApp();
-    const email = randomEmail();
-    const device = deviceBody("agent");
-    const res = await call(app, "POST", "/v1/auth/register", { body: { email, password: PASSWORD, device } });
-    expect(res.status).toBe(201);
-    const body = await res.json<{ user_id: string; device_id: string; token: string }>();
-    expect(body.user_id).toMatch(UUID_RE);
-    expect(body.device_id).toMatch(UUID_RE);
-    expect(body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-
-    const user = db().get<{ email: string; password_hash: string }>("SELECT email, password_hash FROM users WHERE id = ?", body.user_id);
-    expect(user?.email).toBe(email);
-    expect(user?.password_hash).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
-
-    const tokenRow = db().get<{ device_id: string }>("SELECT device_id FROM tokens WHERE token_hash = ?", await hashToken(body.token));
-    expect(tokenRow?.device_id).toBe(body.device_id);
-    const rawToken = db().get<{ n: number }>("SELECT COUNT(*) AS n FROM tokens WHERE token_hash = ?", body.token);
-    expect(rawToken?.n).toBe(0);
-  });
-
-  it("normalises the email (whitespace + uppercase) before storing", async () => {
-    const app = makeApp();
-    const local = `Mixed.Case-${crypto.randomUUID()}`;
-    const res = await call(app, "POST", "/v1/auth/register", {
-      body: { email: `  ${local}@Example.COM \n`, password: PASSWORD, device: deviceBody("agent") },
-    });
-    expect(res.status).toBe(201);
-    const { user_id } = await res.json<{ user_id: string }>();
-    const row = db().get<{ email: string }>("SELECT email FROM users WHERE id = ?", user_id);
-    expect(row?.email).toBe(`${local.toLowerCase()}@example.com`);
-  });
-
+describe("POST /v1/auth/register (closed, contracts §2)", () => {
   it.each([
-    [{ email: "not-an-email" }, 400, "invalid_email"],
-    [{ email: 42 }, 400, "invalid_email"],
-    [{ email: "someone@yopmail.com" }, 400, "disposable_email"],
-    [{ email: "someone@x.yopmail.com" }, 400, "disposable_email"],
-    [{ email: "  Someone@X.YOPMAIL.com " }, 400, "disposable_email"],
-    [{ password: "1234567" }, 400, "weak_password"],
-    [{ password: "x".repeat(129) }, 400, "weak_password"],
-    [{ password: 12345678 }, 400, "weak_password"],
-    [{ device: undefined }, 400, "invalid_device"],
-    [{ device: deviceBody("agent", { kind: "tablet" }) }, 400, "invalid_device"],
-    [{ device: deviceBody("agent", { platform: "linux" }) }, 400, "invalid_device"],
-    [{ device: deviceBody("agent", { name: "   " }) }, 400, "invalid_device"],
-    [{ device: deviceBody("agent", { name: "n".repeat(101) }) }, 400, "invalid_device"],
-    [{ device: deviceBody("agent", { public_key: "AAAA" }) }, 400, "invalid_device"],
-    [{ device: deviceBody("agent", { public_key: `${randomPublicKey()}=` }) }, 400, "invalid_device"],
-  ])("rejects %j with %i %s", async (override, status, code) => {
-    const body = { email: randomEmail(), password: PASSWORD, device: deviceBody("agent"), ...override };
+    ["a valid body", { email: "new@example.com", password: PASSWORD, device: deviceBody("agent") }],
+    ["a malformed body", "{not json"],
+    ["no body", undefined],
+  ])("answers 410 registration_closed to %s and creates nothing", async (_, body) => {
     const res = await call(makeApp(), "POST", "/v1/auth/register", { body });
-    expect(res.status).toBe(status);
-    expect(await errorCode(res)).toBe(code);
-  });
-
-  it("rejects a non-JSON body with 400 bad_request", async () => {
-    const res = await call(makeApp(), "POST", "/v1/auth/register", { body: "{not json" });
-    expect(res.status).toBe(400);
-    expect(await errorCode(res)).toBe("bad_request");
-  });
-
-  it("returns 409 email_taken for the same address in a different case", async () => {
-    const app = makeApp();
-    const account = await registerAccount(app);
-    const res = await call(app, "POST", "/v1/auth/register", {
-      body: { email: ` ${account.email.toUpperCase()} `, password: PASSWORD, device: deviceBody("agent") },
-    });
-    expect(res.status).toBe(409);
-    expect(await errorCode(res)).toBe("email_taken");
-  });
-
-  it("returns 429 rate_limited once the per-IP register limiter refuses", async () => {
-    const registerIp = new CountingLimiter(3);
-    const app = makeApp({ limiters: { ...unlimited, registerIp } });
-    for (let i = 0; i < 3; i++) {
-      const ok = await call(app, "POST", "/v1/auth/register", {
-        ip: "198.51.100.1",
-        body: { email: randomEmail(), password: PASSWORD, device: deviceBody("agent") },
-      });
-      expect(ok.status).toBe(201);
-    }
-    const res = await call(app, "POST", "/v1/auth/register", {
-      ip: "198.51.100.1",
-      body: { email: randomEmail(), password: PASSWORD, device: deviceBody("agent") },
-    });
-    expect(res.status).toBe(429);
-    expect(await errorCode(res)).toBe("rate_limited");
-    expect(registerIp.calls).toEqual(Array(4).fill("198.51.100.1"));
+    expect([res.status, await errorCode(res)]).toEqual([410, "registration_closed"]);
+    expect(db().get("SELECT COUNT(*) AS n FROM users")).toEqual({ n: 0 });
   });
 });
 
 describe("production rate limits (createRateLimiters, keyed by X-Real-IP)", () => {
-  const register = (app: ReturnType<typeof makeApp>, ip?: string) =>
-    call(app, "POST", "/v1/auth/register", {
-      ip,
-      body: { email: randomEmail(), password: PASSWORD, device: deviceBody("agent") },
-    });
-
-  it("allows 3 registrations per X-Real-IP per minute, then answers 429; another IP is unaffected", async () => {
-    const app = makeApp({ limiters: createRateLimiters({ rateLimitsEnabled: true }) });
-    for (let i = 0; i < 3; i++) expect((await register(app, "198.51.100.10")).status).toBe(201);
-    const refused = await register(app, "198.51.100.10");
-    expect(refused.status).toBe(429);
-    expect(await errorCode(refused)).toBe("rate_limited");
-    expect((await register(app, "198.51.100.11")).status).toBe(201);
-  });
-
-  it('turns every limit off when RATE_LIMITS_ENABLED is "false"', async () => {
-    const app = makeApp({ limiters: createRateLimiters({ rateLimitsEnabled: false }) });
-    for (let i = 0; i < 5; i++) expect((await register(app, "198.51.100.12")).status).toBe(201);
-  });
-
   it("logs neither the IP nor the email of a refused request", async () => {
     const app = makeApp({ limiters: createRateLimiters({ rateLimitsEnabled: true }) });
     const lines: string[] = [];
@@ -154,6 +53,15 @@ describe("production rate limits (createRateLimiters, keyed by X-Real-IP)", () =
 });
 
 describe("POST /v1/auth/login", () => {
+  it("refuses an account without a password, even with the dummy password, and adds no device to it", async () => {
+    const app = makeApp();
+    const email = randomEmail();
+    const userId = await seedUser(email, null);
+    const res = await call(app, "POST", "/v1/auth/login", { body: { email, password: "shellx-dummy-password", device: deviceBody("mobile") } });
+    expect([res.status, await errorCode(res)]).toEqual([401, "invalid_credentials"]);
+    expect(db().get("SELECT COUNT(*) AS n FROM devices WHERE user_id = ?", userId)).toEqual({ n: 0 });
+  });
+
   it("logs in with a differently-cased, padded email and creates a new device for a new key", async () => {
     const app = makeApp();
     const account = await registerAccount(app);
@@ -295,9 +203,7 @@ describe("database contention", () => {
       lines.push(args.map(String).join(" "));
     });
     const other = new Database(path); // e.g. the reset-password script in the same volume
-    const email = randomEmail();
-    const register = () =>
-      call(app, "POST", "/v1/auth/register", { body: { email, password: PASSWORD, device: deviceBody("agent") } });
+    const register = () => call(app, "POST", "/v1/auth/nonce", { body: {} });
     try {
       other.exec("BEGIN IMMEDIATE");
       const blocked = await register();
@@ -313,7 +219,6 @@ describe("database contention", () => {
     const output = lines.join("\n");
     expect(output).toContain('"event":"unhandled_error"');
     expect(output).toContain('"error":"SQLITE_BUSY"');
-    expect(output).not.toContain(email);
     expect(output).not.toContain("INSERT");
   });
 });

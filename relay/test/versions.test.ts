@@ -41,15 +41,8 @@ describe("GET /v1/version with admin overrides", () => {
 });
 
 describe("X-ShellX-Version is recorded on the device", () => {
-  it("at register and login, only once the request succeeded", async () => {
+  it("at login, only once the request succeeded", async () => {
     const app = makeApp();
-    const email = randomEmail();
-    const res = await call(app, "POST", "/v1/auth/register", {
-      body: { email, password: PASSWORD, device: deviceBody("agent") }, headers: { "X-ShellX-Version": "1.2.3" },
-    });
-    const agentId = (await res.json<{ device_id: string }>()).device_id;
-    expect(appVersionOf(agentId)).toBe("1.2.3");
-
     const account = await registerAccount(app);
     expect(appVersionOf(account.agent.deviceId)).toBeNull(); // no header: an older build
 
@@ -132,7 +125,7 @@ describe("migration 0004_admin", () => {
       expect(migrate(old, dir)).toHaveLength(3);
       old.run("INSERT INTO users VALUES ('u1', 'a@example.com', 'x', 1, 1)");
       old.run("INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES ('d1', 'u1', 'agent', 'n', 'macos', x'00', 1)");
-      expect(migrate(old)).toEqual(["0004_admin.sql", "0005_relay_v2.sql", "0006_shares.sql", "0007_link_slot.sql", "0008_phones.sql", "0009_apns_tokens.sql"]);
+      expect(migrate(old)).toEqual(["0004_admin.sql", "0005_relay_v2.sql", "0006_shares.sql", "0007_link_slot.sql", "0008_phones.sql", "0009_apns_tokens.sql", "0010_identities.sql"]);
       expect(old.get("SELECT id, app_version FROM devices")).toEqual({ id: "d1", app_version: null });
     } finally {
       old.close();

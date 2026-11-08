@@ -1,3 +1,5 @@
+import { APPLE_ISSUER, DEFAULT_APPLE_CLIENT_IDS, GOOGLE_ISSUERS } from "./auth/providers.js";
+
 /**
  * Relay configuration, read once from environment variables at startup (spec §4.2). Unknown
  * variables are ignored. A missing or malformed value throws `ConfigError` with a one-line message;
@@ -45,6 +47,14 @@ export interface Config {
   relayV2Url: string;
   /** The one origin whose pages may call POST /v2/shares/:id/ticket cross-origin (SHARE_ALLOWED_ORIGIN). */
   shareAllowedOrigin: string;
+  /** GOOGLE_CLIENT_IDS: allowed `aud` values of Google ID tokens (comma-separated); empty disables Google sign-in. */
+  googleClientIds: string[];
+  /** APPLE_CLIENT_IDS: allowed `aud` values (bundle ids) of Apple identity tokens. */
+  appleClientIds: string[];
+  /** PASSWORD_LOGIN: `on` (default) keeps password sign-in; `off` answers 410 password_sign_in_removed. */
+  passwordLogin: boolean;
+  /** TEST_IDP_ISSUER + TEST_IDP_JWKS_PATH: a test identity provider, for test relays only; null in production. */
+  testIdp: { issuer: string; jwksPath: string } | null;
 }
 
 export class ConfigError extends Error {
@@ -109,6 +119,25 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   const secretBytes = secretText === undefined || secretText === "" ? null : new Uint8Array(Buffer.from(secretText, "utf8"));
   const relayHmacSecret = secretBytes !== null && secretBytes.length >= RELAY_HMAC_SECRET_MIN_BYTES ? secretBytes : null;
   const relayV2DisabledReason = relayHmacSecret !== null ? null : secretBytes === null ? "missing_secret" : "short_secret";
+  const list = (name: string): string[] | undefined => {
+    const raw = value(name);
+    return raw === undefined ? undefined : raw.split(",").map((part) => part.trim()).filter((part) => part !== "");
+  };
+  const googleClientIds = list("GOOGLE_CLIENT_IDS") ?? [];
+  const appleClientIds = list("APPLE_CLIENT_IDS") ?? [...DEFAULT_APPLE_CLIENT_IDS];
+  if (appleClientIds.length === 0) throw new ConfigError("APPLE_CLIENT_IDS must list at least one bundle id");
+  const passwordLoginText = value("PASSWORD_LOGIN");
+  if (passwordLoginText !== undefined && passwordLoginText !== "on" && passwordLoginText !== "off") {
+    throw new ConfigError(`PASSWORD_LOGIN must be "on" or "off", got "${passwordLoginText}"`);
+  }
+  const testIssuer = value("TEST_IDP_ISSUER");
+  const testJwksPath = value("TEST_IDP_JWKS_PATH");
+  if ((testIssuer === undefined) !== (testJwksPath === undefined)) {
+    throw new ConfigError("TEST_IDP_ISSUER and TEST_IDP_JWKS_PATH must be set together");
+  }
+  if (testIssuer !== undefined && (GOOGLE_ISSUERS.includes(testIssuer) || testIssuer === APPLE_ISSUER)) {
+    throw new ConfigError("TEST_IDP_ISSUER must not be a Google or Apple issuer");
+  }
   return {
     host: value("HOST") ?? DEFAULT_HOST,
     port,
@@ -129,5 +158,9 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     relayIssuer,
     relayV2Url,
     shareAllowedOrigin: value("SHARE_ALLOWED_ORIGIN") ?? DEFAULT_SHARE_ALLOWED_ORIGIN,
+    googleClientIds,
+    appleClientIds,
+    passwordLogin: passwordLoginText !== "off",
+    testIdp: testIssuer !== undefined && testJwksPath !== undefined ? { issuer: testIssuer, jwksPath: testJwksPath } : null,
   };
 }

@@ -31,7 +31,40 @@ describe("loadConfig", () => {
       relayIssuer: "shellx-relay",
       relayV2Url: "wss://relay.shellx.pro/v2/relay",
       shareAllowedOrigin: "https://shellx.pro",
+      googleClientIds: [],
+      appleClientIds: ["com.shellx.prod", "com.shellx.dev"],
+      passwordLogin: true,
+      testIdp: null,
     });
+  });
+
+  it("reads the sign-in settings", () => {
+    const config = loadConfig({
+      ...REQUIRED, GOOGLE_CLIENT_IDS: " a.apps.googleusercontent.com, b.apps.googleusercontent.com ,, ",
+      APPLE_CLIENT_IDS: "com.shellx.dev", PASSWORD_LOGIN: "off",
+      TEST_IDP_ISSUER: "https://test-idp.shellx.invalid", TEST_IDP_JWKS_PATH: "/tmp/jwks.json",
+    });
+    expect(config).toMatchObject({
+      googleClientIds: ["a.apps.googleusercontent.com", "b.apps.googleusercontent.com"], appleClientIds: ["com.shellx.dev"],
+      passwordLogin: false, testIdp: { issuer: "https://test-idp.shellx.invalid", jwksPath: "/tmp/jwks.json" },
+    });
+    expect(loadConfig({ ...REQUIRED, PASSWORD_LOGIN: "on" }).passwordLogin).toBe(true);
+    expect(loadConfig({ ...REQUIRED, PASSWORD_LOGIN: " " }).passwordLogin).toBe(true);
+  });
+
+  it.each(["OFF", "false", "no", "1"])("refuses PASSWORD_LOGIN=%s", (flag) => {
+    expect(() => loadConfig({ ...REQUIRED, PASSWORD_LOGIN: flag })).toThrow(`PASSWORD_LOGIN must be "on" or "off", got "${flag}"`);
+  });
+
+  it("refuses an empty Apple list, half a test provider and a test issuer that is Google's or Apple's", () => {
+    expect(() => loadConfig({ ...REQUIRED, APPLE_CLIENT_IDS: " , " })).toThrow("APPLE_CLIENT_IDS must list at least one bundle id");
+    for (const half of [{ TEST_IDP_ISSUER: "https://t.invalid" }, { TEST_IDP_JWKS_PATH: "/k.json" }]) {
+      expect(() => loadConfig({ ...REQUIRED, ...half })).toThrow("TEST_IDP_ISSUER and TEST_IDP_JWKS_PATH must be set together");
+    }
+    for (const issuer of ["https://accounts.google.com", "accounts.google.com", "https://appleid.apple.com"]) {
+      expect(() => loadConfig({ ...REQUIRED, TEST_IDP_ISSUER: issuer, TEST_IDP_JWKS_PATH: "/k.json" }))
+        .toThrow("TEST_IDP_ISSUER must not be a Google or Apple issuer");
+    }
   });
 
   it("SHARE_ALLOWED_ORIGIN overrides the default; an empty or blank value falls back to https://shellx.pro", () => {

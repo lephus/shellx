@@ -70,10 +70,15 @@ describe("request body limit (16 KiB) on the JSON routes", () => {
     token: "none" | "agent";
   }
   const routes: [string, Route][] = [
-    ["POST /v1/auth/register", { method: "POST", path: () => "/v1/auth/register", token: "none" }],
     ["POST /v1/auth/login", { method: "POST", path: () => "/v1/auth/login", token: "none" }],
     ["POST /v1/auth/password", { method: "POST", path: () => "/v1/auth/password", token: "agent" }],
     ["DELETE /v1/account", { method: "DELETE", path: () => "/v1/account", token: "agent" }],
+    ["POST /v1/auth/nonce", { method: "POST", path: () => "/v1/auth/nonce", token: "none" }],
+    ["POST /v1/auth/google", { method: "POST", path: () => "/v1/auth/google", token: "none" }],
+    ["POST /v1/auth/google/link", { method: "POST", path: () => "/v1/auth/google/link", token: "agent" }],
+    ["POST /v1/auth/apple", { method: "POST", path: () => "/v1/auth/apple", token: "none" }],
+    ["POST /v1/auth/apple/link", { method: "POST", path: () => "/v1/auth/apple/link", token: "none" }],
+    ["POST /v1/auth/apple/link/status", { method: "POST", path: () => "/v1/auth/apple/link/status", token: "none" }],
     ["POST /v1/pairings", { method: "POST", path: () => "/v1/pairings", token: "agent" }],
   ];
 

@@ -25,7 +25,7 @@ describe("migration 0007", () => {
           id, `d${i}`, new Uint8Array([i]), `slot${i}`,
         );
       });
-      expect(migrate(db)).toEqual(["0007_link_slot.sql", "0008_phones.sql", "0009_apns_tokens.sql"]);
+      expect(migrate(db)).toEqual(["0007_link_slot.sql", "0008_phones.sql", "0009_apns_tokens.sql", "0010_identities.sql"]);
       const rows = db.all<{ link_slot: string }>("SELECT link_slot FROM machines");
       expect(rows).toHaveLength(50);
       for (const r of rows) expect(r.link_slot).toMatch(/^[A-Za-z0-9_-]{22}$/);

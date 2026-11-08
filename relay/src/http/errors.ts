@@ -45,6 +45,14 @@ export const Errors = {
   payloadTooLarge: () => new ApiError(413, "payload_too_large", "Request body is too large"),
   upgradeRequired: () => new ApiError(426, "upgrade_required", "Expected a WebSocket upgrade"),
   rateLimited: () => new ApiError(429, "rate_limited", "Too many requests, try again later"),
+  switchFromSignedInDevice: () => new ApiError(409, "switch_from_signed_in_device", "This email already has a ShellX account: switch it to Google from a device that is signed in"),
+  emailInUse: () => new ApiError(409, "email_in_use", "Another account already uses this email address"),
+  identityInUse: () => new ApiError(409, "identity_in_use", "This sign-in is already used by another account"),
+  lastGoogleIdentity: () => new ApiError(409, "last_google_identity", "The Google sign-in of an account cannot be removed"),
+  registrationClosed: () => new ApiError(410, "registration_closed", "Registration is closed: sign in with Google or Apple"),
+  passwordSignInRemoved: () => new ApiError(410, "password_sign_in_removed", "Password sign-in was removed: sign in with Google or Apple"),
+  reauthRequired: () => new ApiError(401, "reauth_required", "Sign in again with Google or Apple to confirm"),
+  identityNotFound: () => new ApiError(404, "identity_not_found", "Sign-in method not found"),
   pushUnavailable: () => new ApiError(503, "push_unavailable", "Push notifications are not configured on this relay"),
 } as const;
 

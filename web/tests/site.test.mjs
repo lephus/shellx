@@ -124,7 +124,7 @@ for (const page of legalPages) {
   });
 }
 
-for (const [path, inApp] of [['/privacy/', 'Settings → Delete account']]) {
+for (const [path, inApp] of [['/privacy/', 'Settings › Account › Delete Account…']]) {
   test(`privacy page ${path} documents account deletion and what is stored`, () => {
     const html = readPage(path);
     assert.match(html, /id="delete-account"/);

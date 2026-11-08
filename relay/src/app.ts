@@ -24,6 +24,11 @@ import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import { phoneGrantRoutes, phonePairingRoutes } from "./v2/phones.js";
 import type { ApnsGateway } from "./push/apns.js";
 import type { FcmDataGateway, PushGateway } from "./push/fcm.js";
+import type { AppleTokenGateway } from "./auth/apple-rest.js";
+import { type IdTokenVerifier, loadIdTokenVerifier } from "./auth/id-token.js";
+import { appleLinkRoutes } from "./routes/apple-link.js";
+import { identityRoutes } from "./routes/identities.js";
+import { signInRoutes } from "./routes/sign-in.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 import { readNativeLatest } from "./native-latest.js";
 import { versionAnswer } from "./settings.js";
@@ -42,6 +47,10 @@ export interface AppDeps {
   push?: PushGateway | null;
   /** APNs gateway for the native iPhone app (`POST /v2/notifications`); null or absent when not configured. */
   apns?: ApnsGateway | null;
+  /** Google / Apple / test ID-token verifier; defaults to `loadIdTokenVerifier(config)` (cached remote JWKS). */
+  idTokens?: IdTokenVerifier;
+  /** Apple REST (code exchange, revoke); null or absent when Sign in with Apple's key is not configured. */
+  appleTokens?: AppleTokenGateway | null;
   /**
    * FCM data messages to the Android app (`POST /v2/notifications`); in production the same `FcmClient`
    * as `push`. Null or absent when FCM is not configured; with `apns` also null, `/v2/notifications`
@@ -68,6 +77,8 @@ export interface AppVariables {
   fcm: FcmDataGateway | null;
   pairingCode: () => string;
   shareSlot: () => string;
+  idTokens: IdTokenVerifier;
+  appleTokens: AppleTokenGateway | null;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
 }
@@ -81,6 +92,7 @@ export type AppEnv = { Bindings: AppBindings; Variables: AppVariables };
 
 export function createApp(deps: AppDeps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
+  const idTokens = deps.idTokens ?? loadIdTokenVerifier(deps.config);
   const admin = createAdminApp({
     config: deps.config,
     db: deps.db,
@@ -104,6 +116,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("limiters", deps.limiters);
     c.set("passwords", deps.passwords ?? defaultPasswords);
     c.set("now", deps.now ?? Date.now);
+    c.set("idTokens", idTokens);
+    c.set("appleTokens", deps.appleTokens ?? null);
     c.set("push", deps.push ?? null);
     c.set("apns", deps.apns ?? null);
     c.set("fcm", deps.fcm ?? null);
@@ -126,7 +140,10 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   });
 
   app.route("/v1/auth", authRoutes);
+  app.route("/v1/auth", signInRoutes);
+  app.route("/v1/auth/apple/link", appleLinkRoutes);
   app.route("/v1/account", accountRoutes);
+  app.route("/v1/account/identities", identityRoutes);
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);
   app.route("/v1/notifications", notificationRoutes);

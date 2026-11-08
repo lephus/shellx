@@ -1,11 +1,12 @@
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app.js";
 import { requestIp } from "../auth/client-ip.js";
 import { parseDevice } from "../auth/device.js";
-import { checkEmail, normalizeEmail } from "../auth/email.js";
+import { normalizeEmail } from "../auth/email.js";
 import type { PasswordHasher } from "../auth/password.js";
 import { isAcceptablePassword, isOverlongPassword } from "../auth/password-policy.js";
-import { insertToken, insertTokenIfPasswordUnchanged, requireAuth } from "../auth/session.js";
+import { insertTokenIfPasswordUnchanged, requireAuth } from "../auth/session.js";
 import { generateToken, hashToken, parseBearer } from "../auth/tokens.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { Errors, readJsonObject } from "../http/errors.js";
@@ -28,45 +29,18 @@ function dummyHash(passwords: PasswordHasher): Promise<string> {
   return dummyPhc;
 }
 
-authRoutes.post("/register", jsonBodyLimit, async (c) => {
-  if (!(await c.get("limiters").registerIp.limit(requestIp(c)))) throw Errors.rateLimited();
-  const body = await readJsonObject(c.req.raw);
-  const email = checkEmail(body.email);
-  if (!email.ok) throw email.code === "invalid_email" ? Errors.invalidEmail() : Errors.disposableEmail();
-  if (!isAcceptablePassword(body.password)) throw Errors.weakPassword();
-  const device = parseDevice(body.device);
-  if (device === null) throw Errors.invalidDevice();
+/** PASSWORD_LOGIN=off (S1 §6.9): password sign-in and password change answer 410. */
+const passwordLoginOn: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!c.get("config").passwordLogin) throw Errors.passwordSignInRemoved();
+  await next();
+};
 
-  const db = c.get("db");
-  if (db.get("SELECT 1 FROM users WHERE email = ?", email.email) !== undefined) throw Errors.emailTaken();
-  const now = c.get("now")();
-  const userId = crypto.randomUUID();
-  const deviceId = crypto.randomUUID();
-  const passwordHash = await c.get("passwords").hash(body.password);
-  const token = generateToken();
-  const tokenHash = await hashToken(token);
-  try {
-    db.transaction(() => {
-      db.run(
-        "INSERT INTO users (id, email, password_hash, password_changed_at, created_at) VALUES (?, ?, ?, ?, ?)",
-        userId, email.email, passwordHash, now, now,
-      );
-      db.run(
-        "INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        deviceId, userId, device.kind, device.name, device.platform, device.publicKey, now,
-      );
-      insertToken(db, tokenHash, deviceId, now);
-    });
-  } catch (err) {
-    if (String(err).includes("UNIQUE constraint failed: users.email")) throw Errors.emailTaken();
-    throw err;
-  }
-  recordAppVersion(db, deviceId, c.req.header(CLIENT_VERSION_HEADER));
-  logMeta("register", { device_id: deviceId });
-  return c.json({ user_id: userId, device_id: deviceId, token }, 201);
+/** Registration is closed (S1 §7): accounts are created by signing in with Google or Apple. */
+authRoutes.post("/register", () => {
+  throw Errors.registrationClosed();
 });
 
-authRoutes.post("/login", jsonBodyLimit, async (c) => {
+authRoutes.post("/login", passwordLoginOn, jsonBodyLimit, async (c) => {
   const limiters = c.get("limiters");
   if (!(await limiters.loginIp.limit(requestIp(c)))) throw Errors.rateLimited();
   const body = await readJsonObject(c.req.raw);
@@ -82,14 +56,15 @@ authRoutes.post("/login", jsonBodyLimit, async (c) => {
   }
 
   const db = c.get("db");
-  const user = db.get<{ id: string; password_hash: string }>("SELECT id, password_hash FROM users WHERE email = ?", email);
+  const user = db.get<{ id: string; password_hash: string | null }>("SELECT id, password_hash FROM users WHERE email = ?", email);
   const passwords = c.get("passwords");
   const passwordOk = await passwords.verify(password, user?.password_hash ?? (await dummyHash(passwords)));
-  if (user === undefined || !passwordOk) {
+  if (user === undefined || user.password_hash === null || !passwordOk) {
     logMeta("login_failed");
     throw Errors.invalidCredentials();
   }
 
+  const verifiedHash = user.password_hash;
   const now = c.get("now")();
   // Same public key in the same account → same device_id (spec §5.2); name/platform refreshed.
   const deviceId = db.get<{ id: string }>(
@@ -106,8 +81,8 @@ authRoutes.post("/login", jsonBodyLimit, async (c) => {
   // (M1) must neither get a token minted under the old password nor sign this device out.
   const unchanged = "(SELECT password_hash FROM users WHERE id = ?) = ?";
   const inserted = db.transaction(() => {
-    db.run(`DELETE FROM tokens WHERE device_id = ? AND ${unchanged}`, deviceId, user.id, user.password_hash);
-    return insertTokenIfPasswordUnchanged(db, tokenHash, deviceId, now, user.id, user.password_hash);
+    db.run(`DELETE FROM tokens WHERE device_id = ? AND ${unchanged}`, deviceId, user.id, verifiedHash);
+    return insertTokenIfPasswordUnchanged(db, tokenHash, deviceId, now, user.id, verifiedHash);
   });
   if (inserted !== 1) {
     logMeta("login_failed", { device_id: deviceId });
@@ -170,7 +145,7 @@ authRoutes.post("/logout", requireAuth, async (c) => {
  * The sockets are closed by the hub from its own live list once the change has committed; a socket
  * that lands in the hub only after this runs is caught by the ws route's post-upgrade re-check.
  */
-authRoutes.post("/password", requireAuth, jsonBodyLimit, async (c) => {
+authRoutes.post("/password", passwordLoginOn, requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   if (auth.kind !== "agent") throw Errors.agentOnly();
   const body = await readJsonObject(c.req.raw);

@@ -1,7 +1,7 @@
-// Post-deploy smoke test for relay v2: log in as a throwaway desktop, register a machine, mint a
-// `register` ticket and let the real cmux-relay accept it. Prints only the two lines below; never a
-// token, ticket, slot or password.
-//   npm run relay2:smoke
+// Post-deploy smoke test for relay v2: with a minted smoke token (`npm run -s mint-smoke-token` inside the
+// relay container), register a machine, mint a `register` ticket and let the real cmux-relay accept it.
+// Prints only the two lines below; never a token, ticket or slot.
+//   SHELLX_SMOKE_TOKEN="$(ssh <deploy-user>@<vps> 'cd ~/phu/shellx && docker compose exec -T relay npm run -s mint-smoke-token')" npm run relay2:smoke
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { WebSocket } from "ws";
@@ -13,8 +13,8 @@ export type SmokeResult =
 
 export interface SmokeOptions {
   base: string;
-  email: string;
-  password: string;
+  /** A session token from `mint-smoke-token`; the smoke logs it out when it is done. */
+  token: string;
   fetch?: typeof fetch;
   WebSocket?: typeof WebSocket;
   /** How long the relay may take to answer `register` (ms). */
@@ -90,7 +90,7 @@ function registerOnRelay(Ws: typeof WebSocket, url: string, slot: string, ticket
   });
 }
 
-/** https anywhere, plain http only to this machine (local runs): the password must never cross the network in clear. */
+/** https anywhere, plain http only to this machine (local runs): the token must never cross the network in clear. */
 export function isSecureBase(base: string): boolean {
   let url: URL;
   try {
@@ -107,15 +107,9 @@ export async function runRelay2Smoke(options: SmokeOptions): Promise<SmokeResult
   const Ws = options.WebSocket ?? WebSocket;
   const base = options.base;
   if (!isSecureBase(base)) return { ok: false, step: "base", code: "insecure URL" };
-  let token: string | undefined;
+  const token = options.token;
   let machineId: string | undefined;
   try {
-    const login = await api(f, base, "login", "POST", "/v1/auth/login", undefined, {
-      email: options.email,
-      password: options.password,
-      device: { kind: "desktop", name: "relay2-smoke", platform: "macos", public_key: randomBytes(32).toString("base64url") },
-    });
-    token = str(login.token, "login");
     const machine = await api(f, base, "machine", "POST", "/v2/machines", token, {
       name: "relay2-smoke", platform: "macos", os_version: "1.0", app_version: "1.0.0",
       noise_public_key_b64: randomBytes(32).toString("base64url"),
@@ -133,10 +127,9 @@ export async function runRelay2Smoke(options: SmokeOptions): Promise<SmokeResult
     }
     return { ok: false, step: "unexpected" };
   } finally {
-    if (token !== undefined) {
-      if (machineId !== undefined) await api(f, base, "cleanup", "DELETE", `/v2/machines/${machineId}`, token).catch(() => undefined);
-      await api(f, base, "cleanup", "POST", "/v1/auth/logout", token).catch(() => undefined);
-    }
+    // Each minted token is single use: the machine goes and so does the session.
+    if (machineId !== undefined) await api(f, base, "cleanup", "DELETE", `/v2/machines/${machineId}`, token).catch(() => undefined);
+    await api(f, base, "cleanup", "POST", "/v1/auth/logout", token).catch(() => undefined);
   }
 }
 
@@ -148,22 +141,21 @@ export function formatResult(result: SmokeResult): string {
 
 async function main(): Promise<number> {
   const prompter = createTtyPrompter();
-  let base: string, email: string, password: string;
+  let base: string, token: string;
   try {
     base = (await prompter.ask("API base [https://relay.shellx.pro]: ")).trim() || "https://relay.shellx.pro";
     if (!isSecureBase(base)) {
       console.log(formatResult({ ok: false, step: "base", code: "insecure URL" }));
       return 1;
     }
-    email = (await prompter.ask("E-mail: ")).trim();
-    password = await prompter.ask("Password: ", { hidden: true });
+    token = process.env.SHELLX_SMOKE_TOKEN?.trim() || (await prompter.ask("Smoke token: ", { hidden: true })).trim();
   } catch {
     console.log("relay2 smoke: FAIL at prompt");
     return 1;
   } finally {
     prompter.close();
   }
-  const result = await runRelay2Smoke({ base, email, password });
+  const result = await runRelay2Smoke({ base, token });
   console.log(formatResult(result));
   return result.ok ? 0 : 1;
 }
