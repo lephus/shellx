@@ -1,4 +1,6 @@
 import type { Db } from "../db/db.js";
+import { Errors } from "../http/errors.js";
+import { upsertDevice, insertIdentity } from "./identity.js";
 import { generateToken, hashToken } from "./tokens.js";
 
 /** The link token of an Apple sign-in that matched no account lives 10 minutes (S1 §6.4). */
@@ -58,4 +60,32 @@ export async function findLiveAppleLink(db: Db, linkToken: unknown, nowMs: numbe
 /** Deletes links created more than a day ago (their pairing requests go with them). */
 export function purgeAppleLinks(db: Db, nowMs: number): void {
   db.run("DELETE FROM apple_links WHERE created_at < ?", nowMs - APPLE_LINK_RETENTION_MS);
+}
+
+/**
+ * Runs inside the approve transaction of a phone pairing made with a link token: creates (or finds) the
+ * iPhone's device in the Mac's account, attaches the Apple ID to that account and points the pairing at
+ * the device. Returns the device id. The session token is minted later, by the status call.
+ */
+export function approveAppleLinkPairing(db: Db, pairing: { id: string; user_id: string; apple_link_id: string }, nowMs: number): string {
+  const link = db.get<AppleLinkRow>("SELECT * FROM apple_links WHERE id = ?", pairing.apple_link_id);
+  if (link === undefined || link.expires_at <= nowMs || link.redeemed_at !== null) throw Errors.pairingExpired();
+  const existing = db.get<{ id: string; user_id: string }>("SELECT id, user_id FROM identities WHERE provider = 'apple' AND subject = ?", link.subject);
+  if (existing !== undefined && existing.user_id !== pairing.user_id) throw Errors.identityInUse();
+  const deviceId = upsertDevice(db, pairing.user_id, { kind: "mobile", name: link.device_name, platform: "ios", publicKey: link.device_public_key }, nowMs);
+  if (existing === undefined) {
+    insertIdentity(db, pairing.user_id, {
+      provider: "apple", subject: link.subject, email: link.email, isPrivateEmail: link.is_private_email === 1,
+      appleRefreshToken: link.apple_refresh_token,
+      appleClientId: link.apple_refresh_token === null ? null : link.apple_client_id,
+      linkedViaDeviceId: deviceId,
+    }, nowMs);
+  } else {
+    db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", nowMs, existing.id);
+    if (link.apple_refresh_token !== null) {
+      db.run("UPDATE identities SET apple_refresh_token = ?, apple_client_id = ? WHERE id = ?", link.apple_refresh_token, link.apple_client_id, existing.id);
+    }
+  }
+  db.run("UPDATE phone_pairings SET device_id = ? WHERE id = ?", deviceId, pairing.id);
+  return deviceId;
 }

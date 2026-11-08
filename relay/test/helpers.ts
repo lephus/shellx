@@ -391,6 +391,39 @@ export async function signInApple(app: TestApp, options: AppleSignInOptions = {}
   return call(app, "POST", "/v1/auth/apple", { ip: options.ip, body });
 }
 
+export interface LinkedApple {
+  sub: string;
+  email: string;
+  pairingId: string;
+  session: Session;
+}
+
+/**
+ * An iPhone signs in with a hidden-email Apple ID (202 link_required), asks `machineId` through its link
+ * token, the Mac (`desktopToken`) approves, and the iPhone reads the session (`approved`).
+ */
+export async function linkAppleIdByQr(
+  app: TestApp, desktopToken: string, machineId: string, options: AppleSignInOptions = {},
+): Promise<LinkedApple> {
+  const sub = options.sub ?? `a-${crypto.randomUUID()}`;
+  const email = options.email ?? randomEmail();
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const first = await signInApple(app, { ...options, sub, email, publicKey });
+  if (first.status !== 202) throw new Error(`apple sign-in did not ask for a link: ${first.status} ${await first.text()}`);
+  const { link_token } = await first.json<{ link_token: string }>();
+  const b64 = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64");
+  const asked = await call(app, "POST", "/v1/auth/apple/link", { body: { link_token, machine_id: machineId, client_key_b64: b64(), proof_b64: b64() } });
+  if (asked.status !== 201) throw new Error(`apple link request failed: ${asked.status} ${await asked.text()}`);
+  const { pairing_id } = await asked.json<{ pairing_id: string }>();
+  const approved = await call(app, "POST", `/v2/phone-pairings/${pairing_id}/approve`, { token: desktopToken });
+  if (approved.status !== 204) throw new Error(`apple link approve failed: ${approved.status} ${await approved.text()}`);
+  const status = await call(app, "POST", "/v1/auth/apple/link/status", { body: { link_token, pairing_id } });
+  const body = await status.json<{ status: string; session?: { user_id: string; device_id: string; token: string } }>();
+  if (status.status !== 200 || body.status !== "approved" || body.session === undefined) throw new Error(`apple link status: ${status.status} ${JSON.stringify(body)}`);
+  const { user_id, device_id, token } = body.session;
+  return { sub, email, pairingId: pairing_id, session: { userId: user_id, deviceId: device_id, token, publicKey } };
+}
+
 /** Logs in an additional device (new key unless `publicKey` is given). */
 export async function loginDevice(app: TestApp, account: Account, kind: Kind, publicKey = randomPublicKey()): Promise<Session> {
   const res = await call(app, "POST", "/v1/auth/login", {
