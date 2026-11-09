@@ -44,17 +44,30 @@ import com.shellx.core.platform.CoreLog
 @Composable
 fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     val typography = MaterialTheme.typography
-    val code = SpanStyle(fontFamily = FontFamily.Monospace)
-    val links = TextLinkStyles(SpanStyle(color = ShellXTheme.colors.accentText))
+    val accent = ShellXTheme.colors.accentText
     val uriHandler = LocalUriHandler.current
-    val open = remember(uriHandler) { { url: String -> PlanMarkdownText.open(url, uriHandler) } }
-    fun inline(text: String) = PlanMarkdownText.inline(text, code, links, open)
+    // Parsed once per text: a redraw never parses the plan again (review A M-7).
+    val parsed = remember(markdown, accent, uriHandler) {
+        val code = SpanStyle(fontFamily = FontFamily.Monospace)
+        val links = TextLinkStyles(SpanStyle(color = accent))
+        val open = { url: String -> PlanMarkdownText.open(url, uriHandler) }
+        PlanMarkdownText.blocks(markdown).map { block ->
+            val text = when (block) {
+                is PlanMarkdownText.Block.Heading -> block.text
+                is PlanMarkdownText.Block.Bullet -> block.text
+                is PlanMarkdownText.Block.Numbered -> block.text
+                is PlanMarkdownText.Block.Paragraph -> block.text
+                is PlanMarkdownText.Block.Code, PlanMarkdownText.Block.Rule -> null
+            }
+            block to (text?.let { PlanMarkdownText.inline(it, code, links, open) } ?: AnnotatedString(""))
+        }
+    }
     SelectionContainer(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (block in PlanMarkdownText.blocks(markdown)) {
+            for ((block, inline) in parsed) {
                 when (block) {
                     is PlanMarkdownText.Block.Heading -> Text(
-                        inline(block.text),
+                        inline,
                         modifier = Modifier.padding(top = 4.dp).semantics { heading() },
                         color = color,
                         style = when (block.level) {
@@ -63,8 +76,8 @@ fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Col
                             else -> typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                         },
                     )
-                    is PlanMarkdownText.Block.Bullet -> ListRow("•", inline(block.text), block.level, color)
-                    is PlanMarkdownText.Block.Numbered -> ListRow(block.number + ".", inline(block.text), block.level, color)
+                    is PlanMarkdownText.Block.Bullet -> ListRow("•", inline, block.level, color)
+                    is PlanMarkdownText.Block.Numbered -> ListRow(block.number + ".", inline, block.level, color)
                     is PlanMarkdownText.Block.Code -> Text(
                         block.code,
                         modifier = Modifier
@@ -75,7 +88,7 @@ fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Col
                         style = typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     )
                     PlanMarkdownText.Block.Rule -> HorizontalDivider()
-                    is PlanMarkdownText.Block.Paragraph -> Text(inline(block.text), color = color)
+                    is PlanMarkdownText.Block.Paragraph -> Text(inline, color = color)
                 }
             }
         }
