@@ -48,6 +48,20 @@ class PushNotifierTest {
         }
     }
 
+    /** Review C m-2: the app came to the front while the paired Macs were read, so its clearAll ran first; the alert
+     *  must not post after it and stay while the app is in front. */
+    @Test
+    fun theAppComingToTheFrontDuringTheMacCheckPostsNothing() {
+        runTest {
+            val notifier = PushNotifier(app, { foreground }, {
+                foreground = true
+                setOf("m1")
+            })
+            notifier.handle(needsYou("m1", "r1"))
+            assertTrue(shown.isEmpty())
+        }
+    }
+
     @Test
     fun aMacThisPhoneDoesNotHaveIsIgnored() {
         runTest {

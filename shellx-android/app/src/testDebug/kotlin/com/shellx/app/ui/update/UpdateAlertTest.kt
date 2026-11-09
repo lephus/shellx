@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -78,6 +79,20 @@ class UpdateAlertTest {
         rule.onNodeWithText(res.getString(R.string.update_restart)).performClick()
         rule.waitForIdle()
         assertEquals(1, restarts)
+    }
+
+    /** Review C m-5: the Snackbar covers the bottom of every page (the composer's Send), so it can be dismissed;
+     *  dismissing never restarts. */
+    @Test
+    fun aDownloadedUpdateCanBeDismissedWithoutRestarting() {
+        val installs = MutableStateFlow(PlayUpdateChecker.InstallPhase.DOWNLOADED)
+        var restarts = 0
+        rule.setContent { ShellXTheme { UpdateAlert(null, installs, restart = { restarts++ }) } }
+        rule.onNodeWithText(res.getString(R.string.update_downloaded)).assertIsDisplayed()
+        rule.onNodeWithContentDescription(res.getString(androidx.compose.material3.R.string.m3c_snackbar_dismiss)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(res.getString(R.string.update_downloaded)).assertCountEquals(0)
+        assertEquals(0, restarts)
     }
 
     @Test

@@ -8,6 +8,7 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -125,6 +126,45 @@ class PermissionRequesterTest {
             runCurrent()
             owner.resume()
             assertEquals(listOf<Any?>(Manifest.permission.RECORD_AUDIO), registry.launches.map { it.input })
+            registry.answerLast(true)
+            assertTrue(microphone.await())
+            assertEquals(1, registry.launches.size)
+        }
+    }
+
+    /** Review C m-3: a prompt that fails to start runs no onLaunch (the one notification ask stays unspent) and is
+     *  answered with what the phone says. */
+    @Test
+    fun aPromptThatFailsToStartRunsNoOnLaunch() {
+        runTest {
+            registry.failure = IllegalStateException("no activity")
+            val requester = attached()
+            var launched = 0
+            val answer = async { requester.request(Manifest.permission.RECORD_AUDIO) { launched++ } }
+            runCurrent()
+            assertFalse(answer.await())
+            assertEquals(0, launched)
+        }
+    }
+
+    /** Review C m-3: a caller cancelled on another thread is let go on the main thread, and its prompt still never
+     *  shows, even when the activity resumes before the main thread got to it. */
+    @Test
+    fun aCallerCancelledOffTheMainThreadNeverGetsItsPrompt() {
+        runTest {
+            val requester = PermissionRequester(context).also { it.attach(registry, owner) }
+            owner.start()
+            val notifications = async { requester.request(Manifest.permission.POST_NOTIFICATIONS) }
+            val microphone = async { requester.request(Manifest.permission.RECORD_AUDIO) }
+            runCurrent()
+            Thread { notifications.cancel() }.apply {
+                start()
+                join()
+            }
+            owner.resume()
+            assertEquals(listOf<Any?>(Manifest.permission.RECORD_AUDIO), registry.launches.map { it.input })
+
+            shadowOf(Looper.getMainLooper()).idle()
             registry.answerLast(true)
             assertTrue(microphone.await())
             assertEquals(1, registry.launches.size)
