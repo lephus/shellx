@@ -1,5 +1,6 @@
 package com.shellx.app.platform
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
@@ -123,6 +124,9 @@ class KeystoreSecretStore(
         return plain
     }
 
+    // NewApi: keystoreFailure runs only when sdkInt >= 33, and sdkInt is Build.VERSION.SDK_INT outside tests (they pass
+    // a lower level only), so the guard holds; lint cannot see through the injected value.
+    @SuppressLint("NewApi")
     private fun classify(error: Exception): Failure {
         val chain = generateSequence<Throwable>(error) { it.cause }.take(8).toList()
         if (error is AEADBadTagException || chain.any { it is KeyPermanentlyInvalidatedException }) return Failure.LOST

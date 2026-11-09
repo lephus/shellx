@@ -1,8 +1,12 @@
 package com.shellx.app.ui.nav
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -186,6 +190,7 @@ private fun agentTitle(session: com.shellx.link.core.AgentSession?, ref: Session
 @Composable
 fun RootSync(nav: NavHostController, root: String) {
     // The whole stack, not the current entry: popping the last entry empties the stack without a new current entry.
+    @SuppressLint("RestrictedApi") // No public API gives the whole stack or its emptying; RootSyncTest guards upgrades.
     val stack by nav.currentBackStack.collectAsState()
     LaunchedEffect(root, stack) {
         val bottom = bottomRoute(nav)
@@ -201,6 +206,7 @@ fun RootSync(nav: NavHostController, root: String) {
 }
 
 /** The route of the stack's bottom destination (the root), or null when the stack is empty. */
+@SuppressLint("RestrictedApi") // No public API gives the stack's bottom entry; RootSyncTest guards Navigation upgrades.
 internal fun bottomRoute(nav: NavHostController): String? =
     nav.currentBackStack.value.firstOrNull { it.destination !is NavGraph }?.destination?.route
 
@@ -232,7 +238,7 @@ internal fun WorkPlaceholder(title: String, back: () -> Unit) {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
             )
         },
-    ) {}
+    ) { padding -> Box(Modifier.padding(padding).fillMaxSize()) }
 }
 
 /**
