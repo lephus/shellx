@@ -1,6 +1,7 @@
 package com.shellx.link.core
 
 import java.util.Base64
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
@@ -11,7 +12,7 @@ import kotlinx.serialization.json.long
 
 /** Builds the message a `messages.json` entry describes, by hand and key by key. It never calls [LinkCodec]. */
 object VectorMessages {
-    /** The 40 sendable cases of the plan's table: every case except `unknown`. */
+    /** The 49 sendable cases of the plans' tables (3B's 40 and 3G's nine call messages): every case except `unknown`. */
     val SENDABLE_CASES: Set<String> = setOf(
         "hello", "welcome", "error", "snapshot_get", "snapshot", "changed", "reply", "reply_result", "ping", "pong",
         "sessions_get", "sessions", "sessions_changed", "chat_history_get", "chat_history", "chat_entries",
@@ -20,6 +21,8 @@ object VectorMessages {
         "workspaces_get", "workspaces", "workspaces_changed", "workspace_create", "workspace_create_result",
         "workspace_rename", "workspace_rename_result", "workspace_close", "workspace_close_result",
         "agent_close", "agent_close_result", "terminal_close", "terminal_close_result",
+        "terminal_view_open", "terminal_view_open_result", "terminal_view_input", "terminal_view_resize",
+        "terminal_view_resync", "terminal_view_close", "terminal_view_ended", "terminal_create", "terminal_create_result",
     )
 
     private fun JsonObject.s(key: String): String = getValue(key).jsonPrimitive.content
@@ -70,6 +73,20 @@ object VectorMessages {
         "question" -> LinkDecision.Question(o.strings("selections"))
         "exit_plan" -> LinkDecision.ExitPlan(ExitPlanMode(o.s("mode")), o.os("feedback"))
         else -> LinkDecision.Other(kind)
+    }
+
+    /** As 2A's `terminalUnits`: an unknown `k` keeps only its kind. */
+    private fun terminalUnits(e: JsonElement?): List<TerminalInputUnit> = e!!.jsonArray.map { it.jsonObject }.map { u ->
+        when (val k = u.s("k")) {
+            "text" -> TerminalInputUnit.Text(u.s("text"))
+            "key" -> TerminalInputUnit.Key(
+                TerminalKey(u.s("key")),
+                u["mods"]?.jsonArray?.map { TerminalModifier(it.jsonPrimitive.content) } ?: emptyList(),
+            )
+            "paste" -> TerminalInputUnit.Paste(u.s("text"))
+            "scroll" -> TerminalInputUnit.Scroll(u.i("lines"))
+            else -> TerminalInputUnit.Other(k)
+        }
     }
 
     fun fromVector(m: JsonObject): LinkMessage = when (val case = m.s("case")) {
@@ -125,6 +142,16 @@ object VectorMessages {
         "agent_close_result" -> LinkMessage.AgentCloseResult(m.s("call_id"), WorkspaceControlOutcome(m.s("outcome")))
         "terminal_close" -> LinkMessage.TerminalClose(m.s("call_id"), m.s("workspace_id"), m.s("terminal_id"))
         "terminal_close_result" -> LinkMessage.TerminalCloseResult(m.s("call_id"), WorkspaceControlOutcome(m.s("outcome")))
+        "terminal_view_open" -> LinkMessage.TerminalViewOpen(m.s("call_id"), m.s("terminal_id"), m.i("cols"), m.i("rows"))
+        "terminal_view_open_result" -> LinkMessage.TerminalViewOpenResult(m.s("call_id"), TerminalViewOpenOutcome(m.s("outcome")))
+        "terminal_view_input" -> LinkMessage.TerminalViewInput(m.s("terminal_id"), terminalUnits(m["units"]))
+        "terminal_view_resize" -> LinkMessage.TerminalViewResize(m.s("terminal_id"), m.i("cols"), m.i("rows"))
+        "terminal_view_resync" -> LinkMessage.TerminalViewResync(m.s("terminal_id"))
+        "terminal_view_close" -> LinkMessage.TerminalViewClose(m.s("terminal_id"))
+        "terminal_view_ended" -> LinkMessage.TerminalViewEnded(m.s("terminal_id"), TerminalViewEndReason(m.s("reason")))
+        "terminal_create" -> LinkMessage.TerminalCreate(m.s("call_id"), m.s("workspace_id"))
+        "terminal_create_result" ->
+            LinkMessage.TerminalCreateResult(m.s("call_id"), WorkspaceControlOutcome(m.s("outcome")), m.os("terminal_id"))
         "unknown" -> LinkMessage.Unknown(m.s("type"), m.os("call_id"))
         else -> error("no vector builder for case $case")
     }
