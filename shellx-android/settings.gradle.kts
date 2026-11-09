@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "shellx-android"
 includeBuild("../shellx-link/kotlin")
-include(":core")
+include(":core", ":app")

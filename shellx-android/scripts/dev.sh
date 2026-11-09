@@ -90,8 +90,8 @@ run_checks() {
 cmd_test() {
   local which="${1:-all}"
   case "$which" in
-    link|core|all) ;;
-    app|screenshots) die "test $which comes with a later task" 2 ;;
+    link|core|app|all) ;;
+    screenshots) die "test $which comes with a later task" 2 ;;
     *) die "unknown test target: $which (link, core, app, screenshots or all)" 2 ;;
   esac
   check_java
@@ -100,10 +100,13 @@ cmd_test() {
   case "$which" in
     link) gradle_link test || status=$? ;;
     core) gradle_android :core:test || status=$? ;;
+    app) gradle_android --continue :app:testDebugUnitTest :app:testReleaseUnitTest || status=$? ;;
     all)
       python3 -m unittest discover -s "$ANDROID_DIR/scripts/tests" -t "$ANDROID_DIR/scripts/tests" || status=$?
       [ "$status" -ne 0 ] || gradle_link test || status=$?
       [ "$status" -ne 0 ] || gradle_android :core:test || status=$?
+      [ "$status" -ne 0 ] || gradle_android --continue :app:testDebugUnitTest :app:testReleaseUnitTest || status=$?
+      [ "$status" -ne 0 ] || (cmd_build_release) || status=$?
       ;;
   esac
   if [ "$status" -eq 0 ]; then
@@ -114,10 +117,14 @@ cmd_test() {
   return "$status"
 }
 
+cmd_build_release() {
+  die "build-release comes with a later task" 2
+}
+
 cmd_lock() {
   check_java
   gradle_link :link-core:dependencies :link-account:dependencies --write-locks -q >/dev/null
-  gradle_android :core:dependencies --write-locks -q >/dev/null
+  gradle_android :core:dependencies :app:dependencies --write-locks -q >/dev/null
 }
 
 [ $# -gt 0 ] || usage 2
