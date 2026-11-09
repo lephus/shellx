@@ -5,20 +5,24 @@
 //! The sidebar (machines), Settings -> Account and the sign-in dialog
 //! observe it.
 //!
-//! The password goes from the sign-in dialog straight into
-//! `AccountEvent::LoginSubmitted` -> `CallLogin` -> the worker, and is
-//! dropped after the call. The account token stays inside shellx-core.
+//! Sign-in is Google only: the dialog calls `google_sign_in`; `OpenBrowser` opens the system
+//! browser and `CallGoogleFinish` (which blocks until the browser answers) runs on its own
+//! background task, never on the serial worker, so a cancel can still be sent. The account
+//! token stays inside shellx-core.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui::{Context, prelude::*};
 use shellx_model::account::{AccountAction, AccountEvent, AccountFlow, AccountState};
-use shellx_model::core_api::{CoreCall, CoreErr};
+use shellx_model::core_api::{CoreCall, CoreErr, GooglePurpose, SignInMethod};
 use shellx_model::sidebar::MachineInfo;
 use shellx_model::update::{CHECK_INTERVAL_SECS, UpdateStatus};
 
-use crate::core_service::{MachineFacts, run_account_action, run_version_check};
+use super::update_banner::open_https;
+use crate::core_service::{
+    GOOGLE_SWITCH_MARKER, MachineFacts, run_account_action, run_version_check, take_once,
+};
 use crate::os_info;
 
 /// What the one worker runs. `version.check` shares the worker with the
@@ -36,11 +40,12 @@ enum Done {
 pub struct AccountService {
     flow: AccountFlow,
     jobs: async_channel::Sender<Job>,
+    /// For `CallGoogleFinish`, which runs on its own task.
+    core: Arc<dyn CoreCall>,
+    facts: MachineFacts,
+    done_tx: async_channel::Sender<Done>,
     started: Instant,
     utc_offset_secs: i32,
-    /// Email typed at sign-in (kept for the settings panel, never the
-    /// password). Unknown after a restart.
-    email: Option<String>,
     update: UpdateStatus,
     checking: bool,
     /// A check has finished since the app started.
@@ -51,6 +56,7 @@ impl AccountService {
     pub fn new(core: Arc<dyn CoreCall>, facts: MachineFacts, cx: &mut Context<Self>) -> Self {
         let (jobs, job_rx) = async_channel::unbounded::<Job>();
         let (result_tx, results) = async_channel::unbounded::<Done>();
+        let (finish_core, finish_facts, done_tx) = (core.clone(), facts.clone(), result_tx.clone());
         // Blocking core calls (ureq) run here, never on the UI thread.
         cx.background_spawn(async move {
             while let Ok(job) = job_rx.recv().await {
@@ -96,9 +102,11 @@ impl AccountService {
         let mut svc = AccountService {
             flow: AccountFlow::new(),
             jobs,
+            core: finish_core,
+            facts: finish_facts,
+            done_tx,
             started: Instant::now(),
             utc_offset_secs: os_info::utc_offset_secs(),
-            email: None,
             update: UpdateStatus::Unknown,
             checking: false,
             checked: false,
@@ -119,10 +127,6 @@ impl AccountService {
         self.flow.machines()
     }
 
-    pub fn login_in_flight(&self) -> bool {
-        self.flow.login_in_flight()
-    }
-
     /// A submit now would start a login (not while one runs or this machine
     /// is being registered).
     pub fn accepts_login(&self) -> bool {
@@ -134,15 +138,37 @@ impl AccountService {
         self.flow.notice()
     }
 
+    /// The notice is a failed sign-in-methods list or removal.
+    pub fn notice_is_methods(&self) -> bool {
+        self.flow.notice_is_methods()
+    }
+
     /// Local UTC offset for "lần cuối HH:MM", refreshed with every list.
     pub fn utc_offset_secs(&self) -> i32 {
         self.utc_offset_secs
     }
 
-    /// Sign-in dialog submit. The password is moved into the event.
-    pub fn login(&mut self, email: String, password: String, cx: &mut Context<Self>) {
-        self.email = Some(email.clone());
-        self.apply(AccountEvent::LoginSubmitted { email, password }, cx);
+    /// A Google flow the dialog started and has not seen end, if any.
+    pub fn google_in_flight(&self) -> Option<GooglePurpose> {
+        self.flow.google_in_flight()
+    }
+
+    /// "Continue with Google" (`SignIn`) or the switch from a password session (`Link`).
+    pub fn google_sign_in(&mut self, purpose: GooglePurpose, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::GoogleRequested(purpose), cx);
+    }
+
+    /// Cancel / Esc while a Google flow waits for the browser.
+    pub fn cancel_google(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::GoogleCancelRequested, cx);
+    }
+
+    pub fn refresh_sign_in_methods(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::SignInMethodsRequested, cx);
+    }
+
+    pub fn remove_sign_in_method(&mut self, identity_id: String, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::RemoveSignInMethodRequested(identity_id), cx);
     }
 
     /// Sign out (the settings panel's button).
@@ -150,12 +176,41 @@ impl AccountService {
         self.apply(AccountEvent::LogoutRequested, cx);
     }
 
-    /// The email typed at sign-in, while signed in.
+    /// The account email (Google sign-in or `auth.session`), while signed in.
     pub fn email(&self) -> Option<&str> {
         match self.flow.state() {
-            AccountState::LoggedIn { .. } => self.email.as_deref(),
+            AccountState::LoggedIn { .. } => self.flow.email(),
             _ => None,
         }
+    }
+
+    pub fn auth_method(&self) -> Option<&str> {
+        self.flow.auth_method()
+    }
+
+    /// Signed in with a password: Settings offers the switch to Google.
+    pub fn needs_google_switch(&self) -> bool {
+        self.flow.needs_google_switch()
+    }
+
+    pub fn sign_in_methods(&self) -> Option<&[SignInMethod]> {
+        self.flow.sign_in_methods()
+    }
+
+    pub fn removing_sign_in_method(&self) -> Option<&str> {
+        self.flow.removing_sign_in_method()
+    }
+
+    /// True once after the server ended the session (the window shows sign-in).
+    pub fn take_signed_out_by_server(&mut self) -> bool {
+        self.flow.take_signed_out_by_server()
+    }
+
+    /// Once ever (a marker file in the native data dir): a password account is offered the switch to Google.
+    pub fn take_google_switch_offer(&mut self) -> bool {
+        self.flow.needs_google_switch()
+            && crate::paths::native_dir()
+                .is_ok_and(|dir| take_once(&dir.join(GOOGLE_SWITCH_MARKER)))
     }
 
     pub fn update_status(&self) -> &UpdateStatus {
@@ -205,6 +260,18 @@ impl AccountService {
         for action in self.flow.on(event, now) {
             match action {
                 AccountAction::ScheduleTick { at_ms } => self.schedule_tick(at_ms, cx),
+                AccountAction::OpenBrowser(url) => open_https(cx, &url),
+                // Blocks for minutes: its own task, so a cancel can run on the worker meanwhile.
+                finish @ AccountAction::CallGoogleFinish(_) => {
+                    let (core, facts, tx) =
+                        (self.core.clone(), self.facts.clone(), self.done_tx.clone());
+                    cx.background_spawn(async move {
+                        if let Some(event) = run_account_action(core.as_ref(), &facts, finish) {
+                            let _ = tx.send(Done::Account(event)).await;
+                        }
+                    })
+                    .detach();
+                }
                 // Unbounded: never full; closed only if the worker is gone.
                 call => {
                     let _ = self.jobs.try_send(Job::Account(call));

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import re
 import shlex
@@ -24,6 +25,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "shellx" / "remote-e2e"))
@@ -629,6 +631,30 @@ class AnnotateLog(unittest.TestCase):
         self.assertEqual(lines[1], "::error title=e2e log (part 1/2)::FAIL: test_x (m.C.test_x)")
         self.assertEqual(lines[2], "::error title=e2e log (part 2/2)::Ran 1 test")
         self.assertEqual(lines[3], "::error title=e2e log::cannot read the e2e log: FileNotFoundError")
+
+
+class GoogleLogin(unittest.TestCase):
+    def test_login_signs_in_through_the_fake_google_without_a_password(self):
+        h = harness.Harness("/nonexistent/bin", "/nonexistent/core")
+        try:
+            machine, seen = h.machine("host1"), {}
+
+            def run(argv, env=None, **_kwargs):
+                seen["argv"], seen["env"] = argv, env
+                return subprocess.CompletedProcess(argv, 0, '{"ok":{"auth_method":"google"}}\n', "")
+
+            with mock.patch.object(harness.subprocess, "run", run):
+                result = machine.login()
+            self.assertEqual(seen["argv"][1:], ["auth.google.e2e", json.dumps({"purpose": "sign_in"})])
+            config = json.loads(seen["env"]["SHELLX_CORE_CONFIG"])
+            self.assertEqual(config["google_auth_url"], f"{h.api_base}/fake-google/auth")
+            self.assertEqual(config["google_token_url"], f"{h.api_base}/fake-google/token")
+            self.assertEqual(config["google_client_id"], harness.FAKE_GOOGLE_CLIENT_ID)
+            self.assertEqual(config["google_client_secret"], harness.FAKE_GOOGLE_CLIENT_SECRET)
+            self.assertNotIn(h.password, " ".join(seen["argv"]))
+            self.assertEqual(result["auth_method"], "google")
+        finally:
+            h.close()
 
 
 if __name__ == "__main__":

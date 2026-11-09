@@ -202,3 +202,12 @@ test('native latest manifests: only the relay mounts ./downloads/desktop, read-o
   assert.match(service('relay'), /^ {6}- \.\/downloads\/desktop:\/srv\/downloads\/desktop:ro$/m);
   assert.doesNotMatch(service('relay2'), /downloads\/desktop/);
 });
+
+test('sign-in: the relay takes the Google/Apple sign-in settings and PASSWORD_LOGIN from .env, never a test identity provider', () => {
+  const relay = service('relay');
+  for (const name of ['GOOGLE_CLIENT_IDS', 'APPLE_CLIENT_IDS', 'APPLE_TEAM_ID', 'APPLE_SIWA_KEY_ID', 'APPLE_SIWA_KEY_PATH', 'PASSWORD_LOGIN']) {
+    assert.match(relay, new RegExp(`^ {6}${name}: \\$\\{${name}:-\\}$`, 'm'), name);
+  }
+  assert.doesNotMatch(compose, /TEST_IDP/);
+  assert.doesNotMatch(readFileSync(join(deployDir, 'relay.env'), 'utf8'), /TEST_IDP|GOOGLE_CLIENT|APPLE_|PASSWORD_LOGIN/);
+});

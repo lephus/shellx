@@ -844,9 +844,82 @@ final class LinkCodecTests: XCTestCase {
                 callId: try s("call_id"), workspaceId: try s("workspace_id"), terminalId: try s("terminal_id"))
         case "terminal_close_result":
             return .terminalCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
+        case "terminal_view_open":
+            return .terminalViewOpen(callId: try s("call_id"), terminalId: try s("terminal_id"),
+                                     cols: try n("cols").intValue, rows: try n("rows").intValue)
+        case "terminal_view_open_result":
+            return .terminalViewOpenResult(callId: try s("call_id"), outcome: TerminalViewOpenOutcome(wire: try s("outcome")))
+        case "terminal_view_input": return .terminalViewInput(terminalId: try s("terminal_id"), units: try terminalUnits(m["units"]))
+        case "terminal_view_resize":
+            return .terminalViewResize(terminalId: try s("terminal_id"), cols: try n("cols").intValue, rows: try n("rows").intValue)
+        case "terminal_view_resync": return .terminalViewResync(terminalId: try s("terminal_id"))
+        case "terminal_view_close": return .terminalViewClose(terminalId: try s("terminal_id"))
+        case "terminal_view_ended":
+            return .terminalViewEnded(terminalId: try s("terminal_id"), reason: TerminalViewEndReason(wire: try s("reason")))
+        case "terminal_view_frame":
+            return .terminalViewFrame(terminalId: try s("terminal_id"), frame: try terminalFramePart(m))
+        case "terminal_create": return .terminalCreate(callId: try s("call_id"), workspaceId: try s("workspace_id"))
+        case "terminal_create_result":
+            return .terminalCreateResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")),
+                                         terminalId: m["terminal_id"] as? String)
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)
         }
+    }
+
+    static func terminalUnits(_ o: Any?) throws -> [TerminalInputUnit] {
+        let arr = try XCTUnwrap(o as? [[String: Any]])
+        return try arr.map { u in
+            let k = try XCTUnwrap(u["k"] as? String)
+            switch k {
+            case "text": return .text(try XCTUnwrap(u["text"] as? String))
+            case "key":
+                let mods = (u["mods"] as? [String] ?? []).map(TerminalModifier.init(wire:))
+                return .key(TerminalKey(wire: try XCTUnwrap(u["key"] as? String)), mods: mods)
+            case "paste": return .paste(try XCTUnwrap(u["text"] as? String))
+            case "scroll": return .scroll(lines: try XCTUnwrap(u["lines"] as? Int))
+            default: return .other(kind: k)
+            }
+        }
+    }
+
+    static func terminalFramePart(_ m: [String: Any]) throws -> TerminalFramePart {
+        func int(_ o: [String: Any], _ k: String) throws -> Int { try XCTUnwrap((o[k] as? NSNumber)?.intValue, k) }
+        func str(_ o: [String: Any], _ k: String) throws -> String { try XCTUnwrap(o[k] as? String, k) }
+        func head(_ h: [String: Any]) throws -> TerminalFrameHead {
+            var cursor: TerminalCursor?
+            if let c = h["cursor"] as? [String: Any] {
+                cursor = TerminalCursor(
+                    x: try int(c, "x"), y: try int(c, "y"), shape: TerminalCursorShape(wire: try str(c, "shape")),
+                    visible: try XCTUnwrap(c["visible"] as? Bool), blink: try XCTUnwrap(c["blink"] as? Bool))
+            }
+            var palette: TerminalPalette?
+            if let p = h["palette"] as? [String: Any] {
+                palette = TerminalPalette(
+                    fg: try str(p, "fg"), bg: try str(p, "bg"), cursor: p["cursor"] as? String,
+                    colors: try XCTUnwrap(p["colors"] as? [String]))
+            }
+            return TerminalFrameHead(
+                kind: TerminalFrameKind(wire: try str(h, "kind")), cols: try int(h, "cols"), rows: try int(h, "rows"),
+                alt: try XCTUnwrap(h["alt"] as? Bool), cursor: cursor, palette: palette,
+                history: (h["history"] as? NSNumber)?.intValue ?? 0, scroll: (h["scroll"] as? NSNumber)?.intValue ?? 0)
+        }
+        let styles = try (m["styles"] as? [[String: Any]] ?? []).map { s in
+            TerminalStyle(
+                id: try int(s, "id"), fg: (s["fg"] as? NSNumber)?.intValue, fgRgb: s["fg_rgb"] as? String,
+                bg: (s["bg"] as? NSNumber)?.intValue, bgRgb: s["bg_rgb"] as? String,
+                attrs: (s["attrs"] as? [String] ?? []).map(TerminalAttribute.init(wire:)))
+        }
+        let lines = try (m["lines"] as? [[String: Any]] ?? []).map { l in
+            TerminalLine(y: try int(l, "y"), runs: (l["runs"] as? [[String: Any]] ?? []).map { r in
+                TerminalRun(
+                    x: (r["x"] as? NSNumber)?.intValue, text: r["t"] as? String ?? "", style: (r["s"] as? NSNumber)?.intValue,
+                    width: (r["w"] as? NSNumber)?.intValue)
+            })
+        }
+        return TerminalFramePart(
+            revision: try int(m, "revision"), part: try int(m, "part"), parts: try int(m, "parts"),
+            head: try (m["head"] as? [String: Any]).map(head), styles: styles, lines: lines)
     }
 }

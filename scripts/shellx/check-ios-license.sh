@@ -48,6 +48,7 @@ if [ ! -d "$APP" ]; then
   exit 1
 fi
 
+# ShellXDemo: the app's own demo target (shellx-ios/Packages/ShellXAppCore, "Try without an account").
 ALLOWED_MODULES="
   Swift _Concurrency Darwin Dispatch Foundation os OSLog Observation Combine Synchronization RegexBuilder
   SwiftUI UIKit CoreFoundation CoreGraphics CoreImage CoreText CoreMedia CoreVideo CoreHaptics
@@ -58,7 +59,7 @@ ALLOWED_MODULES="
   LinkPresentation NaturalLanguage MetricKit
   XCTest Testing PackageDescription
   ShellXLinkCore ShellXLinkRelay ShellXLinkSession ShellXLinkAccount
-  ShellXAppCore ShellXAppTestSupport ShellX
+  ShellXAppCore ShellXDemo ShellXAppTestSupport ShellX
 "
 
 fail=0

@@ -22,6 +22,20 @@ final class LaunchSmokeTests: XCTestCase {
         XCTAssertEqual(ats?["NSAllowsLocalNetworking"] as? Bool, true)
     }
 
+    func testGoogleClientIDComesFromTheBuildSettings() {
+        let id = Bundle.main.object(forInfoDictionaryKey: "ShellXGoogleClientID") as? String
+        XCTAssertEqual(id?.hasSuffix(".apps.googleusercontent.com"), true, id ?? "nil")
+        XCTAssertEqual(id?.contains("$("), false, "the build setting was expanded")
+    }
+
+    @MainActor
+    func testPlaceholderClientMakesGoogleUnavailable() async {
+        let provider = SystemIdentityProvider(googleClientID: "0-shellx-placeholder.apps.googleusercontent.com")
+        do { _ = try await provider.googleIDToken(nonce: "n"); XCTFail("signed in without a client") } catch {
+            XCTAssertEqual(error as? IdentityProviderError, .notConfigured)
+        }
+    }
+
     @MainActor
     func testRootRenders() throws {
         let images = try SnapshotWriter().write(RootView(graph: .preview(), inbox: PairingInbox()), name: "root")

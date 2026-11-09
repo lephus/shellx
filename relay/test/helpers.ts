@@ -5,13 +5,17 @@ import { join } from "node:path";
 import { afterEach, expect } from "vitest";
 import { WebSocket } from "ws";
 import type { AppDeps } from "../src/app.js";
-import type { Argon2Backend } from "../src/auth/password.js";
+import { normalizeEmail } from "../src/auth/email.js";
+import { insertToken } from "../src/auth/session.js";
+import { generateToken, hashToken } from "../src/auth/tokens.js";
+import { type Argon2Backend, passwords } from "../src/auth/password.js";
 import type { RateLimiter, RateLimiters } from "../src/auth/rate-limit.js";
 import type { Config } from "../src/config.js";
 import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import type { HubSocket } from "../src/hub/user-hub.js";
+import { appleClaims, fakeApple, fakeGoogle, fakeTestIdp, googleClaims, testClaims, testIdTokens } from "./fake-idp.js";
 import { type ListenOptions, startRelay, type RunningRelay } from "../src/relay.js";
 
 // ---- configuration used by every test relay ---------------------------------------------------
@@ -37,11 +41,15 @@ export const TEST_CONFIG: Config = {
   relayIssuer: "shellx-relay",
   relayV2Url: "ws://127.0.0.1:1/v1/relay",
   shareAllowedOrigin: "https://shellx.pro",
+  googleClientIds: [],
+  appleClientIds: ["com.shellx.prod", "com.shellx.dev"],
+  passwordLogin: true,
+  testIdp: null,
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
-  loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
+  loginIp: allowAll, loginEmail: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
   ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll,
 };
 
@@ -128,6 +136,8 @@ afterEach(async () => {
 /** A relay listening on a random 127.0.0.1 port; started in the background by `makeApp`. */
 export interface TestApp {
   readonly ready: Promise<RunningRelay>;
+  /** The app's clock (`deps.now`, else `Date.now`); absent for `remote(port)` apps. */
+  readonly now?: () => number;
 }
 
 /**
@@ -137,7 +147,7 @@ export interface TestApp {
  */
 export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptions> = {}): TestApp {
   const ready = startRelay(
-    { config: { ...TEST_CONFIG, nativeManifestDir: join(tempDir(), "desktop") }, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
+    { config: { ...TEST_CONFIG, nativeManifestDir: join(tempDir(), "desktop") }, db: db(), hubs: hubs(), limiters: unlimited, idTokens: testIdTokens(), ...deps },
     { ...listen, host: "127.0.0.1", port: 0 },
   );
   onCleanup(async () => {
@@ -145,7 +155,7 @@ export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptio
     relay.server.closeAllConnections();
     await new Promise<void>((resolve) => relay.server.close(() => resolve()));
   });
-  return { ready };
+  return { ready, now: deps.now ?? Date.now };
 }
 
 /** A buffered HTTP response (`json<T>()` is generic, like the Workers `Response` the tests were written for). */
@@ -229,7 +239,25 @@ async function request(
   });
 }
 
+/** POST /v1/auth/nonce; throws unless 201. */
+export async function newNonce(app: TestApp, ip?: string): Promise<string> {
+  const res = await call(app, "POST", "/v1/auth/nonce", { ip, body: {} });
+  if (res.status !== 201) throw new Error(`nonce failed: ${res.status} ${await res.text()}`);
+  return (await res.json<{ nonce: string }>()).nonce;
+}
+
 export const PASSWORD = "correct horse battery";
+
+/** Inserts a `users` row straight into the test database (registration is closed); returns its id. */
+export async function seedUser(email: string, password: string | null, nowMs: number = Date.now()): Promise<string> {
+  const id = crypto.randomUUID();
+  const hash = password === null ? null : await passwords.hash(password);
+  db().run(
+    "INSERT INTO users (id, email, password_hash, password_changed_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    id, normalizeEmail(email), hash, nowMs, nowMs,
+  );
+  return id;
+}
 
 export function randomEmail(): string {
   return `user-${crypto.randomUUID()}@example.com`;
@@ -267,17 +295,140 @@ export interface Account {
   agent: Session;
 }
 
-/** Registers a fresh account whose first device is an agent. */
+/**
+ * Creates a fresh account whose first device is an agent, straight in the database (registration is
+ * closed): the account has a password and a password session. Goes through no route and no limiter.
+ */
 export async function registerAccount(app: TestApp, email = randomEmail(), password = PASSWORD): Promise<Account> {
+  const now = (app.now ?? Date.now)();
   const device = deviceBody("agent");
-  const res = await call(app, "POST", "/v1/auth/register", { body: { email, password, device } });
-  if (res.status !== 201) throw new Error(`register failed: ${res.status} ${await res.text()}`);
-  const body = await res.json<{ user_id: string; device_id: string; token: string }>();
-  return {
-    email,
-    password,
-    agent: { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey: device.public_key as string },
+  const userId = await seedUser(email, password, now);
+  const deviceId = crypto.randomUUID();
+  db().run(
+    "INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES (?, ?, 'agent', ?, ?, ?, ?)",
+    deviceId, userId, device.name as string, device.platform as string, Buffer.from(device.public_key as string, "base64url"), now,
+  );
+  const token = generateToken();
+  insertToken(db(), await hashToken(token), deviceId, now);
+  return { email, password, agent: { userId, deviceId, token, publicKey: device.public_key as string } };
+}
+
+// ---- Google sign-in (the fake issuers of fake-idp.ts) -----------------------------------------------
+
+export interface GoogleSignInOptions {
+  idp?: "google" | "test";
+  sub?: string;
+  email?: string;
+  kind?: "desktop" | "mobile";
+  publicKey?: string;
+  claims?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  ip?: string;
+}
+
+/** A fresh nonce and an ID token carrying it, `iat` taken from the app's clock. */
+export async function googleIdToken(app: TestApp, options: GoogleSignInOptions = {}): Promise<{ id_token: string; nonce: string }> {
+  const nonce = await newNonce(app, options.ip);
+  const nowSec = Math.floor((app.now ?? Date.now)() / 1000);
+  const input = {
+    nonce, nowSec, extra: options.claims,
+    sub: options.sub ?? (options.idp === "test" ? `t-${crypto.randomUUID()}` : `g-${crypto.randomUUID()}`),
+    email: options.email ?? randomEmail(),
   };
+  const id_token = options.idp === "test" ? await fakeTestIdp.sign(testClaims(input)) : await fakeGoogle.sign(googleClaims(input));
+  return { id_token, nonce };
+}
+
+export async function signInGoogle(app: TestApp, options: GoogleSignInOptions = {}): Promise<TestResponse> {
+  const sub = options.sub ?? (options.idp === "test" ? `t-${crypto.randomUUID()}` : `g-${crypto.randomUUID()}`);
+  const email = options.email ?? randomEmail();
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const { id_token, nonce } = await googleIdToken(app, { ...options, sub, email });
+  return call(app, "POST", "/v1/auth/google", {
+    ip: options.ip, headers: options.headers,
+    body: { id_token, nonce, device: deviceBody(options.kind ?? "desktop", { public_key: publicKey }) },
+  });
+}
+
+export interface GoogleSession extends Session {
+  sub: string;
+  email: string;
+}
+
+/** Signs in with Google; throws unless 200. `sub` and `publicKey` are the ones used, `email` the response's. */
+export async function googleSession(app: TestApp, options: GoogleSignInOptions = {}): Promise<GoogleSession> {
+  const sub = options.sub ?? (options.idp === "test" ? `t-${crypto.randomUUID()}` : `g-${crypto.randomUUID()}`);
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const res = await signInGoogle(app, { ...options, sub, publicKey });
+  if (res.status !== 200) throw new Error(`google sign-in failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ user_id: string; device_id: string; token: string; email: string }>();
+  return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey, sub, email: body.email };
+}
+
+// ---- Apple sign-in ------------------------------------------------------------------------------
+
+export interface AppleSignInOptions {
+  sub?: string;
+  email?: string;
+  isPrivateEmail?: boolean;
+  publicKey?: string;
+  name?: string;
+  /** `null` leaves authorization_code out. */
+  authorizationCode?: string | null;
+  claims?: Record<string, unknown>;
+  ip?: string;
+}
+
+export async function appleIdToken(app: TestApp, options: AppleSignInOptions = {}): Promise<{ identity_token: string; nonce: string }> {
+  const nonce = await newNonce(app, options.ip);
+  const nowSec = Math.floor((app.now ?? Date.now)() / 1000);
+  const identity_token = await fakeApple.sign(appleClaims({
+    nonce, nowSec, sub: options.sub, email: options.email, isPrivateEmail: options.isPrivateEmail, extra: options.claims,
+  }));
+  return { identity_token, nonce };
+}
+
+export async function signInApple(app: TestApp, options: AppleSignInOptions = {}): Promise<TestResponse> {
+  const { identity_token, nonce } = await appleIdToken(app, options);
+  const overrides: Record<string, unknown> = {};
+  if (options.name !== undefined) overrides.name = options.name;
+  if (options.publicKey !== undefined) overrides.public_key = options.publicKey;
+  const body: Record<string, unknown> = { identity_token, nonce, device: deviceBody("mobile", overrides) };
+  if (options.authorizationCode !== null) body.authorization_code = options.authorizationCode ?? `code-${crypto.randomUUID()}`;
+  return call(app, "POST", "/v1/auth/apple", { ip: options.ip, body });
+}
+
+export interface LinkedApple {
+  sub: string;
+  email: string;
+  pairingId: string;
+  session: Session;
+}
+
+/**
+ * An iPhone signs in with a hidden-email Apple ID (202 link_required), asks `machineId` through its link
+ * token, the Mac (`desktopToken`) approves, and the iPhone reads the session (`approved`).
+ */
+export async function linkAppleIdByQr(
+  app: TestApp, desktopToken: string, machineId: string, options: AppleSignInOptions = {},
+): Promise<LinkedApple> {
+  const sub = options.sub ?? `a-${crypto.randomUUID()}`;
+  const email = options.email ?? randomEmail();
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const first = await signInApple(app, { ...options, sub, email, publicKey });
+  if (first.status !== 202) throw new Error(`apple sign-in did not ask for a link: ${first.status} ${await first.text()}`);
+  const { link_token } = await first.json<{ link_token: string }>();
+  const b64 = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64");
+  const asked = await call(app, "POST", "/v1/auth/apple/link", { body: { link_token, machine_id: machineId, client_key_b64: b64(), proof_b64: b64() } });
+  if (asked.status !== 201) throw new Error(`apple link request failed: ${asked.status} ${await asked.text()}`);
+  const { pairing_id } = await asked.json<{ pairing_id: string }>();
+  const approved = await call(app, "POST", `/v2/phone-pairings/${pairing_id}/approve`, { token: desktopToken });
+  if (approved.status !== 204) throw new Error(`apple link approve failed: ${approved.status} ${await approved.text()}`);
+  const status = await call(app, "POST", "/v1/auth/apple/link/status", { body: { link_token, pairing_id } });
+  const body = await status.json<{ status: string; session?: { user_id: string; device_id: string; token: string } }>();
+  if (status.status !== 200 || body.status !== "approved" || body.session === undefined) throw new Error(`apple link status: ${status.status} ${JSON.stringify(body)}`);
+  const { user_id, device_id, token } = body.session;
+  return { sub, email, pairingId: pairing_id, session: { userId: user_id, deviceId: device_id, token, publicKey } };
 }
 
 /** Logs in an additional device (new key unless `publicKey` is given). */

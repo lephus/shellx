@@ -1,5 +1,7 @@
 // Entry point of the relay container: `node dist/server.js` (dev: `npm run dev`).
 import { adminStatus } from "./admin/app.js";
+import { loadAppleSiwa } from "./auth/apple-rest.js";
+import { type IdTokenVerifier, loadIdTokenVerifier } from "./auth/id-token.js";
 import { createRateLimiters } from "./auth/rate-limit.js";
 import { ConfigError, loadConfig, type Config } from "./config.js";
 import { Db } from "./db/db.js";
@@ -26,6 +28,23 @@ try {
   fail(err instanceof ConfigError ? err.message : "invalid configuration");
 }
 
+// Google / Apple / test-provider ID-token checks; an unreadable TEST_IDP_JWKS_PATH stops the relay.
+let idTokens: IdTokenVerifier;
+try {
+  idTokens = loadIdTokenVerifier(config);
+} catch (err) {
+  fail(err instanceof ConfigError ? err.message : "invalid configuration");
+}
+if (config.googleClientIds.length === 0) logMeta("google_sign_in_disabled");
+if (config.testIdp !== null) logMeta("test_idp_enabled");
+if (!config.passwordLogin) logMeta("password_login_off");
+
+// Sign in with Apple's REST side (refresh-token exchange and revocation) is optional: without the key
+// the Apple sign-in itself works, but no refresh token is stored and nothing is revoked.
+const siwa = loadAppleSiwa(process.env);
+if (siwa.gateway === null) logMeta("apple_siwa_disabled", { reason: siwa.reason });
+else logMeta("apple_siwa_enabled");
+
 let db: Db;
 try {
   db = Db.open(config.dbPath);
@@ -35,11 +54,13 @@ try {
 }
 
 // Push is optional (push spec §5): without a usable FCM_SERVICE_ACCOUNT the relay runs as before.
+// The one FCM client serves POST /v1/notifications and the Android app's data messages.
 const push = loadPush(process.env);
 if (push.gateway === null) logMeta("push_disabled", { reason: push.reason });
 else logMeta("push_enabled", { project: push.projectId });
 // APNs for the native iPhone app is optional as well: without APNS_KEY_PATH, APNS_KEY_ID and
-// APNS_TEAM_ID (and a readable .p8 key) POST /v2/notifications answers 503.
+// APNS_TEAM_ID (and a readable .p8 key) POST /v2/notifications reaches Android phones only
+// (503 only when FCM is off too).
 const apns = loadApns(process.env);
 if (apns.gateway === null) logMeta("apns_disabled", { reason: apns.reason });
 else logMeta("apns_enabled");
@@ -56,7 +77,7 @@ else logMeta("relay_v2_disabled", { reason: config.relayV2DisabledReason });
 
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
-  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, apns: apns.gateway },
+  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, fcm: push.gateway, apns: apns.gateway, idTokens, appleTokens: siwa.gateway },
   { host: config.host, port: config.port },
 ).catch((err: unknown) => fail(`cannot listen on ${config.host}:${config.port} (${errorKind(err)})`));
 logMeta("relay_started", { port: relay.port });

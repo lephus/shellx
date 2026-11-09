@@ -27,6 +27,10 @@ set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$repo"
+# The sign-in button needs Google's official mark in the commit being built.
+branding_args=()
+[[ -z "${SHELLX_GOOGLE_BRANDING_ROOT:-}" ]] || branding_args=(--root "$SHELLX_GOOGLE_BRANDING_ROOT")
+python3 scripts/shellx/check-google-branding.py --git-rev HEAD ${branding_args[@]+"${branding_args[@]}"} >&2 || exit 1
 out_dir="${1:-$repo/dist/windows}"
 vps="${SHELLX_VPS:-higio@42.115.41.70}"
 read -r -a ssh_opts <<< "${SHELLX_VPS_SSH_OPTS:--S $HOME/.ssh/cm-shellx-vps}"

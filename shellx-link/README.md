@@ -1,6 +1,6 @@
 # shellx-link
 
-ShellX Link is the phone-to-Mac protocol for ShellX: Noise sessions, a message codec, a relay client and sessions. It is a standalone Swift package that the ShellX Mac app and the future iOS app both use.
+ShellX Link is the phone-to-Mac protocol for ShellX: Noise sessions, a message codec, a relay client and sessions, and terminal views (`ShellXLinkCore` holds the grid format with its splitter, assembler and screen model, which the iOS app and the Mac's tests share). It is a standalone Swift package that the ShellX Mac app and the future iOS app both use.
 
 It is MIT licensed (see `LICENSE`), unlike the rest of this repository. For that reason it must not depend on, link to or copy code from GPL parts of the repo (`Sources/`, `ios/`, `Packages/`, `cmux-tui/`). Reading them to understand a protocol is fine. `scripts/shellx/check-link-license.sh` enforces the boundary.
 
@@ -39,6 +39,9 @@ $probe chat-send <session_id> --state $state --text-file message.txt
 $probe chat-stop <session_id> --state $state [--hard]
 $probe agent-close <session_id> --state $state
 $probe terminal-close <workspace_id> <terminal_id> --state $state
+$probe terminal-view <terminal_id> --state $state [--cols 80 --rows 24] [--seconds 30]
+$probe terminal-type <terminal_id> --state $state --text "ls" --key enter
+$probe terminal-create <workspace_id> --state $state
 $probe bench --state $state --count 50 --socket /tmp/shellx-debug-<tag>.sock
 $probe unpair --state $state --machine <machine_id>
 $probe logout --state $state
@@ -55,6 +58,12 @@ $probe logout --state $state
 - `watch` exits 4 when the Mac or the relay ends the session, and 0 when `--seconds` pass. With
   `--recheck` it then tries to connect again twice: with a ticket minted before the end (only the
   Mac's trust check can refuse it) and with a new ticket (the relay's grant check).
+- `terminal-view` shows a terminal of the Mac the way a phone does (`terminal_view`, `spec/PROTOCOL.md`
+  section 11): it logs every frame and prints the screen after each snapshot. A session views one terminal at
+  a time, so the probe holds its view until it exits.
+- `terminal-type` measures the echo: the time from sending the input to the next frame. A key is `name` or
+  `mod+name` (`ctrl+c`, `shift+tab`); `--dry-run` prints the `terminal.view.input` message without connecting.
+- `terminal-create` opens a new terminal tab (`terminal_create`) without changing what the Mac shows.
 - `bench` sends fake blocking Claude `PermissionRequest` hooks to the Mac app's control socket and
   answers them from the phone side. The app must accept other processes: a DEBUG build launched
   with `CMUX_SOCKET_MODE=allowAll`.

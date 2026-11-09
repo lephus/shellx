@@ -2,7 +2,7 @@ import { generateKeyPairSync, createVerify } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { loadPush, loopbackUrl } from "../src/push/config.js";
 import {
-  FCM_SCOPE, FcmClient, parseServiceAccount, ServiceAccountError, TOKEN_RENEW_MARGIN_MS, type PushMessage, type ServiceAccount,
+  FCM_SCOPE, FcmClient, parseServiceAccount, ServiceAccountError, TOKEN_RENEW_MARGIN_MS, type FcmDataMessage, type PushMessage, type ServiceAccount,
 } from "../src/push/fcm.js";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -22,6 +22,12 @@ const ACCOUNT_JSON = JSON.stringify({
 const ACCOUNT: ServiceAccount = parseServiceAccount(ACCOUNT_JSON);
 
 const MESSAGE: PushMessage = { token: "phone-token", title: "Mac · Session 1", body: "✓ make · 45 s", data: { kind: "command" } };
+
+const DATA_MESSAGE: FcmDataMessage = {
+  token: "android-token",
+  data: { kind: "needs_you", machine_id: "m-1", request_id: "req-1", agent: "Claude Code", workspace_title: "shellx" },
+  priority: "high", ttlSec: 86_400, collapseKey: "req-1",
+};
 
 interface Recorded {
   url: string;
@@ -252,6 +258,56 @@ describe("FcmClient", () => {
       "http://127.0.0.1:9999/token",
       "http://127.0.0.1:9999/v1/projects/shellxpro/messages:send",
     ]);
+  });
+
+  it("sends a data-only message: data plus android priority, ttl and collapse_key, no notification or apns block", async () => {
+    const f = fakeFetch();
+    const client = new FcmClient({ account: ACCOUNT, fetch: f.fn });
+    expect(await client.sendData(DATA_MESSAGE)).toBe("ok");
+    const send = f.sends()[0]!;
+    expect(send.url).toBe("https://fcm.googleapis.com/v1/projects/shellxpro/messages:send");
+    expect(new Headers(send.init.headers).get("authorization")).toBe("Bearer access-1");
+    expect(JSON.parse(String(send.init.body))).toEqual({
+      message: {
+        token: "android-token",
+        data: { kind: "needs_you", machine_id: "m-1", request_id: "req-1", agent: "Claude Code", workspace_title: "shellx" },
+        android: { priority: "high", ttl: "86400s", collapse_key: "req-1" },
+      },
+    });
+  });
+
+  it("leaves collapse_key out of a data message without one", async () => {
+    const f = fakeFetch();
+    await new FcmClient({ account: ACCOUNT, fetch: f.fn })
+      .sendData({ token: "android-token", data: { kind: "resolved" }, priority: "normal", ttlSec: 60 });
+    expect(JSON.parse(String(f.sends()[0]!.init.body))).toEqual({
+      message: { token: "android-token", data: { kind: "resolved" }, android: { priority: "normal", ttl: "60s" } },
+    });
+  });
+
+  it("uses one cached access token for notification and data messages", async () => {
+    const f = fakeFetch();
+    const client = new FcmClient({ account: ACCOUNT, fetch: f.fn });
+    await client.send(MESSAGE);
+    await client.sendData(DATA_MESSAGE);
+    expect(f.tokenCalls()).toHaveLength(1);
+    expect(f.sends().map((s) => new Headers(s.init.headers).get("authorization"))).toEqual(["Bearer access-1", "Bearer access-1"]);
+  });
+
+  it("maps a data message's answers like a notification's: a gone token is invalid_token, a payload error or an outage is error", async () => {
+    const ttlViolation = () => Response.json({
+      error: { code: 400, status: "INVALID_ARGUMENT", details: [
+        { "@type": "type.googleapis.com/google.rpc.BadRequest", fieldViolations: [{ field: "message.android.ttl", description: "bad" }] },
+      ] },
+    }, { status: 400 });
+    for (const [reply, expected] of [
+      [() => fcmError(404, "NOT_FOUND", "UNREGISTERED"), "invalid_token"],
+      [ttlViolation, "error"],
+      [() => fcmError(503, "UNAVAILABLE", "UNAVAILABLE"), "error"],
+    ] as const) {
+      const client = new FcmClient({ account: ACCOUNT, fetch: fakeFetch({ sendReply: reply }).fn });
+      expect(await client.sendData(DATA_MESSAGE)).toBe(expected);
+    }
   });
 });
 

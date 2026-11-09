@@ -233,9 +233,81 @@ docker compose logs relay | grep apns_   # apns_enabled
 One key serves both APNs hosts: Debug builds (`com.shellx.dev`) register sandbox tokens, App Store
 builds (`com.shellx.prod`) production ones, and the relay sends each token to its own host.
 
+### Android push (FCM)
+
+The Android app gets its "needs you" alerts from the same `POST /v2/notifications` call that
+reaches iPhones: the relay sends each Android phone granted that Mac an FCM data-only message with
+the service account key above. Nothing else is set up on the VPS. Check it after a deploy:
+
+```bash
+cd ~/phu/shellx && docker compose logs relay | grep push_   # push_enabled {"project":"shellxpro"}
+```
+
+With `push_disabled` instead, Android phones get nothing (iPhones still get APNs): do steps 1–2
+above. Both Android apps, `com.shellx.prod` and `com.shellx.dev`, must be apps of Firebase project
+`shellxpro`; FCM refuses a token from another project (`fcm_send_failed` with `SENDER_ID_MISMATCH`)
+and the relay keeps such a token. `POST /v2/notifications` answers 503 `push_unavailable` only when
+both the FCM and the APNs key are missing. Each call logs one `v2_notification` line with
+`recipients`, `fcm_recipients`, `sent` and `tokens_removed`, never what the alert says or a token.
+
 The website only builds once the country hosting the VPS replaces `[quốc gia]` in
 `web/src/pages/privacy.md` and `web/src/pages/terms.md` (update their `updated:` dates too). Until
 then every deploy stops at the web image build, so fill it in before the first deploy.
+
+## Sign in with Google and Apple (once, by hand)
+
+The relay checks Google and Apple ID tokens against their published keys (S1 §6.2) and, for an Apple
+ID, exchanges the iPhone's authorization code for a refresh token so it can revoke ShellX's access when
+the Apple ID is removed or the account deleted. All of it is set once by hand in the VPS's `.env`
+(never in this repository):
+
+- `GOOGLE_CLIENT_IDS`: the iOS clients of `com.shellx.prod` and `com.shellx.dev`, the Web client
+  (Android's `serverClientId`) and the Desktop client, comma-separated, no spaces. Without it every
+  Google sign-in answers 401 and the relay logs `google_sign_in_disabled`.
+- `APPLE_TEAM_ID=W4RF3W4VTZ`
+- `APPLE_SIWA_KEY_ID=<key id>`
+- `APPLE_SIWA_KEY_PATH=/secrets/siwa.p8`: a key with Sign in with Apple enabled (it may be the APNs key
+  if that key has both services). Without the key the relay logs `apple_siwa_disabled`: Apple sign-in
+  itself works, but no refresh token is stored and nothing is revoked.
+- `APPLE_CLIENT_IDS` stays unset (default `com.shellx.prod,com.shellx.dev`).
+
+```bash
+mkdir -m 700 -p ~/siwa-upload
+# from your machine: scp AuthKey_<KEYID>.p8 <deploy-user>@<vps>:siwa-upload/siwa.p8
+sudo install -o 1000 -g 1000 -m 400 ~/siwa-upload/siwa.p8 ~/phu/shellx/secrets/siwa.p8
+rm -rf ~/siwa-upload
+printf 'GOOGLE_CLIENT_IDS=<id1>,<id2>,<id3>,<id4>\nAPPLE_TEAM_ID=W4RF3W4VTZ\nAPPLE_SIWA_KEY_ID=<KEYID>\nAPPLE_SIWA_KEY_PATH=/secrets/siwa.p8\n' >> ~/phu/shellx/.env
+cd ~/phu/shellx && docker compose up -d --force-recreate relay
+docker compose logs relay | grep -E 'google_sign_in|apple_siwa'   # apple_siwa_enabled, and no google_sign_in_disabled
+```
+
+Never set `TEST_IDP_ISSUER` or `TEST_IDP_JWKS_PATH` here: they switch on a test identity provider and
+exist for test relays only.
+
+### Password cut-over (the day password sign-in ends)
+
+Run these on the VPS in `~/phu/shellx`, in this order:
+
+1. Switch password sign-in off and recreate the relay; the log shows `password_login_off`:
+
+   ```bash
+   sed -i '/^PASSWORD_LOGIN=/d' .env && echo 'PASSWORD_LOGIN=off' >> .env && docker compose up -d --force-recreate relay
+   docker compose logs relay | grep password_login_off
+   ```
+
+2. Dry run (counts only):
+
+   ```bash
+   docker compose exec relay npm run -s password-cutover
+   ```
+
+3. Remove every password and password session:
+
+   ```bash
+   docker compose exec relay npm run -s password-cutover -- --yes
+   ```
+
+Step 3 cannot be undone except by restoring a backup. Sessions that signed in with Google or Apple stay.
 
 ## Admin (admin.shellx.pro)
 
@@ -435,7 +507,8 @@ All commands run in `~/phu/shellx`.
   if it is not the config you want, roll back with the workflow instead (it re-stages the config of
   the chosen commit).
 - **Versions and download links:** edit `deploy/relay.env` and push `main`.
-- **Emergency password reset:** see `relay/README.md` (`docker compose exec relay node dist/scripts/reset-password.js …`).
+- **Smoke test of relay2:** from your machine, in `relay/`, run `SHELLX_SMOKE_TOKEN="$(ssh <deploy-user>@<vps> 'cd ~/phu/shellx && docker compose exec -T relay npm run -s mint-smoke-token')" npm run relay2:smoke`. Each mint replaces the previous token, and the smoke logs it out.
+- **Emergency password reset (until the password cut-over):** see `relay/README.md` (`docker compose exec relay node dist/scripts/reset-password.js …`).
 - **Backups:** `backups/relay-<date>.db`, written at 03:00 VPS time (mode 0600 — `umask 077` in
   `backup-once.sh`, M9), the 14 newest are kept. The backup container runs as root, so
   `backup-once.sh` hands each finished file to the owner of `backups/` (the deploy user) — readable by

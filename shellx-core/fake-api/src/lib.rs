@@ -9,6 +9,10 @@
 //! device (like v1 `/v1/auth/login`). One live token per device; tokens are random
 //! 32-byte b64url strings.
 //!
+//! Google sign-in (plan 1B): `POST /v1/auth/nonce`, `POST /v1/auth/google`, `POST /v1/auth/google/link`,
+//! `GET /v1/account/identities`, `DELETE /v1/account/identities/<id>`, `DELETE /v1/account`, and a fake
+//! Google (`GET /fake-google/auth`, `POST /fake-google/token`) that checks PKCE. Nonces and id_tokens are single use.
+//!
 //! Routes so far: `POST /v1/auth/login`, `POST /v1/auth/logout`, `GET /v1/version`,
 //! `POST|GET /v2/machines`, `POST /v2/machines/<id>/heartbeat`, `POST /v2/relay/tickets`,
 //! `POST|GET /v2/pairings`, `POST /v2/pairings/<id>/approve|deny`, and the desktop side of
@@ -62,6 +66,12 @@ pub struct FakeOptions {
     pub relay_url: String,
     /// Body served by `GET /v1/version`.
     pub version_body: Value,
+    /// Client id/secret the fake Google accepts.
+    pub google_client_id: String,
+    pub google_client_secret: String,
+    /// The account the fake Google signs in (changeable with `set_google_account`).
+    pub google_email: String,
+    pub google_subject: String,
 }
 
 /// Redacts the password and the HMAC secret.
@@ -74,6 +84,8 @@ impl std::fmt::Debug for FakeOptions {
             .field("ticket_ttl_secs", &self.ticket_ttl_secs)
             .field("relay_url", &self.relay_url)
             .field("version_body", &self.version_body)
+            .field("google_client_id", &self.google_client_id)
+            .field("google_client_secret", &"<redacted>")
             .finish()
     }
 }
@@ -102,6 +114,10 @@ impl Default for FakeOptions {
             ticket_ttl_secs: 120,
             relay_url: "ws://127.0.0.1:9/v2/relay".to_string(),
             version_body: FakeOptions::default_version_body(),
+            google_client_id: "fake-desktop-client".to_string(),
+            google_client_secret: "fake-desktop-secret".to_string(),
+            google_email: "google-user@shellx.test".to_string(),
+            google_subject: "fake-google-sub-1".to_string(),
         }
     }
 }
@@ -118,12 +134,45 @@ pub struct Recorded {
     pub headers: BTreeMap<String, String>,
     /// JSON body, `Value::Null` when empty or not JSON.
     pub body: Value,
+    /// Decoded `application/x-www-form-urlencoded` body, else empty.
+    pub form: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
 struct TokenInfo {
     user_id: String,
     device_id: String,
+    /// "password" | "google"
+    auth_method: String,
+}
+
+#[derive(Clone)]
+struct Identity {
+    id: String,
+    user_id: String,
+    provider: String,
+    subject: String,
+    email: String,
+    is_private_email: bool,
+    linked_via_device_name: Option<String>,
+    created_at: u64,
+    seq: u64,
+}
+
+struct GoogleCode {
+    challenge: String,
+    redirect_uri: String,
+    nonce: String,
+    email: String,
+    subject: String,
+    used: bool,
+}
+
+struct IdToken {
+    email: String,
+    subject: String,
+    nonce: String,
+    used: bool,
 }
 
 #[derive(Default)]
@@ -154,10 +203,21 @@ struct State {
     phone_grants: HashMap<String, PhoneGrant>,
     /// Creation counter for phone rows (oldest first ordering).
     phone_seq: u64,
+    /// Users that signed in with a password (`/v1/auth/login`).
+    password_users: HashSet<String>,
+    /// Every nonce issued, oldest first; `spent_nonces` holds the used ones.
+    nonces: Vec<String>,
+    spent_nonces: HashSet<String>,
+    google_account: Option<(String, String)>,
+    google_codes: HashMap<String, GoogleCode>,
+    id_tokens: HashMap<String, IdToken>,
+    identities: Vec<Identity>,
+    identity_seq: u64,
 }
 
 #[derive(Clone)]
 struct PhonePairing {
+    links_apple_id: bool,
     user_id: String,
     device_id: String,
     device_name: String,
@@ -296,6 +356,37 @@ impl FakeApi {
         self.shared.lock().last_token.clone().unwrap_or_default()
     }
 
+    /// Change the account the fake Google signs in. Test hook.
+    pub fn set_google_account(&self, email: &str, subject: &str) {
+        self.shared.lock().google_account = Some((email.to_string(), subject.to_string()));
+    }
+
+    /// Every nonce ever issued, oldest first. Test helper.
+    pub fn issued_nonces(&self) -> Vec<String> {
+        self.shared.lock().nonces.clone()
+    }
+
+    /// Add an identity to a user; returns its id. Test hook.
+    pub fn add_identity(&self, user_id: &str, provider: &str, subject: &str, email: &str, is_private_email: bool, linked_via_device_name: Option<&str>) -> String {
+        let mut st = self.shared.lock();
+        add_identity(&mut st, user_id, provider, subject, email, is_private_email, linked_via_device_name)
+    }
+
+    /// The account email of a user. Test helper.
+    pub fn user_email(&self, user_id: &str) -> Option<String> {
+        self.shared.lock().users.iter().find(|(_, u)| u.as_str() == user_id).map(|(e, _)| e.clone())
+    }
+
+    /// Whether the user still exists. Test helper.
+    pub fn user_exists(&self, user_id: &str) -> bool {
+        self.shared.lock().users.values().any(|u| u == user_id)
+    }
+
+    /// `"password"` or `"google"` for a live token. Test helper.
+    pub fn token_auth_method(&self, token: &str) -> Option<String> {
+        self.shared.lock().tokens.get(token).map(|t| t.auth_method.clone())
+    }
+
     /// Whether `token` is currently accepted. Test helper.
     pub fn token_is_live(&self, token: &str) -> bool {
         self.shared.lock().tokens.contains_key(token)
@@ -397,12 +488,22 @@ impl FakeApi {
     /// A phone of the machine's account asks to pair with `machine_id`; returns the
     /// pairing id. Test hook (the phone side routes live in the real relay only).
     pub fn add_phone_pairing(&self, machine_id: &str, device_name: &str, platform: &str, client_key: [u8; 32]) -> String {
+        self.add_phone_pairing_inner(machine_id, device_name, platform, client_key, false)
+    }
+
+    /// Like `add_phone_pairing` (platform ios) for a pairing that links an Apple ID. Test hook.
+    pub fn add_apple_link_phone_pairing(&self, machine_id: &str, device_name: &str, client_key: [u8; 32]) -> String {
+        self.add_phone_pairing_inner(machine_id, device_name, "ios", client_key, true)
+    }
+
+    fn add_phone_pairing_inner(&self, machine_id: &str, device_name: &str, platform: &str, client_key: [u8; 32], links_apple_id: bool) -> String {
         let mut st = self.shared.lock();
         let user_id = st.machines.get(machine_id).map(|m| m.user_id.clone()).expect("add_phone_pairing: unknown machine");
         st.phone_seq += 1;
         let seq = st.phone_seq;
         let id = random_id();
         let pairing = PhonePairing {
+            links_apple_id,
             user_id,
             device_id: random_id(),
             device_name: device_name.to_string(),
@@ -491,14 +592,15 @@ fn random_id() -> String {
 struct Reply {
     status: u16,
     body: Option<Value>,
+    location: Option<String>,
 }
 
 impl Reply {
     fn json(status: u16, body: Value) -> Reply {
-        Reply { status, body: Some(body) }
+        Reply { status, body: Some(body), location: None }
     }
     fn empty(status: u16) -> Reply {
-        Reply { status, body: None }
+        Reply { status, body: None, location: None }
     }
     fn error(status: u16, code: &str, message: &str) -> Reply {
         Reply::json(status, json!({"error": {"code": code, "message": message}}))
@@ -520,7 +622,12 @@ fn handle(mut req: Request, shared: &Shared) {
     let mut raw = Vec::new();
     let _ = req.as_reader().take(MAX_BODY_BYTES).read_to_end(&mut raw);
     let body: Value = serde_json::from_slice(&raw).unwrap_or(Value::Null);
-    let rec = Recorded { method, path, query, headers, body };
+    let form = if headers.get("content-type").is_some_and(|c| c.starts_with("application/x-www-form-urlencoded")) {
+        parse_form(&String::from_utf8_lossy(&raw)).into_iter().collect()
+    } else {
+        BTreeMap::new()
+    };
+    let rec = Recorded { method, path, query, headers, body, form };
 
     let reply = {
         let mut st = shared.lock();
@@ -529,10 +636,13 @@ fn handle(mut req: Request, shared: &Shared) {
     };
 
     let content_type = Header::from_bytes("Content-Type", "application/json").expect("static header");
-    let resp = match reply.body {
+    let mut resp = match reply.body {
         Some(v) => Response::from_string(v.to_string()).with_status_code(reply.status).with_header(content_type),
         None => Response::from_string(String::new()).with_status_code(reply.status),
     };
+    if let Some(loc) = reply.location {
+        resp = resp.with_header(Header::from_bytes("Location", loc).expect("location header"));
+    }
     let _ = req.respond(resp);
 }
 
@@ -544,6 +654,14 @@ fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
     match (rec.method.as_str(), rec.path.as_str()) {
         ("GET", "/v1/version") => Reply::json(200, opts.version_body.clone()),
         ("POST", "/v1/auth/login") => login(rec, raw, opts, st),
+        ("POST", "/v1/auth/nonce") => issue_nonce(st),
+        ("GET", "/fake-google/auth") => fake_google_auth(rec, opts, st),
+        ("POST", "/fake-google/token") => fake_google_token(rec, opts, st),
+        ("POST", "/v1/auth/google") => google_sign_in(rec, opts, st),
+        ("POST", "/v1/auth/google/link") => google_link(rec, opts, st),
+        ("GET", "/v1/account/identities") => list_identities(rec, st),
+        ("DELETE", p) if p.starts_with("/v1/account/identities/") => remove_identity(rec, &p["/v1/account/identities/".len()..], st),
+        ("DELETE", "/v1/account") => delete_account(rec, st),
         ("POST", "/v1/auth/logout") => match bearer(rec) {
             Some(t) if st.tokens.contains_key(t) => {
                 let t = t.to_string();
@@ -1075,12 +1193,13 @@ fn list_phone_pairings(rec: &Recorded, st: &State) -> Reply {
     if !rec.query.split('&').any(|kv| kv == "role=target") {
         return Reply::error(400, "bad_request", "Malformed request");
     }
+    let apple_links = rec.query.split('&').any(|kv| kv == "apple_links=1");
     let Some(own) = own_machine_id(&who, st) else { return Reply::json(200, json!({"pairings": []})) };
     let now = now_unix();
     let mut items: Vec<(&String, &PhonePairing)> = st
         .phone_pairings
         .iter()
-        .filter(|(_, p)| p.machine_id == own && p.user_id == who.user_id && p.current_status(now) == "pending")
+        .filter(|(_, p)| p.machine_id == own && p.user_id == who.user_id && p.current_status(now) == "pending" && (apple_links || !p.links_apple_id))
         .collect();
     items.sort_by_key(|(_, p)| std::cmp::Reverse(p.seq));
     let pairings: Vec<Value> = items
@@ -1093,6 +1212,7 @@ fn list_phone_pairings(rec: &Recorded, st: &State) -> Reply {
                 "client_key_b64": STANDARD.encode(&p.client_key),
                 "proof_b64": p.proof_b64,
                 "created_at_unix": p.created_at,
+                "links_apple_id": p.links_apple_id,
             })
         })
         .collect();
@@ -1221,11 +1341,306 @@ fn login(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
     let key = b["device"]["public_key"].as_str().unwrap_or_default().to_string();
     let device_id = st.devices.entry((user_id.clone(), key)).or_insert_with(random_id).clone();
     // One live token per device.
+    st.password_users.insert(user_id.clone());
+    let token = issue_token(st, &user_id, &device_id, "password");
+    Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token}))
+}
+
+/// One live token per device; the newest is `last_token`.
+fn issue_token(st: &mut State, user_id: &str, device_id: &str, auth_method: &str) -> String {
     st.tokens.retain(|_, t| t.device_id != device_id);
     let token = random_b64url(32);
-    st.tokens.insert(token.clone(), TokenInfo { user_id: user_id.clone(), device_id: device_id.clone() });
+    st.tokens.insert(token.clone(), TokenInfo { user_id: user_id.to_string(), device_id: device_id.to_string(), auth_method: auth_method.to_string() });
     st.last_token = Some(token.clone());
-    Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token}))
+    token
+}
+
+fn pct_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'+' => out.push(b' '),
+            b'%' if i + 2 < b.len() => {
+                match u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                    Ok(v) => {
+                        out.push(v);
+                        i += 2;
+                    }
+                    Err(_) => out.push(b'%'),
+                }
+            }
+            c => out.push(c),
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn parse_form(s: &str) -> Vec<(String, String)> {
+    s.split('&')
+        .filter(|kv| !kv.is_empty())
+        .map(|kv| {
+            let (k, v) = kv.split_once('=').unwrap_or((kv, ""));
+            (pct_decode(k), pct_decode(v))
+        })
+        .collect()
+}
+
+fn pct_encode(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.bytes() {
+        if c.is_ascii_alphanumeric() || matches!(c, b'-' | b'.' | b'_' | b'~') {
+            out.push(c as char);
+        } else {
+            out.push_str(&format!("%{c:02X}"));
+        }
+    }
+    out
+}
+
+fn issue_nonce(st: &mut State) -> Reply {
+    let nonce = random_b64url(32);
+    st.nonces.push(nonce.clone());
+    Reply::json(201, json!({"nonce": nonce, "expires_in": 600}))
+}
+
+fn google_account(opts: &FakeOptions, st: &State) -> (String, String) {
+    st.google_account.clone().unwrap_or_else(|| (opts.google_email.clone(), opts.google_subject.clone()))
+}
+
+fn google_error(status: u16, error: &str) -> Reply {
+    Reply::json(status, json!({"error": error}))
+}
+
+/// `GET /fake-google/auth`: validates the request, then redirects back with a code.
+fn fake_google_auth(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
+    let q: HashMap<String, String> = parse_form(&rec.query).into_iter().collect();
+    let get = |k: &str| q.get(k).map(String::as_str).unwrap_or("");
+    let redirect = get("redirect_uri");
+    let valid = get("client_id") == opts.google_client_id
+        && get("response_type") == "code"
+        && get("scope") == "openid email profile"
+        && get("code_challenge_method") == "S256"
+        && get("code_challenge").len() == 43
+        && !get("state").is_empty()
+        && !get("nonce").is_empty()
+        && get("prompt") == "select_account"
+        && redirect.starts_with("http://127.0.0.1:")
+        && redirect.ends_with("/oauth2/callback");
+    if !valid {
+        return google_error(400, "invalid_request");
+    }
+    let code = format!("4/{}", random_b64url(24));
+    let (email, subject) = google_account(opts, st);
+    st.google_codes.insert(
+        code.clone(),
+        GoogleCode { challenge: get("code_challenge").to_string(), redirect_uri: redirect.to_string(), nonce: get("nonce").to_string(), email, subject, used: false },
+    );
+    let mut r = Reply::empty(302);
+    r.location = Some(format!("{redirect}?code={}&state={}", pct_encode(&code), pct_encode(get("state"))));
+    r
+}
+
+/// `POST /fake-google/token`: PKCE-checked code exchange.
+fn fake_google_token(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
+    let f = |k: &str| rec.form.get(k).map(String::as_str).unwrap_or("");
+    if f("client_id") != opts.google_client_id || f("client_secret") != opts.google_client_secret {
+        return google_error(400, "invalid_client");
+    }
+    let verifier_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(f("code_verifier").as_bytes()));
+    let ok = f("grant_type") == "authorization_code"
+        && st.google_codes.get(f("code")).is_some_and(|c| !c.used && c.redirect_uri == f("redirect_uri") && c.challenge == verifier_challenge);
+    if !ok {
+        return google_error(400, "invalid_grant");
+    }
+    let c = st.google_codes.get_mut(f("code")).expect("checked above");
+    c.used = true;
+    let (email, subject, nonce) = (c.email.clone(), c.subject.clone(), c.nonce.clone());
+    let idt = format!("fake-idt.{}", random_b64url(32));
+    st.id_tokens.insert(idt.clone(), IdToken { email, subject, nonce, used: false });
+    Reply::json(200, json!({"access_token": "fake-at", "expires_in": 3599, "id_token": idt, "scope": "openid email profile", "token_type": "Bearer"}))
+}
+
+/// Spend the relay nonce and the id_token; `(email, subject)` when both are valid for each other.
+fn verify_google(rec: &Recorded, st: &mut State) -> Result<(String, String), Reply> {
+    let invalid = || Reply::error(401, "invalid_credentials", "Google sign-in could not be verified");
+    let nonce = rec.body["nonce"].as_str().unwrap_or("").to_string();
+    let idt = rec.body["id_token"].as_str().unwrap_or("").to_string();
+    let nonce_ok = st.nonces.contains(&nonce) && !st.spent_nonces.contains(&nonce);
+    if nonce_ok {
+        st.spent_nonces.insert(nonce.clone());
+    }
+    let token_ok = st.id_tokens.get(&idt).is_some_and(|t| !t.used && t.nonce == nonce);
+    if let Some(t) = st.id_tokens.get_mut(&idt) {
+        t.used = true;
+    }
+    if !(nonce_ok && token_ok) {
+        return Err(invalid());
+    }
+    let t = &st.id_tokens[&idt];
+    Ok((t.email.clone(), t.subject.clone()))
+}
+
+fn add_identity(st: &mut State, user_id: &str, provider: &str, subject: &str, email: &str, is_private_email: bool, via: Option<&str>) -> String {
+    st.identity_seq += 1;
+    let id = random_id();
+    st.identities.push(Identity {
+        id: id.clone(),
+        user_id: user_id.to_string(),
+        provider: provider.to_string(),
+        subject: subject.to_string(),
+        email: email.to_string(),
+        is_private_email,
+        linked_via_device_name: via.map(str::to_string),
+        created_at: now_unix(),
+        seq: st.identity_seq,
+    });
+    id
+}
+
+fn google_sign_in(rec: &Recorded, _opts: &FakeOptions, st: &mut State) -> Reply {
+    if !rec.body.is_object() || !device_ok(&rec.body["device"]) {
+        return Reply::error(400, "invalid_device", "Device information is not valid");
+    }
+    let (email, subject) = match verify_google(rec, st) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    let by_identity = st.identities.iter().find(|i| i.provider == "google" && i.subject == subject).map(|i| i.user_id.clone());
+    let user_id = if let Some(u) = by_identity {
+        u
+    } else if let Some(u) = st.users.get(&email).cloned() {
+        if st.password_users.contains(&u) {
+            return Reply::error(409, "switch_from_signed_in_device", "Switch to Google from a signed-in device");
+        }
+        add_identity(st, &u, "google", &subject, &email, false, None);
+        u
+    } else {
+        let u = random_id();
+        st.users.insert(email.clone(), u.clone());
+        add_identity(st, &u, "google", &subject, &email, false, None);
+        u
+    };
+    let key = rec.body["device"]["public_key"].as_str().unwrap_or_default().to_string();
+    let device_id = st.devices.entry((user_id.clone(), key)).or_insert_with(random_id).clone();
+    let token = issue_token(st, &user_id, &device_id, "google");
+    let account_email = st.users.iter().find(|(_, u)| **u == user_id).map(|(e, _)| e.clone()).unwrap_or(email);
+    Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token, "email": account_email}))
+}
+
+fn google_link(rec: &Recorded, _opts: &FakeOptions, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let old = bearer(rec).unwrap_or_default().to_string();
+    let (email, subject) = match verify_google(rec, st) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    let existing = st.identities.iter().find(|i| i.provider == "google" && i.subject == subject).map(|i| i.user_id.clone());
+    match existing {
+        Some(u) if u != who.user_id => return Reply::error(409, "identity_in_use", "This Google account is linked to another ShellX account"),
+        Some(_) => {}
+        None => {
+            if st.identities.iter().any(|i| i.provider == "google" && i.user_id == who.user_id) {
+                return Reply::error(409, "identity_in_use", "This account already uses another Google account");
+            }
+            if st.users.get(&email).is_some_and(|u| *u != who.user_id) {
+                return Reply::error(409, "email_in_use", "Another account already uses this email");
+            }
+            add_identity(st, &who.user_id, "google", &subject, &email, false, None);
+            let old_email = st.users.iter().find(|(_, u)| **u == who.user_id).map(|(e, _)| e.clone());
+            if let Some(oe) = old_email {
+                st.users.remove(&oe);
+            }
+            st.users.insert(email.clone(), who.user_id.clone());
+        }
+    }
+    st.tokens.remove(&old);
+    let token = issue_token(st, &who.user_id, &who.device_id, "google");
+    let account_email = st.users.iter().find(|(_, u)| **u == who.user_id).map(|(e, _)| e.clone()).unwrap_or(email);
+    Reply::json(200, json!({"user_id": who.user_id, "device_id": who.device_id, "token": token, "email": account_email}))
+}
+
+fn list_identities(rec: &Recorded, st: &State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let mut items: Vec<&Identity> = st.identities.iter().filter(|i| i.user_id == who.user_id).collect();
+    items.sort_by_key(|i| i.seq);
+    let list: Vec<Value> = items
+        .into_iter()
+        .map(|i| {
+            json!({
+                "identity_id": i.id,
+                "provider": i.provider,
+                "email": i.email,
+                "is_private_email": i.is_private_email,
+                "linked_via_device_name": i.linked_via_device_name,
+                "created_at_unix": i.created_at,
+            })
+        })
+        .collect();
+    Reply::json(200, json!({"identities": list}))
+}
+
+fn remove_identity(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let Some(ident) = st.identities.iter().find(|i| i.id == id && i.user_id == who.user_id).cloned() else {
+        return Reply::error(404, "identity_not_found", "Identity not found");
+    };
+    if ident.provider == "google" && st.identities.iter().filter(|i| i.user_id == who.user_id && i.provider == "google").count() == 1 {
+        return Reply::error(409, "last_google_identity", "A Google sign-in is required");
+    }
+    st.identities.retain(|i| i.id != id);
+    Reply::empty(204)
+}
+
+fn delete_account(rec: &Recorded, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    if rec.body["id_token"].as_str().is_none() {
+        return Reply::error(401, "reauth_required", "Sign in with Google again to delete the account");
+    }
+    let (_, subject) = match verify_google(rec, st) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    if !st.identities.iter().any(|i| i.provider == "google" && i.subject == subject && i.user_id == who.user_id) {
+        return Reply::error(401, "invalid_credentials", "Google sign-in could not be verified");
+    }
+    let uid = who.user_id;
+    st.users.retain(|_, u| *u != uid);
+    st.identities.retain(|i| i.user_id != uid);
+    st.tokens.retain(|_, t| t.user_id != uid);
+    st.password_users.remove(&uid);
+    Reply::empty(204)
+}
+
+/// Test browser: GET `url` (loopback only), follow one 3xx `Location` (loopback only).
+pub fn browse(url: &str) -> Result<(u16, String), String> {
+    fn get(url: &str) -> Result<(u16, Option<String>, String), String> {
+        let rest = url.strip_prefix("http://127.0.0.1:").ok_or_else(|| "browse: only http://127.0.0.1: URLs".to_string())?;
+        let (port, path) = rest.split_once('/').map(|(p, r)| (p, format!("/{r}"))).unwrap_or((rest, "/".to_string()));
+        let mut s = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).map_err(|e| e.to_string())?;
+        let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+        use std::io::Write;
+        write!(s, "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n").map_err(|e| e.to_string())?;
+        let mut resp = String::new();
+        s.read_to_string(&mut resp).map_err(|e| e.to_string())?;
+        let status: u16 = resp.get(9..12).and_then(|c| c.parse().ok()).ok_or_else(|| "browse: bad status line".to_string())?;
+        let (head, body) = resp.split_once("\r\n\r\n").unwrap_or((&resp, ""));
+        let loc = head.lines().find_map(|l| {
+            let (k, v) = l.split_once(':')?;
+            k.eq_ignore_ascii_case("location").then(|| v.trim().to_string())
+        });
+        Ok((status, loc, body.to_string()))
+    }
+    let (status, loc, body) = get(url)?;
+    if (300..400).contains(&status) {
+        if let Some(l) = loc {
+            let (s2, _, b2) = get(&l)?;
+            return Ok((s2, b2));
+        }
+    }
+    Ok((status, body))
 }
 
 #[cfg(test)]

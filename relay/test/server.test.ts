@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createTestIssuer, testIdTokenClaims } from "../scripts/test-idp.js";
 import { passwords, type PasswordHasher } from "../src/auth/password.js";
 import { Db } from "../src/db/db.js";
 import { HubRegistry } from "../src/hub/registry.js";
@@ -13,8 +14,8 @@ import { GOING_AWAY } from "../src/hub/user-hub.js";
 import { pairingRemovedEvent } from "../src/protocol/frames.js";
 import type { RunningRelay } from "../src/relay.js";
 import {
-  call, connect, db, deviceBody, hex, loginDevice, makeApp, newPairingId, onCleanup, pair, PASSWORD, randomEmail,
-  registerAccount, tempDir, type TestApp, waitFor,
+  call, connect, db, deviceBody, hex, loginDesktop, loginDevice, makeApp, newPairingId, onCleanup, pair, PASSWORD, randomEmail,
+  registerAccount, registerMachine, tempDir, type TestApp, waitFor,
 } from "./helpers.js";
 
 const RELAY_DIR = join(import.meta.dirname, "..");
@@ -186,17 +187,17 @@ describe("graceful shutdown (spec §4.3)", () => {
     const server = startServer({ ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false" });
     onCleanup(() => server.child.kill("SIGKILL"));
     const port = await waitForListening(server.output);
-    const body = Buffer.from(JSON.stringify({ email: randomEmail(), password: PASSWORD, device: deviceBody("agent") }), "utf8");
+    const body = Buffer.from(JSON.stringify({ email: randomEmail(), password: PASSWORD, device: deviceBody("mobile") }), "utf8");
 
-    // A registration whose body is still arriving: the relay is inside the route, awaiting the rest.
+    // A sign-in whose body is still arriving: the relay is inside the route, awaiting the rest.
     // `Expect: 100-continue` makes the relay confirm it has dispatched the request before we go on.
     let sendRest: () => void = () => {};
     let dispatched: () => void = () => {};
     const inRoute = new Promise<void>((resolve) => (dispatched = resolve));
-    const registered = new Promise<number>((resolve, reject) => {
+    const answered = new Promise<number>((resolve, reject) => {
       const req = httpRequest(
         {
-          host: "127.0.0.1", port, method: "POST", path: "/v1/auth/register", agent: false,
+          host: "127.0.0.1", port, method: "POST", path: "/v1/auth/login", agent: false,
           headers: { "Content-Type": "application/json", "Content-Length": String(body.length), Expect: "100-continue" },
         },
         (res) => {
@@ -222,7 +223,7 @@ describe("graceful shutdown (spec §4.3)", () => {
     expect(server.child.signalCode).toBeNull();
 
     sendRest();
-    expect(await registered).toBe(201);
+    expect(await answered).toBe(401); // completed normally
     const result = await server.exit;
     expect(result.code).toBe(0);
     expect(result.stdout.match(/"event":"relay_stopping"/g)).toHaveLength(1);
@@ -306,6 +307,33 @@ describe("restart", () => {
 });
 
 describe("push configuration (FCM_SERVICE_ACCOUNT, push spec §5)", () => {
+  /** A service account key file with a fresh 2048-bit RSA PKCS#8 key. */
+  function writeServiceAccount(path: string, projectId: string): void {
+    const { privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    });
+    writeFileSync(path, JSON.stringify({ project_id: projectId, client_email: `t@${projectId}.iam`, private_key: privateKey }));
+  }
+
+  /** A fake FCM server on 127.0.0.1 (`/token` answers an access token, anything else a message name); closed on cleanup. */
+  async function startFakeFcm(): Promise<{ url: string; seen: { path: string; body: string }[] }> {
+    const seen: { path: string; body: string }[] = [];
+    const fake = createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
+      req.on("end", () => {
+        seen.push({ path: req.url ?? "", body });
+        res.setHeader("Content-Type", "application/json");
+        res.end(req.url === "/token" ? JSON.stringify({ access_token: "fake", expires_in: 3600 }) : JSON.stringify({ name: "m/1" }));
+      });
+    });
+    await new Promise<void>((resolve) => fake.listen(0, "127.0.0.1", resolve));
+    onCleanup(() => new Promise<void>((resolve) => fake.close(() => resolve())));
+    return { url: `http://127.0.0.1:${(fake.address() as AddressInfo).port}`, seen };
+  }
+
   it("a missing or broken key file leaves push off: the relay still runs and answers 503 push_unavailable", async () => {
     const keyFile = join(tempDir(), "fcm.json");
     writeFileSync(keyFile, "{ not json");
@@ -328,26 +356,11 @@ describe("push configuration (FCM_SERVICE_ACCOUNT, push spec §5)", () => {
   });
 
   it("with a key and loopback FCM overrides, a notification reaches the (fake) FCM server with the phone's token", async () => {
-    const { privateKey } = generateKeyPairSync("rsa", {
-      modulusLength: 2048,
-      privateKeyEncoding: { type: "pkcs8", format: "pem" },
-      publicKeyEncoding: { type: "spki", format: "pem" },
-    });
     const keyFile = join(tempDir(), "fcm.json");
-    writeFileSync(keyFile, JSON.stringify({ project_id: "shellx-test", client_email: "t@shellx-test.iam", private_key: privateKey }));
-    const seen: { path: string; body: string }[] = [];
-    const fake = createServer((req, res) => {
-      let body = "";
-      req.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
-      req.on("end", () => {
-        seen.push({ path: req.url ?? "", body });
-        res.setHeader("Content-Type", "application/json");
-        res.end(req.url === "/token" ? JSON.stringify({ access_token: "fake", expires_in: 3600 }) : JSON.stringify({ name: "m/1" }));
-      });
-    });
-    await new Promise<void>((resolve) => fake.listen(0, "127.0.0.1", resolve));
-    onCleanup(() => new Promise<void>((resolve) => fake.close(() => resolve())));
-    const fakeUrl = `http://127.0.0.1:${(fake.address() as AddressInfo).port}`;
+    writeServiceAccount(keyFile, "shellx-test");
+    const fake = await startFakeFcm();
+    const seen = fake.seen;
+    const fakeUrl = fake.url;
 
     const server = startServer({
       ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false",
@@ -376,6 +389,47 @@ describe("push configuration (FCM_SERVICE_ACCOUNT, push spec §5)", () => {
     expect(result.stdout).not.toContain("Build xong");
     expect(result.stdout).not.toContain("phone-fcm-token");
   });
+
+  it("with only an FCM key, POST /v2/notifications reaches a granted Android phone as a data-only message", async () => {
+    const keyFile = join(tempDir(), "fcm.json");
+    writeServiceAccount(keyFile, "shellx-test");
+    const fcm = await startFakeFcm();
+    const server = startServer({
+      ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false",
+      FCM_SERVICE_ACCOUNT: keyFile, FCM_ENDPOINT: fcm.url, FCM_TOKEN_ENDPOINT: `${fcm.url}/token`,
+    });
+    const port = await waitForListening(server.output);
+    expect(server.output()).toContain('"event":"apns_disabled","reason":"not_configured"');
+    const app = remote(port);
+    const account = await registerAccount(app);
+    const desktop = await loginDesktop(app, account);
+    const { machine_id: machineId } = await registerMachine(app, desktop.token);
+    const phone = await loginDesktop(app, account, { kind: "mobile", platform: "android", name: "Pixel 9" });
+    const key = Buffer.alloc(32, 7).toString("base64");
+    const request = await call(app, "POST", "/v2/phone-pairings", { token: phone.token, body: { machine_id: machineId, client_key_b64: key, proof_b64: key } });
+    const { pairing_id: pairingId } = await request.json<{ pairing_id: string }>();
+    expect((await call(app, "POST", `/v2/phone-pairings/${pairingId}/approve`, { token: desktop.token })).status).toBe(204);
+    expect((await call(app, "PUT", "/v1/devices/me/push-token", { token: phone.token, body: { token: "android-fcm-token", platform: "android" } })).status).toBe(204);
+
+    const res = await call(app, "POST", "/v2/notifications", {
+      token: desktop.token, body: { kind: "needs_you", request_id: "req-1", agent: "Claude Code", workspace_title: "Dự án" },
+    });
+
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ sent: 1 });
+    expect(fcm.seen.map((s) => s.path)).toEqual(["/token", "/v1/projects/shellx-test/messages:send"]);
+    expect(JSON.parse(fcm.seen[1]!.body)).toEqual({
+      message: {
+        token: "android-fcm-token",
+        data: { kind: "needs_you", machine_id: machineId, request_id: "req-1", agent: "Claude Code", workspace_title: "Dự án" },
+        android: { priority: "high", ttl: "86400s", collapse_key: "req-1" },
+      },
+    });
+    server.child.kill("SIGTERM");
+    const result = await server.exit;
+    expect(result.code).toBe(0);
+    for (const secret of ["Claude Code", "Dự án", "android-fcm-token"]) expect(result.stdout).not.toContain(secret);
+  });
 });
 
 describe("admin configuration (ADMIN_PASSWORD, ADMIN_HOST)", () => {
@@ -396,5 +450,30 @@ describe("admin configuration (ADMIN_PASSWORD, ADMIN_HOST)", () => {
       expect(result.code).toBe(0);
       if ("ADMIN_PASSWORD" in extra) expect(result.stdout).not.toContain(extra.ADMIN_PASSWORD);
     }
+  });
+});
+
+describe("test identity provider (TEST_IDP_ISSUER, TEST_IDP_JWKS_PATH)", () => {
+  it("signs in with a token of the configured test issuer and logs it; an unreadable JWKS file stops the relay", async () => {
+    const issuer = "https://test-idp.shellx.invalid";
+    const idp = await createTestIssuer(issuer);
+    const jwksFile = join(tempDir(), "test-idp.json");
+    writeFileSync(jwksFile, JSON.stringify(idp.jwks));
+    const env = { ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db"), RATE_LIMITS_ENABLED: "false", TEST_IDP_ISSUER: issuer };
+    const server = startServer({ ...env, TEST_IDP_JWKS_PATH: jwksFile });
+    onCleanup(() => server.child.kill("SIGKILL"));
+    const app = remote(await waitForListening(server.output));
+    expect(server.output()).toContain('"event":"test_idp_enabled"');
+    expect(server.output()).toContain('"event":"google_sign_in_disabled"');
+    const { nonce } = await (await call(app, "POST", "/v1/auth/nonce", { body: {} })).json<{ nonce: string }>();
+    const id_token = await idp.sign(testIdTokenClaims(issuer, { sub: "t-1", email: "e2e@example.com", nonce }));
+    const res = await call(app, "POST", "/v1/auth/google", { body: { id_token, nonce, device: deviceBody("desktop") } });
+    expect(res.status).toBe(200);
+    expect(db().get("SELECT auth_method FROM tokens WHERE device_id = ?", (await res.json<{ device_id: string }>()).device_id)).toEqual({ auth_method: "test" });
+    server.child.kill("SIGTERM");
+    expect((await server.exit).code).toBe(0);
+
+    const broken = await startServer({ ...env, TEST_IDP_JWKS_PATH: join(tempDir(), "missing.json") }).exit;
+    expect([broken.code, broken.stderr]).toEqual([1, "relay: TEST_IDP_JWKS_PATH is not a readable JWKS file\n"]);
   });
 });

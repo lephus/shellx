@@ -39,7 +39,10 @@ enum AppComposition {
         // The hub reports a refused token to the coordinator that made it.
         let owner = CoordinatorReference()
         let coordinator = AppCoordinator(
-            vault: vault, relay: relay, deviceName: deviceName, wipers: [history],
+            vault: vault, relay: relay,
+            identity: SystemIdentityProvider(
+                googleClientID: bundle.object(forInfoDictionaryKey: "ShellXGoogleClientID") as? String),
+            deviceName: deviceName, wipers: [history],
             makeHub: {
                 let hub = MachineHub(
                     vault: vault, relay: relay, connector: connector, latency: latency, defaults: .standard,

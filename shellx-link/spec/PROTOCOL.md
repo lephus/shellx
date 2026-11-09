@@ -62,10 +62,12 @@ A frame is one UTF-8 JSON object:
 
 ### Extension
 
-- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision, of a ChatEntry and
-  of an `attach.begin`), `mode`, `outcome`, `state` (of an AgentSession), `role` (of a ChatEntry), and
-  the enum fields later versions add. A value this version does not know still decodes (an
-  implementation keeps the raw string, for example as `.other(raw)`); it is never `bad_json`.
+- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision, of a ChatEntry, of an
+  `attach.begin` and of a terminal frame's head), `mode`, `outcome`, `state` (of an AgentSession), `role` (of a
+  ChatEntry), `reason` (of a `terminal.view.ended`), `k`, `key` and the `mods` entries (of a terminal input unit),
+  `shape` (of a terminal cursor), the `attrs` entries (of a terminal style), and the enum fields later versions add.
+  A value this version does not know still decodes (an implementation keeps the raw string, for example as
+  `.other(raw)`); it is never `bad_json`.
 - A sender MAY add an optional field at any time; receivers ignore fields they do not know.
 - A host MAY add a push, a message that answers no call (such as `chat.reset`): a client that predates it
   ignores it (section 7), so it needs no new `v`. A new request that expects an answer carries a
@@ -79,7 +81,7 @@ A frame is one UTF-8 JSON object:
 Every request that expects exactly one answer carries a `call_id`: `agent.snapshot.get`,
 `agent.reply`, `agent.sessions.get`, `chat.history.get`, `chat.send`, `chat.interrupt`, `attach.begin`,
 `attach.chunk`, `attach.end`, `workspace.list.get`, `workspace.create`, `workspace.rename`,
-`workspace.close`, `agent.close` and `terminal.close` (and the requests later versions add on the same pattern).
+`workspace.close`, `agent.close`, `terminal.close`, `terminal.view.open` and `terminal.create` (and the requests later versions add on the same pattern).
 
 - The client chooses it: a string of 1 to 64 UTF-8 bytes, different from every other call of
   that client that is still waiting in the session.
@@ -87,7 +89,7 @@ Every request that expects exactly one answer carries a `call_id`: `agent.snapsh
   answer (`agent.snapshot`, `agent.reply.result`, `agent.sessions`, `chat.history`,
   `chat.send.result`, `chat.interrupt.result`, `attach.ready`, `attach.chunk.result`, `attach.end.result`,
   `workspace.list`, `workspace.create.result`, `workspace.rename.result`, `workspace.close.result`,
-  `agent.close.result`, `terminal.close.result`), or an `error` that carries it.
+  `agent.close.result`, `terminal.close.result`, `terminal.view.open.result`, `terminal.create.result`), or an `error` that carries it.
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
 - A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
@@ -140,13 +142,23 @@ Every request that expects exactly one answer carries a `call_id`: `agent.snapsh
 | `agent.close.result` | host | Reply to every `agent.close` | `call_id` string, `outcome` string |
 | `terminal.close` | client | The user closes one terminal tab of a workspace on the Mac | `call_id` string, `workspace_id` string, `terminal_id` string |
 | `terminal.close.result` | host | Reply to every `terminal.close` | `call_id` string, `outcome` string |
+| `terminal.view.open` | client | The user opens a terminal pane: start a view (section 11) | `call_id` string, `terminal_id` string, `cols` int, `rows` int |
+| `terminal.view.open.result` | host | Reply to every acceptable `terminal.view.open` | `call_id` string, `outcome` string |
+| `terminal.view.frame` | host | One part of a frame of the open view | `terminal_id` string, `revision` int, `part` int, `parts` int, `head` object (part 0 only), `styles` array (optional), `lines` array (optional); section 11 |
+| `terminal.view.input` | client | The user types, presses a key, pastes or scrolls in the open view | `terminal_id` string, `units` array of input units (section 11) |
+| `terminal.view.resize` | client | The phone's terminal area changed size | `terminal_id` string, `cols` int, `rows` int |
+| `terminal.view.resync` | client | The phone missed part of the stream and needs a snapshot | `terminal_id` string |
+| `terminal.view.close` | client | The user leaves the terminal pane (the tab stays on the Mac) | `terminal_id` string |
+| `terminal.view.ended` | host | A view ended without the phone asking, or the phone named a terminal it does not view | `terminal_id` string, `reason` string |
+| `terminal.create` | client | The user opens a new terminal tab in a workspace | `call_id` string, `workspace_id` string |
+| `terminal.create.result` | host | Reply to every acceptable `terminal.create` | `call_id` string, `outcome` string, `terminal_id` string (the new terminal; present only when `outcome` is `ok`) |
 | `ping` | either | Keep-alive / latency probe | `nonce` uint64 |
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
 Error codes in use: `protocol_mismatch`, `bad_request`, `too_large` (an answer that does not fit a frame,
 section 6, or an `attach.begin` whose `size` is above the limit, section 5), `unsupported` (the host has no
 session list or no chat, takes no attachments, lists no workspaces, takes no workspace control, no agent
-control or no terminal control, or does not know the call's `t`: it answers each such call with this code and its
+control or no terminal control, offers no terminal views or no terminal creation, or does not know the call's `t`: it answers each such call with this code and its
 `call_id`), `not_found` (`chat.history.get` for a `session_id` the host does not have). Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
@@ -187,6 +199,10 @@ lists it, and ignores a string it does not know. These features are defined:
 - `workspace_control`: the host takes `workspace.create`, `workspace.rename` and `workspace.close` (Workspace).
 - `agent_close`: the host takes `agent.close` (Workspace).
 - `terminal_close`: the host takes `terminal.close` (Workspace).
+- `terminal_view`: the host takes `terminal.view.open`, `terminal.view.input`, `terminal.view.resize`,
+  `terminal.view.resync` and `terminal.view.close`, and sends `terminal.view.frame` and `terminal.view.ended`
+  (section 11).
+- `terminal_create`: the host takes `terminal.create` (section 11).
 
 ### PendingItem
 
@@ -495,7 +511,7 @@ answer to a call, not only snapshots. A push that answers no call, such as `agen
 logged and dropped; a client recovers through `agent.snapshot.get`, which the host answers with
 the same rule.
 Splitting one logical message into several frames is not defined in v1, except for `chat.entries`
-(below).
+(below) and `terminal.view.frame` (section 11.4).
 
 `text` of a ChatEntry is at most 4096 UTF-8 bytes, cut on a Unicode scalar boundary, with `truncated` set
 to `true` when it was cut. The host enforces this on every entry it sends, whatever its transcript source gave. Besides the snapshot rule above,
@@ -571,8 +587,7 @@ Rules:
   its character count does not. Encoding the `error` message with that filler as `message` must
   succeed or fail the same way.
 
-`message.case` names the message; the other `message` keys use the JSON field names (`decision`
-and PendingItem objects use their wire form). All 41 cases:
+`message.case` names the message; the other `message` keys use the JSON field names (`decision`, PendingItem objects, and the `head`, `styles`, `lines` and `units` of the terminal messages use their wire form). All 51 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
@@ -616,7 +631,33 @@ and PendingItem objects use their wire form). All 41 cases:
 | `agent_close_result` | `agent.close.result` | `call_id`, `outcome` |
 | `terminal_close` | `terminal.close` | `call_id`, `workspace_id`, `terminal_id` |
 | `terminal_close_result` | `terminal.close.result` | `call_id`, `outcome` |
+| `terminal_view_open` | `terminal.view.open` | `call_id`, `terminal_id`, `cols`, `rows` |
+| `terminal_view_open_result` | `terminal.view.open.result` | `call_id`, `outcome` |
+| `terminal_view_frame` | `terminal.view.frame` | `terminal_id`, `revision`, `part`, `parts`, `head` (optional), `styles` (optional), `lines` (optional) |
+| `terminal_view_input` | `terminal.view.input` | `terminal_id`, `units` |
+| `terminal_view_resize` | `terminal.view.resize` | `terminal_id`, `cols`, `rows` |
+| `terminal_view_resync` | `terminal.view.resync` | `terminal_id` |
+| `terminal_view_close` | `terminal.view.close` | `terminal_id` |
+| `terminal_view_ended` | `terminal.view.ended` | `terminal_id`, `reason` |
+| `terminal_create` | `terminal.create` | `call_id`, `workspace_id` |
+| `terminal_create_result` | `terminal.create.result` | `call_id`, `outcome`, `terminal_id` (optional) |
 | `unknown` | any unrecognized `t` | `type` (the `t` value), `call_id` (optional: the frame's valid `call_id`); decode-only |
+
+`spec/vectors/terminal.json` holds the vectors of section 11:
+
+- `palette`: a Palette. In `screens`, a head whose `palette` is the string `"@palette"` stands for it: a test puts the
+  object in before decoding.
+- `limits` (the values of 11.10, by name), `keys` and `modifiers` (the names of 11.2, in the order given there).
+- `input_checks`: `{name, units, ok}`. `units` is the `units` of a `terminal.view.input`; `ok` is true when a host
+  applies the message (it skips unknown kinds, keys and modifiers) and false when it answers `bad_request`.
+- `screens`: `{name, max_history_rows (optional: how many history rows the client keeps), frames, expect}`. A client
+  that follows 11.6 and 11.7 is given the `frames` (whole `terminal.view.frame` messages) in order; afterwards it must
+  hold `expect`: `revision` (its current revision), `resyncs` (how many `terminal.view.resync` it sent), `cols`,
+  `rows`, `alt`, `cursor` (optional), `screen` and `history` (each row as text: the cells' text from left to right, a
+  blank cell as a space, nothing for the second column of a wide cell, trailing spaces removed) and `cells`
+  (optional): `{x, y, kind}` with `kind` `glyph` (and `t`, `w`, and `style` with `fg`, `fg_rgb`, `bg`, `bg_rgb`,
+  `attrs`, absent for the default style), `blank`, or `continuation` (the second column of a wide cell); a negative
+  `y` counts history rows from the newest (-1).
 
 ## 9. Pairing and trust
 
@@ -691,24 +732,27 @@ accepts a pairing request for a machine of the phone's own account.
 
 ## 10. Phone commands
 
-A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt it,
-close the terminal it runs in, close any terminal tab of a listed workspace, and make, rename or close a workspace.
-This section is the safety analysis for those commands. It follows the rules a remote command channel must meet: deny by default, allow only the
-calls a product flow needs, scope every call to objects the caller may touch, and never let a call execute
-or open arbitrary content on the Mac.
+A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt it, close the
+terminal it runs in, close any terminal tab of a listed workspace, make, rename or close a workspace, open a new
+terminal tab in a listed workspace, and view one terminal of a listed workspace and type into it. This section is the
+safety analysis for those commands. It follows the rules a remote command channel must meet: deny by default, allow
+only the calls a product flow needs, scope every call to objects the caller may touch, and never let a call execute
+or open arbitrary content on the Mac. Typing into a terminal the user opened on the phone is the one place where what
+the phone sends runs as the user's input, on purpose (Terminal views below).
 
 **Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
 call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
 ignored, and a host frame type sent by a client is ignored or answered `bad_request` (section 7). No
-field of any message names a command line, a program, a directory or other path on the host, or a URL for
-the host to open or run, and none names a terminal to type into (`chat.send` and `chat.interrupt` name an
-agent session, and the host types only into that session's terminal: see Shell fall-through below). A call
-names a workspace only to rename or close one that the host's own list holds (`workspace.rename`,
-`workspace.close`), or to find a tab in it (`terminal.close`), and `workspace.create` names nothing: the host
-chooses where the new workspace goes.
-`agent.close` names an agent session and nothing else, and the host closes only the terminal that
-session is bound to (Agents below). `terminal.close` names a workspace and one of its terminals in the host's own
-list, to close that tab and for nothing else (Tabs below).
+field of any message names a command line, a program, a directory or other path on the host, an environment variable,
+or a URL for the host to open or run. Only `terminal.view.input` names a terminal to type into, and only the one
+terminal its session opened with `terminal.view.open` (Terminal views below); `chat.send` and `chat.interrupt` name an
+agent session, and the host types only into that session's terminal (Shell fall-through below). A call names a
+workspace only to rename or close one that the host's own list holds (`workspace.rename`, `workspace.close`), to find a
+tab in it (`terminal.close`), or to add a terminal tab to it (`terminal.create`), and `workspace.create` names nothing:
+the host chooses where the new workspace goes. `agent.close` names an agent session and nothing else, and the host
+closes only the terminal that session is bound to (Agents below). `terminal.close` names a workspace and one of its
+terminals in the host's own list, to close that tab and for nothing else (Tabs below). `terminal.view.open` names a
+terminal of the host's own list, to show it and for nothing else.
 (`attach.begin.name` is a label that the host sanitises, never a path: see Attachments below.)
 
 **Allowed calls.**
@@ -726,16 +770,21 @@ list, to close that tab and for nothing else (Tabs below).
 | `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rules: it refuses to close a pinned workspace or the last workspace of a window, and refuses every control call while device management blocks remote control | One local workspace in the host's list, by `workspace_id` |
 | `agent.close` | Closes the terminal tab of that agent session, without asking, ending what runs in it. A tab pinned on the Mac is `refused`, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes. The Mac refuses while device management blocks remote control | One live Claude Code session in a local workspace of the host's list, by `session_id`; `not_found` for an unknown, ended or tab-less session |
 | `terminal.close` | Closes that terminal tab, without asking, ending what runs in it, whether or not an agent runs there. A tab pinned on the Mac is `refused`, as the Mac's Close Tab refuses it. On the workspace's last tab (of any kind) it closes the workspace, as the Mac's Close Tab does by default; with the Mac's "Keep Workspace Open When Closing Last Surface" setting on it is `refused` and nothing closes, and the Mac's rules for closing a workspace still hold (a pinned workspace, the last workspace of a window). The Mac refuses while device management blocks remote control | One terminal of a local workspace in the host's list, by `workspace_id` and `terminal_id`; `not_found` for any other pair |
+| `terminal.view.open` | Starts sending that terminal's screen and its history (at most 4 000 rows) to the phone, and counts the phone among the parties of the terminal's size (section 11.3). Changes no selection, focus or window order on the Mac | One terminal of a local workspace in the host's list, by `terminal_id`; `not_found` for any other id; at most one per session (`busy`) |
+| `terminal.view.input` | Types text, presses keys from a fixed list (no ⌘), pastes text, or turns the mouse wheel (alternate screen only) in that terminal, as the user at the Mac's keyboard would: whatever runs there gets it | Only the terminal this session views; for any other `terminal_id` nothing is typed and the answer is `terminal.view.ended` `not_open`. At most 4 096 bytes of typed text and 16 384 of pasted text per message, no control characters in typed text |
+| `terminal.view.resize`, `terminal.view.resync`, `terminal.view.close` | Reports the phone's size, which the terminal takes while the phone is the last to use it; sends a new snapshot; ends the view (the terminal goes back to the Mac's size) | The terminal this session views |
+| `terminal.create` | Opens a new terminal tab in that workspace's selected pane, running the user's default shell, as the Mac's add-tab button does. Changes no selection, focus or window order | One local workspace in the host's list, by `workspace_id`; `not_found` otherwise. The call carries nothing else: no command, path, directory, program or environment |
 | `ping` | None | |
 
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
-local workspaces. `session_id`, `request_id`, `workspace_id` and `terminal_id` are looked up in the host's own
-lists; an id it does not have is `not_found` (`unknown` for a reply). A phone cannot name a workspace that is not
-in the list (an SSH or other remote workspace never is), nor a file, machine or account, nor a terminal outside
-those workspaces; `terminal.close` reaches a terminal of a listed workspace by its `terminal_id`, and `agent.close`
-reaches a terminal only through a live agent session the host lists in one of those local workspaces. Only a
-phone the Mac trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac
-showed, and allowed by the user on that Mac (section 9).
+local workspaces with their terminals. `session_id`, `request_id`, `workspace_id` and `terminal_id` are looked up in
+the host's own lists; an id it does not have is `not_found` (`unknown` for a reply). A phone cannot name a workspace
+that is not in the list (an SSH or other remote workspace never is), nor a file, machine or account, nor a terminal
+outside those workspaces; `terminal.close` and `terminal.view.open` reach a terminal of a listed workspace by its
+`terminal_id`, `terminal.view.input` reaches only the terminal its session opened, and `agent.close` reaches a
+terminal only through a live agent session the host lists in one of those local workspaces. Only a phone the Mac
+trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac showed, and allowed by
+the user on that Mac (section 9).
 
 **Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in, and
 `agent.close` closes it. Once the agent has exited, that terminal runs the user's shell or whatever started
@@ -750,7 +799,7 @@ never sends the text to, or closes, another terminal. What remains is the moment
 typing: an agent that exits within it can still let one message reach the terminal, the same window the
 Mac's own remote-control path has. For `agent.close` the same moment lets a terminal that has just turned
 into the user's shell be closed. `terminal.close` is not bound by this rule: it closes a tab the user picked,
-whatever runs there (Tabs, below).
+whatever runs there (Tabs, below). Typing into a shell is what a terminal view is for, but only into a terminal the user opened as one on the phone (`terminal.view.input`, Terminal views below); `chat.send` and `chat.interrupt` stay bound to live agents.
 
 **Attachments.** `attach.*` lets a phone put files on the Mac, so what it may choose is narrow. The phone
 never picks a path: the host names the directory, the file name and the file mode. An image is saved the
@@ -793,14 +842,11 @@ its prompt, and a paired phone is trusted like the user (below). The host never 
 bytes. The cmux socket method `mobile.chat.send` does not accept files (it
 answers `invalid_params`); only ShellX Link does.
 
-**Workspaces.** `workspace.*` is the one place where a phone makes the Mac start something, so it answers the
-three questions a remote command channel must answer, one by one.
+**Workspaces.** `workspace.create` starts something on the Mac (so does `terminal.create`, Terminal views below), so `workspace.*` answers the three questions a remote command channel must answer, one by one.
 
 - Does it run commands or open content on the Mac? Only `workspace.create` starts anything: a workspace whose
   terminal starts the user's default shell when it is first shown, in a directory the Mac chooses, exactly as
-  when the user presses the add button on the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no
-  call types into that shell: `chat.send` still reaches only the terminal of a live agent (Shell fall-through
-  above). The phone does not select the new workspace on the Mac, nor bring a window forward.
+  when the user presses the add button on the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no workspace call types into that shell: `chat.send` still reaches only the terminal of a live agent (Shell fall-through above), and only a terminal view the user opened types into a shell (Terminal views below). The phone does not select the new workspace on the Mac, nor bring a window forward.
 - Does it change or destroy what the phone does not own? The only objects are this Mac's own local workspaces,
   found by `workspace_id` in the host's list; any other id is `not_found`, and SSH or other remote workspaces
   are not listed, so they can be neither renamed nor closed. `workspace.close` keeps the Mac's rules: the Mac
@@ -851,13 +897,43 @@ three questions a remote command channel must answer, one by one.
 - Does it read state the phone has no business seeing? No. The answer is an `outcome` and nothing else, and the
   host never logs a workspace id, a terminal id or a title for it.
 
+**Terminal views.** `terminal.view.*` and `terminal.create` let a phone use the Mac's terminals, so they answer the
+same three questions.
+
+- Does it run commands or open content on the Mac? Yes, on purpose: `terminal.view.input` types into the one terminal
+  the session opened, exactly as the user at the Mac's keyboard could, so whatever runs there (a shell, an editor, an
+  agent) gets what the phone types and acts on it. Nothing else is reachable. No message carries a command line, path,
+  directory, environment variable, URL or program name for the host to run or open. Typed text cannot hold control
+  characters, so no escape sequence reaches the Mac's terminal (the Mac turns typed text into key presses, and would
+  hand an escape sequence in it to its display parser rather than to the program); keys come from a fixed list with
+  `ctrl`, `alt` and `shift` only, so the Mac app's ⌘ shortcuts cannot be pressed (a key the user bound to a terminal
+  action in the terminal's own configuration does what it does at the Mac); pasted text goes through the Mac's paste
+  path and may hold only tabs and line breaks as control characters; the mouse wheel acts only on the alternate
+  screen. `terminal.create` starts the user's default shell in a new tab, in a directory the Mac chooses, and types
+  nothing into it.
+- Does it change or destroy what the phone does not own? It reaches only terminals of the Mac's own local workspaces,
+  by ids the host looks up in its own list; SSH and other remote workspaces are not listed, so `not_found`. Input goes
+  only to the terminal its session opened, never to another (`not_open`), and a view ends with its session, its
+  terminal or device management. The phone's size applies to that terminal only while the phone is the last to use
+  it, and the terminal goes back to the Mac's size when the view ends (closed, another terminal opened, session
+  ended, phone removed). None of these calls changes the Mac's selection or focus or brings a window to the front.
+  `terminal.create` adds a tab and closes nothing.
+- Does it read state the phone has no business seeing? It reads the screen of the terminal the phone opened, at most
+  4 000 rows (and 262 144 bytes) of its history, and the terminal's colors: what the user sees in that terminal on the
+  Mac. It reads no other terminal, no file, no environment variable and no setting beyond the terminal's colors. One
+  view per session, one frame per view waiting to be sent, and bounded input queues keep what a phone can make the
+  Mac capture and hold small (section 11.8).
+
 More rules: a Mac whose device management (MDM) blocks remote control does not run a Link host at all, and a
 host that sees that policy change during a session answers every `workspace.create`, `workspace.rename`,
-`workspace.close`, `agent.close` and `terminal.close` with `refused` without acting. Removing a phone on the Mac
-closes its sessions at once (above). A control call, `agent.close` and `terminal.close` included, runs on its own,
-so a slow Mac does not hold up the session's other calls. The host never logs a workspace title, directory, branch or tab title, nor the
-title of an agent session. These are ShellX Link calls, not cmux socket methods: the allowlist of the `cmux ssh`
-relay does not change.
+`workspace.close`, `agent.close`, `terminal.close`, `terminal.create` and `terminal.view.open` with `refused` without
+acting, and ends an open view with `terminal.view.ended` `refused` (input that arrives after that is not applied).
+Removing a phone on the Mac closes its sessions at once (above), and with them its view. A control call,
+`agent.close`, `terminal.close` and `terminal.create` included, runs on its own, so a slow Mac does not hold up the
+session's other calls; the input of a view is applied in order without holding them up either. The host never logs a
+workspace title, directory, branch or tab title, the title of an agent session, terminal content, or text and keys a
+phone typed or pasted. These are ShellX Link calls, not cmux socket methods: the allowlist of the `cmux ssh` relay
+does not change.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
@@ -865,10 +941,260 @@ that trust nor widen it (section 9). Removing the phone on the Mac untrusts its 
 sessions close and its next handshake is refused. Removing it on the phone deletes the grant, so the relay
 mints it no new connect ticket, and the Mac drops the key when it next checks the grants. Within that
 trust, typing into the user's own agent session, stopping it, closing its terminal or any of its tabs, answering
-its requests, and making, renaming and closing its workspaces are what the user could do at the keyboard; the
-allowed calls limit *which objects* a phone reaches (this Mac's live agent sessions and their pending requests,
-and its local workspaces with their terminal tabs), not what the user may do with them. Out of reach for a phone
-in this version: spawning or respawning terminals (a new workspace's first terminal apart), keys or text for anything but a live agent,
-opening URLs or files, the Mac's settings, the `bypass` modes, other machines and other accounts. The host
-never logs message text, attachment names or bytes, tool inputs, workspace or tab names, keys, tickets or
-tokens.
+its requests, making, renaming and closing its workspaces, opening terminal tabs in them, and watching and typing
+into one of their terminals are what the user could do at the keyboard; the allowed calls limit *which objects* a
+phone reaches (this Mac's live agent sessions and their pending requests, and its local workspaces with their
+terminal tabs), not what the user may do with them. Out of reach for a phone in this version: spawning or respawning
+terminals other than a new workspace's first terminal and the new tab of `terminal.create`, keys or text for a
+terminal its session has not opened, the Mac app's ⌘ shortcuts, opening URLs or files, the Mac's settings, the
+`bypass` modes, other machines and other accounts. The host never logs message text, attachment names or bytes, tool
+inputs, workspace or tab names, terminal content, typed keys or text, tickets or tokens.
+
+## 11. Terminal views
+
+A phone can show one terminal of the host and type into it (`terminal_view`), and open a new terminal tab in a
+workspace (`terminal_create`). The phone gets the screen the Mac's terminal has already drawn, as a grid of styled
+cells, not the bytes the program wrote: it draws cells and never parses escape sequences. A terminal is named by the
+`terminal_id` of a Terminal in the workspace list (section 4, Workspace).
+
+### 11.1 Views
+
+- `terminal.view.open` asks to view a terminal at the size the phone can show (`cols`, `rows`, 11.3). The host answers
+  `terminal.view.open.result` with an `outcome` (an open enum; a client treats a value it does not know as `failed`):
+  - `ok`: the view is open; its frames follow (11.4), the first a snapshot at revision 1;
+  - `not_found`: no terminal with this id in a local workspace the host lists;
+  - `refused`: the Mac blocks remote control (device management);
+  - `busy`: this session already views another terminal;
+  - `failed`: the host could not start the view.
+- A session views at most one terminal. An open for another terminal while one is open answers `busy` and changes
+  nothing: the client closes the first view, then opens the next. An open for the terminal the session already views
+  restarts the view: the old one ends without a `terminal.view.ended`, and the answer is that of a new open. Several
+  phones, each in its own session, may view the same terminal.
+- `terminal.view.close` ends the session's view of that terminal. It has no answer, and the tab stays on the Mac
+  (`terminal.close`, section 4, closes a tab). A close for a terminal the session does not view is ignored. A view also
+  ends when its session ends. Input that arrived before a close, a restart or the session's end is still applied. When
+  a view ends, the terminal goes back to the Mac's own size (11.3).
+- `terminal.view.ended` tells the phone that a view ended without the phone asking, or that the phone named a terminal
+  it does not view. `reason` is an open enum (a client treats a value it does not know as `failed`):
+  - `gone`: the terminal no longer exists (its tab or its workspace was closed);
+  - `refused`: the Mac began to block remote control; the phone does not open it again;
+  - `failed`: the host could not keep the view going; the phone may open it again;
+  - `not_open`: the answer to a `terminal.view.input`, `terminal.view.resize` or `terminal.view.resync` that names a
+    terminal the session does not view (never opened, closed, or ended); nothing was applied.
+
+  A client ignores a `terminal.view.ended` for a terminal it does not view.
+- Order. The host sends `terminal.view.open.result` before the view's first frame, and no frame of a view after its
+  end. A client starts a fresh assembler (11.7) when an `ok` arrives: every frame of that terminal after it belongs to
+  the new view. It ignores frames of a terminal it does not view, and frames that arrive before the answer to its
+  latest open (frames of an earlier view may still be on the way).
+- `terminal.view.open` is a call (section 3). `terminal.view.input`, `terminal.view.resize`, `terminal.view.resync`
+  and `terminal.view.close` carry no `call_id` and get no answer, apart from `terminal.view.ended` `not_open` and
+  `error` `bad_request` (without `call_id`) for one that breaks a rule of 11.2 or 11.3, which then has no effect.
+- A host without `terminal_view` answers `terminal.view.open` with `error` `unsupported` and its `call_id`, and
+  ignores the other `terminal.view.*` messages, as a host that predates them does (section 7).
+
+### 11.2 Input
+
+`terminal.view.input` carries `units`: 1 to 64 input units, applied in order; the messages of a view are applied in
+the order they arrive. A unit is an object whose `k` (an open enum) selects its other fields:
+
+| `k` | Other fields | What the host does |
+| --- | --- | --- |
+| `text` | `text` string | Types it, as key presses of its characters. 1 or more UTF-8 bytes, and no control character: nothing in U+0000 to U+001F, U+007F, or U+0080 to U+009F (newline, tab, escape and backspace are keys) |
+| `key` | `key` string, `mods` array of strings (optional, omitted when empty) | Presses the named key with the modifiers through the terminal's own key handling, so the program gets what that key sends at the Mac (application cursor keys and the like apply) |
+| `paste` | `text` string | Pastes it through the Mac's paste path: bracketed when the program asked for it, so a multi-line text does not run line by line. 1 to 16 384 UTF-8 bytes; tab (U+0009), line feed (U+000A) and carriage return (U+000D) are the only control characters it may hold |
+| `scroll` | `lines` int | Turns the terminal's mouse wheel by that many lines: positive toward older content (up), negative toward newer (down), 1 to 100 either way. Only on the alternate screen, where the terminal reports the wheel to the program or turns it into arrow keys as it does at the Mac; on the main screen the host ignores it (the phone scrolls its own history, 11.6) |
+
+- `key` names (an open enum): `enter`, `tab`, `backspace`, `escape`, `delete` (forward delete), `space`, `up`,
+  `down`, `left`, `right`, `home`, `end`, `page_up`, `page_down`, and the lowercase letters `a` to `z` (meant for
+  chords such as `ctrl` with `c`). `mods` names (an open enum): `ctrl`, `alt`, `shift`, each at most once, in any
+  order. There is no `cmd`, `super` or `meta`.
+- The `text` of all `text` units of one message is at most 4 096 UTF-8 bytes in all, and that of all `paste` units at
+  most 16 384. A phone sends only committed text: text an input method is still composing (marked text) stays on the
+  phone, and a backspace that edits it is not sent.
+- A host skips a unit whose `k`, `key` or a modifier it does not know and applies the others: a later version may add
+  names.
+- A message with no unit or more than 64, an empty or oversized `text`, a forbidden control character, a `lines` of 0
+  or beyond 100, or a repeated modifier is answered `error` `bad_request` (without `call_id`), and none of its units is
+  applied.
+- Input reaches only the terminal the session views: a `terminal.view.input` for another `terminal_id` is answered
+  `terminal.view.ended` `not_open` and reaches no terminal.
+- A host holds at most 64 input and resize messages of a view that it has not applied yet (not counting the one it is
+  applying) and drops later ones while that many wait.
+
+### 11.3 Size
+
+`terminal.view.open` and `terminal.view.resize` carry `cols` and `rows`: the grid the phone can show at its font size.
+Each is an integer of at least 1; 0 or less is answered `error` `bad_request` (with the `call_id` of an open). The
+host clamps `cols` into 20 to 300 and `rows` into 5 to 120, the bounds the Mac accepts from a phone.
+
+The grid has the size of whoever used the terminal last, like tmux's `latest` rule: the phone's size after the phone
+opens the view, resizes it or types; the Mac's window size after the user types or resizes there. Frames carry the
+grid's actual `cols` and `rows` (up to 1 000 each, so beyond the 300 and 120 a phone may ask for while the Mac's
+window owns the size), and a phone draws whatever they say (it scales a wider grid down to fit). When the
+view ends, the terminal goes back to the Mac's own size. A `terminal.view.resize` for a terminal the session does not
+view is answered `terminal.view.ended` `not_open`.
+
+### 11.4 Frames and parts
+
+`terminal.view.frame` carries one part of one frame of the open view. A frame is a **snapshot** (the whole grid,
+which replaces what the phone holds), a **delta** (what changed since the frame before it) or a **history** frame
+(older rows for the phone's history, 11.8). Fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `terminal_id` | string | The terminal the view shows |
+| `revision` | int | 1 or more: the frame's number in its view (11.7) |
+| `part` | int | 0 to `parts` - 1: which part of the frame this message carries |
+| `parts` | int | 1 to 256: how many messages carry the frame |
+| `head` | Head | Required in part 0, absent in the others |
+| `styles` | array of Style | Optional, omitted when empty |
+| `lines` | array of Line | Optional, omitted when empty |
+
+A frame is the `head` of its part 0, the `styles` of all its parts (one table) and the `lines` of all its parts in
+part order. The host sends the parts of a frame in order, with no part of another frame of that terminal in between,
+each in one message within the frame limit (section 3).
+
+### 11.5 The grid
+
+The grid has `rows` screen rows of `cols` cells; on the main screen it also has history rows above it.
+
+**Head** (part 0):
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `kind` | string | `snapshot`, `delta` or `history` (open enum) |
+| `cols`, `rows` | int | The grid size, 1 to 1 000 each |
+| `alt` | bool | True while the alternate screen is active (full-screen programs such as vim, less, htop). It has no history |
+| `cursor` | Cursor | Required in snapshots and deltas, absent in history frames |
+| `palette` | Palette | Required in snapshots, absent otherwise |
+| `history` | int | 0 or more, optional (omitted when 0): the history rows this frame carries (11.6) |
+| `scroll` | int | 0 or more, deltas only, optional (omitted when 0): rows that left the top of the screen since the frame before |
+
+**Cursor**: `x` int (column, 0 at the left), `y` int (screen row, 0 at the top), `shape` string (`block`, `bar`,
+`underline` or `block_hollow`; an open enum, drawn as `block` when unknown), `visible` bool, `blink` bool.
+
+**Palette**: `fg` and `bg` colors (the terminal's default foreground and background, with any change a program made to
+them), `cursor` color (optional; absent means the cursor takes the foreground color), `colors` array of exactly 256
+colors (the indexed palette). A color is `#` followed by 6 hexadecimal digits (`#rrggbb`; either case is read, hosts
+send lowercase).
+
+**Style**: `id` int (1 to 65 535, unique within the frame); `fg` int (a palette index, 0 to 255) or `fg_rgb` color, at
+most one of the two, neither meaning the default foreground; `bg` or `bg_rgb` likewise for the background; `attrs`
+array of strings (optional, omitted when empty; an open enum whose unknown values a receiver ignores): `bold`,
+`faint`, `italic`, `underline`, `blink`, `inverse` (foreground and background swapped), `invisible` (only the
+background is drawn), `strike`, `overline`. The colors are those the Mac draws with: a host that shows bold text in
+bright colors sends the bright index. The default style (default colors, no attribute) has id 0 and is never listed.
+A style id means something only in its frame.
+
+**Line**: `y` int (the row: 0 to `rows` - 1 for the screen, -1 to -`history` for the frame's history rows, -1 being
+the newest, right above screen row 0) and `runs` array of Run (optional, omitted when empty; a line without runs is a
+blank row). A frame may carry several lines with the same `y`: together, in order, their runs make the row.
+
+**Run**, a stretch of cells of one style: `x` int (optional: the first column; when absent, the column right after
+the previous run of the same line, or 0 for the line's first run), `t` string (1 or more UTF-8 bytes), `s` int
+(optional: the style id; absent or 0 for the default style), `w` int (optional, 1 or 2):
+
+- without `w` the run is narrow cells: each Unicode scalar of `t` is one cell, one column wide, at `x`, `x` + 1, and
+  so on;
+- with `w` the run is exactly one cell holding all of `t` (a grapheme cluster: a letter with its combining marks, an
+  emoji sequence, a flag) and `w` columns wide; a wide cell (`w` 2) covers its column and the next.
+
+Cells no run covers are blank: a space in the default style. A run ends at `x` plus its number of scalars (narrow) or
+plus `w` (one cell).
+
+A host sends every character that combines with others, or that is not one column wide, as a cell of its own with
+`w`; puts at most 32 UTF-8 bytes in one cell (cutting a longer cluster on a scalar boundary); and sends no runs that
+overlap or reach past `cols`. A receiver is lenient, so a slip draws wrong but never breaks the view: it drops cells
+at or past `cols` (and a wide cell that does not fit whole), lets a later run overwrite an earlier one cell by cell,
+ignores a line whose `y` is outside the frame's range, uses the default style for a style id the frame does not list,
+and moves a cursor that lies outside the grid to the nearest cell.
+
+### 11.6 Applying a frame
+
+A client keeps, for the view: the grid size, `alt`, the cursor, the palette, the screen rows, and the history rows,
+oldest first. It applies a frame that passed the rules of 11.7:
+
+- **snapshot**: everything is replaced. The size, `alt`, cursor and palette are the head's; the screen is rows 0 to
+  `rows` - 1; the history is rows -`history` to -1, oldest first (none on the alternate screen).
+- **delta**: first the scroll. With `s` the `scroll` and `k` = min(`s`, `rows`), the top `k` screen rows go to the end
+  of the history, followed by the delta's history rows -`history` to -1, oldest first; the other screen rows move up
+  by `k`, and `k` blank rows enter at the bottom. When more rows scrolled than the screen holds (`s` > `rows`), the
+  `s` - `rows` rows in between never reached the phone: the delta carries the newest of them as its history rows (at
+  most `s` - `rows`; a receiver ignores the oldest beyond that) and the rest are not shown. Then each screen row the
+  delta has lines for is replaced by them (a line without runs blanks it); the other rows stay as they are. Last, the
+  cursor is the head's. A delta of the alternate screen has no scroll (a receiver ignores one there).
+- **history**: its rows -`history` to -1 go above the oldest history row the client holds, oldest first: the history
+  grows upward.
+- A client keeps as many history rows as it likes and drops the oldest first. Once it has dropped any since the last
+  snapshot (or did not keep all of that snapshot's), it ignores history frames until the next snapshot: their rows
+  could no longer join.
+
+### 11.7 Revisions, gaps and resync
+
+Within a view the host numbers its frames 1, 2, 3, ... whatever their kind, with no gap, the first being a snapshot.
+A client keeps the revision of the last frame it applied (its current revision, 0 before the first) and assembles
+parts:
+
+- A part 0 starts a frame. If the frame before it still lacked parts, that frame is lost: a gap.
+- Any other part must continue the frame being assembled: same `revision` and `parts`, and `part` one more than the
+  last. Otherwise it is a gap, and the client drops that frame and the part.
+- With its last part, the frame is complete:
+  - a snapshot whose revision is above the current one is applied;
+  - a delta or history frame whose revision is the current one + 1, and whose `cols`, `rows` and `alt` equal the
+    client's, is applied;
+  - a frame whose revision is at or below the current one is ignored (the client already has what it says);
+  - anything else is a gap: a delta or history frame further ahead, of another size or screen, or before the first
+    snapshot; a `kind` the client does not know; a snapshot without cursor or palette, or a delta without cursor; a
+    size beyond 1 000.
+- On a gap the client sends `terminal.view.resync` once, then ignores deltas and history frames until a snapshot
+  arrives, and sends no other resync before that snapshot. The host answers a resync with a snapshot (11.8).
+
+### 11.8 What a host sends
+
+- After `ok`, a snapshot. A snapshot of the main screen carries at most the newest 240 history rows, so the view
+  appears fast. Right after it the host sends older history of the same capture in history frames, the rows just
+  above those 240 first, at most 240 rows per frame, until the snapshot and its history frames hold 4 000 rows, or
+  until the history frames' messages would pass 262 144 bytes, whichever comes first. A history frame never holds up a
+  delta: the host sends one only while no other frame of the view waits.
+- Then a delta whenever the terminal changes, against the frame sent before it. The host merges changes instead of
+  queueing them: it asks the terminal for the next frame only when no frame it made is waiting, so it holds at most
+  one frame per view that it has not begun to send, and a slow phone or network gets fewer, larger deltas. A delta
+  carries at most 2 000 history rows.
+- A new size, a switch between the main and the alternate screen, and a new palette come as a snapshot. A new
+  snapshot drops what is left of the fill of the one before and begins its own: after a resize that rewraps the
+  history, the phone gets it again the same way.
+- On `terminal.view.resync` the host drops the deltas and history frames it has not begun to send and sends a
+  snapshot next. Resyncs that arrive before that snapshot share it.
+- The host never logs terminal content, or keys or text a phone typed or pasted.
+
+### 11.9 New terminals
+
+`terminal.create` (`terminal_create`) opens a new terminal tab in a workspace the host lists, in the pane the Mac has
+selected in that workspace, running the user's default shell, as when the user adds a tab there. It does not change
+what the Mac has selected (the workspace, the pane, the tab shown in each pane), moves no focus and brings no window
+to the front. `terminal.create.result` carries an `outcome` (the open enum of the workspace calls: `ok`; `not_found`
+for a workspace the host does not list; `refused` when the Mac blocks remote control or its own rules forbid it;
+`failed`) and, only with `ok`, the new `terminal_id`. A `workspace.changed` lists the new terminal too; it and the
+answer may arrive in either order. The call carries a `workspace_id` and nothing else: no command, path, directory,
+program or environment. A client does not send it again after losing the connection; it reads the workspace list
+instead. A host without `terminal_create` answers `error` `unsupported`.
+
+### 11.10 Limits
+
+| Limit | Value |
+| --- | --- |
+| `cols`, `rows` a phone asks for | at least 1; the host clamps them into 20 to 300 and 5 to 120 |
+| Grid size in a frame | 1 to 1 000 columns and rows |
+| Parts of one frame | 1 to 256 |
+| Text of one cell (a run with `w`) | at most 32 UTF-8 bytes |
+| History rows in a snapshot | at most 240 |
+| History frames | at most 240 rows each; snapshot plus its history frames at most 4 000 rows; their messages at most 262 144 bytes |
+| History rows in a delta | at most 2 000, and at most `scroll` - `rows` |
+| Units in one input message | 1 to 64 |
+| Typed text in one input message | each unit 1 byte or more; 4 096 UTF-8 bytes in all |
+| Pasted text in one input message | each unit 1 to 16 384 UTF-8 bytes; 16 384 in all |
+| `lines` of a scroll unit | 1 to 100, either sign |
+| Input and resize messages waiting per view | 64 |
+| Views per session | 1 |
+| Frames per view made but not yet being sent | 1 |

@@ -37,6 +37,65 @@ struct ShellXPhonePairingCoordinatorTests {
         rig.coordinator.close()
     }
 
+    @Test func testAppleLinkRequestShowsTheAppleIDNotice() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        let offer = try await rig.coordinator.currentOffer()
+        let phone = Data(repeating: 7, count: 32)
+        let other = Data(repeating: 5, count: 32)
+        rig.relay.setPending([
+            PhonePairingRequest(id: "a1", deviceName: "Apple phone", platform: "ios", clientKey: phone,
+                                proof: offer.proof(clientKey: phone), createdAt: Date(), linksAppleID: true),
+            Self.request("p1", key: other, proof: offer.proof(clientKey: other)),
+        ])
+
+        await rig.coordinator.pollNow()
+
+        let apple = try #require(rig.coordinator.candidates.first { $0.id == "a1" })
+        let plain = try #require(rig.coordinator.candidates.first { $0.id == "p1" })
+        #expect(apple.linksAppleID)
+        #expect(PhonePairingSheet.appleLinkNotice(for: apple) == String(
+            localized: "remote.phonePairing.appleLink",
+            defaultValue: "Allowing lets this Apple ID sign in to your ShellX account and manage it, including deleting the account."))
+        #expect(!plain.linksAppleID)
+        #expect(PhonePairingSheet.appleLinkNotice(for: plain) == nil)
+        rig.coordinator.close()
+    }
+
+    @Test func testApproveAppleLinkIdentityInUseShowsTheNotice() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        let offer = try await rig.coordinator.currentOffer()
+        let phone = Data(repeating: 6, count: 32)
+        rig.relay.setPending([PhonePairingRequest(id: "a1", deviceName: "Apple phone", platform: "ios", clientKey: phone,
+                                                  proof: offer.proof(clientKey: phone), createdAt: Date(), linksAppleID: true)])
+        await rig.coordinator.pollNow()
+        rig.relay.approveError = ShellXCoreError(code: "identity_in_use", message: "in use")
+        await #expect(throws: ShellXCoreError.self) { try await rig.coordinator.approve("a1") }
+        #expect(rig.coordinator.errorText == String(
+            localized: "remote.phonePairing.error.appleIdInUse",
+            defaultValue: "This Apple ID already signs in to another ShellX account."))
+        rig.coordinator.close()
+    }
+
+    @Test func testApproveExpiredAppleLinkShowsExpired() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        let offer = try await rig.coordinator.currentOffer()
+        let phone = Data(repeating: 6, count: 32)
+        rig.relay.setPending([PhonePairingRequest(id: "a1", deviceName: "Apple phone", platform: "ios", clientKey: phone,
+                                                  proof: offer.proof(clientKey: phone), createdAt: Date(), linksAppleID: true)])
+        await rig.coordinator.pollNow()
+        rig.relay.approveError = ShellXCoreError(code: "pairing_expired", message: "expired")
+        await #expect(throws: ShellXCoreError.self) { try await rig.coordinator.approve("a1") }
+        #expect(rig.coordinator.errorText == String(
+            format: String(localized: "remote.phonePairing.error", defaultValue: "Something went wrong (%@)"), "pairing_expired"))
+        rig.coordinator.close()
+    }
+
     @Test func testProofForOldOfferIsDeniedNotShown() async throws {
         let rig = Rig()
         rig.coordinator.open()
@@ -465,7 +524,7 @@ struct ShellXPhonePairingCoordinatorTests {
                                                coolicon: "Desktop", isOnline: true)
 
         let menu = SidebarMachineHeaderCellView.contextMenu(for: local, pairingAvailable: true, target: nil)
-        #expect(menu?.items.map(\.title) == [String(localized: "remote.phonePairing.menu", defaultValue: "Pair iPhone…")])
+        #expect(menu?.items.map(\.title) == [String(localized: "remote.phonePairing.menu", defaultValue: "Pair Phone…")])
         #expect(SidebarMachineHeaderCellView.contextMenu(for: remote, pairingAvailable: true, target: nil) == nil)
         #expect(SidebarMachineHeaderCellView.contextMenu(for: local, pairingAvailable: false, target: nil) == nil)
     }

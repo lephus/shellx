@@ -25,7 +25,7 @@ use serde_json::{Value, json};
 use std::fmt;
 use zeroize::Zeroizing;
 
-const PENDING_PATH: &str = "/v2/phone-pairings?role=target";
+const PENDING_PATH: &str = "/v2/phone-pairings?role=target&apple_links=1";
 const GRANTS_PATH: &str = "/v2/phone-grants";
 
 /// One item of `GET /v2/phone-pairings?role=target`. `Debug` hides key and proof.
@@ -39,6 +39,9 @@ struct PendingItem {
     client_key_b64: String,
     proof_b64: String,
     created_at_unix: u64,
+    /// The approval also lets an Apple ID sign in to this account (relay plan 1A).
+    #[serde(default)]
+    links_apple_id: bool,
 }
 
 impl fmt::Debug for PendingItem {

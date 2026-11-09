@@ -28,11 +28,11 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
    - its version or build differs from `Version.xcconfig`;
    - `get-task-allow` is true (a development signature);
    - it has `aps-environment` with a value other than `production`;
+   - its `ShellXGoogleClientID` is not a Google iOS client id (`SHELLX_GOOGLE_IOS_CLIENT` in `shellx-ios/Config/Release.xcconfig` still holds the placeholder);
+   - it lacks the Sign in with Apple entitlement `com.apple.developer.applesignin`;
+   - it lacks Google's sign-in branding: the `GoogleG` asset (in `Assets.car`) or `GoogleSans.ttf`;
    - it embeds a `.framework` in `Frameworks/` (P3 links everything statically);
-   - any Mach-O file in it contains Debug-only code: the demo (`SHELLX_DEMO`), `FakeMac`,
-     `FakeRelayAccount`, `InMemorySecretStore` or anything from `ShellXAppTestSupport`.
-     `Release.xcconfig` leaves `ShellXAppTestSupport` out of the link, and the app's demo code is
-     under `#if DEBUG`.
+   - any Mach-O file in it contains Debug-only code: a test fake (`FakeRelayAccount`, `FakeIdentityProvider`, `InMemorySecretStore`, `FakeTranscriber`, `FakeVoicePermissions`), anything from `ShellXAppTestSupport`, or the Debug demo switch `SHELLX_DEMO`. `Release.xcconfig` leaves `ShellXAppTestSupport` out of the link. The in-app demo (`ShellXDemo`, "Try without an account") ships on purpose.
 
    It also refuses to start when this build number was already uploaded, and it records the commit
    it was built from (`.source`).
@@ -64,9 +64,7 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
   itself. That is Apple's "encryption limited to that within the Apple operating system", which
   needs no documentation in App Store Connect. An algorithm the app implements itself, or a
   library that brings its own, changes the answer: revisit the key before shipping one.
-- **App Review** needs a demo account and a video in the review notes: the app does nothing until
-  it is paired with a Mac running ShellX, and a reviewer has no such Mac. The video shows sign-in,
-  pairing by QR, an agent session, answering a pending request and voice input.
+- **App Review.** Sign-in is Google or Apple only, so there is no demo account to give. The review notes say: "Without a Mac running ShellX, tap “Try without an account” on the sign-in screen: it opens a sample Mac with workspaces, agent sessions and requests waiting for you. Full use needs a Mac running ShellX (https://shellx.pro). To delete an account: Settings › Account › Delete Account…."
 - **App Privacy.** `shellx-ios/ShellX/PrivacyInfo.xcprivacy` declares no tracking and one collected
   data type: the email address, linked to the account, used for app functionality (sign-in). The
   maintainer decides whether the App Store Connect answers (and then the manifest) also list

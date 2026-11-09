@@ -178,7 +178,7 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
         guard pairingAvailable, header.key == .local else { return nil }
         let menu = NSMenu()
         let item = NSMenuItem(
-            title: String(localized: "remote.phonePairing.menu", defaultValue: "Pair iPhone…"),
+            title: String(localized: "remote.phonePairing.menu", defaultValue: "Pair Phone…"),
             action: #selector(SidebarMachineHeaderCellView.pairIPhoneFromMenu),
             keyEquivalent: ""
         )

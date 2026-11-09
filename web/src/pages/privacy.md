@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: "What data ShellX collects, why, how long it is kept, how end-to-end encryption protects your terminal content, and how to delete your account."
-updated: "2026-10-15"
+updated: "2026-11-08"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -12,7 +12,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 ## Summary
 
 - Terminal content (the commands you type and the output you see) is **end-to-end encrypted** between your phone and your computer. The relay only forwards encrypted data and **cannot read** it, except for the content of push notifications (section 3).
-- We store only what is needed to run your account: your email, a hash of your password, device information and pairing records.
+- We store only what is needed to run your account: your email, the Google account or Apple ID you sign in with, device information and pairing records. You sign in with Google, or with Apple on iPhone; we never see your Google or Apple password.
 - Push notifications: while the computer's "Notify when long commands finish" setting is on (the default), or when a program sends a notification, the agent sends the notification text through our server, Google Firebase Cloud Messaging and Apple Push Notification service, without end-to-end encryption, to paired phones that allowed notifications (section 3).
 - Voice input: when you tap the mic, what you say is turned into text by Apple's (iPhone) or Google's (Android, when the phone cannot do it itself) speech recognition, which may process the audio on their servers. ShellX does not store or receive the audio (section 2).
 - No ads, no analytics or tracking tools, and we never sell data.
@@ -21,11 +21,12 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 
 **Account**
 
-- **Email** — your sign-in name, stored in lowercase. We do not send verification or marketing emails.
-- **Password** — never stored as entered. The server stores only an **argon2id** hash, from which the password cannot be recovered.
-- When the account was created and when the password was last changed.
+- **Email** — the email of your account, stored in lowercase: the address Google (or, for an iPhone that signs in with Apple, your Apple ID) reported when the account was created. We do not send verification or marketing emails.
+- **Sign-in methods** — for each Google account or Apple ID that can sign in to your account: the provider, the stable account identifier it gives ShellX (not your password), the email it reported when it was linked, whether that email is an Apple "Hide My Email" address, when it was linked and last used and, for an Apple ID linked by scanning your computer's QR code, which iPhone linked it. For Apple IDs we also keep the refresh token Apple issues to ShellX, only so that we can revoke ShellX's access when you remove that Apple ID or delete your account.
+- **Password (older accounts only)** — accounts created before sign-in with Google keep their password until password sign-in is switched off. The server stores only an **argon2id** hash, from which the password cannot be recovered, and deletes it on that day.
+- When the account was created (and, for older accounts, when the password was last changed).
 
-**Devices** — each time you register or sign in on a device, we store:
+**Devices** — each time you sign in on a device, we store:
 
 - the **device name**: the hostname for a computer, the model name for a phone;
 - the **device kind** (desktop agent or mobile app) and **platform** (macOS, Windows, iOS or Android);
@@ -33,13 +34,15 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 - the device's **public key** (X25519). The matching private key never leaves the device;
 - when the device was added and when it was **last online**, used to show "Last online" in the app.
 
-**Access tokens** — each signed-in device receives a random access token. The server stores only its SHA-256 hash, when it was created and when it was last used.
+**Access tokens** — each signed-in device receives a random access token. The server stores only its SHA-256 hash, how the device signed in (Google, Apple or a password), when it was created and when it was last used.
 
-**Push token** — if you allow notifications in the mobile app, the server stores that phone's push token (FCM token), its platform (iOS or Android) and when it was last updated (section 3).
+**Push token** — if you allow notifications in the mobile app, the server stores that phone's push token (an Apple Push Notification service device token on iPhone, a Firebase Cloud Messaging token on Android), its platform (iOS or Android) and when it was last updated (section 3).
 
 **Pairing records** — when you pair a phone with a computer by scanning a QR code, the server stores the (computer, phone) pair and when it was paired, for display in the apps only. Whether a phone is trusted is decided and stored on your computer, not on the server.
 
-**IP addresses** — your IP address is used transiently to limit sign-in and registration attempts per 60-second window (to stop password guessing and abuse). We do not store IP addresses in the account database. `https://` requests to the Service are not access-logged; however, if you visit over a plain `http://` link, the shared web server may record that request (including your IP address) in its technical log before redirecting you to `https://`.
+**IP addresses** — your IP address is used transiently to limit sign-in attempts per 60-second window (to stop guessing and abuse). We do not store IP addresses in the account database. `https://` requests to the Service are not access-logged; however, if you visit over a plain `http://` link, the shared web server may record that request (including your IP address) in its technical log before redirecting you to `https://`.
+
+**Sign-in requests** — each sign-in uses a random one-time code that the server keeps, as a SHA-256 hash, for at most 10 minutes. When an iPhone that signed in with a hidden-email Apple ID asks to join your computer's account, the server keeps that request — the Apple ID's identifier and email, the iPhone's name and public key — for at most 24 hours.
 
 **Operational logs** — the server keeps minimal technical logs to run the Service and fix problems: timestamps, device IDs, error codes and frame sizes. Logs **never** contain terminal content, passwords or access tokens.
 
@@ -63,7 +66,7 @@ The agent on your computer can tell your paired phones when a long-running comma
 - **What the agent sends, and when.** While the computer's "Notify when long commands finish" setting is on (default: 30 seconds) — and whenever a program in the terminal emits a notification sequence (for example `shellx notify`, OSC 9, OSC 777) — the agent sends the **notification text** to the ShellX relay: the computer's name, the session or terminal window name, the command line, its exit code and running time, or the text the program sent. This text is **not end-to-end encrypted**.
 - **What the relay does with it.** The relay only forwards it through **Google Firebase Cloud Messaging** and, for iPhones, **Apple Push Notification service**, and only to phones that are paired with that computer and have allowed notifications. The relay does not store it or write it to its logs; Google and Apple process it under their own policies.
 - **When no phone can receive it** (no phone has allowed notifications, or all are signed out), the agent stops sending for up to 15 minutes — less if a phone connects to the computer in the meantime.
-- **Push tokens.** When you allow notifications, the mobile app receives a push token (FCM token) from Google Firebase Cloud Messaging and sends it to our server. The server keeps it until you sign out on that phone, delete your account, turn off ShellX notifications in the phone's settings (the next time the app opens), or Firebase reports the token is no longer valid.
+- **Push tokens.** When you allow notifications, the iPhone app receives a device token from Apple Push Notification service and the Android app a token from Google Firebase Cloud Messaging, and sends it to our server. The server keeps it until you sign out on that phone, delete your account, turn off ShellX notifications in the phone's settings (the next time the app opens), or Apple or Firebase reports the token is no longer valid.
 - This is the only exception to section 2: only the content of notifications, not the rest of your terminal.
 - **How to turn it off:** choose "Off" under "Notify when long commands finish" in the ShellX menu on the computer (notifications when commands finish), turn off ShellX notifications in your phone's settings, or sign out on the phone.
 
@@ -82,7 +85,7 @@ The device private key, access token, the list of trusted phones (on the compute
 
 ## 5. What we do not do
 
-- No analytics, advertising, tracking pixels or third-party tracking SDKs. The mobile app uses Firebase Cloud Messaging only to receive push notifications, and none of Firebase's analytics services.
+- No analytics, advertising, tracking pixels or third-party tracking SDKs. The Android app uses Firebase Cloud Messaging only to receive push notifications, and none of Firebase's analytics services; the iPhone app receives them from Apple Push Notification service directly.
 - No promotional notifications: push notifications only come from your own computers.
 - We do not sell, rent or share personal data for advertising.
 - The `shellx.pro` website sets no cookies and embeds no third-party scripts.
@@ -95,6 +98,8 @@ We use the data listed in section 1 only to: create and authenticate your accoun
 
 The Service runs on a private server rented by ShellX in **Vietnam**: the relay server, the account database and its backups, the website and the installers. Data is stored and processed in **Vietnam**. We use no content delivery network (CDN) and no third-party analytics.
 
+When you sign in, Google (Sign in with Google) or Apple (Sign in with Apple) confirms who you are under its own policy and tells ShellX the account identifier and email described in section 1.
+
 When you download the mobile app from the App Store or Google Play, Apple and Google process data under their own policies. When you turn on push notifications, their content and the push token are passed to Google (Firebase Cloud Messaging) and, for iPhones, Apple (Apple Push Notification service) to reach your phone (section 3); these services may process data outside Vietnam. When you use voice input, the audio is processed by Apple's speech recognition (iPhone) or, when the phone cannot recognize it itself, Google's speech recognition (Android), which may also process it outside Vietnam (section 2).
 
 We disclose data to authorities only when the law requires it. Because terminal content is end-to-end encrypted, we do not have it to disclose.
@@ -102,15 +107,18 @@ We disclose data to authorities only when the law requires it. Because terminal 
 ## 8. Retention
 
 - **Account and devices:** until the account is deleted.
-- **Access tokens:** deleted when you sign out on that device or when revoked (changing your password revokes the tokens of all other devices); a token expires after 90 days without use.
-- **Push tokens:** deleted when you sign out on that phone, when the account is deleted, when you turn off ShellX notifications in the phone's settings (the next time the app opens), or when Firebase reports the token is no longer valid.
+- **Access tokens:** deleted when you sign out on that device, when you remove the Apple ID it signed in with, or when the account is deleted; a token expires after 90 days without use. Older password sessions are deleted when password sign-in is switched off.
+- **Push tokens:** deleted when you sign out on that phone, when the account is deleted, when you turn off ShellX notifications in the phone's settings (the next time the app opens), or when Apple or Firebase reports the token is no longer valid.
 - **Pairing records:** deleted when you revoke or unpair, or when you sign out of the agent on that computer.
+- **Sign-in methods:** until you remove that Apple ID (desktop app → Settings → Account) or delete the account; the Google sign-in of an account is kept as long as the account exists.
+- **Sign-in codes:** at most 10 minutes. **Requests to link an Apple ID through your computer:** at most 24 hours.
+- **Passwords of older accounts:** deleted when password sign-in is switched off.
 - **Operational logs:** no longer than 30 days.
 - **Database backups:** one per day; the 14 most recent are kept.
 
 <h2 id="delete-account">9. Deleting your account</h2>
 
-You can delete your account yourself in the mobile app: open **Settings → Delete account** and enter your password again to confirm. Deletion takes effect immediately and cannot be undone: the server permanently deletes the account with all of its devices, access tokens, push tokens and pairing records; every connected device is signed out. The desktop agent cannot tell this apart from a password change, so it always deletes its access token, closes all terminal sessions and shows the sign-in screen again — it **keeps** its device key and its list of trusted phones. That list is cleared only when you sign in again with a different account, when you sign out of the agent from the tray, or when you uninstall the agent.
+You can delete your ShellX account yourself in the iPhone or Android app: open **Settings › Account › Delete Account…**, read what will be deleted, then sign in again with Google or Apple to confirm. Deletion takes effect immediately and cannot be undone: the server permanently deletes the account with all of its devices, sign-in methods, access tokens, push tokens and pairing records, and every device is signed out. If an Apple ID could sign in to the account, the server also asks Apple to revoke ShellX's access to it. The phone then clears its own data, as when you sign out. A desktop app that was signed in shows the sign-in screen again; its Settings → Account links to this section.
 
 If you can no longer use the mobile app, email [phule9225@gmail.com](mailto:phule9225@gmail.com) **from the email address of the account** with the subject "Delete my ShellX account". We may ask for more information to confirm that you own the account, delete it within 30 days of verification, and confirm by email.
 
@@ -122,11 +130,11 @@ Data stored on your devices (section 4): on Windows, uninstalling the agent remo
 
 You have the right to request access to, correction of, or deletion of your personal data, to withdraw consent and to object to processing, under the data protection laws where you live. Send requests to [phule9225@gmail.com](mailto:phule9225@gmail.com); we reply within 30 days.
 
-In the apps you can view your devices, revoke or remove pairings, sign out, change your password (from a signed-in computer) and delete your account (from the mobile app).
+In the apps you can view your devices, revoke or remove pairings, see the Google account and Apple IDs that can sign in and remove an Apple ID (desktop app → Settings → Account), sign out, and delete your account (iPhone and Android app).
 
 ## 11. Security
 
-All connections to our servers use TLS; terminal content is end-to-end encrypted (except the content of push notifications, section 3); passwords are hashed with argon2id; access tokens are stored only as SHA-256 hashes; private keys live in the operating system's secure storage; and the mobile app is locked with biometrics by default. No system is perfectly secure; if an incident affects your data, we will notify you as required by law.
+All connections to our servers use TLS; terminal content is end-to-end encrypted (except the content of push notifications, section 3); sign-ins are checked against the public keys Google and Apple publish, and each one-time sign-in code works once; the remaining passwords of older accounts are hashed with argon2id until password sign-in is switched off; access tokens are stored only as SHA-256 hashes; private keys live in the operating system's secure storage; and the mobile app is locked with biometrics by default. No system is perfectly secure; if an incident affects your data, we will notify you as required by law.
 
 ## 12. Children
 

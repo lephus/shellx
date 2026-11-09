@@ -32,6 +32,7 @@ struct AboutLicenseContent {
         Attribution(name: "Ghostty", license: "MIT", url: URL(string: "https://github.com/ghostty-org/ghostty")),
         Attribution(name: "coolicons by Kryston Schwarze", license: "CC BY 4.0", url: URL(string: "https://github.com/krystonschwarze/coolicons")),
         Attribution(name: "Space Grotesk", license: "OFL-1.1", url: URL(string: "https://github.com/floriankarsten/space-grotesk")),
+        Attribution(name: "Google Sans", license: "OFL-1.1", url: URL(string: "https://github.com/googlefonts/googlesans")),
     ]
 
     let bundle: Bundle

@@ -3,8 +3,10 @@
 //! The Mac app links the staticlib through one C function (`ffi`); the Windows
 //! app uses the rlib. Every method goes through [`Core::call`].
 
+pub mod account;
 pub mod api;
 pub mod auth;
+pub mod auth_google;
 pub mod config;
 pub mod envelope;
 pub mod ffi;
@@ -34,6 +36,10 @@ pub const KNOWN_METHODS: &[&str] = &[
     "config.set",
     "auth.login",
     "auth.logout",
+    "auth.session",
+    "auth.google.begin",
+    "auth.google.finish",
+    "auth.google.cancel",
     "machines.register",
     "machines.list",
     "machines.heartbeat",
@@ -53,12 +59,14 @@ pub const KNOWN_METHODS: &[&str] = &[
     "phones.grants",
     "phones.revoke",
     "notify.phones",
+    "account.identities.list",
+    "account.identities.remove",
     "version.check",
 ];
 
 /// Methods that need `session.json` (Ruling R1: checked before dispatch).
 fn needs_session(method: &str) -> bool {
-    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("phones.") || method.starts_with("shares.") || method.starts_with("notify.")
+    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("phones.") || method.starts_with("shares.") || method.starts_with("notify.") || method.starts_with("account.")
 }
 
 #[derive(Default)]
@@ -73,6 +81,8 @@ pub struct Core {
     /// (Ruling R14, see `pairing`). Public keys' fingerprints only, no secrets.
     /// Cleared by `config.set`, `auth.login` and `auth.logout`.
     shown_fingerprints: Mutex<HashMap<String, String>>,
+    /// Google sign-in flows waiting for their browser callback.
+    google_flows: auth_google::Flows,
 }
 
 impl Core {
@@ -127,12 +137,7 @@ impl Core {
     /// as before: only logout or a login as another account drops it). A session
     /// replaced meanwhile by a concurrent `auth.login` is left alone.
     fn forget_refused_session(&self, store: &StateStore, used: &str) {
-        let _g = self.auth_lock.lock().unwrap_or_else(|p| p.into_inner());
-        if let Ok(Some(current)) = auth::load_session(store)
-            && current.token == used
-        {
-            let _ = store.remove(auth::SESSION_FILE);
-        }
+        auth::forget_session_if(store, used, &self.auth_lock);
     }
 
     fn forget_shown_fingerprints(&self) {
@@ -151,6 +156,16 @@ impl Core {
                 self.forget_shown_fingerprints();
                 auth::logout(self.agent(), cfg, store)
             }
+            "auth.session" => auth::session_info(store),
+            "auth.google.begin" => auth_google::begin(self.agent(), cfg, store, &self.google_flows, params),
+            "auth.google.finish" => {
+                let r = auth_google::finish(self.agent(), cfg, store, &self.google_flows, params, &self.auth_lock);
+                if r.is_ok() {
+                    self.forget_shown_fingerprints();
+                }
+                r
+            }
+            "auth.google.cancel" => auth_google::cancel(&self.google_flows, params),
             "machines.register" => machines::register(self.agent(), cfg, store, params),
             "machines.list" => machines::list(self.agent(), cfg, store),
             "machines.heartbeat" => machines::heartbeat(self.agent(), cfg, store),
@@ -180,6 +195,8 @@ impl Core {
             "phones.deny" => phones::deny(self.agent(), cfg, store, params),
             "phones.grants" => phones::grants(self.agent(), cfg, store),
             "phones.revoke" => phones::revoke(self.agent(), cfg, store, params),
+            "account.identities.list" => account::list_identities(self.agent(), cfg, store),
+            "account.identities.remove" => account::remove_identity(self.agent(), cfg, store, params),
             "notify.phones" => notify::phones(self.agent(), cfg, store, params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),
         }

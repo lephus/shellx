@@ -36,6 +36,10 @@ public struct AccountSection: View {
                         Divider()
                         AccountTeamPicker(flow: accountFlow!)
                     }
+                    if let detail = accountFlow?.accountDetailContent {
+                        Divider()
+                        detail
+                    }
                 }
             }
             .settingsSearchAnchors(["setting:account:account"])

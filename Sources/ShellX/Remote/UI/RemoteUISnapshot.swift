@@ -30,9 +30,30 @@ extension SignInErrorLabels {
         SignInErrorLabels(
             credentials: String(
                 localized: "remote.signin.error.credentials",
-                defaultValue: "Email or password is incorrect"
+                defaultValue: "Google sign-in didn't work. Try again."
             ),
-            network: String(localized: "remote.signin.error.network", defaultValue: "Can't reach relay.shellx.pro")
+            network: String(localized: "remote.signin.error.network", defaultValue: "Can't reach relay.shellx.pro"),
+            timeout: String(
+                localized: "remote.signin.error.timeout",
+                defaultValue: "Google sign-in timed out. Try again."
+            ),
+            stateMismatch: String(
+                localized: "remote.signin.error.stateMismatch",
+                defaultValue: "Sign-in didn't finish. Try again."
+            ),
+            switchFromSignedInDevice: String(
+                localized: "remote.signin.error.switchFromSignedInDevice",
+                defaultValue: "This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again."
+            ),
+            emailInUse: String(
+                localized: "remote.signin.error.emailInUse",
+                defaultValue: "Another ShellX account already uses this Google account's email. Choose a different Google account."
+            ),
+            identityInUse: String(
+                localized: "remote.signin.error.identityInUse",
+                defaultValue: "This Google account already signs in to another ShellX account, or this account already uses another Google account."
+            ),
+            browser: String(localized: "remote.signin.error.browser", defaultValue: "Couldn't open your browser.")
         )
     }
 }

@@ -25,8 +25,11 @@ protocol ShellXRemoteServicing: AnyObject {
     func approve(_ id: PairingRequest.ID) async throws
     func deny(_ id: PairingRequest.ID) async
     func openSession(on machineID: RemoteMachine.ID) async throws
-    /// Throws `ShellXCoreError` (`invalid_credentials`, `network`, …).
-    func signIn(email: String, password: String) async throws
+    /// Signs in through Google in the browser; returns the account email.
+    /// Throws `ShellXCoreError` (`google_cancelled`, `google_timeout`, `network`, …).
+    func signInWithGoogle() async throws -> String
+    /// Ends the Google flow that `signInWithGoogle()` waits on.
+    func cancelGoogleSignIn() async
     func signOut() async
     /// Called when a workspace closes so the service stops tracking it.
     func forgetRemoteWorkspace(_ id: UUID)

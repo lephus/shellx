@@ -178,12 +178,8 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
         }
     }
 
-    func signIn(email: String, password: String) async throws {
+    func signInWithGoogle() async throws -> String {
         try? await Task.sleep(nanoseconds: 400_000_000)
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedEmail.isEmpty, !password.isEmpty, password != "wrong" else {
-            throw ShellXCoreError(code: "invalid_credentials", message: "email or password is incorrect")
-        }
         machines = Self.fixtureMachines(now: now())
         // The MacBook Air's pending request, reopened from its header.
         outgoing = [OutgoingPairing(
@@ -192,7 +188,10 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
         )]
         pendingApprovals = Self.fixtureApprovals(now: now())
         isSignedIn = true
+        return "fixture@shellx.dev"
     }
+
+    func cancelGoogleSignIn() async {}
 
     func forgetRemoteWorkspace(_ id: UUID) {
         guard remoteWorkspaces[id] != nil else { return }

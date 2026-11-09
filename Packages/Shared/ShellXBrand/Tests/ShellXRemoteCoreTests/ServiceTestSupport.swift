@@ -18,6 +18,13 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
     let coreStateDir: URL
     private let recorded = Locked<[Call]>([])
     let signedIn = Locked(true)
+    /// The email `auth.google.finish` signs in.
+    let googleEmail = Locked("g@shellx.test")
+    /// `account.identities.list` items.
+    let identities = Locked<[JSONValue]>([])
+    /// What `auth.session` reports (`auth.login` / `auth.google.finish` set them).
+    let sessionEmail = Locked<String?>(nil)
+    let sessionAuthMethod = Locked("password")
     /// The account `auth.login` signs into.
     let userID = Locked("u_1")
     /// `machines.list` items (shellx-core shape, incl. `is_this_machine`).
@@ -79,7 +86,7 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
         if let code = failures.with({ $0[method]?.isEmpty == false ? $0[method]!.removeFirst() : nil }) ?? down.get()[method] {
             return Self.error(code)
         }
-        let needsSession = method.hasPrefix("machines.") || method.hasPrefix("tickets.") || method.hasPrefix("pair.")
+        let needsSession = method.hasPrefix("machines.") || method.hasPrefix("tickets.") || method.hasPrefix("pair.") || method.hasPrefix("account.")
         if needsSession && !signedIn.get() { return Self.error("not_logged_in") }
         switch method {
         case "config.set", "machines.heartbeat", "pair.approve", "pair.deny":
@@ -87,8 +94,39 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
         case "auth.login":
             guard params["password"] == .string("pw") else { return Self.error("invalid_credentials") }
             signedIn.with { $0 = true }
+            if case .string(let email)? = params["email"] { sessionEmail.with { $0 = email } }
+            sessionAuthMethod.with { $0 = "password" }
             return Self.ok(.object(["user_id": .string(userID.get()), "device_id": .string("d_1"),
                                     "device_public_key_b64": .string("AAAA"), "fingerprint": .string(Self.ownFingerprint)]))
+        case "auth.google.begin":
+            guard case .string(let purpose)? = params["purpose"], purpose == "sign_in" || purpose == "link" else {
+                return Self.error("invalid_params")
+            }
+            if purpose == "link" && !signedIn.get() { return Self.error("not_logged_in") }
+            return Self.ok(.object(["flow_id": .string("flow-1"),
+                                    "auth_url": .string("https://accounts.google.com/o/oauth2/v2/auth?client_id=test")]))
+        case "auth.google.finish":
+            signedIn.with { $0 = true }
+            sessionEmail.with { $0 = googleEmail.get() }
+            sessionAuthMethod.with { $0 = "google" }
+            return Self.ok(.object(["user_id": .string(userID.get()), "device_id": .string("d_1"),
+                                    "device_public_key_b64": .string("AAAA"), "fingerprint": .string(Self.ownFingerprint),
+                                    "email": .string(googleEmail.get()), "auth_method": .string("google")]))
+        case "auth.google.cancel":
+            return Self.ok(.object([:]))
+        case "auth.session":
+            guard signedIn.get() else { return Self.error("not_logged_in") }
+            return Self.ok(.object(["user_id": .string(userID.get()), "device_id": .string("d_1"),
+                                    "email": sessionEmail.get().map { .string($0) } ?? .null,
+                                    "auth_method": .string(sessionAuthMethod.get())]))
+        case "account.identities.list":
+            return Self.ok(.object(["identities": .array(identities.get())]))
+        case "account.identities.remove":
+            guard case .string(let id)? = params["identity_id"] else { return Self.error("invalid_params") }
+            identities.with { items in
+                items.removeAll { if case .object(let o) = $0, o["identity_id"] == .string(id) { return true } else { return false } }
+            }
+            return Self.ok(.object([:]))
         case "auth.logout":
             signedIn.with { $0 = false }
             return Self.ok(.object([:]))

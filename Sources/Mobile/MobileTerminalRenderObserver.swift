@@ -9,9 +9,15 @@ import os
 /// Ghostty notification demand is tied to subscriptions so the desktop terminal
 /// path is untouched when no iPhone/iPad is attached.
 @MainActor
-final class MobileTerminalRenderObserver {
+final class MobileTerminalRenderObserver: MobileTerminalFrameSinkRegistry {
     static let shared = MobileTerminalRenderObserver()
 
+    private struct WeakFrameSink {
+        weak var sink: (any MobileTerminalFrameSink)?
+    }
+
+    /// ShellX Link terminal views, by the surface they watch. Weak: a released view stops costing demand.
+    private var frameSinksBySurfaceID: [UUID: [ObjectIdentifier: WeakFrameSink]] = [:]
     private var releaseFrameDemand: (() -> Void)?
     private var releaseTickDemand: (() -> Void)?
     private var observers: [NSObjectProtocol] = []
@@ -107,6 +113,7 @@ final class MobileTerminalRenderObserver {
         ) { [weak self] notification in
             MainActor.assumeIsolated {
                 guard let surfaceID = notification.object as? UUID else { return }
+                self?.notifyFrameSinks(surfaceIDs: [surfaceID], all: false)
                 guard MobileHostService.hasEventSubscribers(topic: "terminal.render_grid") else { return }
                 self?.themeInvalidationScheduler.schedule(surfaceID: surfaceID)
             }
@@ -120,6 +127,8 @@ final class MobileTerminalRenderObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         observers.removeAll()
+        frameSinksBySurfaceID.removeAll()
+        MobileTerminalByteTee.shared.setFrameSinkDemand(false)
         releaseFrameDemand?()
         releaseFrameDemand = nil
         releaseTickDemand?()
@@ -138,7 +147,8 @@ final class MobileTerminalRenderObserver {
     }
 
     func noteTerminalBytes(surfaceID: UUID) {
-        guard MobileHostService.hasEventSubscribers(topic: "terminal.render_grid") else { return }
+        guard MobileHostService.hasEventSubscribers(topic: "terminal.render_grid")
+            || frameSinksBySurfaceID[surfaceID] != nil else { return }
         pendingSurfaceIDs.insert(surfaceID)
         // The byte tee runs before Ghostty's VT parser consumes the bytes, and
         // the hop back to the main actor can land after the current tick/frame
@@ -173,7 +183,7 @@ final class MobileTerminalRenderObserver {
     }
 
     private func refreshNotificationDemand() {
-        let shouldRetainDemand = hasAnyRenderEventSubscribers
+        let shouldRetainDemand = hasAnyRenderEventSubscribers || !frameSinksBySurfaceID.isEmpty
         let hasRenderGridSubscribers = MobileHostService.hasEventSubscribers(topic: "terminal.render_grid")
         let hasDeviceTerminalGridSubscribers = MobileHostService.hasEventSubscribers(
             topic: DeviceTerminalGridPublisher.eventTopic
@@ -214,7 +224,7 @@ final class MobileTerminalRenderObserver {
     }
 
     private func enqueueTerminalUpdate(surfaceID: UUID?) {
-        guard hasAnyRenderEventSubscribers else {
+        guard hasAnyRenderEventSubscribers || !frameSinksBySurfaceID.isEmpty else {
             refreshNotificationDemand()
             return
         }
@@ -246,7 +256,7 @@ final class MobileTerminalRenderObserver {
         HostLatencyTrace.stamp("host.flush", "pending=\(pendingSurfaceIDs.count)")
         #endif
         isEmitFlushScheduled = false
-        guard hasAnyRenderEventSubscribers else {
+        guard hasAnyRenderEventSubscribers || !frameSinksBySurfaceID.isEmpty else {
             refreshNotificationDemand()
             return
         }
@@ -260,6 +270,10 @@ final class MobileTerminalRenderObserver {
         hasPendingGlobalUpdate = false
         hasPendingThemeInvalidation = false
         pendingThemeSurfaceIDs.removeAll()
+        notifyFrameSinks(
+            surfaceIDs: surfaceIDs.union(themeSurfaceIDs),
+            all: shouldEmitAllThemes || (surfaceIDs.isEmpty && shouldEmitGlobal)
+        )
 
         if shouldEmitUpdatedEvents, shouldEmitGlobal {
             MobileHostService.emitEvent(topic: "terminal.updated", payload: [:])
@@ -666,6 +680,7 @@ final class MobileTerminalRenderObserver {
     }
 
     private func invalidateTerminalThemes() {
+        notifyFrameSinks(surfaceIDs: [], all: true)
         guard MobileHostService.hasEventSubscribers(topic: "terminal.render_grid") else {
             hasLoadedTerminalTheme = false
             return
@@ -759,9 +774,75 @@ final class MobileTerminalRenderObserver {
         framePacersBySurfaceID.removeAll()
     }
 
+    // MARK: - Frame sinks
+
+    func addFrameSink(_ sink: any MobileTerminalFrameSink) {
+        let wasEmpty = frameSinksBySurfaceID.isEmpty
+        frameSinksBySurfaceID[sink.frameSinkSurfaceID, default: [:]][ObjectIdentifier(sink)] = WeakFrameSink(sink: sink)
+        if wasEmpty {
+            MobileTerminalByteTee.shared.setFrameSinkDemand(true)
+        }
+        refreshNotificationDemand()
+    }
+
+    func removeFrameSink(_ sink: any MobileTerminalFrameSink) {
+        let surfaceID = sink.frameSinkSurfaceID
+        frameSinksBySurfaceID[surfaceID]?[ObjectIdentifier(sink)] = nil
+        if frameSinksBySurfaceID[surfaceID]?.isEmpty == true {
+            frameSinksBySurfaceID[surfaceID] = nil
+        }
+        releaseFrameSinkDemandIfEmpty()
+    }
+
+    /// Tells the live sinks of `surfaceIDs` (of every surface when `all`) that their surface may have changed.
+    /// Sinks capture on their own schedule; nothing is captured here.
+    private func notifyFrameSinks(surfaceIDs: Set<UUID>, all: Bool) {
+        guard !frameSinksBySurfaceID.isEmpty else { return }
+        var live: [any MobileTerminalFrameSink] = []
+        for (surfaceID, entries) in frameSinksBySurfaceID {
+            let wanted = all || surfaceIDs.contains(surfaceID)
+            for (key, entry) in entries {
+                guard let sink = entry.sink else {
+                    frameSinksBySurfaceID[surfaceID]?[key] = nil
+                    continue
+                }
+                if wanted { live.append(sink) }
+            }
+            if frameSinksBySurfaceID[surfaceID]?.isEmpty == true {
+                frameSinksBySurfaceID[surfaceID] = nil
+            }
+        }
+        for sink in live {
+            sink.terminalSurfaceMayHaveChanged()
+        }
+        releaseFrameSinkDemandIfEmpty()
+    }
+
+    private func releaseFrameSinkDemandIfEmpty() {
+        guard frameSinksBySurfaceID.isEmpty else { return }
+        MobileTerminalByteTee.shared.setFrameSinkDemand(false)
+        refreshNotificationDemand()
+    }
+
     #if DEBUG
     var debugIsRetainingNotificationDemandForTesting: Bool {
         releaseFrameDemand != nil && releaseTickDemand != nil
+    }
+
+    var debugFrameSinkCountForTesting: Int {
+        frameSinksBySurfaceID.values.reduce(0) { $0 + $1.count }
+    }
+
+    var debugPendingSurfaceCountForTesting: Int { pendingSurfaceIDs.count }
+
+    var debugRenderGridStateSurfaceCountForTesting: Int { renderGridStatesBySurfaceID.count }
+
+    func debugEnqueueTerminalUpdateForTesting(surfaceID: UUID?) {
+        enqueueTerminalUpdate(surfaceID: surfaceID)
+    }
+
+    func debugFlushTerminalUpdatesForTesting() {
+        flushTerminalUpdates()
     }
     #endif
 }

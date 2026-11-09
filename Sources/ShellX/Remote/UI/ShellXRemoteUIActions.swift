@@ -58,7 +58,10 @@ enum ShellXRemoteUIActions {
     }
 
     static func presentSignIn() {
-        guard let service = ShellXRemoteUIModel.shared.service else { return }
+        guard let service = ShellXRemoteUIModel.shared.service else {
+            ShellXAccountFlow.shared.startSignIn()
+            return
+        }
         SignInSheetPresenter.shared.present(service: service)
     }
 

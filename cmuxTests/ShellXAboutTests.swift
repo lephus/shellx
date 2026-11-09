@@ -16,6 +16,7 @@ struct ShellXAboutTests {
         #expect(names.contains("Ghostty"))
         #expect(names.contains("coolicons by Kryston Schwarze"))
         #expect(names.contains("Space Grotesk"))
+        #expect(names.contains("Google Sans"))
         #expect(AboutLicenseContent.sourceCodeURL == ShellXBrand.sourceCodeURL)
     }
 
@@ -27,6 +28,7 @@ struct ShellXAboutTests {
         #expect(licenses["Ghostty"] == "MIT")
         #expect(licenses["coolicons by Kryston Schwarze"] == "CC BY 4.0")
         #expect(licenses["Space Grotesk"] == "OFL-1.1")
+        #expect(licenses["Google Sans"] == "OFL-1.1")
     }
 
     @Test func licenseLineNamesTheShellXSource() {

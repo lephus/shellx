@@ -123,6 +123,41 @@ pub fn send(
     Ok(Reply { status, body })
 }
 
+/// `POST` an `application/x-www-form-urlencoded` body to an absolute `url` (Google's token endpoint).
+/// No `X-ShellX-*` headers and no bearer: only `User-Agent`. A transport failure is `network`.
+pub fn post_form(
+    agent: &Agent,
+    cfg: &Config,
+    url: &str,
+    fields: &[(&str, &str)],
+    timeout: Option<Duration>,
+) -> Result<Reply, CoreError> {
+    let body = Zeroizing::new(
+        fields
+            .iter()
+            .map(|(k, v)| format!("{}={}", crate::auth_google::percent_encode(k), crate::auth_google::percent_encode(v)))
+            .collect::<Vec<_>>()
+            .join("&"),
+    );
+    let mut rb = agent
+        .post(url)
+        .header("User-Agent", user_agent(cfg))
+        .header("Content-Type", "application/x-www-form-urlencoded");
+    if let Some(t) = timeout {
+        rb = rb.config().timeout_global(Some(t)).build();
+    }
+    let mut resp = rb.send(body.as_bytes()).map_err(|e| transport_error("google token endpoint", &e))?;
+    let status = resp.status().as_u16();
+    let body = resp
+        .body_mut()
+        .with_config()
+        .limit(MAX_RESPONSE_BYTES)
+        .read_to_vec()
+        .map(Zeroizing::new)
+        .map_err(|e| transport_error("google token endpoint", &e))?;
+    Ok(Reply { status, body })
+}
+
 /// The ureq error's Display may name the URL (no secrets in our URLs) but never bodies.
 fn transport_error(path: &str, e: &ureq::Error) -> CoreError {
     CoreError::new("network", format!("{path}: {e}"))

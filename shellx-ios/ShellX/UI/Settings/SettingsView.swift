@@ -4,7 +4,7 @@ import SwiftUI
 /// section.
 struct SettingsView: View {
     let email: String
-    let signOut: () async -> Void
+    let account: AccountActions?
 
     @Environment(VoiceService.self) private var voice: VoiceService?
 
@@ -19,7 +19,7 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier("settings.machines")
                 }
-                AccountSection(email: email, signOut: signOut)
+                AccountSection(email: email, account: account)
                 AppearanceSection()
                 if let voice { VoiceSection(service: voice) }
                 AboutSection()
@@ -34,6 +34,6 @@ struct SettingsView: View {
 
 #if DEBUG
 #Preview {
-    NavigationStack { SettingsView(email: "phu@example.com", signOut: {}) }
+    NavigationStack { SettingsView(email: "phu@example.com", account: nil) }
 }
 #endif

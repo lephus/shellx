@@ -22,6 +22,43 @@ use zeroize::{Zeroize, Zeroizing};
 pub const SESSION_FILE: &str = "session.json";
 pub const DEVICE_KEY_FILE: &str = "device.key";
 pub const MACHINE_FILE: &str = "machine.json";
+/// Write `session.json`; drop `machine.json` when the account changed (a machine registered
+/// under another account must not be reused).
+pub fn save_session(store: &StateStore, session: &SessionFile, previous_user: Option<&str>) -> Result<(), CoreError> {
+    let bytes = Zeroizing::new(
+        serde_json::to_vec(session).map_err(|_| CoreError::new("io", "session is not serializable"))?,
+    );
+    store.write_secret(SESSION_FILE, &bytes)?;
+    if previous_user.is_some_and(|u| u != session.user_id) {
+        store.remove(MACHINE_FILE)?;
+    }
+    Ok(())
+}
+
+/// The server refused `used` (401): forget `session.json` so the next sign-in sends no stale
+/// bearer. `machine.json` and `device.key` stay. A session replaced meanwhile is left alone.
+pub fn forget_session_if(store: &StateStore, used: &str, lock: &std::sync::Mutex<()>) {
+    let _g = lock.lock().unwrap_or_else(|p| p.into_inner());
+    if let Ok(Some(current)) = load_session(store)
+        && current.token == used
+    {
+        let _ = store.remove(SESSION_FILE);
+    }
+}
+
+/// `auth.session`: who is signed in and how. Sends nothing.
+pub fn session_info(store: &StateStore) -> Result<Value, CoreError> {
+    let Some(s) = load_session(store)? else {
+        return Err(CoreError::new("not_logged_in", "no session"));
+    };
+    Ok(json!({
+        "user_id": s.user_id,
+        "device_id": s.device_id,
+        "email": s.email,
+        "auth_method": s.auth_method.clone().unwrap_or_else(|| "password".to_string()),
+    }))
+}
+
 /// Best-effort server logout must not hold up a local sign-out.
 pub const LOGOUT_TIMEOUT: Duration = Duration::from_secs(2);
 const DEVICE_NAME_MAX_CHARS: usize = 100;
@@ -35,6 +72,18 @@ impl Drop for SessionFile {
 impl Drop for crate::api::MintResponse {
     fn drop(&mut self) {
         self.ticket.zeroize();
+    }
+}
+
+impl Drop for crate::api::GoogleAuthResponse {
+    fn drop(&mut self) {
+        self.token.zeroize();
+    }
+}
+
+impl Drop for crate::api::GoogleTokenResponse {
+    fn drop(&mut self) {
+        self.id_token.zeroize();
     }
 }
 
@@ -147,15 +196,10 @@ pub fn login(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Val
         token: resp.token.clone(),
         user_id: resp.user_id.clone(),
         device_id: resp.device_id.clone(),
+        auth_method: Some("password".to_string()),
+        email: Some(email.trim().to_string()),
     };
-    let bytes = Zeroizing::new(
-        serde_json::to_vec(&session).map_err(|_| CoreError::new("io", "session is not serializable"))?,
-    );
-    store.write_secret(SESSION_FILE, &bytes)?;
-    // A machine registered under another account must not be reused.
-    if previous_user.as_deref().is_some_and(|u| u != resp.user_id) {
-        store.remove(MACHINE_FILE)?;
-    }
+    save_session(store, &session, previous_user.as_deref())?;
     Ok(json!({
         "user_id": resp.user_id,
         "device_id": resp.device_id,

@@ -58,5 +58,6 @@ import Foundation
         #expect(ShellXFeatures.phonePairing == true)   // 1.5.1: iPhone pairing without remote machines
         #expect(ShellXFeatures.upstreamDeviceMirroring == false)
         #expect(ShellXBrand.apiBaseURL.absoluteString == "https://relay.shellx.pro")
+        #expect(ShellXBrand.deleteAccountURL.absoluteString == "https://shellx.pro/privacy#delete-account")
     }
 }

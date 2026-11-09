@@ -9,8 +9,9 @@ use gpui::{
     IntoElement, KeyDownEvent, Render, SharedString, Window, div, prelude::*, px,
 };
 use shellx_model::account::AccountState;
+use shellx_model::account::DELETE_ACCOUNT_URL;
 use shellx_model::palette;
-use shellx_model::strings::{Lang, Str, t, update_available};
+use shellx_model::strings::{Lang, Str, added_from, sign_in_methods_error, t, update_available};
 use shellx_model::update::{UpdateStatus, download_url};
 
 use super::account::AccountService;
@@ -28,6 +29,8 @@ pub enum SettingsEvent {
     Closed,
     /// "Đăng nhập…" (signed out): RootView opens the sign-in dialog.
     SignInRequested,
+    /// "Chuyển…" (signed in with a password): RootView opens the dialog that switches to Google.
+    SwitchToGoogleRequested,
 }
 
 pub struct SettingsPanel {
@@ -61,6 +64,10 @@ impl SettingsPanel {
     pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.open = true;
         window.focus(&self.focus);
+        if matches!(self.account.read(cx).state(), AccountState::LoggedIn { .. }) {
+            self.account
+                .update(cx, |a, cx| a.refresh_sign_in_methods(cx));
+        }
         cx.notify();
     }
 
@@ -116,24 +123,57 @@ impl SettingsPanel {
         };
         // A failed logout, else why the account is not working (offline at
         // start, a state-folder problem): the sidebar no longer shows these.
-        let notice =
-            account
-                .notice()
-                .map(|e| e.message.clone())
-                .or_else(|| match account.state() {
-                    AccountState::Error(e) if e.message.trim().is_empty() => {
-                        Some(t(lang, Str::Error).to_string())
-                    }
-                    AccountState::Error(e) => {
-                        Some(format!("{} · {}", t(lang, Str::Error), e.message))
-                    }
-                    _ => None,
-                });
+        let notice = account
+            .notice()
+            .map(|e| {
+                if account.notice_is_methods() {
+                    sign_in_methods_error(lang, &e.code)
+                } else {
+                    e.message.clone()
+                }
+            })
+            .or_else(|| match account.state() {
+                AccountState::Error(e) if e.message.trim().is_empty() => {
+                    Some(t(lang, Str::Error).to_string())
+                }
+                AccountState::Error(e) => Some(format!("{} · {}", t(lang, Str::Error), e.message)),
+                _ => None,
+            });
         Self::section(t(lang, Str::Account))
             .child(div().text_color(theme::text_hi()).truncate().child(who))
             .when(!signed_in, |s| {
                 s.child(Self::muted(t(lang, Str::SignInSubtitle)))
             })
+            .when(signed_in && account.needs_google_switch(), |s| {
+                s.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(4.0))
+                        .child(
+                            div()
+                                .text_color(theme::text_hi())
+                                .child(t(lang, Str::SwitchToGoogle)),
+                        )
+                        .child(Self::muted(t(lang, Str::SwitchToGoogleIntro)))
+                        .child(
+                            div().flex().child(
+                                button(
+                                    "settings-switch-google",
+                                    t(lang, Str::SwitchEllipsis),
+                                    Kind::Primary,
+                                    false,
+                                )
+                                .on_click(cx.listener(
+                                    |_, _: &ClickEvent, _, cx| {
+                                        cx.emit(SettingsEvent::SwitchToGoogleRequested);
+                                    },
+                                )),
+                            ),
+                        ),
+                )
+            })
+            .when(signed_in, |s| s.child(self.methods_block(lang, cx)))
             .children(notice.filter(|m| !m.is_empty()).map(|m| {
                 div()
                     .text_size(theme::SMALL_SIZE)
@@ -174,6 +214,98 @@ impl SettingsPanel {
                     ),
                 )
             })
+    }
+
+    /// "Sign-in methods": one row per identity; an Apple ID can be removed; the link to delete the account.
+    fn methods_block(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
+        let account = self.account.read(cx);
+        let removing = account.removing_sign_in_method().map(str::to_string);
+        let rows: Vec<Div> = account
+            .sign_in_methods()
+            .unwrap_or_default()
+            .iter()
+            .map(|m| {
+                let hidden = m.email.is_empty() || m.is_private_email;
+                let who = if m.is_apple() {
+                    if hidden {
+                        t(lang, Str::HiddenEmail).to_string()
+                    } else {
+                        m.email.clone()
+                    }
+                } else {
+                    m.email.clone()
+                };
+                let kind = if m.is_apple() {
+                    Str::AppleId
+                } else {
+                    Str::GoogleAccount
+                };
+                let id = m.identity_id.clone();
+                let busy = removing.as_deref() == Some(m.identity_id.as_str());
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(8.0))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .min_w_0()
+                            .child(div().text_color(theme::text()).child(t(lang, kind)))
+                            .child(Self::muted(who))
+                            .children(
+                                m.linked_via_device_name
+                                    .as_deref()
+                                    .filter(|_| m.is_apple())
+                                    .map(|d| Self::muted(added_from(lang, d))),
+                            ),
+                    )
+                    .when(m.is_apple(), |row| {
+                        row.child(
+                            button(
+                                SharedString::from(format!("settings-remove-{id}")),
+                                t(lang, Str::RemoveMethod),
+                                Kind::Secondary,
+                                busy,
+                            )
+                            .when(!busy, |b| {
+                                let id = id.clone();
+                                b.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                    this.account.update(cx, |a, cx| {
+                                        a.remove_sign_in_method(id.clone(), cx)
+                                    });
+                                }))
+                            }),
+                        )
+                    })
+            })
+            .collect();
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(6.0))
+            .pt(px(6.0))
+            .child(
+                div()
+                    .text_size(theme::PILL_SIZE)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme::muted())
+                    .child(t(lang, Str::SignInMethods).to_uppercase()),
+            )
+            .children(rows)
+            .child(
+                div().flex().child(
+                    button(
+                        "settings-delete-account",
+                        t(lang, Str::DeleteAccount),
+                        Kind::Secondary,
+                        false,
+                    )
+                    .on_click(|_, _, cx| open_https(cx, DELETE_ACCOUNT_URL)),
+                ),
+            )
     }
 
     fn update_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {

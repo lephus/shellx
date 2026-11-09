@@ -58,6 +58,10 @@ final class MachinesRenderTests: XCTestCase {
         XCTAssertEqual(offered, [true, false, true, true, false, false, true])
     }
 
+    func testFirstMacWithDemoRenders() throws {
+        try assertRenders(NavigationStack { FirstMacView(pair: {}, tryDemo: {}) }, name: "first-mac-demo")
+    }
+
     func testFirstMacRenders() throws {
         try assertRenders(NavigationStack { FirstMacView(pair: {}) }, name: "first-mac")
     }

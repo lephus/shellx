@@ -30,6 +30,9 @@ enum Probe {
           shellx-link-probe chat-stop <session_id> --state <dir> [--machine <id>] [--hard]
           shellx-link-probe agent-close <session_id> --state <dir> [--machine <id>]
           shellx-link-probe terminal-close <workspace_id> <terminal_id> --state <dir> [--machine <id>]
+          shellx-link-probe terminal-view <terminal_id> --state <dir> [--machine <id>] [--cols <n>] [--rows <n>] [--seconds <n>]
+          shellx-link-probe terminal-type <terminal_id> --state <dir> [--machine <id>] [--cols <n>] [--rows <n>] [--text <text>] [--key <key>]... [--paste-file <file>] [--wait-ms <n>] [--dry-run]
+          shellx-link-probe terminal-create <workspace_id> --state <dir> [--machine <id>]
           shellx-link-probe bench --state <dir> [--machine <id>] --socket <path> [--count <n>] [--mode <mode>]
 
         --state is a directory only you can read (created 0700 when missing); keep it outside any
@@ -50,6 +53,16 @@ enum Probe {
         workspace's last tab of any kind); take the session_id from sessions. It exits 2 unless the Mac answers ok.
         terminal-close closes one terminal tab of a workspace on the Mac (the whole workspace when it is the
         workspace's last tab); take both ids from workspaces. It exits 2 unless the Mac answers ok.
+        terminal-view opens a view of a terminal (take the id from workspaces) at --cols x --rows (80 x 24 when left
+        out), logs every frame it applies and prints the screen after each snapshot and when it stops, until the view
+        or its session ends (exit 4) or --seconds pass (exit 0). terminal-type opens a view, waits for its first snapshot,
+        sends one input message (the --paste-file text, then --text, then each --key in order), logs the time until the
+        next frame (the echo), waits --wait-ms (1000 when left out), prints the screen and closes the view. A key is a
+        name (enter, tab, backspace, escape, delete, space, up, down, left, right, home, end, page_up, page_down, a to z)
+        after any of ctrl, alt and shift joined with +, like ctrl+c or shift+tab. With --dry-run it prints the
+        terminal.view.input message instead of connecting. terminal-create opens a terminal tab in a workspace without
+        changing what the Mac shows; it exits 2 unless the Mac answers ok. All three exit 3 when the Mac does not offer
+        the feature (terminal_view, terminal_create).
         watch logs pending requests, session states and chat entries until the session ends
         (exit 4) or --seconds pass (exit 0). With --recheck it then tries to connect again twice:
         with a ticket minted before the end (the Mac's handshake check) and with a new ticket (the
@@ -120,6 +133,18 @@ enum Probe {
         case "terminal-close":
             try args.expect(positional: 2, options: ["state", "machine"])
             try await Commands.terminalClose(args)
+        case "terminal-view":
+            try args.expect(positional: 1, options: ["state", "machine", "cols", "rows", "seconds"])
+            try await TerminalCommands.view(args)
+        case "terminal-type":
+            try args.expect(
+                positional: 1,
+                options: ["state", "machine", "cols", "rows", "text", "key", "paste-file", "wait-ms", "dry-run"],
+                repeatable: ["key"])
+            try await TerminalCommands.type(args)
+        case "terminal-create":
+            try args.expect(positional: 1, options: ["state", "machine"])
+            try await TerminalCommands.create(args)
         case "bench":
             try args.expect(positional: 0, options: ["state", "machine", "socket", "count", "mode"])
             try await Bench(args: args).run()

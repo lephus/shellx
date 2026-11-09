@@ -296834,127 +296834,127 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "أرسل إشعارات الوكيل إلى تطبيق ShellX على iPhone. تكون الميزة متوقفة افتراضيًا، ولا يتم رفع أي شيء إلا عند تشغيلها."
+            "value": "أرسل إشعارات الوكلاء المحلية إلى ShellX على هاتفك. مفعّل افتراضيًا؛ أوقفه كي يتوقف هذا الـ Mac عن إعادة توجيهها."
           }
         },
         "bs": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Šalji obavještenja agenata u ShellX aplikaciju za iPhone. Isključeno je po zadanim postavkama; ništa se ne šalje dok ovo ne uključite."
           }
         },
         "da": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Send agentnotifikationer til ShellX-appen på iPhone. Funktionen er slået fra som standard; intet uploades, medmindre den er slået til."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Agentenmitteilungen an die ShellX-App auf dem iPhone senden. Standardmäßig deaktiviert; ohne Aktivierung wird nichts hochgeladen."
+            "value": "Sende lokale Agent-Benachrichtigungen an ShellX auf deinem Telefon. Standardmäßig aktiviert; deaktiviere dies, damit dieser Mac sie nicht mehr weiterleitet."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Send local agent notifications to ShellX on your iPhone. Enabled by default; turn this off to stop this Mac from forwarding them."
+            "value": "Send local agent notifications to ShellX on your phone. Enabled by default; turn this off to stop this Mac from forwarding them."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Envía notificaciones de agentes a la app ShellX del iPhone. Está desactivado de forma predeterminada; no se carga nada a menos que lo actives."
+            "value": "Envía las notificaciones locales de agentes a ShellX en tu teléfono. Activado de forma predeterminada; desactívalo para que este Mac deje de reenviarlas."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Envoyez les notifications des agents à l’app ShellX sur iPhone. Cette option est désactivée par défaut ; rien n’est téléversé tant qu’elle ne l’est pas."
+            "value": "Envoyez les notifications locales des agents à ShellX sur votre téléphone. Activé par défaut ; désactivez-le pour que ce Mac cesse de les transférer."
           }
         },
         "it": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Invia le notifiche degli agenti all’app ShellX per iPhone. L’opzione è disattivata per impostazione predefinita; non viene caricato nulla finché non la attivi."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ローカルエージェントの通知を iPhone の ShellX に送信します。デフォルトでオンです。この Mac からの転送を停止するにはオフにしてください。"
+            "value": "ローカルのエージェント通知をスマートフォンの ShellX に送ります。既定で有効です。オフにすると、この Mac は転送しなくなります。"
           }
         },
         "km": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "ផ្ញើការជូនដំណឹងរបស់ភ្នាក់ងារទៅកម្មវិធី ShellX លើ iPhone។ មុខងារនេះបិទតាមលំនាំដើម ហើយគ្មានអ្វីត្រូវបានផ្ទុកឡើងទេ លុះត្រាតែអ្នកបើកវា។"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "에이전트 알림을 iPhone용 ShellX 앱으로 보냅니다. 기본적으로 꺼져 있으며, 이 설정을 켜기 전에는 아무것도 업로드되지 않습니다."
+            "value": "로컬 에이전트 알림을 휴대전화의 ShellX로 보냅니다. 기본적으로 켜져 있으며, 끄면 이 Mac이 알림을 더 이상 전달하지 않습니다."
           }
         },
         "nb": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Send agentvarslinger til ShellX-appen på iPhone. Funksjonen er av som standard; ingenting lastes opp med mindre den er slått på."
           }
         },
         "pl": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Wysyłaj powiadomienia agentów do aplikacji ShellX na iPhonie. Funkcja jest domyślnie wyłączona; nic nie jest przesyłane, dopóki jej nie włączysz."
           }
         },
         "pt-BR": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Envie notificações dos agentes ao app ShellX no iPhone. O recurso vem desativado; nada é enviado até que você o ative."
           }
         },
         "ru": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Отправлять уведомления агентов в приложение ShellX на iPhone. По умолчанию выключено; данные не загружаются, пока вы не включите эту функцию."
           }
         },
         "th": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "ส่งการแจ้งเตือนของเอเจนต์ไปยังแอป ShellX บน iPhone ปิดไว้ตามค่าเริ่มต้น และจะไม่มีการอัปโหลดข้อมูลจนกว่าจะเปิดใช้"
           }
         },
         "tr": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Aracı bildirimlerini iPhone’daki ShellX uygulamasına gönderir. Varsayılan olarak kapalıdır; açılmadıkça hiçbir şey yüklenmez."
           }
         },
         "uk": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Надсилати сповіщення агентів у застосунок ShellX на iPhone. Типово вимкнено; нічого не завантажується, доки ви не ввімкнете цю функцію."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将代理通知发送到 iPhone 上的 ShellX App。默认关闭；只有开启后才会上传内容。"
+            "value": "将本机 agent 通知发送到手机上的 ShellX。默认开启；关闭后，这台 Mac 将不再转发。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "將代理程式通知傳送到 iPhone 上的 ShellX App。預設關閉；只有開啟後才會上傳內容。"
+            "value": "將本機 agent 通知傳送到手機上的 ShellX。預設啟用；關閉後，這部 Mac 就不會再轉寄。"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gửi thông báo agent cục bộ tới ShellX trên iPhone của bạn. Được bật theo mặc định; hãy tắt để Mac này ngừng chuyển tiếp."
+            "value": "Gửi thông báo agent cục bộ tới ShellX trên điện thoại của bạn. Được bật theo mặc định; hãy tắt để Mac này ngừng chuyển tiếp."
           }
         }
       }
@@ -296965,127 +296965,127 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إعادة توجيه الإشعارات إلى iPhone الخاص بي"
+            "value": "إعادة توجيه الإشعارات إلى هاتفي"
           }
         },
         "bs": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Proslijedi obavještenja na moj iPhone"
           }
         },
         "da": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Videresend notifikationer til min iPhone"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mitteilungen an mein iPhone weiterleiten"
+            "value": "Benachrichtigungen an mein Telefon weiterleiten"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Forward notifications to my iPhone"
+            "value": "Forward notifications to my phone"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reenviar notificaciones a mi iPhone"
+            "value": "Reenviar notificaciones a mi teléfono"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transférer les notifications vers mon iPhone"
+            "value": "Transférer les notifications vers mon téléphone"
           }
         },
         "it": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Inoltra le notifiche al mio iPhone"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "通知を iPhone に転送する"
+            "value": "通知を自分のスマートフォンに転送"
           }
         },
         "km": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "បញ្ជូនការជូនដំណឹងទៅ iPhone របស់ខ្ញុំ"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "내 iPhone으로 알림 전달"
+            "value": "알림을 내 휴대전화로 전달"
           }
         },
         "nb": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Videresend varslinger til min iPhone"
           }
         },
         "pl": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Przekazuj powiadomienia na mój iPhone"
           }
         },
         "pt-BR": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Encaminhar notificações para meu iPhone"
           }
         },
         "ru": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Пересылать уведомления на мой iPhone"
           }
         },
         "th": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "ส่งต่อการแจ้งเตือนไปยัง iPhone ของฉัน"
           }
         },
         "tr": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Bildirimleri iPhone'uma ilet"
           }
         },
         "uk": {
           "stringUnit": {
-            "state": "translated",
+            "state": "needs_review",
             "value": "Пересилати сповіщення на мій iPhone"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将通知转发到我的 iPhone"
+            "value": "将通知转发到我的手机"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "將通知轉寄到我的 iPhone"
+            "value": "將通知轉寄到我的手機"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chuyển tiếp thông báo tới iPhone của tôi"
+            "value": "Chuyển tiếp thông báo tới điện thoại của tôi"
           }
         }
       }
@@ -719760,61 +719760,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Email or password is incorrect"
+            "value": "Google sign-in didn't work. Try again."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+            "value": "لم ينجح تسجيل الدخول عبر Google. حاول مرة أخرى."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "E-Mail oder Passwort ist falsch"
+            "value": "Die Google-Anmeldung hat nicht funktioniert. Versuche es erneut."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El correo o la contraseña no son correctos"
+            "value": "El inicio de sesión con Google no funcionó. Inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "E-mail ou mot de passe incorrect"
+            "value": "La connexion Google n’a pas fonctionné. Réessayez."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "メールアドレスまたはパスワードが正しくありません"
+            "value": "Google サインインに失敗しました。もう一度お試しください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이메일 또는 비밀번호가 올바르지 않습니다"
+            "value": "Google 로그인에 실패했습니다. 다시 시도하세요."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Email hoặc mật khẩu không đúng"
+            "value": "Đăng nhập Google không thành công. Hãy thử lại."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "邮箱或密码不正确"
+            "value": "Google 登录未成功，请重试。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "電子郵件或密碼不正確"
+            "value": "Google 登入未成功，請再試一次。"
           }
         }
       }
@@ -723725,61 +723725,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pair iPhone…"
+            "value": "Pair Phone…"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إقران iPhone…"
+            "value": "إقران هاتف…"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone koppeln …"
+            "value": "Telefon koppeln …"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincular iPhone…"
+            "value": "Vincular teléfono…"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jumeler un iPhone…"
+            "value": "Jumeler un téléphone…"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone をペアリング…"
+            "value": "スマートフォンをペアリング…"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone 페어링…"
+            "value": "휴대전화 페어링…"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ghép cặp iPhone…"
+            "value": "Ghép cặp điện thoại…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "配对 iPhone…"
+            "value": "配对手机…"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "配對 iPhone…"
+            "value": "配對手機…"
           }
         }
       }
@@ -723790,61 +723790,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pair iPhone"
+            "value": "Pair Phone"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إقران iPhone"
+            "value": "إقران هاتف"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone koppeln"
+            "value": "Telefon koppeln"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincular iPhone"
+            "value": "Vincular teléfono"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jumeler un iPhone"
+            "value": "Jumeler un téléphone"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone をペアリング"
+            "value": "スマートフォンをペアリング"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone 페어링"
+            "value": "휴대전화 페어링"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ghép cặp iPhone"
+            "value": "Ghép cặp điện thoại"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "配对 iPhone"
+            "value": "配对手机"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "配對 iPhone"
+            "value": "配對手機"
           }
         }
       }
@@ -723855,61 +723855,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scan this code with the ShellX app on your iPhone"
+            "value": "Scan this code with the ShellX app on your phone"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "امسح هذا الرمز باستخدام تطبيق ShellX على iPhone"
+            "value": "امسح هذا الرمز بتطبيق ShellX على هاتفك"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scanne diesen Code mit der ShellX-App auf deinem iPhone"
+            "value": "Scanne diesen Code mit der ShellX-App auf deinem Telefon"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escanea este código con la app ShellX en tu iPhone"
+            "value": "Escanea este código con la app ShellX de tu teléfono"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scannez ce code avec l’app ShellX sur votre iPhone"
+            "value": "Scannez ce code avec l’app ShellX sur votre téléphone"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone の ShellX アプリでこのコードをスキャンしてください"
+            "value": "スマートフォンの ShellX アプリでこのコードをスキャンしてください"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone의 ShellX 앱으로 이 코드를 스캔하세요"
+            "value": "휴대전화의 ShellX 앱으로 이 코드를 스캔하세요"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quét mã này bằng app ShellX trên iPhone"
+            "value": "Quét mã này bằng app ShellX trên điện thoại"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用 iPhone 上的 ShellX App 扫描此代码"
+            "value": "请用手机上的 ShellX App 扫描此二维码"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 iPhone 上的 ShellX App 掃描此代碼"
+            "value": "請用手機上的 ShellX App 掃描此代碼"
           }
         }
       }
@@ -725870,61 +725870,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pair iPhone"
+            "value": "Pair Phone"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إقران iPhone"
+            "value": "إقران هاتف"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone koppeln"
+            "value": "Telefon koppeln"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincular iPhone"
+            "value": "Vincular teléfono"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jumeler un iPhone"
+            "value": "Jumeler un téléphone"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone をペアリング"
+            "value": "スマートフォンをペアリング"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone 페어링"
+            "value": "휴대전화 페어링"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ghép cặp iPhone"
+            "value": "Ghép cặp điện thoại"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "配对 iPhone"
+            "value": "配对手机"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "配對 iPhone"
+            "value": "配對手機"
           }
         }
       }
@@ -726000,61 +726000,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scan the QR code with ShellX on your iPhone, then allow the phone here on this Mac."
+            "value": "Scan the QR code with ShellX on your phone, then allow the phone here on this Mac."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "امسح رمز QR باستخدام ShellX على iPhone، ثم اسمح للهاتف هنا على هذا الـ Mac."
+            "value": "امسح رمز QR باستخدام ShellX على هاتفك، ثم اسمح للهاتف هنا على هذا الـ Mac."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scannen Sie den QR-Code mit ShellX auf Ihrem iPhone und erlauben Sie das Telefon dann hier auf diesem Mac."
+            "value": "Scanne den QR-Code mit ShellX auf deinem Telefon und erlaube das Telefon dann hier auf diesem Mac."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escanea el código QR con ShellX en tu iPhone y luego permite el teléfono aquí, en este Mac."
+            "value": "Escanea el código QR con ShellX en tu teléfono y luego permite el teléfono aquí, en este Mac."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scannez le code QR avec ShellX sur votre iPhone, puis autorisez le téléphone ici, sur ce Mac."
+            "value": "Scannez le code QR avec ShellX sur votre téléphone, puis autorisez le téléphone ici, sur ce Mac."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone の ShellX で QR コードをスキャンし、この Mac で iPhone を許可してください。"
+            "value": "スマートフォンの ShellX で QR コードをスキャンし、この Mac でスマートフォンを許可してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "iPhone의 ShellX로 QR 코드를 스캔한 다음, 이 Mac에서 휴대폰을 허용하세요."
+            "value": "휴대전화의 ShellX로 QR 코드를 스캔한 다음, 이 Mac에서 휴대전화를 허용하세요."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quét mã QR bằng ShellX trên iPhone, rồi cho phép điện thoại ngay trên Mac này."
+            "value": "Quét mã QR bằng ShellX trên điện thoại, rồi cho phép điện thoại ngay trên Mac này."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用 iPhone 上的 ShellX 扫描二维码，然后在这台 Mac 上允许这部手机。"
+            "value": "用手机上的 ShellX 扫描二维码，然后在这台 Mac 上允许该手机。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 iPhone 上的 ShellX 掃描 QR 碼，然後在這台 Mac 上允許這支手機。"
+            "value": "用手機上的 ShellX 掃描 QR 代碼，然後在這部 Mac 上允許該手機。"
           }
         }
       }
@@ -726065,61 +726065,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in under Settings › Account to pair an iPhone with this Mac."
+            "value": "Sign in under Settings › Account to pair a phone with this Mac."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "سجّل الدخول من الإعدادات › حساب لإقران iPhone بجهاز Mac هذا."
+            "value": "سجّل الدخول من الإعدادات › الحساب لإقران هاتف مع هذا الـ Mac."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Melde dich unter Einstellungen › Konto an, um ein iPhone mit diesem Mac zu koppeln."
+            "value": "Melde dich unter Einstellungen › Konto an, um ein Telefon mit diesem Mac zu koppeln."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inicia sesión en Ajustes › Cuenta para vincular un iPhone con este Mac."
+            "value": "Inicia sesión en Ajustes › Cuenta para vincular un teléfono con este Mac."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connectez-vous dans Réglages › Compte pour jumeler un iPhone avec ce Mac."
+            "value": "Connectez-vous dans Réglages › Compte pour jumeler un téléphone avec ce Mac."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "この Mac と iPhone をペアリングするには、設定 › アカウントでサインインしてください。"
+            "value": "設定 › アカウントでサインインすると、この Mac とスマートフォンをペアリングできます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 Mac과 iPhone을 페어링하려면 설정 › 계정에서 로그인하세요."
+            "value": "설정 › 계정에서 로그인하면 이 Mac과 휴대전화를 페어링할 수 있습니다."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hãy đăng nhập trong Cài đặt › Tài khoản để ghép cặp iPhone với Mac này."
+            "value": "Hãy đăng nhập trong Cài đặt › Tài khoản để ghép cặp điện thoại với Mac này."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请在设置 › 账户中登录，以便将 iPhone 与这台 Mac 配对。"
+            "value": "请在“设置 › 账号”中登录，以将手机与这台 Mac 配对。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "請在設定 › 帳戶中登入，以便將 iPhone 與這台 Mac 配對。"
+            "value": "請在「設定 › 帳號」登入，以將手機與這部 Mac 配對。"
           }
         }
       }
@@ -728850,6 +728850,1566 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude đọc SKILL.md rồi vẽ, mất vài giây"
+          }
+        }
+      }
+    },
+    "remote.signin.error.browser": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open your browser."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Browser konnte nicht geöffnet werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’ouvrir votre navigateur."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر فتح المتصفح."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo abrir el navegador."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法開啟瀏覽器。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开浏览器。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브라우저를 열 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ブラウザを開けませんでした。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không mở được trình duyệt."
+          }
+        }
+      }
+    },
+    "remote.signin.error.emailInUse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another ShellX account already uses this Google account's email. Choose a different Google account."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die E-Mail-Adresse dieses Google-Kontos gehört bereits zu einem anderen ShellX-Konto. Wähle ein anderes Google-Konto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’adresse e-mail de ce compte Google appartient déjà à un autre compte ShellX. Choisissez un autre compte Google."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البريد الإلكتروني لحساب Google هذا مستخدم بالفعل في حساب ShellX آخر. اختر حساب Google مختلفًا."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El correo de esta cuenta de Google ya pertenece a otra cuenta de ShellX. Elige otra cuenta de Google."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個 Google 帳號的電子郵件已屬於另一個 ShellX 帳號，請選擇其他 Google 帳號。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Google 账号的邮箱已属于另一个 ShellX 账号，请选择其他 Google 账号。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Google 계정의 이메일은 이미 다른 ShellX 계정에서 사용 중입니다. 다른 Google 계정을 선택하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Google アカウントのメールアドレスは、既に別の ShellX アカウントで使われています。別の Google アカウントを選んでください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email của tài khoản Google này đã thuộc một tài khoản ShellX khác. Hãy chọn tài khoản Google khác."
+          }
+        }
+      }
+    },
+    "remote.signin.error.identityInUse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Google account already signs in to another ShellX account, or this account already uses another Google account."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Google-Konto meldet bereits ein anderes ShellX-Konto an, oder dieses Konto verwendet bereits ein anderes Google-Konto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce compte Google sert déjà à se connecter à un autre compte ShellX, ou ce compte utilise déjà un autre compte Google."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حساب Google هذا يسجّل الدخول بالفعل إلى حساب ShellX آخر، أو أن هذا الحساب يستخدم حساب Google آخر."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta cuenta de Google ya inicia sesión en otra cuenta de ShellX, o esta cuenta ya usa otra cuenta de Google."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個 Google 帳號已用於登入另一個 ShellX 帳號，或這個帳號已使用另一個 Google 帳號。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Google 账号已用于登录另一个 ShellX 账号，或这个账号已使用另一个 Google 账号。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Google 계정은 이미 다른 ShellX 계정에 로그인하는 데 사용되고 있거나, 이 계정이 이미 다른 Google 계정을 사용하고 있습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Google アカウントは既に別の ShellX アカウントのサインインに使われているか、このアカウントが既に別の Google アカウントを使っています。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tài khoản Google này đã dùng để đăng nhập một tài khoản ShellX khác, hoặc tài khoản này đã dùng một tài khoản Google khác."
+          }
+        }
+      }
+    },
+    "remote.signin.error.stateMismatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in didn't finish. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Anmeldung wurde nicht abgeschlossen. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion n’a pas abouti. Réessayez."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يكتمل تسجيل الدخول. حاول مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El inicio de sesión no se completó. Inténtalo de nuevo."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入未完成，請再試一次。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录未完成，请重试。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인이 완료되지 않았습니다. 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインインが完了しませんでした。もう一度お試しください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập chưa hoàn tất. Hãy thử lại."
+          }
+        }
+      }
+    },
+    "remote.signin.error.switchFromSignedInDevice": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für diese E-Mail-Adresse gibt es bereits ein ShellX-Konto. Öffne ShellX auf einem Gerät, das noch angemeldet ist, gehe zu Einstellungen › Konto › Zur Google-Anmeldung wechseln und versuche es dann erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette adresse e-mail a déjà un compte ShellX. Ouvrez ShellX sur un appareil encore connecté, allez dans Réglages › Compte › Passer à la connexion Google, puis réessayez."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذا البريد الإلكتروني لديه حساب ShellX بالفعل. افتح ShellX على جهاز لا يزال مسجّلاً للدخول، وانتقل إلى الإعدادات › الحساب › التبديل إلى تسجيل الدخول عبر Google، ثم حاول مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este correo ya tiene una cuenta de ShellX. Abre ShellX en un dispositivo que siga con la sesión iniciada, ve a Ajustes › Cuenta › Cambiar al inicio de sesión con Google y vuelve a intentarlo."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個電子郵件已有 ShellX 帳號。請在仍保持登入的裝置上開啟 ShellX，前往「設定 › 帳號 › 切換為 Google 登入」，然後再試一次。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个邮箱已有 ShellX 账号。请在仍保持登录的设备上打开 ShellX，前往“设置 › 账号 › 切换为 Google 登录”，然后重试。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 이메일에는 이미 ShellX 계정이 있습니다. 아직 로그인된 기기에서 ShellX를 열고 설정 › 계정 › Google 로그인으로 전환으로 이동한 다음 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このメールアドレスには既に ShellX アカウントがあります。サインインしたままのデバイスで ShellX を開き、設定 › アカウント › Google サインインに切り替え、を選んでから、もう一度お試しください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài khoản › Chuyển sang đăng nhập Google, rồi thử lại."
+          }
+        }
+      }
+    },
+    "remote.signin.error.timeout": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google sign-in timed out. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Google-Anmeldung hat zu lange gedauert. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La connexion Google a expiré. Réessayez."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "انتهت مهلة تسجيل الدخول عبر Google. حاول مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El inicio de sesión con Google caducó. Inténtalo de nuevo."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 登入逾時，請再試一次。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 登录超时，请重试。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 로그인 시간이 초과되었습니다. 다시 시도하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google サインインがタイムアウトしました。もう一度お試しください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập Google đã hết thời gian chờ. Hãy thử lại."
+          }
+        }
+      }
+    },
+    "remote.signin.browserHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish signing in in your browser, then come back here."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schließe die Anmeldung in deinem Browser ab und kehre dann hierher zurück."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminez la connexion dans votre navigateur, puis revenez ici."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أكمل تسجيل الدخول في المتصفح ثم عد إلى هنا."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termina de iniciar sesión en tu navegador y vuelve aquí."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在瀏覽器中完成登入，然後回到這裡。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在浏览器中完成登录，然后回到这里。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브라우저에서 로그인을 마친 뒤 이곳으로 돌아오세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ブラウザでサインインを完了してから、ここに戻ってください。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy hoàn tất đăng nhập trong trình duyệt rồi quay lại đây."
+          }
+        }
+      }
+    },
+    "remote.signin.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertig"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "완료"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
+        }
+      }
+    },
+    "remote.signin.google": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue with Google"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiter mit Google"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuer avec Google"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المتابعة باستخدام Google"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuar con Google"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Google 繼續"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Google 继续"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google로 계속하기"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google で続行"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếp tục với Google"
+          }
+        }
+      }
+    },
+    "remote.signin.signedInAs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed in as %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Angemeldet als %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecté en tant que %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم تسجيل الدخول باسم %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesión iniciada como %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已登入為 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已登录为 %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 계정으로 로그인됨"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ としてサインイン済み"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã đăng nhập: %@"
+          }
+        }
+      }
+    },
+    "remote.signin.switch.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX now signs in with Google. Switching keeps this computer, your phones and your share links."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX meldet jetzt mit Google an. Beim Wechsel bleiben dieser Computer, deine Telefone und deine Freigabelinks erhalten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX se connecte désormais avec Google. Le changement conserve cet ordinateur, vos téléphones et vos liens de partage."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أصبح ShellX يسجّل الدخول عبر Google. يحتفظ التبديل بهذا الكمبيوتر وهواتفك وروابط المشاركة."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX ahora inicia sesión con Google. Al cambiar se conservan este ordenador, tus teléfonos y tus enlaces para compartir."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 現在使用 Google 登入。切換後會保留這部電腦、你的手機和你的分享連結。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 现在使用 Google 登录。切换后会保留这台电脑、你的手机和你的分享链接。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX는 이제 Google로 로그인합니다. 전환해도 이 컴퓨터, 휴대전화, 공유 링크는 그대로 유지됩니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX は Google でサインインするようになりました。切り替えても、このコンピュータ、スマートフォン、共有リンクはそのまま使えます。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX giờ đăng nhập bằng Google. Chuyển sang Google vẫn giữ máy tính này, điện thoại và các liên kết chia sẻ của bạn."
+          }
+        }
+      }
+    },
+    "remote.signin.switch.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Google sign-in"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zur Google-Anmeldung wechseln"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passer à la connexion Google"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التبديل إلى تسجيل الدخول عبر Google"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar al inicio de sesión con Google"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換為 Google 登入"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换为 Google 登录"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 로그인으로 전환"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google サインインに切り替え"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang đăng nhập Google"
+          }
+        }
+      }
+    },
+    "remote.signin.waiting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Google…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warten auf Google …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente de Google…"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "في انتظار Google…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando a Google…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待 Google…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待 Google…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google을 기다리는 중…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google を待っています…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chờ Google…"
+          }
+        }
+      }
+    },
+    "remote.signin.switch.button": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wechseln …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passer…"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التبديل…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切換…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전환…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切り替え…"
+          }
+        }
+      }
+    },
+    "settings.account.deleteAccount": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Account…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto löschen …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le compte…"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حذف الحساب…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar cuenta…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xóa tài khoản…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除帳號…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除账号…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계정 삭제…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを削除…"
+          }
+        }
+      }
+    },
+    "settings.account.methods.addedFrom": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added from %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hinzugefügt von %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouté depuis %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أُضيف من %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadido desde %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thêm từ %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由 %@ 加入"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由 %@ 添加"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 추가됨"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ から追加"
+          }
+        }
+      }
+    },
+    "settings.account.methods.apple": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple ID"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple-ID"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "identifiant Apple"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "معرّف Apple"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID de Apple"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID Apple"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple ID"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple ID"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple ID"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple ID"
+          }
+        }
+      }
+    },
+    "settings.account.methods.error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in methods: something went wrong (%@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anmeldemethoden: Es ist ein Fehler aufgetreten (%@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Méthodes de connexion : une erreur s’est produite (%@)"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "طرق تسجيل الدخول: حدث خطأ (%@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Métodos de inicio de sesión: algo salió mal (%@)"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cách đăng nhập: có lỗi xảy ra (%@)"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入方式：發生錯誤（%@）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录方式：出错了（%@）"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인 방법: 문제가 발생했습니다(%@)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインイン方法: 問題が発生しました（%@）"
+          }
+        }
+      }
+    },
+    "settings.account.methods.google": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google account"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google-Konto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compte Google"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حساب Google"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta de Google"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tài khoản Google"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 帳號"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 账号"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 계정"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google アカウント"
+          }
+        }
+      }
+    },
+    "settings.account.methods.hiddenEmail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hidden email"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verborgene E-Mail"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-mail masqué"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بريد إلكتروني مخفي"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Correo oculto"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email ẩn"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隱藏的電子郵件"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏的邮箱"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "숨긴 이메일"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非公開のメール"
+          }
+        }
+      }
+    },
+    "settings.account.methods.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entfernen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إزالة"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제거"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        }
+      }
+    },
+    "settings.account.methods.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in methods"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anmeldemethoden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Méthodes de connexion"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "طرق تسجيل الدخول"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Métodos de inicio de sesión"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cách đăng nhập"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登入方式"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录方式"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인 방법"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サインイン方法"
+          }
+        }
+      }
+    },
+    "remote.phonePairing.error.appleIdInUse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Apple ID already signs in to another ShellX account."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Apple-ID meldet bereits ein anderes ShellX-Konto an."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet identifiant Apple se connecte déjà à un autre compte ShellX."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "معرّف Apple هذا يسجّل الدخول بالفعل إلى حساب ShellX آخر."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este ID de Apple ya inicia sesión en otra cuenta de ShellX."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這個 Apple ID 已用於登入另一個 ShellX 帳號。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个 Apple ID 已用于登录另一个 ShellX 账号。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Apple ID는 이미 다른 ShellX 계정에 로그인하는 데 사용되고 있습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Apple ID は既に別の ShellX アカウントのサインインに使われています。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ID Apple này đã dùng để đăng nhập một tài khoản ShellX khác."
+          }
+        }
+      }
+    },
+    "remote.phonePairing.appleLink": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowing lets this Apple ID sign in to your ShellX account and manage it, including deleting the account."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn du erlaubst, kann sich diese Apple-ID bei deinem ShellX-Konto anmelden und es verwalten, auch das Löschen des Kontos."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si vous autorisez, cet identifiant Apple pourra se connecter à votre compte ShellX et le gérer, y compris le supprimer."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السماح يتيح لمعرّف Apple هذا تسجيل الدخول إلى حساب ShellX الخاص بك وإدارته، بما في ذلك حذف الحساب."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si lo permites, este ID de Apple podrá iniciar sesión en tu cuenta de ShellX y gestionarla, incluido eliminarla."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允許後，這個 Apple ID 可以登入並管理你的 ShellX 帳號，包括刪除帳號。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许后，这个 Apple ID 可以登录并管理你的 ShellX 账号，包括删除账号。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "허용하면 이 Apple ID로 ShellX 계정에 로그인하고 계정 삭제를 포함해 계정을 관리할 수 있습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "許可すると、この Apple ID で ShellX アカウントにサインインし、アカウントの削除を含めて管理できるようになります。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cho phép sẽ để ID Apple này đăng nhập và quản lý tài khoản ShellX của bạn, kể cả xóa tài khoản."
           }
         }
       }

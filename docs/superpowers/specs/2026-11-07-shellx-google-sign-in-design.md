@@ -142,15 +142,19 @@ Khi một ID token hợp lệ đến **từ màn đăng nhập** (chưa đăng n
 2. Chưa có, mà email đã xác minh **trùng** `users.email` (so sau khi bỏ khoảng trắng và viết thường bằng
    `normalizeEmail`, `relay/src/auth/email.ts`; không gộp biến thể dấu chấm hay `+tag` của Gmail
    **[người viết]**):
-   - tài khoản đó **không còn mật khẩu** (tạo bằng Google, hoặc đã qua ngày cắt) → gắn danh tính vào tài
-     khoản đó **[người dùng: nối theo email]**;
+   - tài khoản đó **không còn mật khẩu** (tạo bằng Google, hoặc đã qua ngày cắt) → gắn danh tính **Google**
+     vào tài khoản đó **[người dùng: nối theo email]**. Apple không đi nhánh này (bước 4);
    - tài khoản đó **còn mật khẩu** (trước ngày cắt) → **không gắn**, trả `switch_from_signed_in_device`.
      App báo: "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài
      khoản › Chuyển sang Google, rồi thử lại." **[người viết; chống chiếm tài khoản, mục 8]**
 3. Không trùng, nhà cung cấp là Google → tạo tài khoản mới với email Google.
-4. Nhà cung cấp là Apple mà không trùng (email ẩn, hoặc email thật nhưng không có tài khoản), **hoặc** trùng một
-   tài khoản còn mật khẩu → **không tạo tài khoản, không nối theo email**; trả `link_required` (mục 6.4) **[người viết, người dùng xác nhận]**. Lý do: desktop chỉ có
-   Google, nên một tài khoản chỉ có Apple sẽ không bao giờ có Mac.
+4. Nhà cung cấp là Apple mà chưa có `identities` → **không tạo tài khoản, không nối theo email**, dù email ẩn,
+   không trùng, trùng tài khoản còn mật khẩu hay trùng tài khoản không còn mật khẩu (kể cả tài khoản đã có
+   Google); trả `link_required` (mục 6.4) **[người viết, người dùng xác nhận; trùng tài khoản không còn mật
+   khẩu: người dùng chọn 2026-11-08]**. Lý do: desktop chỉ có Google, nên một tài khoản chỉ có Apple sẽ không
+   bao giờ có Mac; và ai xác minh được một hộp thư một lần (email công ty bị cấp lại, hộp thư bị chiếm tạm)
+   không được vào tài khoản đang điều khiển terminal của Mac. Đường Google đã chặn trường hợp tương tự (một
+   Google khác trên tài khoản đã có Google → 401).
 
 Thiết bị: như `login` hôm nay, cùng tài khoản + cùng khoá công khai → cùng `device_id`. Nhờ vậy Mac giữ
 `machines` và điện thoại giữ `phone_grants` khi đăng nhập lại bằng Google, **miễn là app không "Đăng

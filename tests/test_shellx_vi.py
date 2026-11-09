@@ -198,6 +198,49 @@ class VietnameseCatalogTests(unittest.TestCase):
         localization = self.catalogs[catalog].get(key, {}).get("localizations", {}).get("vi", {})
         return leaf(localization) or plural_other(localization)
 
+    def en(self, key: str, catalog: str = MAIN_CATALOG) -> str | None:
+        localization = self.catalogs[catalog].get(key, {}).get("localizations", {}).get("en", {})
+        return leaf(localization) or plural_other(localization)
+
+    def test_google_sign_in_strings_read_naturally(self):
+        expected = {  # key: (en, vi) from the plan's String tables
+            "remote.signin.google": ("Continue with Google", "Tiếp tục với Google"),
+            "remote.signin.waiting": ("Waiting for Google…", "Đang chờ Google…"),
+            "remote.signin.switch.title": ("Switch to Google sign-in", "Chuyển sang đăng nhập Google"),
+            "remote.signin.error.credentials": ("Google sign-in didn't work. Try again.", "Đăng nhập Google không thành công. Hãy thử lại."),
+            "remote.signin.error.switchFromSignedInDevice": (
+                "This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again.",
+                "Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài khoản › Chuyển sang đăng nhập Google, rồi thử lại."),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+
+    def test_account_settings_strings_read_naturally(self):
+        expected = {
+            "settings.account.methods.title": ("Sign-in methods", "Cách đăng nhập"),
+            "settings.account.methods.google": ("Google account", "Tài khoản Google"),
+            "settings.account.methods.apple": ("Apple ID", "ID Apple"),
+            "settings.account.methods.addedFrom": ("Added from %@", "Thêm từ %@"),
+            "settings.account.deleteAccount": ("Delete Account…", "Xóa tài khoản…"),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+
+    def test_phone_pairing_says_phone(self):
+        expected = {  # the eight keys of the "phone" table: (en new, vi new)
+            "remote.phonePairing.menu": ("Pair Phone…", "Ghép cặp điện thoại…"),
+            "remote.phonePairing.title": ("Pair Phone", "Ghép cặp điện thoại"),
+            "remote.phonePairing.scan": ("Scan this code with the ShellX app on your phone", "Quét mã này bằng app ShellX trên điện thoại"),
+            "remote.phonePairing.signInFirst": ("Sign in under Settings › Account to pair a phone with this Mac.", "Hãy đăng nhập trong Cài đặt › Tài khoản để ghép cặp điện thoại với Mac này."),
+            "notifications.forwardToPhone.title": ("Forward notifications to my phone", "Chuyển tiếp thông báo tới điện thoại của tôi"),
+            "notifications.forwardToPhone.subtitle": ("Send local agent notifications to ShellX on your phone. Enabled by default; turn this off to stop this Mac from forwarding them.", "Gửi thông báo agent cục bộ tới ShellX trên điện thoại của bạn. Được bật theo mặc định; hãy tắt để Mac này ngừng chuyển tiếp."),
+            "settings.mobile.pairIPhone": ("Pair Phone", "Ghép cặp điện thoại"),
+            "settings.mobile.pairIPhone.subtitle": ("Scan the QR code with ShellX on your phone, then allow the phone here on this Mac.", "Quét mã QR bằng ShellX trên điện thoại, rồi cho phép điện thoại ngay trên Mac này."),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+            self.assertNotIn("iPhone", en, key)
+
     def test_every_covered_catalog_is_checked(self):
         self.assertIn(MAIN_CATALOG, self.catalogs)
         self.assertIn("Resources/InfoPlist.xcstrings", self.catalogs)

@@ -2365,6 +2365,7 @@
 		3865A0153865A0153865A015 /* GlobalSearchTerminalText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3865B0153865B0153865B015 /* GlobalSearchTerminalText.swift */; };
 		3865A0143865A0143865A014 /* GlobalSearchTerminalTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3865B0143865B0143865B014 /* GlobalSearchTerminalTextTests.swift */; };
 		8561A0038561A0038561A003 /* GlobalSearchVisiblePopoverShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8561B0038561B0038561B003 /* GlobalSearchVisiblePopoverShortcutTests.swift */; };
+		8BD38EB9C84A0C24BC40528F /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */; };
 		DD9DE998158FEA6242A9C15F /* GotoSplitActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAA9FEEAC85B8AB216861F2 /* GotoSplitActionTests.swift */; };
 		CC000000A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000001A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift */; };
 		CC2639000000000000000001 /* GotoSplitCycleUITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC2639000000000000000002 /* GotoSplitCycleUITestSupport.swift */; };
@@ -2698,6 +2699,8 @@
 		5FBEE7A11EE7A11EE7A10001 /* MobileTerminalByteTeeAppendCostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBEE7A11EE7A11EE7A10002 /* MobileTerminalByteTeeAppendCostTests.swift */; };
 		5FBEE7A31EE7A31EE7A30001 /* MobileTerminalFramePacer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBEE7A31EE7A31EE7A30002 /* MobileTerminalFramePacer.swift */; };
 		AEF5CBAAC4D67800B57B0250 /* MobileTerminalFramePacerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B32678EFAC31EA6D25F35B9 /* MobileTerminalFramePacerTests.swift */; };
+		1EC11CC061245D5C685ABA5B /* MobileTerminalFrameSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBD3B61B0193E8C4304A7ED /* MobileTerminalFrameSink.swift */; };
+		37296C03D59FED47F9A853C5 /* MobileTerminalFrameSinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */; };
 		D5B6C2EA337442FF589FC85C /* MobileTerminalInputRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 484CB271A3C1390F5A544FBF /* MobileTerminalInputRoutingTests.swift */; };
 		580DAA428E6092CBBC496E6E /* MobileTerminalRenderGridAnchorRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DABF0FECE726AD90156499 /* MobileTerminalRenderGridAnchorRegistry.swift */; };
 		C9CFB398DF94D6DDEAF42D67 /* MobileTerminalRenderObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51B54FAD18160281FC1C2B6 /* MobileTerminalRenderObserver.swift */; };
@@ -3356,6 +3359,7 @@
 		C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */; };
 		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157337FA38DA052318228A89 /* ShellXAboutTests.swift */; };
+		E1073194626D528861FB7697 /* ShellXAccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */; };
 		96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */; };
 		8D37189E2E5CD35178CB98A6 /* ShellXAgentActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */; };
 		5E1A7A000000000000000003 /* ShellXAutomations in Frameworks */ = {isa = PBXBuildFile; productRef = 5E1A7A000000000000000002 /* ShellXAutomations */; };
@@ -3397,8 +3401,13 @@
 		5E11A10000000000000000C1 /* ShellXLinkCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A1 /* ShellXLinkCore */; };
 		7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */; };
 		2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */; };
+		CA1A3F1E2EA137F3BE98565B /* ShellXLinkFramePacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40371AAA99F3276010FAD7E1 /* ShellXLinkFramePacing.swift */; };
+		97B83BFFEC211A770C571B93 /* ShellXLinkFramePacingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B4628FD22D364A57CB6F67 /* ShellXLinkFramePacingTests.swift */; };
+		D3E26CFAD865F8525B2CC953 /* ShellXLinkGridConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */; };
+		528E3F48C5F1339CB8436D74 /* ShellXLinkGridConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */; };
 		1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */; };
 		593001A30A7C992F6A0507BA /* ShellXLinkHostPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */; };
+		3DEF412D2CC72E040CBB247C /* ShellXLinkKeyChord.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E07D9FF4B34827E56A308A /* ShellXLinkKeyChord.swift */; };
 		4F01552EA2EEE386C3CD1C23 /* ShellXLinkKeyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B03FC23876B84852EF3F72 /* ShellXLinkKeyStore.swift */; };
 		8228ADD7A74BFCB3F916A6A0 /* ShellXLinkKeyStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E62DE980C7E9E4A1D8E54437 /* ShellXLinkKeyStoreTests.swift */; };
 		5E11A10000000000000000B2 /* ShellXLinkRelay in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A2 /* ShellXLinkRelay */; };
@@ -3407,6 +3416,17 @@
 		5E11A10000000000000000C3 /* ShellXLinkSession in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A3 /* ShellXLinkSession */; };
 		D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */; };
 		5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */; };
+		BD19B23E88E0C06763AE841E /* ShellXLinkSizingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C57E9E27EC8BB88F8F989FA /* ShellXLinkSizingTests.swift */; };
+		B72A6BB2702EFBE82606593C /* ShellXLinkTerminalCreateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26E568B65909E3B282F5B0A2 /* ShellXLinkTerminalCreateTests.swift */; };
+		AEBFC8BDC52207552478A524 /* ShellXLinkTerminalSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F672858E7AF401175C10BB1B /* ShellXLinkTerminalSessionTests.swift */; };
+		524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */; };
+		E1AF1CADF71D5D3FA11344FF /* ShellXLinkTerminalView+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */; };
+		2D3310D1326CB0E8DAA04227 /* ShellXLinkTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */; };
+		4A35B4DAAD9E15FD6411887C /* ShellXLinkTerminalViewFrameTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */; };
+		1F7A85ED3876DAEE4D105874 /* ShellXLinkTerminalViewInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */; };
+		D12AB02961BBC2909971FE5E /* ShellXLinkTerminalViewSource+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */; };
+		BAA29CB2EA6E3A1A96D4A190 /* ShellXLinkTerminalViewSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */; };
+		A53BA0174A3AAA5D6A2D4BCC /* ShellXLinkTerminalViewSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723E1A8FA3865D682187CBA3 /* ShellXLinkTerminalViewSourceTests.swift */; };
 		786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */; };
 		83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */; };
 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
@@ -4060,6 +4080,7 @@
 		B49282191C80DC84B8AB0BCB /* TerminalController+RemoteTmuxTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCFC650BD590101D445C4A0 /* TerminalController+RemoteTmuxTestSupport.swift */; };
 		A1329C000000000000000101 /* TerminalController+SharedSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1329C000000000000000001 /* TerminalController+SharedSizing.swift */; };
 		7064AB823B7832097B63CFE8 /* TerminalController+ShellXLinkDebug.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA441B00522F75D832A8021 /* TerminalController+ShellXLinkDebug.swift */; };
+		E2988053A8A79463BFE596F9 /* TerminalController+ShellXLinkSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9366EB2E2F427115774F6D5 /* TerminalController+ShellXLinkSizing.swift */; };
 		D310E509C9FA457B8AE81CF6 /* TerminalController+ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC516CC8FB0418AA9D72AB4 /* TerminalController+ShortcutConfiguration.swift */; };
 		A6E57A0F0000000000000001 /* TerminalController+SocketBoundedLanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E57A0F0000000000000002 /* TerminalController+SocketBoundedLanes.swift */; };
 		A79840040000000000000002 /* TerminalController+SocketCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A79840040000000000000001 /* TerminalController+SocketCleanup.swift */; };
@@ -7066,6 +7087,7 @@
 		3865B0153865B0153865B015 /* GlobalSearchTerminalText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search/GlobalSearchTerminalText.swift; sourceTree = "<group>"; };
 		3865B0143865B0143865B014 /* GlobalSearchTerminalTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchTerminalTextTests.swift; sourceTree = "<group>"; };
 		8561B0038561B0038561B003 /* GlobalSearchVisiblePopoverShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchVisiblePopoverShortcutTests.swift; sourceTree = "<group>"; };
+		D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/GoogleSignInButton.swift; sourceTree = "<group>"; };
 		7AAA9FEEAC85B8AB216861F2 /* GotoSplitActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GotoSplitActionTests.swift"; sourceTree = "<group>"; };
 		CC000001A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GotoSplitCycleUITests.swift; sourceTree = "<group>"; };
 		CC2639000000000000000002 /* GotoSplitCycleUITestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Debug/UITests/GotoSplitCycleUITestSupport.swift; sourceTree = "<group>"; };
@@ -7390,6 +7412,8 @@
 		5FBEE7A11EE7A11EE7A10002 /* MobileTerminalByteTeeAppendCostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileTerminalByteTeeAppendCostTests.swift; sourceTree = "<group>"; };
 		5FBEE7A31EE7A31EE7A30002 /* MobileTerminalFramePacer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileTerminalFramePacer.swift; sourceTree = "<group>"; };
 		8B32678EFAC31EA6D25F35B9 /* MobileTerminalFramePacerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileTerminalFramePacerTests.swift"; sourceTree = "<group>"; };
+		4DBD3B61B0193E8C4304A7ED /* MobileTerminalFrameSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileTerminalFrameSink.swift; sourceTree = "<group>"; };
+		5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileTerminalFrameSinkTests.swift"; sourceTree = "<group>"; };
 		484CB271A3C1390F5A544FBF /* MobileTerminalInputRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileTerminalInputRoutingTests.swift"; sourceTree = "<group>"; };
 		E8DABF0FECE726AD90156499 /* MobileTerminalRenderGridAnchorRegistry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileTerminalRenderGridAnchorRegistry.swift; sourceTree = "<group>"; };
 		F51B54FAD18160281FC1C2B6 /* MobileTerminalRenderObserver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileTerminalRenderObserver.swift; sourceTree = "<group>"; };
@@ -8040,6 +8064,7 @@
 		C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
 		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		157337FA38DA052318228A89 /* ShellXAboutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAboutTests.swift"; sourceTree = "<group>"; };
+		C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXAccountDetailView.swift; sourceTree = "<group>"; };
 		295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXAccountFlow.swift; sourceTree = "<group>"; };
 		1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAgentActivityTests.swift"; sourceTree = "<group>"; };
 		89060B2B57314E97A3234D09 /* ShellXAutomationsBridgeContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Automations/ShellXAutomationsBridgeContract.swift; sourceTree = "<group>"; };
@@ -8073,13 +8098,29 @@
 		717290D6E8F1BA131C1A049C /* ShellXLinkChatSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkChatSourceTests.swift"; sourceTree = "<group>"; };
 		213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkFeedSource.swift; sourceTree = "<group>"; };
 		8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkFeedSourceTests.swift"; sourceTree = "<group>"; };
+		40371AAA99F3276010FAD7E1 /* ShellXLinkFramePacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkFramePacing.swift; sourceTree = "<group>"; };
+		58B4628FD22D364A57CB6F67 /* ShellXLinkFramePacingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkFramePacingTests.swift"; sourceTree = "<group>"; };
+		FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkGridConverter.swift; sourceTree = "<group>"; };
+		7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkGridConverterTests.swift"; sourceTree = "<group>"; };
 		FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkHostController.swift; sourceTree = "<group>"; };
 		DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkHostPolicyTests.swift"; sourceTree = "<group>"; };
+		E9E07D9FF4B34827E56A308A /* ShellXLinkKeyChord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkKeyChord.swift; sourceTree = "<group>"; };
 		C1B03FC23876B84852EF3F72 /* ShellXLinkKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkKeyStore.swift; sourceTree = "<group>"; };
 		E62DE980C7E9E4A1D8E54437 /* ShellXLinkKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkKeyStoreTests.swift"; sourceTree = "<group>"; };
 		A7C3D91E5B2F48A6908E1D02 /* ShellXLinkSecretStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSecretStorage.swift; sourceTree = "<group>"; };
 		0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSessionSource.swift; sourceTree = "<group>"; };
 		5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkSessionSourceTests.swift"; sourceTree = "<group>"; };
+		5C57E9E27EC8BB88F8F989FA /* ShellXLinkSizingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkSizingTests.swift"; sourceTree = "<group>"; };
+		26E568B65909E3B282F5B0A2 /* ShellXLinkTerminalCreateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalCreateTests.swift"; sourceTree = "<group>"; };
+		F672858E7AF401175C10BB1B /* ShellXLinkTerminalSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalSessionTests.swift"; sourceTree = "<group>"; };
+		395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalTestSupport.swift"; sourceTree = "<group>"; };
+		F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/ShellXLinkTerminalView+Live.swift"; sourceTree = "<group>"; };
+		552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkTerminalView.swift; sourceTree = "<group>"; };
+		F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewFrameTests.swift"; sourceTree = "<group>"; };
+		2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewInputTests.swift"; sourceTree = "<group>"; };
+		A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/ShellXLinkTerminalViewSource+Live.swift"; sourceTree = "<group>"; };
+		E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkTerminalViewSource.swift; sourceTree = "<group>"; };
+		723E1A8FA3865D682187CBA3 /* ShellXLinkTerminalViewSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkTerminalViewSourceTests.swift"; sourceTree = "<group>"; };
 		8E551E323C80B32BFC70124B /* ShellXLinkWorkspaceSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkWorkspaceSource.swift; sourceTree = "<group>"; };
 		0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkWorkspaceSourceTests.swift"; sourceTree = "<group>"; };
 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
@@ -8723,6 +8764,7 @@
 		1CCFC650BD590101D445C4A0 /* TerminalController+RemoteTmuxTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/RemoteTmux/TerminalController+RemoteTmuxTestSupport.swift"; sourceTree = "<group>"; };
 		A1329C000000000000000001 /* TerminalController+SharedSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+SharedSizing.swift"; sourceTree = "<group>"; };
 		FFA441B00522F75D832A8021 /* TerminalController+ShellXLinkDebug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/TerminalController+ShellXLinkDebug.swift"; sourceTree = "<group>"; };
+		E9366EB2E2F427115774F6D5 /* TerminalController+ShellXLinkSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/Link/TerminalController+ShellXLinkSizing.swift"; sourceTree = "<group>"; };
 		BBC516CC8FB0418AA9D72AB4 /* TerminalController+ShortcutConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+ShortcutConfiguration.swift"; sourceTree = "<group>"; };
 		A6E57A0F0000000000000002 /* TerminalController+SocketBoundedLanes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+SocketBoundedLanes.swift"; sourceTree = "<group>"; };
 		A79840040000000000000001 /* TerminalController+SocketCleanup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalController+SocketCleanup.swift"; sourceTree = "<group>"; };
@@ -9957,6 +9999,7 @@
 				5FBEE7A31EE7A31EE7A30002 /* MobileTerminalFramePacer.swift */,
 				5FBEE7A21EE7A21EE7A20002 /* MobileViewportApplyGovernor.swift */,
 				ACA7C4A70000000000000100 /* AgentChat */,
+				4DBD3B61B0193E8C4304A7ED /* MobileTerminalFrameSink.swift */,
 			);
 			name = Mobile;
 			path = Mobile;
@@ -12704,6 +12747,16 @@
 				EB6E5A2DB3A98C3DE470A6A8 /* ShellXAutomationsBridgeFailure.swift */,
 				1A9344998632CF83439ECCF3 /* ShellXAutomationsOpenQueue.swift */,
 				7D6C2AF2DBDB0F61BF624FDA /* ShellXRoutineRunLauncher.swift */,
+				D76BC45DB25172B2258F138B /* GoogleSignInButton.swift */,
+				C8EC10BB51002EDE075B25A8 /* ShellXAccountDetailView.swift */,
+				FF5CBA4FECA2972563A3EDF9 /* ShellXLinkGridConverter.swift */,
+				E9366EB2E2F427115774F6D5 /* TerminalController+ShellXLinkSizing.swift */,
+				40371AAA99F3276010FAD7E1 /* ShellXLinkFramePacing.swift */,
+				552C2263295CA826EAD0B50E /* ShellXLinkTerminalView.swift */,
+				E9E07D9FF4B34827E56A308A /* ShellXLinkKeyChord.swift */,
+				E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */,
+				A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */,
+				F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14323,6 +14376,16 @@
 				405DEE2125C3F6CB4C4504C7 /* ShellXAutomationsOpenQueueTests.swift */,
 				884A8E5586F9A760EF0CA377 /* ShellXRoutineRunLauncherTests.swift */,
 				B4686D5E954A2598CCA6CB56 /* ShellXAutomationsWebHostTests.swift */,
+				5BECCF8F097B5C48443E40BF /* MobileTerminalFrameSinkTests.swift */,
+				7A799ABAC78B9624E6D627AC /* ShellXLinkGridConverterTests.swift */,
+				395399055B304FC9C5F5036C /* ShellXLinkTerminalTestSupport.swift */,
+				5C57E9E27EC8BB88F8F989FA /* ShellXLinkSizingTests.swift */,
+				58B4628FD22D364A57CB6F67 /* ShellXLinkFramePacingTests.swift */,
+				F633330E7F2053128132EC37 /* ShellXLinkTerminalViewFrameTests.swift */,
+				2EBEE78BBB91B4511A5CCCDB /* ShellXLinkTerminalViewInputTests.swift */,
+				723E1A8FA3865D682187CBA3 /* ShellXLinkTerminalViewSourceTests.swift */,
+				26E568B65909E3B282F5B0A2 /* ShellXLinkTerminalCreateTests.swift */,
+				F672858E7AF401175C10BB1B /* ShellXLinkTerminalSessionTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16372,6 +16435,7 @@
 					3865A0083865A0083865A008 /* GlobalSearchPanelCaptureManager.swift in Sources */,
 				C5E96687F7398AC884B78744 /* GlobalSearchSnippet.swift in Sources */,
 				3865A0153865A0153865A015 /* GlobalSearchTerminalText.swift in Sources */,
+				8BD38EB9C84A0C24BC40528F /* GoogleSignInButton.swift in Sources */,
 				CC2639000000000000000001 /* GotoSplitCycleUITestSupport.swift in Sources */,
 					5B11E5A100000000000000B1 /* GPUSpinner.swift in Sources */,
 					A6AC72010000000000000001 /* GPUSpinnerNSView.swift in Sources */,
@@ -16579,6 +16643,7 @@
 				7BD32764E8A31FA15DCCF257 /* MobileStateSync.swift in Sources */,
 				AB57F0C27BECE8EDFC6B2B97 /* MobileTerminalByteTee.swift in Sources */,
 				5FBEE7A31EE7A31EE7A30001 /* MobileTerminalFramePacer.swift in Sources */,
+				1EC11CC061245D5C685ABA5B /* MobileTerminalFrameSink.swift in Sources */,
 				580DAA428E6092CBBC496E6E /* MobileTerminalRenderGridAnchorRegistry.swift in Sources */,
 				C9CFB398DF94D6DDEAF42D67 /* MobileTerminalRenderObserver.swift in Sources */,
 				00C3AA443F6DA8D94E28CE17 /* MobileWorkspaceListObserver.swift in Sources */,
@@ -16983,6 +17048,7 @@
 				F0ACC0DE0000000000000011 /* SharedLiveAgentIndex.swift in Sources */,
 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
+				E1073194626D528861FB7697 /* ShellXAccountDetailView.swift in Sources */,
 				96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */,
 				D123146A2E41E7A55B222355 /* ShellXAutomationsBridgeContract.swift in Sources */,
 				CA59AED5B345435E5B8ED98B /* ShellXAutomationsBridgeFailure.swift in Sources */,
@@ -17003,10 +17069,17 @@
 				8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */,
 				F5D85DDFB6D8D06F86818A00 /* ShellXLinkChatSource.swift in Sources */,
 				7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */,
+				CA1A3F1E2EA137F3BE98565B /* ShellXLinkFramePacing.swift in Sources */,
+				D3E26CFAD865F8525B2CC953 /* ShellXLinkGridConverter.swift in Sources */,
 				1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */,
+				3DEF412D2CC72E040CBB247C /* ShellXLinkKeyChord.swift in Sources */,
 				4F01552EA2EEE386C3CD1C23 /* ShellXLinkKeyStore.swift in Sources */,
 				A7C3D91E5B2F48A6908E1D01 /* ShellXLinkSecretStorage.swift in Sources */,
 				D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */,
+				E1AF1CADF71D5D3FA11344FF /* ShellXLinkTerminalView+Live.swift in Sources */,
+				2D3310D1326CB0E8DAA04227 /* ShellXLinkTerminalView.swift in Sources */,
+				D12AB02961BBC2909971FE5E /* ShellXLinkTerminalViewSource+Live.swift in Sources */,
+				BAA29CB2EA6E3A1A96D4A190 /* ShellXLinkTerminalViewSource.swift in Sources */,
 				786D3B88CC529C06D222833E /* ShellXLinkWorkspaceSource.swift in Sources */,
 				067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */,
 				94FD51A057547AB301A0EEA5 /* ShellXPhonePairingCoordinator.swift in Sources */,
@@ -17475,6 +17548,7 @@
 				B49282191C80DC84B8AB0BCB /* TerminalController+RemoteTmuxTestSupport.swift in Sources */,
 				A1329C000000000000000101 /* TerminalController+SharedSizing.swift in Sources */,
 				7064AB823B7832097B63CFE8 /* TerminalController+ShellXLinkDebug.swift in Sources */,
+				E2988053A8A79463BFE596F9 /* TerminalController+ShellXLinkSizing.swift in Sources */,
 				D310E509C9FA457B8AE81CF6 /* TerminalController+ShortcutConfiguration.swift in Sources */,
 				A6E57A0F0000000000000001 /* TerminalController+SocketBoundedLanes.swift in Sources */,
 				A79840040000000000000002 /* TerminalController+SocketCleanup.swift in Sources */,
@@ -19170,6 +19244,7 @@
 				F5A700000000000000000001 /* MobileTaskFilesystemJobQuotaTests.swift in Sources */,
 				5FBEE7A11EE7A11EE7A10001 /* MobileTerminalByteTeeAppendCostTests.swift in Sources */,
 				AEF5CBAAC4D67800B57B0250 /* MobileTerminalFramePacerTests.swift in Sources */,
+				37296C03D59FED47F9A853C5 /* MobileTerminalFrameSinkTests.swift in Sources */,
 				D5B6C2EA337442FF589FC85C /* MobileTerminalInputRoutingTests.swift in Sources */,
 				07C0EE882BF0E02B3397205A /* MobileTerminalReplayHibernationTests.swift in Sources */,
 				5FBEE7A21EE7A21EE7A20003 /* MobileViewportApplyGovernorTests.swift in Sources */,
@@ -19391,9 +19466,18 @@
 				E42EC94C29109FA8A189FE34 /* ShellXCoreFFITests.swift in Sources */,
 				D5E55992758670FA515A098C /* ShellXLinkChatSourceTests.swift in Sources */,
 				2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */,
+				97B83BFFEC211A770C571B93 /* ShellXLinkFramePacingTests.swift in Sources */,
+				528E3F48C5F1339CB8436D74 /* ShellXLinkGridConverterTests.swift in Sources */,
 				593001A30A7C992F6A0507BA /* ShellXLinkHostPolicyTests.swift in Sources */,
 				8228ADD7A74BFCB3F916A6A0 /* ShellXLinkKeyStoreTests.swift in Sources */,
 				5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */,
+				BD19B23E88E0C06763AE841E /* ShellXLinkSizingTests.swift in Sources */,
+				B72A6BB2702EFBE82606593C /* ShellXLinkTerminalCreateTests.swift in Sources */,
+				AEBFC8BDC52207552478A524 /* ShellXLinkTerminalSessionTests.swift in Sources */,
+				524A7063B24A93E45D36C7A0 /* ShellXLinkTerminalTestSupport.swift in Sources */,
+				4A35B4DAAD9E15FD6411887C /* ShellXLinkTerminalViewFrameTests.swift in Sources */,
+				1F7A85ED3876DAEE4D105874 /* ShellXLinkTerminalViewInputTests.swift in Sources */,
+				A53BA0174A3AAA5D6A2D4BCC /* ShellXLinkTerminalViewSourceTests.swift in Sources */,
 				83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */,
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,

@@ -15,7 +15,7 @@ describe("migration 0008", () => {
     const db = Db.open(join(tempDir(), "v7.db"));
     try {
       migrate(db, oldDir);
-      expect(migrate(db)).toEqual(["0008_phones.sql", "0009_apns_tokens.sql"]);
+      expect(migrate(db)).toEqual(["0008_phones.sql", "0009_apns_tokens.sql", "0010_identities.sql"]);
       db.run("INSERT INTO users VALUES ('u1', 'a@example.com', 'x', 1, 1)");
       const devices: [string, string, string, number][] = [["dm", "desktop", "macos", 1], ["dp1", "mobile", "ios", 2], ["dp2", "mobile", "ios", 3]];
       for (const [id, kind, platform, k] of devices) {

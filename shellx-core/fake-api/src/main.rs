@@ -48,6 +48,11 @@ fn main() {
         }
         opts.password = pw;
     }
+    if let Ok(email) = std::env::var("SHELLX_FAKE_GOOGLE_EMAIL") {
+        if !email.is_empty() {
+            opts.google_email = email;
+        }
+    }
     if !bind.starts_with("127.0.0.1:") {
         die("--bind must be 127.0.0.1:<port> (the fake API is loopback only)");
     }

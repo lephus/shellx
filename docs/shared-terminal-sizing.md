@@ -73,6 +73,8 @@ A participant **counts toward size** when it is attached, has a viewport, and:
   one user, the phone defers while either counts. Every other participant
   counts.
 
+**ShellX Link phones.** A phone viewing a terminal over ShellX Link joins as participant `mobile:shellx-link-<uuid>` (one per view, `device_kind` `iphone`) with `counts_override: true`, so the same-user deferral above does not apply to it. While at least one Link phone views a terminal whose policy is Fit everyone, the host runs it as `latest` and goes back to Fit everyone after the last one leaves; a policy someone chose is kept. Link input runs inside `TerminalController.performRemoteParticipantInput`, so it is the phone's activity, not the Mac pane's (`Sources/ShellX/Remote/Link/TerminalController+ShellXLinkSizing.swift`).
+
 The priority key is `<user_id or "anon:" + id>/<device_kind>/<device_id>`, or
 `<user_id or "anon:" + id>/<device_kind>` for a device without an id, so a
 priority list survives reconnects and can rank "Maya's Mac Studio" above

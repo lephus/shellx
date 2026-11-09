@@ -7,6 +7,7 @@ import UserNotifications
 struct ShellXApp: App {
     @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var appDelegate
     @State private var graph = AppComposition.make()
+    @State private var demo = DemoSession()
     @State private var inbox = PairingInbox()
     @State private var networkPath = NetworkPathWatcher()
     @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system.rawValue
@@ -16,7 +17,15 @@ struct ShellXApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(graph: graph, inbox: inbox, pushTaps: appDelegate.taps)
+            Group {
+                if let demoGraph = demo.graph {
+                    DemoRootView(graph: demoGraph, exit: { Task { await demo.exit() } })
+                } else {
+                    RootView(
+                        graph: graph, inbox: inbox, pushTaps: appDelegate.taps,
+                        startDemo: { Task { await demo.start() } })
+                }
+            }
                 .task {
                     appDelegate.registration = graph.push
                     networkPath.start { [coordinator] in coordinator.hub?.networkChanged() }
