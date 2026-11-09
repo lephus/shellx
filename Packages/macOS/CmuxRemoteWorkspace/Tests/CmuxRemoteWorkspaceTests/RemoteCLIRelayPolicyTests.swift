@@ -639,4 +639,17 @@ struct RemoteCLIRelayPolicyTests {
             }
         }
     }
+
+    @Test("terminal paths a ShellX Link phone reaches stay off the relay", arguments: [
+        "terminal.create", "mobile.terminal.create", "terminal.input", "mobile.terminal.input",
+        "terminal.scroll", "mobile.terminal.scroll", "mobile.terminal.replay", "mobile.terminal.paste"
+    ])
+    func deniesLinkTerminalPathsThroughTheRelay(method: String) throws {
+        let alias = (remote: UUID(), local: UUID())
+        try withServer(workspaceAliases: [alias.remote: alias.local]) { port, unixServer in
+            let exchange = try runPolicyRelayExchange(port: port, relayID: relayID, tokenHex: tokenHex,
+                commandLine: #"{"id":"p9","method":"\#(method)","params":{"workspace_id":"\#(alias.remote.uuidString)"}}"#)
+            expectDenial(exchange, unixServer, method)
+        }
+    }
 }
