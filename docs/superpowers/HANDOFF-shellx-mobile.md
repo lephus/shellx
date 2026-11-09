@@ -42,7 +42,10 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 ## In progress (overnight run, user: "từ giờ đến mai làm cho xong cho tôi", 2026-11-09 17:22)
 
 - 3D → 3E → 3G, each on its own branch stacked on the previous one (`feat/shellx-android-3d-ui-shell` from develop; 3E from 3D's branch; 3G from 3E's), reviewed and fixed like 3C, plus our own emulator / Pixel 3 checks. **UI plans: not merged** until the user's phone check and "merge" / "auto-merge".
-- 3D notes: the user approved (2026-11-09) Google's G and Google Sans for Android (`~/Downloads/shellx-google-signin/`, incl. `GoogleSans-Medium.ttf`); live Google sign-in waits for the relay's `GOOGLE_CLIENT_IDS` (1D).
+- **3D: READY for the user's phone check** — branch `feat/shellx-android-3d-ui-shell` at 9d8221f749 (pushed, not merged). Four chunks + Task 17 + final review, every Important fixed test-first and re-reviewed; `:app` 300 debug / 172 release tests; R8 release builds, lint 0 errors, `.so` 16 KB aligned; emulator smoke API 26 + 36 (debug and R8) clean; real Keystore checked on the API 26 emulator and under R8. Ledger and reports: `.superpowers/sdd/2026-11-07-shellx-android-3d-ui-shell/` (git-ignored; `task-17-report.md` has the contract additions for §26 at landing).
+  - **How to check (USER):** in `.worktrees/android-3d-ui-shell`, plug in the phone, run `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home shellx-android/scripts/dev.sh device --serial <id>` (Pixel 3: `93BX1XMU7`). Then: "Try without an account" → demo home with "Mac giả" and the "Demo · Exit" banner; Settings › Appearance Dark/Light switch at once; with the phone in Vietnamese the words are Vietnamese; Pairing → deny the camera → "Open Settings" works → allow → the scanner shows; TalkBack on Your Macs rows offers Make Default / Unpair. Then say "merge" (or "auto-merge" for 3D/3E/3G).
+  - **Live Google sign-in is blocked by the relay:** the production relay answers 404 to `POST /v1/auth/nonce`, i.e. it runs without plan 1A. It needs the 1D deploy (relay with 1A + `GOOGLE_CLIENT_IDS` incl. the Web client). The user approved Google's G and Google Sans for Android (2026-11-09).
+- **3E:** in progress on `feat/shellx-android-3e-ui-work` (stacked on 3D), worktree `.worktrees/android-3e-ui-work`; HEIC/HEIF → JPEG (API < 28 sends the original). It merges 3D's head before its final review.
 - Before the first live dogfood: run 3B's `RelayIntegrationTest` with `CMUX_RELAY_BIN` on a machine that has the binary.
 
 ## Waiting on the user
@@ -53,8 +56,7 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 2. **Sign in with Apple is enabled** on `com.shellx.prod`. Nothing left to do.
 3. ~~1B: Google G and Google Sans on Mac and Windows~~ — done 2026-11-09 (112079593c, the user ran `fetch-google-branding.sh`).
 4. **1C Task 15** runs after plan 1D's cut-over.
-5. **Android dark mode on the Pixel 3:** the user turns on dark theme and opens "ShellX Dev" (light was checked 2026-11-09). The vsmart Live (serial in `~/.config/shellx/android-serial`) is not connected on this Mac.
-
+5. **Android phone checks for 3D** (above). The Pixel 3 was disconnected during the night; the vsmart Live (serial in `~/.config/shellx/android-serial`) is not on this Mac.
 6. **HEIC on Android (3E):** default ruling is to convert HEIC/HEIF picks to JPEG like the iPhone; the user may say otherwise.
 7. **iPhone follow-up:** `SpeechRunSlot.swift:78-90` has the quick-tap gap Android fixed in 3C (contracts §25).
 
