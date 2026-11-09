@@ -65,4 +65,30 @@ final class TerminalPaneTests: XCTestCase {
         let reached = await rig.mac.terminalViewInputs("t-claude")
         XCTAssertEqual(reached, [])
     }
+
+    /// A text field that takes the keyboard keeps it while the terminal it took it from keeps changing (final review,
+    /// app M2: the rename field while a dev server logs).
+    func testATerminalNeverTakesTheKeyboardBack() async throws {
+        let (_, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let field = UITextField(frame: CGRect(x: 0, y: 700, width: 200, height: 40))
+        host.window.addSubview(field)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        let unfocused = surface.bounds.height
+        XCTAssertTrue(surface.becomeFirstResponder())
+        let focused = await eventually { surface.bounds.height < unfocused }
+        XCTAssertTrue(focused, "the pane knows the surface has the keyboard")
+
+        XCTAssertTrue(field.becomeFirstResponder())
+        // The terminal changes in the same turn, before the pane hears the surface lost the keyboard.
+        model.toggleCtrl()
+        host.controller.view.setNeedsLayout()
+        host.controller.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(300))
+
+        XCTAssertTrue(field.isFirstResponder, "the field keeps the keyboard")
+        XCTAssertFalse(surface.isFirstResponder)
+    }
 }
