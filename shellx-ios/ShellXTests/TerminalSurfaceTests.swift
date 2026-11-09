@@ -96,4 +96,32 @@ final class TerminalSurfaceTests: XCTestCase {
         let sent = await WorkspaceRig.eventually { await rig.mac.terminalViewInputs("t-zsh") == [[.key(.escape, mods: [.ctrl])]] }
         XCTAssertTrue(sent)
     }
+
+    /// Until the first screen the page shows its loading card, and an open needs the page's size (R1): the size still
+    /// comes from the page, so a pane that no one sizes by hand opens its terminal and goes live.
+    func testALoadingPageOpensItsTerminalAtItsOwnSize() async throws {
+        let rig = try await WorkspaceRig.make(in: self)
+        let model = TerminalViewModel(machineID: rig.model.ref.machineID, link: rig.hub)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+        model.show("t-zsh")
+        let bounds = CGRect(x: 0, y: 0, width: 393, height: 600)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: bounds)
+        window.frame = bounds
+        window.rootViewController = UIHostingController(
+            rootView: TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"))
+        window.isHidden = false
+        addTeardownBlock { @MainActor in
+            window.isHidden = true
+            window.rootViewController = nil
+        }
+
+        let opened = await WorkspaceRig.eventually { await rig.mac.terminalViewOpens.first?.terminalId == "t-zsh" }
+        XCTAssertTrue(opened, "the page asked for no size: \(model.phase)")
+        let cols = await rig.mac.terminalViewOpens.first?.cols ?? 0
+        XCTAssertGreaterThanOrEqual(cols, 20)
+        let live = await WorkspaceRig.eventually { model.phase == .live }
+        XCTAssertTrue(live, "\(model.phase)")
+    }
 }
