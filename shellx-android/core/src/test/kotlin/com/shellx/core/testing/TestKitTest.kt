@@ -1,6 +1,7 @@
 package com.shellx.core.testing
 
 import com.shellx.link.account.RelayApiException
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test
@@ -53,6 +54,18 @@ class TestKitTest {
         assertTrue(started.elapsedNow() >= 50.milliseconds)
         assertEquals(0L, testScheduler.currentTime)
     } }
+
+    /** Review 3b m-4: a hubRig's temporary directory goes with its test. */
+    @Test fun hubRigDeletesItsDirectoryWhenTheTestEnds() {
+        lateinit var directory: File
+        runTest {
+            val rig = hubRig(emptyList())
+            directory = rig.directory
+            File(directory, "threads").mkdirs()
+            File(directory, "threads/copy.json").writeText("{}")
+        }
+        assertFalse(directory.exists())
+    }
 
     @Test fun manualClockMovesOnlyWhenTold() {
         val c = ManualClock(wallMs = 1_700_000_000_000); val mark = c.monotonic.markNow()

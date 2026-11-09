@@ -13,8 +13,10 @@ import com.shellx.core.platform.MemoryKeyValueStore
 import com.shellx.core.storage.ConversationStore
 import com.shellx.link.account.PairedMachine
 import com.shellx.link.account.PairedMachineListing
+import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.time.Duration
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 
@@ -35,6 +37,8 @@ class HubRig(
     val unauthorized: MutableList<Unit>,
     /** A store in a fresh temporary directory, on the test's scheduler and the rig's clock (HubRig.swift). */
     val store: ConversationStore,
+    /** The store's directory, deleted when the test's backgroundScope ends. */
+    val directory: File,
     private val test: TestScope,
 ) {
     /** HubRig.swift's online(sessions:): eventually every Mac is online and liveSessions.size == sessions. */
@@ -67,7 +71,10 @@ suspend fun TestScope.hubRig(
     seed: suspend (ConversationStore) -> Unit = {},
     start: Boolean = false,
 ): HubRig {
-    val store = ConversationStore(createTempDirectory("hub-rig").toFile(), StandardTestDispatcher(testScheduler), clock)
+    val directory = createTempDirectory("hub-rig").toFile()
+    // Review 3b m-4: the directory goes with the test, after the hub and its writes stopped.
+    backgroundScope.coroutineContext.job.invokeOnCompletion { directory.deleteRecursively() }
+    val store = ConversationStore(directory, StandardTestDispatcher(testScheduler), clock)
     seed(store)
     val vault = AccountVault(InMemorySecretStore(), StandardTestDispatcher(testScheduler))
     vault.setSession(StoredSession("u1", "d1", "tok-1", "a@b.c"))
@@ -81,7 +88,7 @@ suspend fun TestScope.hubRig(
         sleep ?: sleeper.sleep,
     ) { unauthorized += Unit }
     if (start) hub.start()
-    return HubRig(hub, vault, fake, settings, latency, clock, sleeper, unauthorized, store, this)
+    return HubRig(hub, vault, fake, settings, latency, clock, sleeper, unauthorized, store, directory, this)
 }
 
 /** Every Mac of the hub is online (and there is at least one). */
