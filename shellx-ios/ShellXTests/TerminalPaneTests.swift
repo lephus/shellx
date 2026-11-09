@@ -206,6 +206,88 @@ final class TerminalPaneTests: XCTestCase {
         let elsewhere = await rig.mac.terminalViewInputs("t-claude")
         XCTAssertEqual(elsewhere, [])
     }
+
+    /// The app goes to the background and comes back while the user is typing: the keyboard and the key bar stay
+    /// through the reopen (`.connecting` with the open in flight), and a key typed before the first screen comes back
+    /// reaches the reopened view after its open (R10) (re-review follow-up).
+    func testTheKeyboardStaysThroughAResume() async throws {
+        let (rig, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        let unfocused = surface.bounds.height
+        XCTAssertTrue(surface.becomeFirstResponder())
+        let keyBar = await eventually { surface.bounds.height < unfocused }
+        XCTAssertTrue(keyBar)
+
+        model.suspend()
+        let closed = await eventually { await rig.mac.terminalViewCloses == ["t-zsh"] }
+        XCTAssertTrue(closed)
+        await rig.mac.holdTerminalViewOpens()
+        model.resume()
+        let reopening = await eventually { await rig.mac.terminalViewOpens.count == 2 && model.phase == .connecting }
+        XCTAssertTrue(reopening, "\(model.phase)")
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(surface.isFirstResponder, "the keyboard stays while the view reopens")
+        XCTAssertLessThan(surface.bounds.height, unfocused, "the key bar stays")
+
+        surface.insertText("ls")
+        await rig.mac.releaseTerminalViewOpens()
+        let typed = await eventually { await rig.mac.terminalViewInputs("t-zsh") == [[.text("ls")]] }
+        XCTAssertTrue(typed, "the key typed while reopening reaches the reopened view")
+        let back = await eventually { model.phase == .live }
+        XCTAssertTrue(back)
+        XCTAssertTrue(surface.isFirstResponder)
+    }
+
+    /// A view the Mac ends `not_open` is reopened at once: the keyboard stays (re-review follow-up).
+    func testTheKeyboardStaysThroughANotOpenReopen() async throws {
+        let (rig, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        XCTAssertTrue(surface.becomeFirstResponder())
+        _ = await eventually { surface.isFirstResponder }
+        await rig.mac.holdTerminalViewOpens()
+
+        await rig.mac.endTerminalView("t-zsh", reason: .notOpen)
+
+        let reopening = await eventually { await rig.mac.terminalViewOpens.count == 2 && model.phase == .connecting }
+        XCTAssertTrue(reopening, "\(model.phase)")
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(surface.isFirstResponder, "the keyboard stays while the view reopens")
+        await rig.mac.releaseTerminalViewOpens()
+        let back = await eventually { model.phase == .live }
+        XCTAssertTrue(back)
+        XCTAssertTrue(surface.isFirstResponder)
+    }
+
+    /// The wait before a failed view is reopened has no view to type into: it takes the keyboard away and sends nothing
+    /// typed meanwhile (core M1, kept by the re-review follow-up).
+    func testAFailedViewsRetryWaitSendsNothing() async throws {
+        let (rig, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        XCTAssertTrue(surface.becomeFirstResponder())
+        _ = await eventually { surface.isFirstResponder }
+
+        await rig.mac.endTerminalView("t-zsh", reason: .failed)
+        let waiting = await eventually { model.phase == .connecting }
+        XCTAssertTrue(waiting)
+        surface.insertText("rm")
+        let released = await eventually { !surface.isFirstResponder }
+        XCTAssertTrue(released)
+
+        let back = await eventually { model.phase == .live }
+        XCTAssertTrue(back)
+        try await Task.sleep(for: .milliseconds(100))
+        let inputs = await rig.mac.terminalViewInputs("t-zsh")
+        XCTAssertEqual(inputs, [], "nothing typed during the wait is sent")
+    }
 }
 
 /// The chip shown, set by the test as a swipe would.
