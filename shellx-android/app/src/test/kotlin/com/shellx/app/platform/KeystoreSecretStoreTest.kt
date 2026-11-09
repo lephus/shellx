@@ -205,6 +205,22 @@ class KeystoreSecretStoreTest {
         assertFalse(file.exists())
     }
 
+    /** Re-review A: a healthy rewrite starts the count again, so a stale count from before it never makes a later
+     *  unclear failure the last one. */
+    @Test
+    fun aWriteStartsTheCountAgain() {
+        val file = written()
+        val unclear = failing { InvalidKeyException("Keystore operation failed") }
+        repeat(2) { assertThrows(SecretStoreException.Unavailable::class.java) { KeystoreSecretStore(folder.root, unclear, sdkInt = 32).read(SecretItem.SESSION) } }
+
+        KeystoreSecretStore(folder.root, keyA, sdkInt = 32).write("two".toByteArray(), SecretItem.SESSION)
+        assertEquals("no count stays behind", listOf("session.bin"), folder.root.list()!!.toList())
+
+        repeat(2) { assertThrows(SecretStoreException.Unavailable::class.java) { KeystoreSecretStore(folder.root, unclear, sdkInt = 32).read(SecretItem.SESSION) } }
+        assertTrue("two starts after the rewrite keep the secrets", file.exists())
+        assertArrayEquals("two".toByteArray(), store.read(SecretItem.SESSION))
+    }
+
     @Test
     fun aKeystoreSystemErrorIsUnclearToo() {
         val file = written()
