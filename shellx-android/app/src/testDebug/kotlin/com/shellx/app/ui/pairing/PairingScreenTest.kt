@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -169,5 +170,14 @@ class PairingScreenTest {
         rule.waitForIdle()
         rule.onNodeWithText("screen:a").assertIsDisplayed()
         assertEquals("leaving the page cancels the attempt", 1, cancels)
+    }
+
+    @Test
+    fun theViewfinderIsOneTaggedTalkBackElement() {
+        rule.setContent {
+            ShellXTheme { PairingScreenContent(Step.Idle, CameraAccess.AUTHORIZED, scanner = { modifier, _ -> Box(modifier) }) }
+        }
+
+        rule.onNodeWithTag("pairing.scanner").assertContentDescriptionEquals("QR code scanner")
     }
 }

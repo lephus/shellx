@@ -5,12 +5,15 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -191,5 +194,13 @@ class MachinesScreenTest {
 
         rule.onNodeWithTag("machines.pair").performClick()
         assertEquals(1, pairs)
+    }
+
+    @Test
+    fun eachMacsDetailsAreOneTaggedTalkBackElement() {
+        show()
+
+        rule.onAllNodesWithTag("machine.row", useUnmergedTree = true).assertCountEquals(items.size)
+        rule.onAllNodesWithTag("machine.row", useUnmergedTree = true)[0].assertContentDescriptionEquals("MacBook Pro, Connected, Default")
     }
 }
