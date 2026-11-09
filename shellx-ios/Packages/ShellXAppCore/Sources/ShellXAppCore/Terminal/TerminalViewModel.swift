@@ -35,8 +35,9 @@ public enum TerminalViewPhase: Equatable, Sendable {
 ///   `snapshots = 0`, `topShift = 0`, `screenRevision += 1`; retry budgets restored; `.connecting`; the first-screen
 ///   clock starts (when `id` is not nil); reconcile. The same id does nothing. The clock starts here, at the user's swipe
 ///   or tap, not at the `ok`: the Mac may hold the first snapshot up to 500 ms for the phone's size (contracts §17) and
-///   that wait is part of criterion 3. The phase stays `.connecting` (the pane's loading state) after the `ok` until a
-///   snapshot is applied.
+///   that wait is part of criterion 3. It never runs while the Mac is offline or unsupported, or the app is in the
+///   background (R1, R8, `suspend()`): the open that follows starts it again. The phase stays `.connecting` (the
+///   pane's loading state) after the `ok` until a snapshot is applied.
 /// - **R3 Open answers**, for the current attempt only (any other is ignored): `ok` → answered. `busy` → forget the view;
 ///   after 300 ms reconcile; after 5 such retries `.unavailable(.failed)`. `not_found` → forget, `.unavailable(.gone)`.
 ///   `refused` → forget, `.unavailable(.refused)`. `failed` (also the answer for a terminal the Mac lists but cannot
@@ -257,9 +258,11 @@ public final class TerminalViewModel {
         scheduleResize()
     }
 
-    /// The app went to the background: the view closes, the screen stays.
+    /// The app went to the background: the view closes, the screen stays. The first-screen clock stops; the open on
+    /// return starts it again.
     public func suspend() {
         suspended = true
+        firstScreenStart = nil
         reconcile()
     }
 
@@ -305,6 +308,8 @@ public final class TerminalViewModel {
             return
         }
         guard active, !isUnavailable, !(online && supported) else { return }
+        // No open while the Mac is the reason: the first-screen clock starts again at the open that brings it.
+        firstScreenStart = nil
         if !online {
             if phase != .unsupported { phase = .offline }
         } else {
@@ -556,6 +561,7 @@ public final class TerminalViewModel {
         waitingForMac = false
         guard state == .online else {
             forgetView()   // its session is gone: nothing to close
+            firstScreenStart = nil   // the open once it is back starts the clock again
             switch phase {
             case .unavailable, .unsupported: break
             default: phase = .offline
