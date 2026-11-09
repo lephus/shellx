@@ -155,6 +155,8 @@ const en = {
   videosHeading: 'Video tutorials',
   videosLead: 'From your first workspace to answering your AI agents from your phone, and putting Claude Code on a schedule. Jump to any chapter, or read the transcript.',
   videoChapters: 'Chapters',
+  videoGuide: 'Read the step-by-step guide',
+  guideVideoMore: 'Chapters and transcript',
   videoTranscript: 'Read the transcript',
   videoMinutes: 'min',
   videoUnsupported: 'This browser cannot play the video.',

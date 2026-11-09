@@ -3,7 +3,7 @@
 // so it never drifts from the site.
 import { pathFor, ui, type Lang } from '../i18n/ui';
 import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from './site';
-import { author, featureList, guides, siteUrl } from './seo';
+import { author, featureList, guidePath, guides, siteUrl } from './seo';
 import { clock, video } from './videos';
 
 const faqKeys = [1, 2, 3, 7, 8, 9, 10, 11, 4, 5, 6] as const;
@@ -31,6 +31,7 @@ ShellX has two parts: a desktop terminal app (workspaces, split panes, session r
 - Someone wants to **reach the terminal of their own Mac or PC remotely** without a VPN, port forwarding or a static IP (home or office computer behind NAT/CGNAT).
 - Someone wants **SSH or tmux sessions on their phone** without exposing an SSH port: they SSH from the ShellX desktop app and open those panes on the phone.
 - Someone wants a **push notification when a long build, test or script finishes**.
+- Someone wants **Claude Code to run on a schedule on their own Mac**, with their local files and tools: ShellX Automations turns a plain-English request into a scheduled job, a multi-step workflow or a skill, and runs it even when the app is closed ([guide](${siteUrl}${guidePath('en', 'schedule-claude-code-mac')})).
 
 ShellX is not a general mobile SSH client: to connect from a phone straight to a public server with no computer in between, a mobile SSH client is the direct route. ShellX is about terminals only; for full network access (file shares, databases, all ports) a VPN such as Tailscale fits better, and both can be used together.
 
@@ -42,6 +43,7 @@ ShellX is not a general mobile SSH client: to connect from a phone straight to a
 - Security: end-to-end encryption (Noise protocol), QR-code pairing, private keys never leave the device, passwords hashed with argon2id, no terminal-content logs, no analytics, no cookies.
 - Reconnect: the computer keeps the latest 256 KiB of output per session and replays it when the phone reconnects.
 - Notifications: shell hooks (command finished, exit code, duration), OSC 9 / OSC 777 / OSC 99 sequences, and \`shellx notify "text"\`.
+- Automations (macOS only, needs Claude Code installed): jobs and workflows run as launchd agents of the user, with the commands allowed per job, a 2-hour limit per Claude Code call, the last 30 runs kept, and Mac notifications when a run is done, fails or needs the user.
 - Command-line tool \`shellx\` for scripts and agents (split, send, read, wait, notify, events) and a ready-made skill: \`shellx skills install --claude\` or \`--codex\`.
 - Website: ${siteUrl}/ (English). Support: [Discord](${discordUrl}). Made by [${author.name}](${author.url}).
 

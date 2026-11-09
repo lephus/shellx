@@ -22,6 +22,8 @@ interface Source {
   description: Record<Lang, string>;
   /** Each chapter starts at a cue, numbered as in the .srt. */
   chapters: Array<{ cue: number; title: Record<Lang, string> }>;
+  /** Slug of the guide that explains what the video shows. */
+  guide?: string;
 }
 
 const sources: Record<VideoId, Source> = {
@@ -64,6 +66,7 @@ const sources: Record<VideoId, Source> = {
     seconds: 97,
     uploaded: '2026-11-06T17:00:00+07:00',
     captions: automationsCaptions,
+    guide: 'schedule-claude-code-mac',
     title: { en: 'Automations for Claude Code' },
     description: {
       en: 'Describe a job in plain English and Claude Code drafts it: a schedule, a folder, the commands it may run and how it tells you. Check the flowchart, save, and ShellX runs it on your Mac.',
@@ -109,6 +112,7 @@ export interface Video {
   poster: string;
   seconds: number;
   chapters: Chapter[];
+  guide?: string;
 }
 
 export function video(lang: Lang, id: VideoId): Video {
@@ -127,7 +131,7 @@ export function video(lang: Lang, id: VideoId): Video {
   return {
     id, name: s.name, title: s.title[lang], description: s.description[lang],
     mp4: `/media/${s.name}.mp4`, poster: `/media/${s.name}.webp`,
-    seconds: s.seconds, chapters,
+    seconds: s.seconds, chapters, guide: s.guide,
   };
 }
 

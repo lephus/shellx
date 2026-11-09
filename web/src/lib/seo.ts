@@ -1,6 +1,7 @@
 // Shared structured data (schema.org JSON-LD) and the guide registry. Every page builds its JSON-LD
 // from here so names, ids and links stay identical across pages, llms.txt and the sitemap.
 import { pathFor, type Lang } from '../i18n/ui';
+import type { VideoId } from './videos';
 
 export const siteUrl = 'https://shellx.pro';
 
@@ -39,6 +40,7 @@ export const featureList: Record<Lang, string[]> = {
     'Workspaces, split panes, session restore, command palette and custom shortcuts',
     'SSH workspaces and tmux attach, with automatic reconnect',
     'Phone pairing with a QR code',
+    'Automations (macOS): describe a Claude Code job in plain English; ShellX saves it as a scheduled job, a workflow or a skill, draws its flowchart and runs it with launchd',
   ],
 };
 
@@ -52,6 +54,8 @@ export interface GuideFrontmatter {
   published: string;
   updated: string;
   keywords: string[];
+  /** A video shown under the title (its VideoObject stays on /videos/). */
+  video?: VideoId;
 }
 
 // Read as raw text, not as modules: the guide pages import Guide.astro, which imports this file.

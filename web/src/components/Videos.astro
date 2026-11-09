@@ -4,7 +4,7 @@
 import Base from '../layouts/Base.astro';
 import VideoPlayer from './VideoPlayer.astro';
 import { pathFor, ui, type Lang } from '../i18n/ui';
-import { breadcrumbs } from '../lib/seo';
+import { breadcrumbs, guides } from '../lib/seo';
 import { clock, video, videoLd, type VideoId } from '../lib/videos';
 
 interface Props { lang: Lang }
@@ -14,6 +14,7 @@ const path = pathFor(lang, 'videos');
 const home = pathFor(lang, 'home');
 const chaptered = (['tutorial', 'automations'] as VideoId[]).map((id) => video(lang, id));
 const intro = video(lang, 'intro');
+const guideOf = (slug?: string) => guides(lang).find((g) => g.slug === slug);
 const ld = [
   ...[...chaptered, intro].map((v) => videoLd(v, path)),
   breadcrumbs([{ name: t.breadcrumbHome, path: home }, { name: t.videosHeading, path }]),
@@ -34,6 +35,9 @@ const ld = [
       <section class="watch" id={v.id} aria-labelledby={`${v.id}-h`} data-chapters>
         <h2 id={`${v.id}-h`}>{v.title} <span class="len">· {Math.round(v.seconds / 60)} {t.videoMinutes}</span></h2>
         <p class="muted">{v.description}</p>
+        {guideOf(v.guide) && (
+          <p class="guide-link"><a href={guideOf(v.guide)!.path}>{t.videoGuide}: {guideOf(v.guide)!.title} →</a></p>
+        )}
         <div class="watch-grid">
           <VideoPlayer video={v} lang={lang} />
           <nav class="chapters" aria-labelledby={`${v.id}-chapters-h`}>
@@ -125,6 +129,9 @@ const ld = [
   .watch { margin-bottom: 4rem; }
   .watch h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
   .watch > .muted { margin: 0; max-width: 44rem; }
+  .guide-link { margin: 0.5rem 0 0; }
+  .guide-link a { color: var(--purple-l); text-decoration: none; font-weight: 600; }
+  .guide-link a:hover { text-decoration: underline; }
   .len { color: var(--muted); font-weight: 500; }
   .watch-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(15rem, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
   /* The chapter list is as tall as the video and scrolls inside it. */
