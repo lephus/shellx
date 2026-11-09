@@ -3,6 +3,7 @@ package com.shellx.app.ui.composer
 import android.content.ContentResolver
 import android.content.res.Resources
 import android.graphics.Bitmap
+import android.graphics.ColorSpace
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
@@ -22,6 +23,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -34,8 +36,8 @@ import kotlinx.coroutines.withContext
  * - A file keeps its display name; a photo is named `photo-<n>.<type>` after the names already taken.
  * - A size the provider reports over the limit is refused before reading; a stream of unknown size is read at most
  *   [ShellXLink.MAX_ATTACHMENT_BYTES] plus one chunk, never whole (RF 2).
- * - A HEIC/HEIF photo is sent as JPEG, as the iPhone's photo picker hands it over (ruling 2026-11-09, ledger A-9); a
- *   phone that cannot decode it (before API 28) sends it as picked.
+ * - A HEIC/HEIF photo is sent as JPEG, as the iPhone's photo picker hands it over (ruling 2026-11-09, ledger A-9), at
+ *   most [HEIF_MAX_EDGE] px on its long side; a phone that cannot decode it (before API 28) sends it as picked.
  *
  * Never logs a name or bytes.
  */
@@ -129,13 +131,31 @@ class AttachmentPreparer(
             is AttachmentReadException.Unreadable -> res.getString(R.string.composer_attach_unreadable, failure.name)
         }
 
-        /** Decodes HEIC/HEIF bytes (API 28+, with their orientation) and encodes them as JPEG at quality 90; null when
-         *  the phone cannot. */
+        /** The longest side a converted photo keeps: about 12 MP at 4:3, so a 50–108 MP HEIC never decodes whole
+         *  (review A M-3). */
+        const val HEIF_MAX_EDGE = 4096
+
+        /** The size [width] × [height] decodes to: the same shape with the long side at most [HEIF_MAX_EDGE], each side
+         *  at least 1 px; unchanged when it already fits. */
+        fun decodedSize(width: Int, height: Int): Pair<Int, Int> {
+            val long = maxOf(width, height)
+            if (long <= HEIF_MAX_EDGE) return width to height
+            val scale = HEIF_MAX_EDGE.toDouble() / long
+            return (width * scale).roundToInt().coerceIn(1, HEIF_MAX_EDGE) to (height * scale).roundToInt().coerceIn(1, HEIF_MAX_EDGE)
+        }
+
+        /** Decodes HEIC/HEIF bytes (API 28+, turned upright by their orientation) at most [HEIF_MAX_EDGE] px on the
+         *  long side, in sRGB, and encodes them as JPEG at quality 90; null when the phone cannot. Called off the main
+         *  thread (the preparer's `io`). */
         fun systemHeifToJpeg(data: ByteArray): ByteArray? {
             if (Build.VERSION.SDK_INT < 28) return null
             return try {
-                val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(data))) { decoder, _, _ ->
+                val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(data))) { decoder, info, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    // The size is the upright one: ImageDecoder applies the orientation, the target size included.
+                    val (width, height) = decodedSize(info.size.width, info.size.height)
+                    if (width != info.size.width || height != info.size.height) decoder.setTargetSize(width, height)
+                    decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
                 }
                 try {
                     ByteArrayOutputStream().use { out ->
