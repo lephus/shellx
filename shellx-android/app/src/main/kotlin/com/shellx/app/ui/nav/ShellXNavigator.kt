@@ -3,7 +3,13 @@ package com.shellx.app.ui.nav
 import com.shellx.core.link.SessionRef
 import com.shellx.core.workspaces.WorkspaceRef
 
-/** Where 3D's screens go. The app's one is Task 16's `NavControllerNavigator`; tests record the calls. */
+/**
+ * Where 3D's screens go. The app's one is Task 16's `NavControllerNavigator`; tests record the calls.
+ *
+ * Every `open…` navigates with `launchSingleTop`, which compares destinations, not arguments: opening a sibling page of
+ * the destination on top (another agent from an agent page) replaces that page and keeps its ViewModels. A screen that
+ * opens a page of its own route compares the target with the top entry instead (3D review m-4).
+ */
 interface ShellXNavigator {
     fun openWorkspace(ref: WorkspaceRef)
 

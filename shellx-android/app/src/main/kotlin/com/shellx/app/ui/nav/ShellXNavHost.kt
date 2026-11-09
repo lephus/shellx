@@ -4,19 +4,6 @@ import android.annotation.SuppressLint
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -26,7 +13,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,23 +25,23 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.shellx.app.AppComposition
 import com.shellx.app.BuildConfig
-import com.shellx.app.R
 import com.shellx.app.SignedInScope
 import com.shellx.app.ui.LaunchView
 import com.shellx.app.ui.SignedInView
+import com.shellx.app.ui.agent.AgentView
 import com.shellx.app.ui.home.EndedSessionsView
 import com.shellx.app.ui.machines.MachinesView
 import com.shellx.app.ui.pairing.CancelPairingWhenLeft
 import com.shellx.app.ui.pairing.PairingScreen
+import com.shellx.app.ui.pending.PendingListView
 import com.shellx.app.ui.settings.AccountActions
 import com.shellx.app.ui.settings.SettingsScreen
 import com.shellx.app.ui.settings.versionText
 import com.shellx.app.ui.signin.SignInView
 import com.shellx.app.ui.workspaces.OtherSessionsView
+import com.shellx.app.ui.workspaces.WorkspaceView
 import com.shellx.core.account.AppPhase
-import com.shellx.core.home.SessionName
 import com.shellx.core.link.SessionRef
-import com.shellx.core.pending.AgentLabel
 import com.shellx.core.workspaces.WorkspaceRef
 import kotlinx.coroutines.launch
 
@@ -63,9 +49,9 @@ private const val FADE_MS = 300
 
 /**
  * The app's NavHost (contracts §5): `launch` first; [RootSync] keeps `composition.root` at the bottom of the stack, and
- * every other route is pushed above it. `nav` is the name plan 3E's Task 12 code uses: it replaces only the three
- * [WorkPlaceholder]s, keeping their [SignedIn] wrapper, arguments and `nav`. Pages fade in and out (300 ms), with the
- * predictive back gesture too. A back arrow goes through [NavControllerNavigator.back], which never closes the page
+ * every other route is pushed above it. The three work routes (plan 3E) show the workspace, the agent's chat and the
+ * waiting requests, each in its [SignedIn] wrapper. Pages fade in and out (300 ms), with the predictive back gesture
+ * too. A back arrow goes through [NavControllerNavigator.back], which never closes the page
  * under a page that is still fading out (a bare `nav.popBackStack()` tapped twice can pop the root and leave a blank
  * window).
  */
@@ -74,6 +60,8 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
     val navigator = rememberShellXNavigator(nav) { composition.active.value.scopes.current.value }
     val root by composition.root.collectAsStateWithLifecycle()
     val startDemo: () -> Unit = { composition.appScope.launch { composition.demo.start() } }
+    // The work screens open routes by string (WorkRoutes); like the navigator's opens, a double tap opens one page.
+    val open: (String) -> Unit = { route -> nav.navigate(route) { launchSingleTop = true } }
 
     NavHost(
         navController = nav,
@@ -110,20 +98,24 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
         }
         composable(WorkRoutes.WORKSPACE) { e ->
             SignedIn(composition) { scope ->
-                val hub by scope.hub.state.collectAsStateWithLifecycle()
-                val machineId = e.arguments?.getString("machineId").orEmpty()
-                val workspaceId = e.arguments?.getString("workspaceId").orEmpty()
-                val ref = WorkspaceRef(machineId, workspaceId)
-                WorkPlaceholder(hub.workspaceRows(machineId).firstOrNull { it.id == ref }?.title.orEmpty(), back = navigator::back)
+                WorkspaceView(
+                    scope,
+                    WorkspaceRef(e.arguments?.getString("machineId").orEmpty(), e.arguments?.getString("workspaceId").orEmpty()),
+                    open = open,
+                    back = navigator::back,
+                )
             }
         }
         composable(WorkRoutes.AGENT) { e ->
             SignedIn(composition) { scope ->
-                val hub by scope.hub.state.collectAsStateWithLifecycle()
-                val machineId = e.arguments?.getString("machineId").orEmpty()
-                val sessionId = e.arguments?.getString("sessionId").orEmpty()
-                val ref = WorkRoutes.sessionRef(hub, machineId, sessionId)
-                WorkPlaceholder(agentTitle(hub.machine(machineId)?.sessions?.sessions?.firstOrNull { it.sessionId == sessionId }, ref), back = navigator::back)
+                val ref = remember(e) {
+                    WorkRoutes.sessionRef(
+                        scope.hub.state.value,
+                        e.arguments?.getString("machineId").orEmpty(),
+                        e.arguments?.getString("sessionId").orEmpty(),
+                    )
+                }
+                AgentView(scope, ref, open = open, back = navigator::back)
             }
         }
         composable(
@@ -140,8 +132,16 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
                     defaultValue = null
                 },
             ),
-        ) {
-            SignedIn(composition) { WorkPlaceholder(stringResource(R.string.workspaces_bell), back = navigator::back) }
+        ) { e ->
+            SignedIn(composition) { scope ->
+                val m = e.arguments?.getString("machineId")
+                val w = e.arguments?.getString("workspaceId")
+                PendingListView(
+                    scope.hub, scope.decisions, scope.sheets,
+                    only = if (m != null && w != null) ({ it.isIn(m, w) }) else null,
+                    back = navigator::back,
+                )
+            }
         }
         composable(Routes.SESSIONS, Routes.SESSIONS_ARGUMENTS) { e ->
             SignedIn(composition) { scope ->
@@ -176,10 +176,6 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
     }
     RootSync(nav, root)
 }
-
-/** The agent route's title until plan 3E's agent screen: the session's name, else its agent's. */
-private fun agentTitle(session: com.shellx.link.core.AgentSession?, ref: SessionRef): String =
-    session?.let(SessionName::base) ?: AgentLabel.of(ref.agent).text
 
 /**
  * Keeps `root` as the only root destination: a new root replaces the whole stack (signing in or out, the demo), except
@@ -218,27 +214,6 @@ fun SignedIn(composition: AppComposition, content: @Composable (SignedInScope) -
     val current by active.scopes.current.collectAsStateWithLifecycle()
     val scope = current
     if (scope == null) LaunchView() else key(scope) { content(scope) }
-}
-
-/** The three work routes until plan 3E replaces them: a top bar with back and [title], no body. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun WorkPlaceholder(title: String, back: () -> Unit) {
-    val background = MaterialTheme.colorScheme.background
-    Scaffold(
-        containerColor = background,
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = back) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
-            )
-        },
-    ) { padding -> Box(Modifier.padding(padding).fillMaxSize()) }
 }
 
 /**

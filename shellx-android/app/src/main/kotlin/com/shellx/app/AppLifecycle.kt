@@ -37,6 +37,8 @@ class AppLifecycle(private val composition: AppComposition) {
         val first = !launched
         if (first) {
             launched = true
+            // A process a push started in the background counts its launch from here (3D's 3E-fit note 8).
+            real.launch.restart()
             watchHubsWhileStopped()
             scope.launch {
                 real.coordinator.launch()
