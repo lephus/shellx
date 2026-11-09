@@ -16,6 +16,8 @@ import com.shellx.app.voice.LocalVoice
 import com.shellx.app.voice.VoiceEnvironment
 import com.shellx.core.platform.KeyValueStore
 import com.shellx.core.push.PushRegistration
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 
 /**
  * What 3E's screens need from a signed-in account (the iPhone `SignedInView`'s environment and tasks), around the whole
@@ -69,14 +71,16 @@ fun SignedInWork(
 }
 
 /** Alerts are worth asking for once a Mac can send them: [signedIn], then [askPermission], each time [machinesEmpty]
- *  turns false (iPhone `.task(id: hub.machines.isEmpty)`). */
+ *  turns false (iPhone `.task(id: hub.machines.isEmpty)`). [signedIn] starts first, but the ask does not wait for it:
+ *  Android's token fetch and the relay call can take seconds on a slow network, and the token does not need the
+ *  permission (on the iPhone the token only comes after it; final review m-4). */
 @Composable
 fun PushRegistrationEffect(machinesEmpty: Boolean, signedIn: suspend () -> Unit, askPermission: suspend () -> Unit) {
     val currentSignedIn by rememberUpdatedState(signedIn)
     val currentAsk by rememberUpdatedState(askPermission)
     LaunchedEffect(machinesEmpty) {
         if (machinesEmpty) return@LaunchedEffect
-        currentSignedIn()
+        launch(start = CoroutineStart.UNDISPATCHED) { currentSignedIn() }
         currentAsk()
     }
 }
