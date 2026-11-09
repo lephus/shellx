@@ -1,6 +1,7 @@
 package com.shellx.core.voice
 
 import com.shellx.core.testing.FakeTranscriber
+import com.shellx.core.testing.NotReadyPrimary
 import com.shellx.core.testing.eventually
 import java.io.IOException
 import kotlin.test.Test
@@ -172,5 +173,30 @@ class FallbackTranscriberTest {
         val text = rig.router.finish(live)
         assertEquals("Chạy test.", text)
         assertNull(rig.legacy.activeRun, "nothing is left holding the microphone")
+    } }
+
+    /** Final review I-3: a quick tap cancels the run while the primary holds the mic but is not ready yet; the
+     *  primary's start then fails. That failure is the cancel's: the run never starts on the fallback (which would
+     *  take the mic with nobody reading it), and the primary stays offered for the language. */
+    @Test fun aRunCancelledAfterItsClaimNeverFallsBack() { runTest {
+        val slot = SpeechRunSlot()
+        val primary = NotReadyPrimary(slot)
+        val legacy = FakeTranscriber(slot)
+        val failures = Failures()
+        val router = FallbackTranscriber(
+            slot, primary = primary, fallback = legacy, usePrimary = { true }, primaryFailed = { failures.add(it) },
+        )
+        val run = SpeechRunId()
+        val start = backgroundScope.async { runCatching { router.start(run, VoiceLanguage.VIETNAMESE, emptyList()) } }
+        assertTrue(eventually { slot.active == run }, "the primary claimed the mic")
+        router.cancel(run)
+        assertNull(slot.active, "the cancel tore the primary down")
+
+        primary.failReady()
+        val failure = start.await().exceptionOrNull()
+        assertIs<SpeechStartException.Recognizer>(failure, "the cancelled run's start fails")
+        assertTrue(failures.languages.isEmpty(), "a cancelled run never gives the primary up")
+        assertTrue(legacy.starts.isEmpty(), "and never starts on the fallback")
+        assertNull(slot.active)
     } }
 }

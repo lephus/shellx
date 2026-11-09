@@ -3,6 +3,7 @@ package com.shellx.core.testing
 import com.shellx.core.voice.SpeechEngine
 import com.shellx.core.voice.SpeechRunId
 import com.shellx.core.voice.SpeechRunSlot
+import com.shellx.core.voice.SpeechStartException
 import com.shellx.core.voice.VoiceLanguage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
@@ -184,5 +185,36 @@ class HoppingCancel(private val base: FakeTranscriber) : SpeechEngine by base {
     override suspend fun cancel(run: SpeechRunId) {
         yield()
         base.cancel(run)
+    }
+}
+
+/**
+ * 3E's planned on-device engine (3E plan, its start): it claims the mic, then waits for the recognizer to be ready, and
+ * its teardown does not end that wait. [failReady] ends it as the readiness timeout does: the start then throws
+ * [SpeechStartException.Recognizer]. Thread-safe.
+ */
+class NotReadyPrimary(private val slot: SpeechRunSlot) : SpeechEngine {
+    private val ready = CompletableDeferred<Unit>()
+
+    fun failReady() {
+        ready.complete(Unit)
+    }
+
+    override suspend fun start(run: SpeechRunId, language: VoiceLanguage, contextualStrings: List<String>): ReceiveChannel<String> {
+        slot.begin(run)
+        val channel = Channel<String>(Channel.UNLIMITED)
+        val claim = slot.claim(run, SpeechRunSlot.Handlers(finish = { channel.close(); "" }, teardown = { channel.close() }))
+        if (claim is SpeechRunSlot.Claim.Refused) {
+            channel.close()
+            return channel
+        }
+        ready.await()
+        throw SpeechStartException.Recognizer(IllegalStateException("not_ready"))
+    }
+
+    override suspend fun finish(run: SpeechRunId): String = slot.takeForFinish(run)?.finish?.invoke() ?: ""
+
+    override suspend fun cancel(run: SpeechRunId) {
+        slot.cancel(run)?.teardown?.invoke()
     }
 }

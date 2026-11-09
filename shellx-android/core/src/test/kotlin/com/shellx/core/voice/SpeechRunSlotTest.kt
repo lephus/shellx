@@ -133,4 +133,18 @@ class SpeechRunSlotTest {
         assertFalse(slot.ended(ending))
         assertNull(slot.active)
     } }
+
+    /** Final review I-3: cancelling the run that holds the mic also refuses a later claim of that run, so a fallback
+     *  retry of a start that failed after the cancel never takes the mic. */
+    @Test fun aCancelledHolderIsNeverGrantedAgain() { runTest {
+        val slot = SpeechRunSlot()
+        val log = Log()
+        val run = SpeechRunId()
+        slot.begin(run)
+        assertNotNull(granted(slot.claim(run, log.handlers("primary"))))
+        slot.cancel(run)?.teardown?.invoke()
+        assertEquals(listOf("teardown primary"), log.all)
+        assertTrue(refused(slot.claim(run, log.handlers("fallback"))), "the retry never takes the mic")
+        assertNull(slot.active)
+    } }
 }

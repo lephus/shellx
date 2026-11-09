@@ -8,6 +8,7 @@ import com.shellx.core.testing.FakeTranscriber
 import com.shellx.core.testing.FakeVoicePermissions
 import com.shellx.core.testing.Gate
 import com.shellx.core.testing.HoppingCancel
+import com.shellx.core.testing.NotReadyPrimary
 import com.shellx.core.testing.eventually
 import com.shellx.core.text.utf8Size
 import java.io.IOException
@@ -58,8 +59,9 @@ class VoiceInputModelTest {
         maxBytes: Int = ComposerValidation.MAX_BYTES,
         engine: (FakeTranscriber) -> SpeechEngine = { it },
         scope: CoroutineScope = backgroundScope,
+        slot: SpeechRunSlot = SpeechRunSlot(),
     ): Rig {
-        val transcriber = FakeTranscriber()
+        val transcriber = FakeTranscriber(slot)
         val permissions = FakeVoicePermissions(microphone = microphone, speech = speech)
         val clock = TestTimeSource()
         val latency = LatencyLog()
@@ -788,5 +790,31 @@ class VoiceInputModelTest {
             assertFalse(rig.transcriber.isRunning, path)
             assertEquals(listOf(run), rig.transcriber.cancelledRuns, path)
         }
+    } }
+
+    /** Final review I-3: a quick tap while the on-device recognizer claimed the mic but is not ready yet (3E's
+     *  engine). The release cancels the run, and the recognizer's start then fails. The run never falls back to the
+     *  standard recognizer, which would take the mic with nobody reading it; the on-device one stays offered for the
+     *  language; and the tap shows nothing. */
+    @Test fun aQuickTapOnARecognizerNotYetReadyNeverFallsBack() { runTest {
+        val slot = SpeechRunSlot()
+        val primary = NotReadyPrimary(slot)
+        var primaryFailed = 0
+        val rig = makeRig(slot = slot, engine = { fallback ->
+            FallbackTranscriber(slot, primary, fallback, usePrimary = { true }, primaryFailed = { primaryFailed += 1 })
+        })
+        val pressing = backgroundScope.async { rig.model.press() }
+        assertTrue(eventually { slot.active != null }, "the on-device recognizer claimed the mic")
+        assertNull(rig.model.release(), "the finger lifted while it started")
+
+        primary.failReady()
+        pressing.await()
+        runCurrent()
+        assertTrue(rig.transcriber.grantedRuns.isEmpty(), "the cancelled run never takes the mic on the fallback")
+        assertNull(slot.active)
+        assertFalse(rig.transcriber.isRunning)
+        assertEquals(0, primaryFailed, "the on-device recognizer stays offered")
+        assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase, "the tap shows nothing")
+        assertFalse(rig.model.wantsKeyboard)
     } }
 }
