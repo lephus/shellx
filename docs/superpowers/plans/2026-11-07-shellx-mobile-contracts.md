@@ -564,3 +564,68 @@ Behaviour Android (3G) mirrors:
   octets (parity difference from Swift); the relay socket's incoming queue is unbounded — 3G bounds it before terminal
   streams; the live-relay test `RelayIntegrationTest` needs `CMUX_RELAY_BIN` and has not run yet; R8 has not yet seen
   link-account / BouncyCastle (3C reruns `dev.sh build-release` once `:app` uses them).
+
+## 25. Additions from plan 3C (landed with the 3C merge on 2026-11-09)
+
+Platform interfaces (packages as built; `:app` implements them):
+- `com.shellx.core.account.SecretStore` — synchronous `read(item): ByteArray?`, `write(data, item)`, `delete(item)`;
+  `SecretItem { SESSION, PHONE_KEY, MACHINES }`; `SecretStoreException.{Unavailable, Failed}`; an undecryptable item
+  (lost Keystore key) reads as absent. `AccountVault` calls it on its `io` dispatcher.
+- `com.shellx.core.link.NetworkMonitor` (`paths: Flow<NetworkPath>`, `NetworkPath(status, interfaces, gateways)`).
+- `com.shellx.core.platform.Clock` (`nowMs()`, `monotonic: TimeSource.WithComparableMarks` — must count deep sleep).
+- `com.shellx.core.platform.KeyValueStore` — synchronous `getString`, `putString(key, null = remove)`,
+  `getBoolean` (false when absent), `putBoolean`, `remove`; one key space; **`suspend fun flush()`** (default no-op,
+  waits until earlier writes are on disk; sign-out and deletion call it after the `shellx.localWipePending` marker
+  and before `vault.wipe()`; 3D's DataStore store overrides it); `MemoryKeyValueStore`.
+- `com.shellx.core.account.IdentityProviding` — `googleIdToken(nonce): String`;
+  `IdentityProviderException.{Cancelled, NotConfigured, Failed}`; `UnavailableIdentityProvider`. Must not hold an
+  Activity (sign-in and deletion outlive their screen).
+- `com.shellx.core.voice.SpeechEngine` — `start(run, language, contextualStrings): ReceiveChannel<String>`,
+  `finish(run): String`, `cancel(run)` (idempotent); `finish`/`cancel` give the mic back, also when cancelled, and
+  never throw; bound `finish` with `SpeechTimeouts` (`STANDARD_FINAL_RESULT` 1.5 s, `ON_DEVICE_FINALIZE` 2 s). One
+  `SpeechRunSlot` is shared by every engine that uses the mic; `SpeechRunSlot.cancel(run)` refuses every later claim of
+  that run, also when it held the mic; `FallbackTranscriber` never falls back or calls `primaryFailed` for a cancelled
+  run. `com.shellx.core.voice.VoicePermissionChecking` (`needsPrompt()`, `microphone()`, `speech()`).
+- `com.shellx.core.push.PushRegistrar` (`currentToken(): String?`; `PushRegistration` owns the signed-out guard),
+  `com.shellx.core.update.UpdateChecker` (`check(): AvailableUpdate?`, `startUpdate(update)`, `AvailableUpdate(versionCode)`),
+  `com.shellx.core.composer.AttachmentReader` (`read(pick, taken): OutgoingAttachment`, `AttachmentPick(uri, kind)`,
+  `AttachmentReadException.{TooLarge, Unreadable}(name)`; rules in `AttachmentChecks`).
+
+Core objects the UI builds:
+- `AppCoordinator(vault, relay, identity, deviceName, wipers, pendingWipeSettings, scope, makeHub)` — `phase`, `hub`
+  (null during sign-out, deletion and a 401 while `phase` is still `SignedIn`; never show "signed out" on a null hub
+  alone); `launch`, `protectedDataBecameAvailable`, `signInWithGoogle`, `signOut`, `handleUnauthorized`,
+  `deleteAccount` are detached in its scope; a repeat call while one runs joins it (`DetachedRun`); no busy flow —
+  3D keeps progress state in a ViewModel.
+- `MachineHub(vault, relay, connector, latency, settings, scope, clock, sleep = delay, onUnauthorized)` — `scope`,
+  `state: StateFlow<HubState>`, `appDidBecomeActive()` (also probes each online session and replaces a silent one —
+  the deep-sleep rule), `appDidEnterBackground()` (start it UNDISPATCHED on ON_STOP; teardown completes even if
+  cancelled), `backgroundTimeExpired()`, `networkChanged()`, `refreshGrants()`.
+- `PairingModel(hub, relay, vault, scope)`, `PairingInbox`, `PairingScanFilter`, `SheetPresence`;
+  `DecisionCenter(sender, latency, scope, clock, sleep)`, `PendingSheetModel(key, hub, center)`;
+  `AgentThreadModel(ref, hub, store, scope, sleep)` (`close()`/`save()` return `Job`),
+  `WorkspaceScreenModel(ref, hub, sleep)`, `HomeFocus.make(...)`; `EndedDismissalStore`, `GoneRemovalStore`,
+  `ConversationStore(directory, io, clock, maxThreads = 100)` (one per directory), `ChatCopySweeper(hub, store).run()`.
+- Voice: `VoiceService(engine, permissions, cache, latency, settings, scope, timeSource, preferredLanguages,
+  contextualStrings)` with `makeModel()`, `cancelAll()` (run on ON_STOP), `primaryFellBack()`; pass a live supervised
+  scope (`hub.scope`): when it ends, a listening mic is given back and later `cancel()`/`cancelAll()` never throw.
+- `PushPayload.parse(data)`, `UpdatePrompt(installedVersionCode, checker)`; `ShellXEndpoints.of(debugBuild,
+  override).apiBase`; `RelayClientFactory.make(apiBase, appVersion, okHttp)` / `makeConnector(…)` (throw on a bad base —
+  build them in a `try`); `CoreLog.sink`.
+- Demo: `com.shellx.core.demo.DemoEnvironment(scope, clock, historyDirectory, io, approvalDelay = 2.seconds,
+  runsScript = true, sleep)` — members `vault`, `settings`, `first`, `second`, `relay`, `history`, `latency`,
+  `coordinator`, `script`; `prepare()`, `secondPairingCode()`, `exit()`; with `FakeMac`, `FakeMacFleet`, `DemoRelay`,
+  `DemoSecretStore`, `DemoScript`.
+- Settings keys (the iPhone's): `shellx.defaultMachineID`, `shellx.localWipePending`, `shellx.dismissedEnded`,
+  `shellx.removedGone`, `shellx.voice.language`.
+
+For later plans:
+- 3D: rerun `dev.sh build-release` once `:app` uses `:core`/link classes (R8 removed them all so far); run 3B's
+  `RelayIntegrationTest` with `CMUX_RELAY_BIN` before the first live dogfood.
+- 3E: HEIC/HEIF picks are converted to JPEG like the iPhone (default ruling 2026-11-09; the user may change it).
+- 3G: Swift `WorkspaceScreenModel` gained `settle()` (bf4ec493ca) and the create-in-flight API (e816cef88f) after 3G
+  was written — 3G Task 11 adds both and ports 37 tests (incl. `typingIntoTheChipShownKeepsItWhenAnAgentAsks`); demo
+  terminal fixtures and the hub's terminal calls are 3G's; `MachineHub.withLink`, `workspaceCommand`,
+  `WorkspaceScreenModel.Absence`/`absence(machine)` are `internal` hooks; the fake Mac never answers `too_large`.
+- iPhone follow-up: `SpeechRunSlot.swift:78-90` has the gap Android fixed in 77c032a0a1 (a cancelled run that held
+  the mic can be claimed again by the fallback after a quick tap).
