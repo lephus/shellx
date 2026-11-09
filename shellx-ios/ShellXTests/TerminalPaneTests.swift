@@ -166,4 +166,13 @@ final class TerminalPaneTests: XCTestCase {
         XCTAssertTrue(
             released, "first responder: \(surface.isFirstResponder), height \(surface.bounds.height) of \(unfocused)")
     }
+
+    /// Only a live page takes input (final review, app I1): the key bar and the keyboard need an open view.
+    func testOnlyALivePageTakesInput() {
+        XCTAssertTrue(TerminalSurfaceView.takesInput(.live))
+        let others: [TerminalViewPhase] = [
+            .connecting, .offline, .unsupported, .unavailable(.gone), .unavailable(.refused), .unavailable(.failed),
+        ]
+        for phase in others { XCTAssertFalse(TerminalSurfaceView.takesInput(phase), "\(phase)") }
+    }
 }

@@ -40,7 +40,11 @@ struct TerminalSurface: UIViewRepresentable {
         // not take it back.
         let turnedOn = focused && !context.coordinator.focused
         context.coordinator.focused = focused
-        if turnedOn, !view.isFirstResponder, view.window != nil {
+        if !view.canBecomeFirstResponder {
+            // The page stopped taking input (it reopens, the Mac went offline, a card covers it): the keyboard goes,
+            // and `focused` follows when the loss reaches the pane, which hides the key bar.
+            if view.isFirstResponder { view.resignFirstResponder() }
+        } else if turnedOn, !view.isFirstResponder, view.window != nil {
             view.becomeFirstResponder()
         } else if !focused, view.isFirstResponder {
             view.resignFirstResponder()

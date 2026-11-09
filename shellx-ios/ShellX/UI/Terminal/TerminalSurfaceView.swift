@@ -151,7 +151,13 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
     // MARK: - Focus
 
     override var canBecomeFirstResponder: Bool {
-        isShown && (model.phase == .live || model.phase == .connecting)
+        isShown && Self.takesInput(model.phase)
+    }
+
+    /// The phases in which the page shown takes input: `.live` only. Opening or reopening (`.connecting`), offline and
+    /// the covered states have no open view, so what was typed would be dropped while the terminal looks ready.
+    static func takesInput(_ phase: TerminalViewPhase) -> Bool {
+        phase == .live
     }
 
     /// The page this surface belongs to is the one the model shows.

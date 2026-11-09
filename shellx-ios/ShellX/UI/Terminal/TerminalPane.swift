@@ -28,7 +28,10 @@ struct TerminalPane: View {
     var body: some View {
         VStack(spacing: 0) {
             content
-            if (focused || showsKeyBar) && model.terminalId == terminalId {
+            // Only under the page shown, and only while it takes input (not over a card, nor while it reopens).
+            if (focused || showsKeyBar) && model.terminalId == terminalId
+                && TerminalSurfaceView.takesInput(model.phase)
+            {
                 TerminalKeyBar(ctrlLatched: model.typing.ctrlLatched) { item in
                     // A tap as the page stops being the one shown never reaches the terminal shown next.
                     guard model.terminalId == terminalId else { return }
