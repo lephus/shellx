@@ -20,10 +20,14 @@ import kotlinx.coroutines.flow.flow
  *   Another terminal's snapshot follows the bound like a delta.
  * - [TerminalViewPush.Opened] and [TerminalViewPush.Ended] are never dropped and weigh nothing.
  *
- * So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of the terminal viewed, which PROTOCOL.md
- * 11.4 caps at 256 parts of one frame each (a snapshot of the largest grid a phone asks for, 300 × 120 with 240
- * history rows, is far smaller). A collector cancelled while it waits takes nothing: what was queued stays for the
- * next one.
+ * A frame's weight is about the size of its JSON: the UTF-8 bytes of its texts, counted exactly, and a fixed estimate
+ * for the rest. So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of the terminal viewed, which
+ * PROTOCOL.md 11.4 caps at 256 parts of one frame each (a snapshot of the largest grid a phone asks for, 300 × 120 with
+ * 240 history rows, is far smaller). Decoded, a frame takes about 1 to 3 times its weight in memory (the most for many
+ * one-cell runs: an object and a string per run), so the bound holds a session's queued terminal output to about 2 to
+ * 6 MiB, plus that one snapshot.
+ *
+ * A collector cancelled while it waits takes nothing: what was queued stays for the next one.
  */
 class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     companion object {
@@ -159,12 +163,36 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     }
 }
 
-/** About the UTF-8 bytes of the part's JSON: what bounds [TerminalPushQueue]. */
+/**
+ * What a part weighs in [TerminalPushQueue]: the UTF-8 bytes of its run texts, counted exactly, plus a fixed estimate
+ * for the JSON around them (64 per part, 48 per style, 2 560 for a palette, 16 per line, 24 per run). About the
+ * size of the part's JSON.
+ */
 private fun TerminalFramePart.weight(): Int {
     var w = 64 + styles.size * 48 + if (head?.palette != null) 256 * 10 else 0
     for (line in lines) {
         w += 16
-        for (run in line.runs) w += 24 + run.text.length
+        for (run in line.runs) w += 24 + utf8Bytes(run.text)
     }
     return w
+}
+
+/** The UTF-8 size of [text], without encoding it. A lone surrogate counts 3, as its replacement character does. */
+private fun utf8Bytes(text: String): Int {
+    var n = 0
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        n += when {
+            c.code < 0x80 -> 1
+            c.code < 0x800 -> 2
+            Character.isHighSurrogate(c) && i + 1 < text.length && Character.isLowSurrogate(text[i + 1]) -> {
+                i += 1
+                4
+            }
+            else -> 3
+        }
+        i += 1
+    }
+    return n
 }
