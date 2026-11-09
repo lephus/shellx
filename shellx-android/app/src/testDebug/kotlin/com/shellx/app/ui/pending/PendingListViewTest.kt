@@ -1,6 +1,7 @@
 package com.shellx.app.ui.pending
 
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
@@ -11,6 +12,10 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -101,6 +106,44 @@ class PendingListViewTest {
         assertEquals(1, backs)
         assertEquals(700.milliseconds, PendingListView.LEAVE_DELAY)
         compose.mainClock.autoAdvance = true
+    }
+
+    /** The page's own lifecycle, as a navigation entry has it: the navigator's back works only while it is RESUMED. */
+    private class Entry : LifecycleOwner {
+        val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
+        override val lifecycle: Lifecycle get() = registry
+    }
+
+    /** Final review m-1: the page leaves once it is in front again when it stopped being in front during the wait (Home
+     *  pressed at once, a dialog over it), as the workspace page does. */
+    @Test
+    fun theLastCardHandledLeavesOnceThePageIsInFrontAgain() {
+        val entry = compose.runOnIdle { Entry() }
+        var dropped = 0
+        rig.mac.addPending(PendingFixtures.permission(workspaceId = "ws-shellx", workspaceTitle = "shellx-ios"))
+        pending(1)
+        compose.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(LocalLifecycleOwner provides entry) {
+                    PendingListView(rig.hub, rig.scope.decisions, rig.scope.sheets, only = null, back = {
+                        if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) backs++ else dropped++
+                    })
+                }
+            }
+        }
+        until { cards() == 1 && enabled("pending.allow") }
+        compose.onNodeWithTag("pending.allow").performClick()
+        until { shown(context.getString(R.string.pending_list_empty)) }
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { entry.registry.currentState = Lifecycle.State.STARTED }
+        compose.mainClock.advanceTimeBy(800)
+        assertEquals("the navigator would drop a back from a page not in front", 0, dropped)
+        assertEquals(0, backs)
+
+        compose.runOnUiThread { entry.registry.currentState = Lifecycle.State.RESUMED }
+        compose.mainClock.autoAdvance = true
+        until { backs == 1 }
+        assertEquals(0, dropped)
     }
 
     @Test
