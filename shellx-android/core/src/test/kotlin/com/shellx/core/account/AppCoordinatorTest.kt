@@ -1,9 +1,12 @@
 package com.shellx.core.account
 
 import com.shellx.core.demo.FakeMac
+import com.shellx.core.platform.KeyValueStore
 import com.shellx.core.platform.MemoryKeyValueStore
 import com.shellx.core.testing.CoordinatorRig
 import com.shellx.core.testing.CountingWiper
+import com.shellx.core.testing.FakeIdentityProvider
+import com.shellx.core.testing.FakeRelayAccount
 import com.shellx.core.testing.FakeRelayAccount.Call
 import com.shellx.core.testing.FakeRelayAccount.Function
 import com.shellx.core.testing.FlakyWiper
@@ -29,6 +32,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 
@@ -292,6 +296,64 @@ class AppCoordinatorTest {
         assertFalse(pending.getBoolean(AppCoordinator.PENDING_WIPE_KEY), "all wipers succeeded")
         assertEquals(1, flaky.attempts)
         assertEquals(1, rig.wiper.wipes)
+    } }
+
+    /** What the stores below were asked to do, in order. Thread-safe. */
+    private class StoreEvents {
+        private val list = mutableListOf<String>()
+        val all: List<String> get() = synchronized(this) { list.toList() }
+        fun add(event: String) {
+            synchronized(this) { list += event }
+        }
+    }
+
+    private class RecordingSecretStore(
+        private val events: StoreEvents,
+        private val base: InMemorySecretStore = InMemorySecretStore(),
+    ) : SecretStore by base {
+        override fun delete(item: SecretItem) {
+            events.add("delete $item")
+            base.delete(item)
+        }
+    }
+
+    /** Like 3D's DataStore store: a write reaches the disk later, unless [flush] waits for it. */
+    private class RecordingSettings(
+        private val events: StoreEvents,
+        private val base: MemoryKeyValueStore = MemoryKeyValueStore(),
+    ) : KeyValueStore by base {
+        override fun putBoolean(key: String, value: Boolean) {
+            events.add("put $key=$value")
+            base.putBoolean(key, value)
+        }
+
+        override fun remove(key: String) {
+            events.add("remove $key")
+            base.remove(key)
+        }
+
+        override suspend fun flush() {
+            events.add("flush")
+        }
+    }
+
+    /**
+     * Final review I-2: the wipe marker is durable before the vault is wiped. A process death right after the wipe
+     * would otherwise leave no owner and no marker, and the old account's history would never be wiped.
+     */
+    @Test fun signOutFlushesTheWipeMarkerBeforeWiping() { runTest {
+        val events = StoreEvents()
+        val vault = AccountVault(RecordingSecretStore(events), StandardTestDispatcher(testScheduler))
+        vault.setSession(StoredSession("u1", "d1", "tok-1", "a@b.c"))
+        val coordinator = AppCoordinator(
+            vault, FakeRelayAccount(), FakeIdentityProvider(), "Phu's Pixel", listOf(CountingWiper()),
+            RecordingSettings(events), backgroundScope,
+        ) { error("no hub expected") }
+
+        coordinator.signOut()
+        val key = AppCoordinator.PENDING_WIPE_KEY
+        val expected = listOf("put $key=true", "flush") + SecretItem.entries.map { "delete $it" } + "remove $key"
+        assertEquals(expected, events.all, "marker, flush, then the wipe; cleared once every wiper succeeded")
     } }
 
     // From MachineHubTests.swift
