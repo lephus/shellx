@@ -53,6 +53,19 @@ public actor FakeMac {
         }
     }
 
+    /// The size of a terminal view a phone opened or resized.
+    public struct TerminalViewSize: Equatable, Sendable {
+        public var terminalId: String
+        public var cols: Int
+        public var rows: Int
+
+        public init(terminalId: String, cols: Int, rows: Int) {
+            self.terminalId = terminalId
+            self.cols = cols
+            self.rows = rows
+        }
+    }
+
     /// The pairing record a phone keeps for this Mac (its pinned host key is the first one).
     public nonisolated let machine: PairedMachine
     /// False: the host has no session list and no chat, like a ShellX from before agent sessions.
@@ -71,6 +84,10 @@ public actor FakeMac {
     /// False: the host takes no `terminal.close` (no `terminal_close` feature in `welcome`), like a ShellX from
     /// before it. A host that serves no workspaces (`servesWorkspaces` false) never advertises it either.
     public nonisolated let acceptsTerminalClose: Bool
+    /// False: no `terminal_view` in `welcome` (a ShellX from before it). False too when `servesWorkspaces` is false.
+    public nonisolated let servesTerminalViews: Bool
+    /// False: no `terminal_create` in `welcome`. False too when `servesWorkspaces` is false.
+    public nonisolated let acceptsTerminalCreate: Bool
     /// How many times a phone tried to connect, failed attempts included.
     public private(set) var connectCount = 0
 
@@ -80,6 +97,7 @@ public actor FakeMac {
     private let feed = FakeMacFeed()
     private let sessionSource: FakeMacSessions
     private let workspaceSource: FakeMacWorkspaces
+    private let terminals: FakeMacTerminals
     private let chat: FakeMacChat
     private var failure: (any Error)?
     private var failuresLeft = 0
@@ -90,7 +108,7 @@ public actor FakeMac {
     public init(
         name: String, id: String? = nil, servesSessionsAndChat: Bool = true, acceptsAttachments: Bool = true,
         servesWorkspaces: Bool = true, acceptsWorkspaceControl: Bool = true, acceptsAgentClose: Bool = true,
-        acceptsTerminalClose: Bool = true
+        acceptsTerminalClose: Bool = true, servesTerminalViews: Bool = true, acceptsTerminalCreate: Bool = true
     ) {
         let key = NoiseStaticKey()
         hostKey = key
@@ -100,9 +118,13 @@ public actor FakeMac {
         self.acceptsWorkspaceControl = acceptsWorkspaceControl
         self.acceptsAgentClose = acceptsAgentClose
         self.acceptsTerminalClose = acceptsTerminalClose
+        self.servesTerminalViews = servesWorkspaces && servesTerminalViews
+        self.acceptsTerminalCreate = servesWorkspaces && acceptsTerminalCreate
         let sessionSource = FakeMacSessions()
         self.sessionSource = sessionSource
-        workspaceSource = FakeMacWorkspaces(sessions: sessionSource)
+        let workspaceSource = FakeMacWorkspaces(sessions: sessionSource)
+        self.workspaceSource = workspaceSource
+        terminals = FakeMacTerminals(workspaces: workspaceSource)
         chat = FakeMacChat(acceptsAttachments: acceptsAttachments)
         let id = id ?? UUID().uuidString.lowercased()
         machine = PairedMachine(
@@ -173,6 +195,8 @@ public actor FakeMac {
             workspaceControl: servesWorkspaces && acceptsWorkspaceControl ? workspaceSource : nil,
             agentControl: servesSessionsAndChat && acceptsAgentClose ? workspaceSource : nil,
             terminalControl: servesWorkspaces && acceptsTerminalClose ? workspaceSource : nil,
+            terminalViews: servesTerminalViews ? terminals : nil,
+            terminalCreator: acceptsTerminalCreate ? terminals : nil,
             hostVersion: "fake", machineName: machine.name)
         let id = UUID()
         live[id] = (macEnd, Task {
@@ -251,6 +275,39 @@ public actor FakeMac {
     /// acts as the real one does: a terminal that the named workspace lists is closed (`ok`), and the
     /// workspace goes with its last terminal; any other pair is `not_found`.
     public func setNextTerminalCloseOutcome(_ outcome: WorkspaceControlOutcome) { workspaceSource.setNextTerminalCloseOutcome(outcome) }
+
+    // MARK: - Terminal views
+
+    /// What a view of each terminal shows, by terminal id; any other listed terminal shows a fresh
+    /// `DemoTerminalScreens.prompt(cols:rows:)` at the size the phone asked for. Views opened later use them.
+    public func setTerminalFixtures(_ fixtures: [String: DemoTerminalFixture]) { terminals.setFixtures(fixtures) }
+    /// From now on opening a view of `terminalId` answers `outcome`.
+    public func refuseTerminalView(_ terminalId: String, with outcome: TerminalViewOpenOutcome) {
+        terminals.refuse(terminalId, with: outcome)
+    }
+    /// From now on view opens are recorded but not answered until `releaseTerminalViewOpens()`.
+    public func holdTerminalViewOpens() { terminals.hold() }
+    public func releaseTerminalViewOpens() { terminals.release() }
+    /// `frame` goes to the phone viewing `terminalId`, before anything the fake shell made.
+    public func emitTerminalFrame(_ terminalId: String, _ frame: TerminalGridFrame) { terminals.emit(terminalId, .frame(frame)) }
+    /// The current view of `terminalId` ends with `reason`.
+    public func endTerminalView(_ terminalId: String, reason: TerminalViewEndReason) {
+        terminals.emit(terminalId, .ended(reason))
+    }
+    /// The next `terminal.create` answers `outcome` and, unless it is `ok`, changes nothing. Without it the Mac adds a
+    /// terminal `<workspaceId>-new-<n>` to a workspace it lists (`not_found` otherwise).
+    public func setNextTerminalCreateOutcome(_ outcome: WorkspaceControlOutcome) { terminals.setNextCreateOutcome(outcome) }
+    /// Every view open the Mac received, in order (refused ones too).
+    public var terminalViewOpens: [TerminalViewSize] { terminals.viewOpens }
+    public var terminalViewResizes: [TerminalViewSize] { terminals.viewResizes }
+    /// The terminal id of every view closed, in order.
+    public var terminalViewCloses: [String] { terminals.viewCloses }
+    /// The units of every `terminal.view.input` a view of `terminalId` applied, in order.
+    public func terminalViewInputs(_ terminalId: String) -> [[TerminalInputUnit]] { terminals.viewInputs(terminalId) }
+    /// How many snapshots views of `terminalId` were asked for (resyncs).
+    public func terminalViewSnapshotRequests(_ terminalId: String) -> Int { terminals.viewSnapshotRequests(terminalId) }
+    /// The workspace id of every `terminal.create`, in order.
+    public var terminalCreates: [String] { terminals.createCalls }
 
     // MARK: - Chat
 

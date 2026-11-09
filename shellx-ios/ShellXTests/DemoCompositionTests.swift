@@ -1,4 +1,5 @@
 import ShellXAppCore
+import ShellXAppTestSupport
 import SwiftUI
 import UIKit
 import XCTest
@@ -128,5 +129,36 @@ final class DemoCompositionTests: XCTestCase {
         XCTAssertTrue(model.canStop)
         let stopped = await model.stop(hard: false)
         XCTAssertEqual(stopped, .sent)
+    }
+
+    /// The demo Mac's terminals show the fixtures `DemoComposition.terminals` maps them to: a shell session, and the note in
+    /// Vietnamese, Chinese, Japanese, Korean and emoji.
+    func testDemoMacShowsItsTerminals() async throws {
+        let graph = DemoComposition.make(
+            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: true, history: makeHistoryDirectory())
+        await graph.prepare()
+        await graph.coordinator.launch()
+        let hub = try XCTUnwrap(graph.coordinator.hub)
+        addTeardownBlock { @MainActor in await hub.stopAll() }
+        let id = try XCTUnwrap(hub.machines.first?.id)
+        let ready = await eventually {
+            hub.supportsTerminalView(id) && hub.supportsTerminalCreate(id) && hub.workspaceRows(machineID: id).count == 4
+        }
+        XCTAssertTrue(ready)
+
+        let model = TerminalViewModel(machineID: id, link: hub)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+        model.setPhoneGrid(cols: 50, rows: 40)
+        model.show("demo-shellx-t2")
+        var expected = TerminalScreen()
+        expected.apply(DemoTerminalScreens.shell.snapshot)
+
+        let shell = await eventually { model.phase == .live && model.screen.screenText() == expected.screenText() }
+        XCTAssertTrue(shell, "\(model.phase)")
+
+        model.show("demo-notes-t1")
+        let wide = await eventually { model.phase == .live && model.screen.screenText().contains("中文：终端测试") }
+        XCTAssertTrue(wide, "\(model.phase)")
     }
 }

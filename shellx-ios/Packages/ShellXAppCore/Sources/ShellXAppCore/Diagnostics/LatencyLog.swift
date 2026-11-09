@@ -17,6 +17,13 @@ public enum LatencyMetric: String, CaseIterable, Sendable {
     case launchToWorkspaceList
     /// Start of speech to the first recognised word.
     case firstWord
+    /// Showing a terminal (a chip shown, or the view opened again) to its first screen (mobile terminal spec S2 §2 with the
+    /// workspaces spec §2.2, criterion 3: p95 under 1 s).
+    case terminalFirstScreen
+    /// Typing in a terminal to the next frame of it (criterion 4: p95 under 300 ms).
+    case terminalKeyEcho
+    /// Assembling and applying one terminal frame on the main actor (criterion 5: a flood never stalls the app; p95 under 16 ms).
+    case terminalFrameApply
 }
 
 public struct LatencySummary: Equatable, Sendable {

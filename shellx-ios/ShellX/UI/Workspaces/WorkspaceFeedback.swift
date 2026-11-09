@@ -10,6 +10,8 @@ enum WorkspaceCommand: Equatable {
     case closeAgent
     /// Closes one terminal tab of a workspace, agent or shell (`MachineHub.closeTerminal(_:workspaceId:terminalId:)`).
     case closeTab
+    /// Opens a terminal tab in the workspace (`MachineHub.createTerminal(_:)`).
+    case createTerminal
 }
 
 /// What the list says when a command did not simply work. The words always say what to do next.
@@ -70,7 +72,7 @@ enum WorkspaceFeedback: Equatable {
             // push brings the tab's leaving anyway).
             case .closeAgent: return .alert(.agentNotClosable)
             case .closeTab: return .alert(.tabNotClosable)
-            case .create, .rename, .close: return .refresh
+            case .create, .rename, .close, .createTerminal: return .refresh
             }
         case .refused:
             switch command {
@@ -78,7 +80,7 @@ enum WorkspaceFeedback: Equatable {
             // Not only blocked remote control: the Mac's own rules can keep the tab too.
             case .closeAgent: return .alert(.refusedCloseAgent)
             case .closeTab: return .alert(.refusedCloseTab)
-            case .create, .rename: return .alert(.refusedControl)
+            case .create, .rename, .createTerminal: return .alert(.refusedControl)
             }
         case .failed:
             return .alert(.failed)

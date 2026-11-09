@@ -3,7 +3,11 @@ import SwiftUI
 
 /// One workspace of a Mac, pushed from the workspace list: `WorkspaceScreen` fed by
 /// `WorkspaceScreenModel` and the hub. A chip that runs an agent shows the existing agent screen as its
-/// pane (`AgentView`, embedded); the commands in `•••` are the hub's (`WorkspaceScreenActions`).
+/// pane (`AgentView`, embedded); a shell chip, or an agent chip shown as its terminal, shows the Mac's terminal
+/// (`TerminalPane`). One `TerminalViewModel` serves every page and shows the terminal of the chip shown
+/// (`WorkspaceScreenModel.terminalShown`), never a neighbour the pager keeps alive; it closes the view while the app
+/// is in the background and opens it again on return. The commands in `•••` and ＋ are the hub's
+/// (`WorkspaceScreenActions`).
 ///
 /// When the pane shown is closed on the Mac, the next chip shows and a short line says why
 /// (`paneClosedNotice`). It leaves on its own when the workspace it showed is closed on the Mac: it
@@ -19,12 +23,15 @@ struct WorkspaceView: View {
     let open: (HomeRoute) -> Void
 
     @State private var model: WorkspaceScreenModel
+    /// The terminal shown, for every terminal page of this screen.
+    @State private var terminal: TerminalViewModel
     @State private var alert: WorkspaceAlert?
     /// The user confirmed closing the workspace here: its leaving needs no word of explanation.
     @State private var closedHere = false
     /// The line over the pages, for `AgentView.noticeDuration`.
     @State private var notice: AgentScreen.Notice?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(VoiceService.self) private var voiceService: VoiceService?
 
     init(scope: SignedInScope, ref: WorkspaceRef, open: @escaping (HomeRoute) -> Void) {
@@ -32,17 +39,23 @@ struct WorkspaceView: View {
         self.ref = ref
         self.open = open
         _model = State(initialValue: WorkspaceScreenModel(ref: ref, hub: scope.hub))
+        _terminal = State(initialValue: TerminalViewModel(machineID: ref.machineID, link: scope.hub))
     }
 
     var body: some View {
         let model = self.model
+        let terminal = self.terminal
+        let hub = scope.hub
         Group {
             switch model.phase {
             case .showing:
                 WorkspaceScreen(
                     title: model.workspace?.title ?? "", branch: model.workspace?.branch, panes: model.panes,
                     selected: model.selectedTerminalId, canControl: model.canControl,
-                    canCloseTab: WorkspaceListActions.canCloseTab(machineID: ref.machineID, hub: scope.hub),
+                    canCloseTab: WorkspaceListActions.canCloseTab(machineID: ref.machineID, hub: hub),
+                    canCreateTerminal: hub.supportsTerminalCreate(ref.machineID),
+                    canViewTerminals: hub.supportsTerminalView(ref.machineID), shownAsTerminal: model.shownAsTerminal,
+                    creatingTerminal: model.creatingTerminal,
                     pagingLocked: voiceService?.isListening ?? false, notice: notice,
                     actions: WorkspaceScreenActions.make(
                         scope: scope, model: model,
@@ -56,6 +69,13 @@ struct WorkspaceView: View {
                         // Another session in the same terminal is another chat, not this one's model.
                         AgentView(scope: scope, ref: session.ref, embedded: true, open: open)
                             .id(session.ref)
+                    },
+                    shell: { pane in
+                        // Typing into a page settles the screen on it: an agent that starts asking does not pull
+                        // the keyboard away mid-command.
+                        TerminalPane(
+                            model: terminal, terminalId: pane.id, title: PaneChips.label(for: pane),
+                            engaged: { model.settle() })
                     })
             case .waiting:
                 WorkspaceWaitingView()
@@ -66,6 +86,15 @@ struct WorkspaceView: View {
             }
         }
         .task { await model.run() }
+        .task { await terminal.run() }
+        .onChange(of: model.terminalShown, initial: true) { _, id in terminal.show(id) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                terminal.suspend()
+            } else if phase == .active {
+                terminal.resume()
+            }
+        }
         .onChange(of: model.phase) { _, phase in
             switch phase {
             case .dismissed: leave()
@@ -111,7 +140,8 @@ struct WorkspaceView: View {
 /// action and see the hub call it makes and what the screen does with the answer (`WorkspaceFeedback`,
 /// the words the list says too): a workspace that is gone refreshes the list, anything that did not work
 /// is an alert, and an answer of "done" shows nothing (the Mac's push renames the workspace, removes a
-/// tab and the next chip shows, or removes the workspace and the screen leaves).
+/// tab and the next chip shows, adds the tab ＋ made and its chip shows, or removes the workspace and the
+/// screen leaves).
 extension WorkspaceScreenActions {
     /// `alert` gets what to tell the user; `closing` is called when the user's close goes out. `done` gets
     /// the task of each command, so a caller (a test) can wait for it.
@@ -153,6 +183,17 @@ extension WorkspaceScreenActions {
                         alert(kind)
                     },
                     done: done)
-            })
+            },
+            createTerminal: {
+                // One at a time (＋ is dimmed meanwhile); a chip picked before the answer wins over the new tab.
+                guard model.startCreatingTerminal() else { return }
+                run(.createTerminal) {
+                    let answer = await hub.createTerminal(ref)
+                    // Shown as soon as the Mac's list has it; the Mac's own selected tab stays.
+                    model.finishCreatingTerminal(answer.terminalId)
+                    return answer.result
+                }
+            },
+            showAsTerminal: { model.showAsTerminal($0, $1) })
     }
 }

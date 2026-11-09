@@ -5017,6 +5017,366 @@
           }
         }
       }
+    },
+    "terminal.needsUpdate": {
+      "comment": "In a shell pane when the Mac's ShellX is too old to show its terminals.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update ShellX on the Mac to see the terminal."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cập nhật ShellX trên Mac để xem terminal."
+          }
+        }
+      }
+    },
+    "terminal.connecting": {
+      "comment": "In a shell pane while the Mac sends the terminal's first screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening the terminal…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang mở terminal…"
+          }
+        }
+      }
+    },
+    "terminal.offline": {
+      "comment": "A short line over a terminal whose Mac went offline; the last screen stays, dimmed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac is offline. This is the last screen it sent."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đang ngoại tuyến. Đây là màn hình cuối cùng Mac gửi."
+          }
+        }
+      }
+    },
+    "terminal.gone": {
+      "comment": "In a shell pane whose terminal was closed on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This terminal is no longer on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal này không còn trên Mac."
+          }
+        }
+      }
+    },
+    "terminal.failed": {
+      "comment": "In a shell pane when the Mac could not show the terminal; a Try Again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't show the terminal."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không hiện được terminal."
+          }
+        }
+      }
+    },
+    "terminal.paste.tooLarge": {
+      "comment": "A short notice over the terminal when a paste is over `TerminalInputBatcher.maxPasteBytes`; nothing is sent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That paste is too large to send (256 KB at most)."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nội dung dán quá lớn để gửi (tối đa 256 KB)."
+          }
+        }
+      }
+    },
+    "terminal.retry": {
+      "comment": "Button under the line saying the terminal could not be shown: asks the Mac again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thử lại"
+          }
+        }
+      }
+    },
+    "terminal.surface.label %@": {
+      "comment": "VoiceOver label of the terminal area; the argument is the tab's name as its chip shows it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màn hình terminal %@"
+          }
+        }
+      }
+    },
+    "terminal.key.escape": {
+      "comment": "VoiceOver label of the esc key on the key bar over the keyboard.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escape"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phím Esc"
+          }
+        }
+      }
+    },
+    "terminal.key.tab": {
+      "comment": "VoiceOver label of the tab key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phím Tab"
+          }
+        }
+      }
+    },
+    "terminal.key.ctrl": {
+      "comment": "VoiceOver label of the ctrl key on the key bar: it holds Control for the next key.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phím Control"
+          }
+        }
+      }
+    },
+    "terminal.key.ctrl.latched": {
+      "comment": "VoiceOver value of the ctrl key while it is held for the next key.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On for the next key"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bật cho phím kế tiếp"
+          }
+        }
+      }
+    },
+    "terminal.key.left": {
+      "comment": "VoiceOver label of the left arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên trái"
+          }
+        }
+      }
+    },
+    "terminal.key.up": {
+      "comment": "VoiceOver label of the up arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên lên"
+          }
+        }
+      }
+    },
+    "terminal.key.down": {
+      "comment": "VoiceOver label of the down arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Down Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên xuống"
+          }
+        }
+      }
+    },
+    "terminal.key.right": {
+      "comment": "VoiceOver label of the right arrow key on the key bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right Arrow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mũi tên phải"
+          }
+        }
+      }
+    },
+    "terminal.key.hideKeyboard": {
+      "comment": "The key at the end of the key bar: hides the keyboard.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Keyboard"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ẩn bàn phím"
+          }
+        }
+      }
+    },
+    "terminal.new": {
+      "comment": "VoiceOver label of the ＋ chip at the end of the chip row: opens a new terminal tab in this workspace on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Terminal"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal mới"
+          }
+        }
+      }
+    },
+    "workspace.menu.viewAsTerminal": {
+      "comment": "Item of the ••• menu while the chip shown runs an agent: shows that agent's terminal instead of its chat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View as Terminal"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem dạng terminal"
+          }
+        }
+      }
+    },
+    "workspace.menu.viewAsChat": {
+      "comment": "Item of the ••• menu while an agent's chip shows its terminal: back to the agent's chat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View as Chat"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem dạng chat"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

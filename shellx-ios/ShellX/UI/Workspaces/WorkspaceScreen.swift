@@ -11,47 +11,72 @@ struct WorkspaceScreenActions {
     var close: () -> Void = {}
     /// Confirmed: close the terminal tab with this id on the Mac, and stop what runs in it.
     var closeTab: (String) -> Void = { _ in }
+    /// The user tapped ＋: open a new terminal tab in this workspace on the Mac.
+    var createTerminal: () -> Void = {}
+    /// "View as Terminal" (true) or "View as Chat" (false) on the agent chip with this terminal id.
+    var showAsTerminal: (String, Bool) -> Void = { _, _ in }
 }
 
 /// What `•••` offers.
 enum WorkspaceMenuItem: CaseIterable {
     case rename
+    /// The agent chip shown shows its terminal instead of its chat.
+    case viewAsTerminal
+    /// The agent chip shown goes back from its terminal to its chat.
+    case viewAsChat
     /// The tab of the chip shown, agent or shell; it asks to confirm first.
     case closeTab
     case closeWorkspace
 
-    /// The items in the menu's order; "Close Tab…" only while a chip shows and its Mac takes `terminal.close`
-    /// (`WorkspaceListActions.canCloseTab`).
-    static func items(canCloseTab: Bool) -> [WorkspaceMenuItem] {
-        allCases.filter { $0 != .closeTab || canCloseTab }
+    /// How the agent chip shown shows its page, when `•••` may switch it (its Mac shows terminals).
+    enum AgentChip { case chat, terminal }
+
+    /// The items in the menu's order: Rename; "View as Terminal" for an agent chip showing its chat, or "View as
+    /// Chat" for one showing its terminal (one item whose words change, HIG: Menus); "Close Tab…" only while a chip
+    /// shows and its Mac takes `terminal.close` (`WorkspaceListActions.canCloseTab`); "Close Workspace…".
+    static func items(canCloseTab: Bool, agentChip: AgentChip? = nil) -> [WorkspaceMenuItem] {
+        allCases.filter { item in
+            switch item {
+            case .rename, .closeWorkspace: true
+            case .viewAsTerminal: agentChip == .chat
+            case .viewAsChat: agentChip == .terminal
+            case .closeTab: canCloseTab
+            }
+        }
     }
 
     var title: String {
         switch self {
         case .rename: String(localized: "workspace.menu.rename")
+        case .viewAsTerminal: String(localized: "workspace.menu.viewAsTerminal")
+        case .viewAsChat: String(localized: "workspace.menu.viewAsChat")
         case .closeTab: String(localized: "terminal.close.menu")
         case .closeWorkspace: String(localized: "workspace.menu.close")
         }
     }
 
-    /// Shown red, apart from Rename.
-    var isDestructive: Bool { self != .rename }
+    /// Shown red: Close Tab… and Close Workspace… only.
+    var isDestructive: Bool { self == .closeTab || self == .closeWorkspace }
 }
 
 /// One workspace's screen, from plain values so render tests can show any state; `WorkspaceView` feeds
 /// it from the hub.
 ///
 /// - Bar: "‹ Workspace" (the system's back button), the workspace's name over its git branch in
-///   monospace, and `•••` with "Rename Workspace", then, in red and each asking first, "Close Tab…" for
+///   monospace, and `•••` with "Rename Workspace", "View as Terminal" / "View as Chat" for an agent chip while
+///   its Mac shows terminals (`canViewTerminals`), then, in red and each asking first, "Close Tab…" for
 ///   the chip shown while its Mac can close tabs (`canCloseTab`), and "Close Workspace…".
-/// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted. While the Mac is online
-///   and can close tabs, a long press on any chip offers "Close Tab…" for it too. Either way one
-///   confirmation names the tab and says what closing it stops (HIG: Action sheets).
+/// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted, then ＋ (a new
+///   terminal tab) while the Mac takes `terminal.create` (`canCreateTerminal`), dimmed while it is not
+///   online or a new tab is on its way (`creatingTerminal`). While the Mac is online and can close tabs, a
+///   long press on any chip offers "Close Tab…" for it too. Either way one confirmation names the tab and
+///   says what closing it stops (HIG: Action sheets).
 /// - Below, one page per chip, swiped sideways like the chips are tapped: a chip that runs an agent
-///   shows the agent's chat (`agent`: the existing agent screen as a pane); any other shows
-///   `ShellPanePlaceholder`. While a mic listens (`pagingLocked`) the pages stay put.
+///   shows the agent's chat (`agent`: the existing agent screen as a pane) unless it is shown as its
+///   terminal (`shownAsTerminal`); any other page is `shell` (the terminal, `TerminalPane`). While a mic
+///   listens (`pagingLocked`) the pages stay put.
 /// - `notice`, when there is one, floats over the top of the pages (the pane shown was closed on the Mac).
-struct WorkspaceScreen<AgentPane: View>: View {
+struct WorkspaceScreen<AgentPane: View, ShellPane: View>: View {
     let title: String
     /// The git branch, when the Mac gave one.
     var branch: String?
@@ -65,6 +90,14 @@ struct WorkspaceScreen<AgentPane: View>: View {
     /// The Mac takes `terminal.close` (`WorkspaceListActions.canCloseTab`): any tab, agent or shell, can be
     /// closed from `•••` (the chip shown) and from a chip's long-press (while `canControl`).
     var canCloseTab = false
+    /// The Mac takes `terminal.create`: the chips end with ＋, enabled while `canControl`.
+    var canCreateTerminal = false
+    /// The Mac shows terminals: `•••` offers View as Terminal / View as Chat on an agent chip.
+    var canViewTerminals = false
+    /// The agent chips shown as their terminal (`WorkspaceScreenModel.shownAsTerminal`).
+    var shownAsTerminal: Set<String> = []
+    /// ＋ was tapped and the Mac has not answered: ＋ is dimmed (`WorkspaceScreenModel.creatingTerminal`).
+    var creatingTerminal = false
     /// A mic is listening: the pages do not follow a sideways drag, so a drag to the left on the mic (its
     /// cancel) never turns the page instead.
     var pagingLocked = false
@@ -75,6 +108,8 @@ struct WorkspaceScreen<AgentPane: View>: View {
     @Binding var alert: WorkspaceAlert?
     /// The agent screen of a pane that runs an agent.
     @ViewBuilder let agent: (MachineSession) -> AgentPane
+    /// The page of a shell chip, and of an agent chip shown as its terminal.
+    @ViewBuilder let shell: (WorkspacePane) -> ShellPane
 
     @State private var renaming = false
     @State private var closing = false
@@ -85,7 +120,8 @@ struct WorkspaceScreen<AgentPane: View>: View {
         VStack(spacing: 0) {
             PaneChips(
                 panes: panes, selected: selected, now: now, select: actions.select,
-                close: canCloseTab && canControl ? { closingTab = $0 } : nil)
+                close: canCloseTab && canControl ? { closingTab = $0 } : nil,
+                add: canCreateTerminal ? actions.createTerminal : nil, addEnabled: canControl && !creatingTerminal)
             pager
                 .overlay(alignment: .top) {
                     if let notice {
@@ -158,7 +194,7 @@ struct WorkspaceScreen<AgentPane: View>: View {
     }
 
     private var menu: some View {
-        let items = WorkspaceMenuItem.items(canCloseTab: canCloseTab && shownPane != nil)
+        let items = WorkspaceMenuItem.items(canCloseTab: canCloseTab && shownPane != nil, agentChip: agentChip)
         return Menu {
             ForEach(items.filter { !$0.isDestructive }, id: \.self, content: menuButton)
             // The red items, which ask first, in a group of their own (HIG: Menus).
@@ -171,10 +207,18 @@ struct WorkspaceScreen<AgentPane: View>: View {
         .accessibilityIdentifier("workspace.menu")
     }
 
+    /// How the agent chip shown shows its page, while its Mac shows terminals; nil for a shell chip.
+    private var agentChip: WorkspaceMenuItem.AgentChip? {
+        guard canViewTerminals, let pane = shownPane, pane.isAgent else { return nil }
+        return shownAsTerminal.contains(pane.id) ? .terminal : .chat
+    }
+
     private func menuButton(_ item: WorkspaceMenuItem) -> some View {
         Button(item.title, role: item.isDestructive ? .destructive : nil) {
             switch item {
             case .rename: renaming = true
+            case .viewAsTerminal: if let pane = shownPane { actions.showAsTerminal(pane.id, true) }
+            case .viewAsChat: if let pane = shownPane { actions.showAsTerminal(pane.id, false) }
             case .closeTab: closingTab = shownPane
             case .closeWorkspace: closing = true
             }
@@ -208,10 +252,10 @@ struct WorkspaceScreen<AgentPane: View>: View {
     }
 
     @ViewBuilder private func page(of pane: WorkspacePane) -> some View {
-        if let session = pane.session {
+        if let session = pane.session, !shownAsTerminal.contains(pane.id) {
             agent(session)
         } else {
-            ShellPanePlaceholder()
+            shell(pane)
         }
     }
 }

@@ -671,4 +671,77 @@ final class WorkspaceScreenModelTests: XCTestCase {
 
         XCTAssertEqual(sleeper.cancelled, 1, "the wait for the workspace ended with the screen")
     }
+
+
+    // MARK: - The terminal shown (plan 2C)
+
+    func testTheTerminalShownIsTheShellOrAnAgentShownAsTerminal() async throws {
+        let mac = FakeMac(name: "Mac")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("claude", "zsh", agent: ["claude": "s1"], selected: "zsh"))])
+        await mac.upsertSession(agentSession("s1"))
+        let (model, _, _) = try await makeModel(mac, sessions: 1)
+        XCTAssertEqual(model.terminalShown, "zsh")
+        model.select("claude")
+        XCTAssertNil(model.terminalShown, "an agent's chip shows its chat")
+        model.showAsTerminal("claude", true)
+        XCTAssertEqual(model.shownAsTerminal, ["claude"])
+        XCTAssertEqual(model.terminalShown, "claude")
+        model.showAsTerminal("claude", false)
+        XCTAssertNil(model.terminalShown)
+        model.showAsTerminal("nope", true)
+        XCTAssertEqual(model.shownAsTerminal, [])
+    }
+
+    func testAnExpectedTerminalShowsOnceTheListHasIt() async throws {
+        let mac = FakeMac(name: "Mac")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("zsh", selected: "zsh"))])
+        let (model, _, _) = try await makeModel(mac)
+        model.expect("t-new")
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("zsh", "t-new", selected: "zsh")))
+        let shown = await eventually { model.selectedTerminalId == "t-new" }
+        XCTAssertTrue(shown)
+        XCTAssertEqual(model.shownPaneClosed, 0)
+    }
+
+    func testAnExpectedTerminalAlreadyListedShowsAtOnce() async throws {
+        let mac = FakeMac(name: "Mac")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("zsh", "t-new", selected: "zsh"))])
+        let (model, _, _) = try await makeModel(mac)
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+        model.expect("t-new")
+        XCTAssertEqual(model.selectedTerminalId, "t-new")
+    }
+
+    func testPickingAChipDropsTheExpectedOne() async throws {
+        let mac = FakeMac(name: "Mac")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("zsh", "other", selected: "zsh"))])
+        let (model, _, _) = try await makeModel(mac)
+        model.expect("t-new")
+        model.select("other")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("zsh", "other", "t-new", selected: "zsh")))
+        let listed = await eventually { model.panes.contains { $0.id == "t-new" } }
+        XCTAssertTrue(listed)
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(model.selectedTerminalId, "other")
+    }
+
+    /// The user typing into the shell shown settles the screen on it, like a pick: an agent that starts asking later
+    /// does not move it (final review, app I2).
+    func testTypingIntoTheChipShownKeepsItWhenAnAgentAsks() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("zsh", "claude", agent: ["claude": "s1"], selected: "zsh"))
+        ])
+        let (model, hub, _) = try await makeModel(mac)
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+
+        model.settle()
+        await mac.upsertSession(agentSession("s1", state: .needsInput))
+        await mac.addPending(pendingItem("r1"))
+        let seen = await eventually { hub.pendingItems.count == 1 }
+        XCTAssertTrue(seen)
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+    }
 }

@@ -10,7 +10,7 @@ import os
 /// One round: connect, `snapshot()`, `sessions()` (a Mac without a session list answers
 /// `unsupported`, which is not a failure), `workspaces()` (only when the Mac lists the `workspaces`
 /// feature), report the client's `hostFeatures` and `.online`, then read `changes`,
-/// `sessionChanges`, `workspaceChanges` and `chatEntries` until `changes` ends. A revision gap
+/// `sessionChanges`, `workspaceChanges`, `chatEntries` and `terminalPushes` until `changes` ends. A revision gap
 /// resyncs inside the live session. When the session ends the items stay but are reported not
 /// actionable (`.reconnecting`); when the first attempt after that fails they are dropped
 /// (`.offline`). Waits follow `ReconnectSchedule`; the failure count starts over at every `welcome`.
@@ -201,7 +201,7 @@ public actor MachineConnection {
         }
     }
 
-    /// Reads the session's four streams until `changes` ends (the session is over).
+    /// Reads the session's five streams until `changes` ends (the session is over).
     private func read(_ client: LinkClient) async {
         let output = self.output
         await withTaskGroup(of: Void.self) { group in
@@ -222,6 +222,10 @@ public actor MachineConnection {
                         output.yield(.chatReset(sessionId: sessionId))
                     }
                 }
+            }
+            group.addTask {
+                // Read even when no page shows a terminal: the client buffers without bound.
+                for await push in client.terminalPushes { output.yield(.terminal(push)) }
             }
             for await change in client.changes { await applyPending(change, from: client) }
             group.cancelAll()

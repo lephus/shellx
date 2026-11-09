@@ -92,16 +92,21 @@ final class WorkspaceRenderTests: XCTestCase {
     private func screen(
         selected: String?, panes: [WorkspacePane] = WorkspaceRenderTests.panes, title: String = "shellx-ios",
         branch: String? = "feat/workspaces", canControl: Bool = true, alert: WorkspaceAlert? = nil,
-        notice: AgentScreen.Notice? = nil, requested: Requested = Requested()
+        notice: AgentScreen.Notice? = nil, requested: Requested = Requested(), canCreateTerminal: Bool = false,
+        canViewTerminals: Bool = false, shownAsTerminal: Set<String> = [], creatingTerminal: Bool = false,
+        shell: @escaping (WorkspacePane) -> AnyView = { _ in AnyView(ShellPanePlaceholder()) }
     ) -> some View {
         NavigationStack {
             WorkspaceScreen(
                 title: title, branch: branch, panes: panes, selected: selected, now: Self.now, canControl: canControl,
+                canCreateTerminal: canCreateTerminal, canViewTerminals: canViewTerminals, shownAsTerminal: shownAsTerminal,
+                creatingTerminal: creatingTerminal,
                 notice: notice, alert: .constant(alert),
                 agent: { session in
                     let _ = requested.sessions.append(session.session.sessionId)
                     self.agentPane(session, pending: session.session.sessionId == "s-claude" ? [Self.request] : [])
-                })
+                },
+                shell: shell)
         }
     }
 
@@ -173,6 +178,36 @@ final class WorkspaceRenderTests: XCTestCase {
         XCTAssertNotEqual(withNotice.first?.pngData(), without.first?.pngData(), "the line shows over the pages")
     }
 
+    /// S2 §3.3: a Mac that takes `terminal.create` ends the chips with ＋.
+    func testRendersTheNewTerminalChip() throws {
+        try assertRenders(screen(selected: "t-zsh", canCreateTerminal: true), name: "workspace-new-terminal")
+        let without = try SnapshotWriter().write(screen(selected: "t-zsh"), name: "workspace-shell")
+        let with = try SnapshotWriter().write(screen(selected: "t-zsh", canCreateTerminal: true), name: "workspace-new-terminal")
+        XCTAssertNotEqual(without.first?.pngData(), with.first?.pngData(), "the ＋ chip shows")
+    }
+
+    /// ＋ is dimmed while the new tab is on its way (final review, app M6).
+    func testRendersTheNewTerminalChipWhileOneIsOnItsWay() throws {
+        try assertRenders(
+            screen(selected: "t-zsh", canCreateTerminal: true, creatingTerminal: true), name: "workspace-new-terminal-creating")
+        let ready = try SnapshotWriter().write(screen(selected: "t-zsh", canCreateTerminal: true), name: "workspace-new-terminal")
+        let creating = try SnapshotWriter().write(
+            screen(selected: "t-zsh", canCreateTerminal: true, creatingTerminal: true), name: "workspace-new-terminal-creating")
+        XCTAssertNotEqual(ready.first?.pngData(), creating.first?.pngData(), "＋ is dimmed")
+    }
+
+    /// S2 §3.4: "View as Terminal" shows an agent chip's terminal instead of its chat.
+    func testRendersAnAgentChipAsItsTerminal() throws {
+        var agent = TerminalScreen()
+        agent.apply(DemoTerminalScreens.agent.snapshot)
+        let model = TerminalViewModel.fixed(terminalId: "t-claude", screen: agent)
+        try assertRenders(
+            screen(
+                selected: "t-claude", canViewTerminals: true, shownAsTerminal: ["t-claude"],
+                shell: { pane in AnyView(TerminalPane(model: model, terminalId: pane.id, title: pane.title)) }),
+            name: "workspace-agent-as-terminal")
+    }
+
     func testRendersTheWaitingAndMissingStates() throws {
         try assertRenders(NavigationStack { WorkspaceWaitingView() }, name: "workspace-loading")
         try assertRenders(NavigationStack { WorkspaceMissingView(back: {}) }, name: "workspace-not-found")
@@ -180,20 +215,25 @@ final class WorkspaceRenderTests: XCTestCase {
 
     // MARK: - Words
 
-    func testTheMenuOffersRenameCloseTabAndCloseWorkspace() {
+    func testTheMenuOffersRenameViewAsTerminalCloseTabAndCloseWorkspace() {
         XCTAssertEqual(
             WorkspaceMenuItem.items(canCloseTab: false), [.rename, .closeWorkspace], "a Mac from before terminal_close")
         XCTAssertEqual(
             WorkspaceMenuItem.items(canCloseTab: true), [.rename, .closeTab, .closeWorkspace],
             "any tab, agent or shell: it replaces Close Agent… here")
+        XCTAssertEqual(
+            WorkspaceMenuItem.items(canCloseTab: true, agentChip: .chat), [.rename, .viewAsTerminal, .closeTab, .closeWorkspace])
+        XCTAssertEqual(
+            WorkspaceMenuItem.items(canCloseTab: true, agentChip: .terminal), [.rename, .viewAsChat, .closeTab, .closeWorkspace])
         let titles = WorkspaceMenuItem.allCases.map(\.title)
         XCTAssertEqual(
             titles,
             [
-                String(localized: "workspace.menu.rename"), String(localized: "terminal.close.menu"),
+                String(localized: "workspace.menu.rename"), String(localized: "workspace.menu.viewAsTerminal"),
+                String(localized: "workspace.menu.viewAsChat"), String(localized: "terminal.close.menu"),
                 String(localized: "workspace.menu.close"),
             ])
-        XCTAssertEqual(Set(titles).count, 3)
+        XCTAssertEqual(Set(titles).count, 5)
         XCTAssertEqual(WorkspaceMenuItem.allCases.filter(\.isDestructive), [.closeTab, .closeWorkspace])
     }
 

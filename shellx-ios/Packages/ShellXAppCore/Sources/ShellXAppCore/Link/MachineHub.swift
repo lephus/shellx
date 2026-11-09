@@ -33,7 +33,7 @@ public final class MachineHub {
     @ObservationIgnored private let vault: AccountVault
     @ObservationIgnored private let relay: any RelayAccountCalling
     @ObservationIgnored private let connector: any MachineLinkConnecting
-    @ObservationIgnored private let latency: LatencyLog
+    @ObservationIgnored let latency: LatencyLog
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
     @ObservationIgnored private let onUnauthorized: @MainActor () async -> Void
@@ -49,6 +49,8 @@ public final class MachineHub {
         [UUID: AsyncStream<(machineID: String, sessions: [AgentSession])>.Continuation] = [:]
     @ObservationIgnored private var stateSubscribers:
         [UUID: AsyncStream<(machineID: String, state: MachineLinkState)>.Continuation] = [:]
+    /// The readers of `terminalEvents()`.
+    @ObservationIgnored var terminalSubscribers: [UUID: AsyncStream<TerminalHubEvent>.Continuation] = [:]
     @ObservationIgnored private var started = false
     @ObservationIgnored private var stopped = false
     /// The app is in the background (until `appDidBecomeActive()`).
@@ -282,9 +284,11 @@ public final class MachineHub {
         for continuation in chatSubscribers.values { continuation.finish() }
         for continuation in sessionSubscribers.values { continuation.finish() }
         for continuation in stateSubscribers.values { continuation.finish() }
+        for continuation in terminalSubscribers.values { continuation.finish() }
         chatSubscribers = [:]
         sessionSubscribers = [:]
         stateSubscribers = [:]
+        terminalSubscribers = [:]
         for model in machines { model.pendingActionable = false }
     }
 
@@ -655,6 +659,7 @@ public final class MachineHub {
             for (id, continuation) in stateSubscribers {
                 if case .terminated = continuation.yield((model.id, state)) { stateSubscribers[id] = nil }
             }
+            publishTerminal(.state(machineID: model.id, state))
         case let .pending(set, actionable):
             if actionable { rememberHandled(leaving: model.pending, for: set, of: model) }
             model.pending = set
@@ -674,6 +679,8 @@ public final class MachineHub {
         case let .chatReset(sessionId):
             resetCounts[SessionRef(machineID: model.id, sessionId: sessionId, agent: "", workspaceTitle: ""), default: 0] += 1
             publishChat(sessionId, of: model) { .reset($0) }
+        case let .terminal(push):
+            publishTerminal(.push(machineID: model.id, push))
         case .signedOut:
             Task { await self.reportUnauthorized() }
         }
@@ -752,6 +759,7 @@ public final class MachineHub {
     private func revoke(_ model: MachineModel) async {
         await disconnect(model)
         model.state = .revoked
+        publishTerminal(.state(machineID: model.id, .revoked))
         model.pending = PendingSet()
         model.pendingActionable = false
         model.sessions = SessionSet()
@@ -769,7 +777,10 @@ public final class MachineHub {
         suspended = true
         for model in machines where !model.state.isTerminal {
             model.pendingActionable = false
-            if model.state == .online { model.state = .reconnecting }
+            if model.state == .online {
+                model.state = .reconnecting
+                publishTerminal(.state(machineID: model.id, .reconnecting))
+            }
         }
         for reader in readers.values { reader.cancel() }
         readers = [:]
@@ -786,7 +797,7 @@ public final class MachineHub {
         }
     }
 
-    private func withLink<T: Sendable>(
+    func withLink<T: Sendable>(
         _ machineID: String, _ body: @Sendable (LinkClient) async throws -> T
     ) async throws -> T {
         guard let model = machines.first(where: { $0.id == machineID }) else { throw LinkCallError.unknownMachine }
@@ -803,7 +814,7 @@ public final class MachineHub {
     /// Runs one command that needs the Mac's `feature` on its live session, and says how it went. It is
     /// never sent twice: after a timeout or a lost link the Mac may or may not have acted (PROTOCOL.md
     /// section 7).
-    private func workspaceCommand(
+    func workspaceCommand(
         _ machineID: String, feature: String, _ body: @Sendable (LinkClient) async throws -> WorkspaceCommandResult
     ) async -> WorkspaceCommandResult {
         guard let model = machines.first(where: { $0.id == machineID }), model.state == .online else { return .offline }

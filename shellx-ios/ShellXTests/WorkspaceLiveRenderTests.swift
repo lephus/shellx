@@ -1,4 +1,5 @@
 import ShellXAppCore
+import ShellXAppTestSupport
 import ShellXLinkCore
 import SwiftUI
 import XCTest
@@ -45,5 +46,20 @@ final class WorkspaceLiveRenderTests: XCTestCase {
 
         XCTAssertEqual(images.count, 2)
         XCTAssertNotEqual(images.first?.pngData(), images.last?.pngData(), "light and dark renders should differ")
+    }
+
+    func testRendersATerminalFromTheHub() async throws {
+        let rig = try await WorkspaceRig.make(in: self)
+        await rig.mac.setTerminalFixtures(["t-zsh": DemoTerminalScreens.shell])
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-zsh", "the Mac's selection: a shell")
+
+        let live = NavigationStack { WorkspaceView(scope: rig.scope, ref: rig.model.ref, open: { _ in }) }
+        let images = try SnapshotWriter().write(live, name: "workspace-live-terminal", settle: 1.0)
+
+        XCTAssertEqual(images.count, 2)
+        let opened = await WorkspaceRig.eventually { await rig.mac.terminalViewOpens.first?.terminalId == "t-zsh" }
+        XCTAssertTrue(opened, "the page shown opened its terminal")
+        let cols = await rig.mac.terminalViewOpens.first?.cols ?? 0
+        XCTAssertGreaterThanOrEqual(cols, 20)
     }
 }

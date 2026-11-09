@@ -207,4 +207,94 @@ final class WorkspaceViewTests: XCTestCase {
         XCTAssertEqual(feedback, .alert(.offline))
         XCTAssertEqual(rig.screen.alerts, [.offline])
     }
+
+    // MARK: - Terminals
+
+    func testNewTerminalReachesTheMacAndItsChipShows() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+        XCTAssertTrue(rig.hub.supportsTerminalCreate(rig.model.ref.machineID))
+
+        rig.actions.createTerminal()
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .nothing)
+        let creates = await rig.mac.terminalCreates
+        XCTAssertEqual(creates, ["ws-shellx"])
+        let shown = await eventually { rig.model.selectedTerminalId?.hasPrefix("ws-shellx-new-") == true }
+        XCTAssertTrue(shown, "\(String(describing: rig.model.selectedTerminalId))")
+        XCTAssertTrue(rig.screen.alerts.isEmpty)
+    }
+
+    func testARefusedNewTerminalIsAnAlert() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+        await rig.mac.setNextTerminalCreateOutcome(.refused)
+
+        rig.actions.createTerminal()
+        let feedback = await rig.lastFeedback()
+
+        XCTAssertEqual(feedback, .alert(.refusedControl))
+        XCTAssertEqual(rig.screen.alerts, [.refusedControl])
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-zsh")
+    }
+
+    func testViewAsTerminalSwitchesTheAgentChipsPage() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+
+        rig.actions.select("t-claude")
+        XCTAssertNil(rig.model.terminalShown, "an agent chip shows its chat")
+        rig.actions.showAsTerminal("t-claude", true)
+        XCTAssertEqual(rig.model.terminalShown, "t-claude")
+        rig.actions.showAsTerminal("t-claude", false)
+        XCTAssertNil(rig.model.terminalShown)
+        XCTAssertTrue(rig.screen.tasks.isEmpty, "switching the page asks the Mac for nothing")
+    }
+
+    func testANewTerminalsAnswers() {
+        let m = "m1"
+        XCTAssertEqual(WorkspaceFeedback.of(.ok(workspaceId: nil), for: .createTerminal, machineID: m), .nothing)
+        XCTAssertEqual(WorkspaceFeedback.of(.ok(workspaceId: "ws"), for: .createTerminal, machineID: m), .nothing)
+        XCTAssertEqual(WorkspaceFeedback.of(.notFound, for: .createTerminal, machineID: m), .refresh)
+        XCTAssertEqual(WorkspaceFeedback.of(.refused, for: .createTerminal, machineID: m), .alert(.refusedControl))
+        XCTAssertEqual(WorkspaceFeedback.of(.failed, for: .createTerminal, machineID: m), .alert(.failed))
+        XCTAssertEqual(WorkspaceFeedback.of(.offline, for: .createTerminal, machineID: m), .alert(.offline))
+        XCTAssertEqual(WorkspaceFeedback.of(.unknown, for: .createTerminal, machineID: m), .alert(.unknown))
+    }
+
+    /// ＋ again while a new terminal is on its way does nothing, and a chip the user picks before the Mac answers stays
+    /// shown when the new tab arrives (final review, app M6).
+    func testAPickWhileANewTerminalIsOnItsWayWins() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+
+        rig.actions.createTerminal()
+        rig.actions.createTerminal()
+        rig.actions.select("t-claude")
+        for task in rig.screen.tasks { _ = await task.value }
+
+        let creates = await rig.mac.terminalCreates
+        XCTAssertEqual(creates, ["ws-shellx"], "one create while one is on its way")
+        let listed = await eventually { rig.model.panes.contains { $0.id.hasPrefix("ws-shellx-new-") } }
+        XCTAssertTrue(listed)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-claude", "the user's pick wins over the new tab")
+    }
+
+    /// ＋ is dimmed from the tap until the Mac answers (final review, app M6).
+    func testPlusIsDimmedWhileANewTerminalIsOnItsWay() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+
+        rig.actions.createTerminal()
+        XCTAssertTrue(rig.model.creatingTerminal)
+        _ = await rig.lastFeedback()
+
+        XCTAssertFalse(rig.model.creatingTerminal)
+        rig.actions.createTerminal()
+        _ = await rig.lastFeedback()
+        let creates = await rig.mac.terminalCreates
+        XCTAssertEqual(creates, ["ws-shellx", "ws-shellx"], "once answered, ＋ works again")
+    }
 }

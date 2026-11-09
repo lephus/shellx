@@ -1,5 +1,6 @@
 import Foundation
 import ShellXLinkCore
+import ShellXLinkSession
 
 /// What a `MachineConnection` reports, in order.
 public enum MachineEvent: Sendable {
@@ -17,6 +18,8 @@ public enum MachineEvent: Sendable {
     case chat(sessionId: String, entries: [ChatEntry])
     /// The session's transcript was replaced (`chat.reset`), in order with its `chat` events.
     case chatReset(sessionId: String)
+    /// A terminal push of the live session (`LinkClient.terminalPushes`), in order with the other events.
+    case terminal(TerminalViewPush)
     /// The relay refused the account token. The connection has stopped; the owner signs the user out.
     case signedOut
 }

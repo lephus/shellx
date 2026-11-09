@@ -50,6 +50,10 @@ public final class WorkspaceScreenModel {
     /// The workspace left the Mac's list (`.dismissed`) after its last tabs were closed from this iPhone
     /// (`closesHere(_:)`): the screen leaves without saying the workspace was closed on the Mac.
     public private(set) var lastTabClosedHere = false
+    /// The agent chips the user switched to their terminal ("View as Terminal"), until the screen closes.
+    public private(set) var shownAsTerminal: Set<String> = []
+    /// ＋ was tapped and the Mac has not answered yet: ＋ is dimmed meanwhile (`startCreatingTerminal()`).
+    public private(set) var creatingTerminal = false
 
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
@@ -69,6 +73,10 @@ public final class WorkspaceScreenModel {
     /// The terminal ids, in chip order, the workspace had when it last had any: a Mac may list the workspace
     /// with no tab for a moment before it goes.
     @ObservationIgnored private var lastTerminalIds: [String] = []
+    /// The terminal the Mac made for this screen (＋, `expect(_:)`), shown as soon as the Mac's list has it.
+    @ObservationIgnored private var expected: String?
+    /// The user picked a chip while ＋ was on its way: the new tab is not shown when it arrives.
+    @ObservationIgnored private var pickedWhileCreating = false
 
     /// `sleep` waits out `patience`; tests pass one they release by hand.
     public init(
@@ -165,6 +173,58 @@ public final class WorkspaceScreenModel {
         else { return }
         selectedTerminalId = terminalId
         settled = true
+        expected = nil
+        if creatingTerminal { pickedWhileCreating = true }
+    }
+
+    /// The user tapped or typed into the terminal of the chip shown: it is chosen for good, like a pick, so an agent
+    /// that starts waiting for an answer no longer moves the screen away from a command being typed (an agent's chat
+    /// has the same protection while it is shown).
+    public func settle() {
+        settled = true
+    }
+
+    /// Switches the agent chip `terminalId` to its terminal (true) or back to its chat; an id the workspace does
+    /// not have is ignored.
+    public func showAsTerminal(_ terminalId: String, _ on: Bool) {
+        if on {
+            guard workspace?.terminals.contains(where: { $0.terminalId == terminalId }) == true else { return }
+            shownAsTerminal.insert(terminalId)
+        } else {
+            shownAsTerminal.remove(terminalId)
+        }
+    }
+
+    /// The terminal the page shown is: the chip shown when it is a shell, or an agent chip shown as its terminal
+    /// (`showAsTerminal(_:_:)`); nil while the chip shown is an agent's chat, or there is none.
+    /// `WorkspaceView` gives it to `TerminalViewModel.show(_:)`.
+    public var terminalShown: String? {
+        guard let selectedTerminalId else { return nil }
+        let isAgent = panes.first { $0.id == selectedTerminalId }?.isAgent ?? false
+        return !isAgent || shownAsTerminal.contains(selectedTerminalId) ? selectedTerminalId : nil
+    }
+
+    /// The user tapped ＋: true when the create may go out, false while an earlier one is still on its way.
+    public func startCreatingTerminal() -> Bool {
+        guard !creatingTerminal else { return false }
+        creatingTerminal = true
+        pickedWhileCreating = false
+        return true
+    }
+
+    /// The Mac answered ＋: the tab it made (`terminalId`, on success) is expected (`expect(_:)`) unless the user
+    /// picked a chip while the answer was on its way.
+    public func finishCreatingTerminal(_ terminalId: String?) {
+        creatingTerminal = false
+        guard let terminalId, !pickedWhileCreating else { return }
+        expect(terminalId)
+    }
+
+    /// The Mac made `terminalId` for this screen (＋): it is shown as soon as the Mac's list has it (at once when
+    /// it does). The user picking a chip first drops it.
+    public func expect(_ terminalId: String) {
+        expected = terminalId
+        reconcile()
     }
 
     /// The user closed the tab `terminalId` from this iPhone, and the close is on its way to the Mac: when the
@@ -241,6 +301,12 @@ public final class WorkspaceScreenModel {
         if kept != workspace { kept = workspace }
         if phase != .showing { phase = .showing }
         let ids = WorkspacePane.ordered(workspace.terminals).map(\.terminalId)
+        if let expected, ids.contains(expected) {
+            // The terminal ＋ made is listed: it shows, chosen for good.
+            self.expected = nil
+            if selectedTerminalId != expected { selectedTerminalId = expected }
+            settled = true
+        }
         if let selected = selectedTerminalId, !ids.contains(selected) {
             selectedTerminalId = Self.successor(of: selected, before: knownTerminalIds, now: ids)
             settled = true
