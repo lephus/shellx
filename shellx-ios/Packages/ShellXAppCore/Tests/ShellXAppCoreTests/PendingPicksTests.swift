@@ -13,6 +13,7 @@ final class PendingPicksTests: XCTestCase {
     }
 
     /// A read the test ends by hand; it ignores cancellation, like a coordinated file read that hangs.
+    @MainActor
     private final class Gate {
         private var continuation: CheckedContinuation<Void, Never>?
         private(set) var entered = false
