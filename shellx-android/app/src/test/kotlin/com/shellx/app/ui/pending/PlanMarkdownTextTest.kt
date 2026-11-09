@@ -13,6 +13,7 @@ import com.shellx.app.ui.pending.PlanMarkdownText.Block.Numbered
 import com.shellx.app.ui.pending.PlanMarkdownText.Block.Paragraph
 import com.shellx.app.ui.pending.PlanMarkdownText.Block.Rule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -67,5 +68,7 @@ class PlanMarkdownTextTest {
         val link = s.getLinkAnnotations(0, s.length).single()
         assertEquals("https://shellx.pro/docs", (link.item as LinkAnnotation.Url).url)
         assertEquals("the docs", s.text.substring(link.start, link.end))
+        // Compose's own handler opens any scheme and lets most failures through (review A I-2): never left to it.
+        assertNotNull((link.item as LinkAnnotation.Url).linkInteractionListener)
     }
 }
