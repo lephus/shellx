@@ -220,7 +220,6 @@
     <string name="update_later">Later</string>
     <string name="update_now">Update</string>
     <string name="update_title">Version %1$s is available</string>
-    <string name="voice_denied">ShellX needs microphone and speech recognition access to hear you.</string>
     <string name="voice_keyboard">Type instead</string>
     <string name="voice_language_english">English</string>
     <string name="voice_language_vietnamese">Vietnamese</string>

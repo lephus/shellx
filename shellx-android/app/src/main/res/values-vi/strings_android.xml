@@ -20,5 +20,6 @@
     <string name="signin_error_reauth_required">Hãy đăng nhập bằng tài khoản Google mà tài khoản ShellX này dùng, rồi thử lại.</string>
     <string name="signin_subtitle">Dùng tài khoản Google bạn dùng với ShellX trên Mac.</string>
     <string name="update_message">Cập nhật ShellX trên Google Play để có các bản sửa lỗi và tính năng mới nhất.</string>
+    <string name="voice_denied">ShellX cần quyền micro để nghe bạn.</string>
     <string name="voice_mic_hint">Giữ để nói, thả ra là xong. Với TalkBack, chạm hai lần để bắt đầu, chạm hai lần nữa là xong.</string>
 </resources>
