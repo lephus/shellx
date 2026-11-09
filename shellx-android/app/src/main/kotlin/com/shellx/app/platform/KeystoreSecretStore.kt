@@ -68,7 +68,8 @@ class AndroidKeystoreKey(private val alias: String = ALIAS) : SecretKeyProvider 
  * - **Unclear** (Unavailable, the file stays, until [LOST_AFTER_STARTS] app starts in a row saw the item fail so; then
  *   lost): `UnrecoverableKeyException` and `InvalidKeyException` that carry no deciding `android.security.KeyStoreException`
  *   (always before API 33), and on API 33+ a Keystore system or authentication error. A broken key cannot hold the
- *   launch screen forever. The count lives in `<item.account>.failures` next to the item; a successful read resets it.
+ *   launch screen forever. The count lives in `<item.account>.failures` next to the item; a successful read or write
+ *   resets it.
  * - Anything else is [SecretStoreException.Failed], and the file stays.
  *
  * One store per process: it counts at most one unclear failure per item per app start.
@@ -193,6 +194,8 @@ class KeystoreSecretStore(
             temporary.delete()
             throw SecretStoreException.Failed(e)
         }
+        // A fresh, healthy item: unclear failures of the old one never count against it (re-review A).
+        resetCount(item)
     }
 
     @Synchronized
