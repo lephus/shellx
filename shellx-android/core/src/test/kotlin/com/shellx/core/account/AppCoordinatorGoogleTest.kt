@@ -238,6 +238,30 @@ class AppCoordinatorGoogleTest {
         assertEquals(0, rig.wiper.wipes)
     } }
 
+    /** The relay's nonces are single-use, so every attempt asks for its own, a failed one included (review 3a m-3). */
+    @Test fun everyAttemptUsesAFreshNonce() { runTest {
+        val rig = rig()
+        rig.coordinator.launch()
+        rig.identity.googleResult = Result.failure(IdentityProviderException.Cancelled())
+        assertFails { rig.coordinator.signInWithGoogle() }
+        rig.identity.googleResult = Result.success("google-id-token")
+        rig.coordinator.signInWithGoogle()
+        val phoneKey = rig.vault.phoneKey().publicKey.hex()
+        rig.identity.googleResult = Result.failure(IdentityProviderException.Cancelled())
+        assertFails { rig.coordinator.deleteAccount() }
+        rig.identity.googleResult = Result.success("google-fresh")
+        rig.coordinator.deleteAccount()
+
+        assertEquals(listOf("nonce-1", "nonce-2", "nonce-3", "nonce-4"), rig.identity.googleNonces)
+        assertEquals(
+            listOf(
+                Call.SignInWithGoogle("google-id-token", "nonce-2", "Phu's Pixel", phoneKey),
+                Call.DeleteAccount("google-fresh", "nonce-4", "tok-g"),
+            ),
+            rig.relay.calls.filter { it is Call.SignInWithGoogle || it is Call.DeleteAccount },
+        )
+    } }
+
     @Test fun deleteWithoutASessionIsSignedOut() { runTest {
         val rig = rig()
         rig.coordinator.launch()

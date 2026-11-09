@@ -37,7 +37,9 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
 
     private val lock = Any()
     private val recorded = ArrayList<Call>()
-    private var nonceValue = "nonce-1"
+    /** The next nonce, when [setNonce] chose it. */
+    private var presetNonce: String? = null
+    private var noncesAnswered = 0
     private var googleSignIn: Result<AccountSignIn> =
         Result.success(AccountSignIn(AccountSession("user", "device", "token"), "user@example.com"))
     private val hooks = HashMap<Function, suspend () -> Unit>()
@@ -50,8 +52,12 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
 
     val calls: List<Call> get() = synchronized(lock) { recorded.toList() }
 
+    /**
+     * The next [nonce] call answers [nonce]. Otherwise every call answers a new one, "nonce-1", "nonce-2", …, as the
+     * relay's nonces are single-use (review 3a m-3).
+     */
     fun setNonce(nonce: String) {
-        synchronized(lock) { nonceValue = nonce }
+        synchronized(lock) { presetNonce = nonce }
     }
 
     fun setGoogleSignIn(result: Result<AccountSignIn>) {
@@ -113,7 +119,10 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
 
     override suspend fun nonce(): String {
         enter(Call.Nonce, Function.NONCE)
-        return synchronized(lock) { nonceValue }
+        return synchronized(lock) {
+            noncesAnswered += 1
+            presetNonce?.also { presetNonce = null } ?: "nonce-$noncesAnswered"
+        }
     }
 
     override suspend fun signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: ByteArray): AccountSignIn {
