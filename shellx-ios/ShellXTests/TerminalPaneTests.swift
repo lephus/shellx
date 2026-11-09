@@ -91,4 +91,32 @@ final class TerminalPaneTests: XCTestCase {
         XCTAssertTrue(field.isFirstResponder, "the field keeps the keyboard")
         XCTAssertFalse(surface.isFirstResponder)
     }
+
+    /// What the panes said to VoiceOver.
+    private final class Lines {
+        var items: [String] = []
+    }
+
+    /// Only the page shown says a paste is too large: a neighbour the pager keeps alive says nothing (final review,
+    /// app M1).
+    func testOnlyThePageShownSaysAPasteIsTooLarge() async throws {
+        var screen = TerminalScreen()
+        screen.apply(DemoTerminalScreens.shell.snapshot)
+        let model = TerminalViewModel.fixed(terminalId: "t-zsh", screen: screen)
+        let lines = Lines()
+        _ = WindowHost(
+            VStack(spacing: 0) {
+                TerminalPane(model: model, terminalId: "t-zsh", title: "zsh", announce: { lines.items.append("t-zsh: \($0)") })
+                TerminalPane(model: model, terminalId: "t-web", title: "zsh", announce: { lines.items.append("t-web: \($0)") })
+            },
+            in: self)
+        try await Task.sleep(for: .milliseconds(200))
+
+        model.paste(String(repeating: "x", count: TerminalInputBatcher.maxPasteBytes + 1))
+
+        let said = await eventually { !lines.items.isEmpty }
+        XCTAssertTrue(said)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(lines.items, ["t-zsh: \(String(localized: "terminal.paste.tooLarge"))"])
+    }
 }
