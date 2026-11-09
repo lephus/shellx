@@ -1,5 +1,6 @@
 package com.shellx.core.testing
 
+import com.shellx.core.link.MachineSession
 import com.shellx.link.core.AgentSession
 import com.shellx.link.core.AgentState
 import com.shellx.link.core.ChatEntry
@@ -74,4 +75,17 @@ fun planItem(id: String): PendingItem = PendingItem(
     requestId = id, kind = PendingKind.EXIT_PLAN, agent = "claude", workspaceId = "ws-shellx",
     workspaceTitle = "shellx", createdAtMs = 1_700_000_000_002, modes = listOf("auto_accept", "manual", "deny"),
     planPreview = "1. Add tests.\n2. Ship.",
+)
+
+/** A session on Mac [mac] ("Mac <mac>"), with the values of HubRig.swift. */
+fun liveSession(
+    id: String,
+    mac: String = "m1",
+    online: Boolean = true,
+    state: AgentState = AgentState.WORKING,
+    activity: Long?,
+    since: Long? = 1_700_000_000_000,
+): MachineSession = MachineSession(
+    machineId = mac, machineName = "Mac $mac", online = online,
+    session = agentSession(id, state = state, lastActivityMs = activity, stateSinceMs = since),
 )
