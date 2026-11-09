@@ -25,9 +25,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 /** Google sign-in, sign-out's push call and account deletion (1C Tasks 6 and 7, S1 §6.3 and §6.8). */
@@ -211,8 +211,14 @@ class AppCoordinatorGoogleTest {
 
         val caller = launch { rig.coordinator.signOut() }
         assertTrue(eventually { gate.waiting == 1 })
-        caller.cancelAndJoin()
+        // The gate holds the logout whatever happens, so a caller stuck behind it would hang a cancelAndJoin: look
+        // whether the wait ended, then open the gate.
+        caller.cancel()
+        runCurrent()
+        val released = caller.isCompleted
         gate.open()
+        caller.join()
+        assertTrue(released, "the caller's wait ends at once")
 
         assertTrue(eventually { rig.coordinator.phase.value == AppPhase.SignedOut(false) })
         assertNothingStored(rig)
