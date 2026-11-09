@@ -79,8 +79,9 @@ Every `test` command first runs the licence check, `import-strings.py --check` a
 
 - **JDK and SDK.** Gradle runs on JDK 17: `JAVA_HOME` defaults to Android Studio's JDK, and any JDK 17 works
   (`export JAVA_HOME=…`). `ANDROID_HOME` defaults to `~/Library/Android/sdk`. The SDK packages (platform,
-  build tools, emulator, system images) are installed by the user with `sdkmanager`; neither `dev.sh` nor
-  Gradle downloads them. Robolectric runs the JVM tests on Android SDK 35
+  build tools, emulator, system images) are installed by the user with `sdkmanager`. `dev.sh` never downloads
+  them, and `gradle.properties` sets `android.builder.sdkDownload=false`, so AGP fails on a missing package
+  instead of installing it (the licence check refuses the file without that line). Robolectric runs the JVM tests on Android SDK 35
   (`app/src/test/resources/robolectric.properties`), because its SDK 36 runtime needs Java 21.
 - **Emulators.** `dev.sh emulator --api <26|36>` uses its own emulators, `ShellX_Dev_API_26` (port 5580,
   serial `emulator-5580`) and `ShellX_Dev_API_36` (port 5582, `emulator-5582`), created on first use from the

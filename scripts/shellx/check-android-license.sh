@@ -14,6 +14,8 @@
 #   7. a .jar, .aar or .so file is vendored (gradle-wrapper.jar excepted)
 #   8. a text file names the upstream company
 #   9. a symlink exists in either tree
+#  10. shellx-android/gradle.properties does not set android.builder.sdkDownload=false (AGP would download
+#      missing SDK packages; the user installs them with sdkmanager)
 # It also runs scripts/shellx/check-link-license.sh. Exit 2 on a usage error.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,7 +29,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     -h|--help)
-      sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)

@@ -22,6 +22,8 @@ GOOGLE_GROUPS = {"com.google.android.gms", "com.google.firebase", "com.google.an
 PATH_CALLS = re.compile(r"\b(includeBuild|file|files|fileTree|File|srcDir|srcDirs|dir)\s*\(")
 REPO_CALL = re.compile(r"\b(maven|mavenLocal|jcenter|ivy|flatDir)\s*[({]")
 COMPANY = re.compile(r"(?<![A-Za-z0-9_])manaflow(?![A-Za-z0-9_])", re.IGNORECASE)
+GRADLE_PROPERTIES = "shellx-android/gradle.properties"
+SDK_DOWNLOAD = re.compile(r"^[ \t]*android\.builder\.sdkDownload[ \t]*[=:][ \t]*(\S*)[ \t]*$", re.MULTILINE)
 
 
 class Report:
@@ -287,9 +289,22 @@ def check_kts(rel: str, text: str, report: Report) -> None:
                                     "shellx-link/vectors/ and shellx-link/spec/" % (call, literal), line)
 
 
+def check_sdk_download(root: Path, report: Report) -> None:
+    """AGP downloads missing SDK packages unless android.builder.sdkDownload is false (the last value wins)."""
+    if not (root / "shellx-android").is_dir():
+        return
+    props = root / GRADLE_PROPERTIES
+    text = props.read_text(encoding="utf-8", errors="replace") if props.is_file() else ""
+    values = SDK_DOWNLOAD.findall(text)
+    if not values or values[-1] != "false":
+        report.add(GRADLE_PROPERTIES, "must set android.builder.sdkDownload=false, so AGP never downloads SDK "
+                                      "packages (the user installs them with sdkmanager)")
+
+
 def run(root: Path) -> int:
     report = Report()
     entries = load_allowlist(root, report)
+    check_sdk_download(root, report)
     files = list(walk(root))
     for rel, full in files:
         if full.is_symlink():
