@@ -144,7 +144,7 @@ class SettingsScreenTest {
         var voice by mutableStateOf<VoiceService?>(settingsVoiceService(voiceScope))
         rule.setContent { Screen(voice = voice) }
 
-        assertEquals(listOf("Account", "Appearance", "Voice", "About"), headings())
+        assertEquals(listOf("Account", "Appearance", "Voice", "Notifications", "About"), headings())
         val machines = rule.onNodeWithTag("settings.machines").fetchSemanticsNode().boundsInRoot.top
         val accountHeading = rule.onNode(hasText("Account") and hasAnyAncestor(hasTestTag("settings.list")), useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot.top
@@ -153,7 +153,7 @@ class SettingsScreenTest {
 
         voice = null
         rule.waitForIdle()
-        assertEquals(listOf("Account", "Appearance", "About"), headings())
+        assertEquals(listOf("Account", "Appearance", "Notifications", "About"), headings())
     }
 
     @Test
