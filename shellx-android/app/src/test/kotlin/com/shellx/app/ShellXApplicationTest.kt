@@ -1,13 +1,16 @@
 package com.shellx.app
 
+import android.app.NotificationManager
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.platform.DataStoreKeyValueStore
+import com.shellx.app.platform.PushNotifier
 import com.shellx.core.platform.CoreLog
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,5 +45,25 @@ class ShellXApplicationTest {
         CoreLog.log("probe_line")
 
         assertTrue(ShadowLog.getLogsForTag("ShellX").any { it.msg == "probe_line" })
+    }
+
+    /** Plan 3E's pieces reach the composition by type, and the "Needs you" channel exists from the start. */
+    @Test
+    fun theCompositionGetsThePlatformsPieces() {
+        val deadline = System.nanoTime() + 10_000_000_000
+        while (app.composition.value == null && System.nanoTime() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        val composition = app.composition.value
+        assertNotNull(composition)
+        val platform = app.platform
+        assertSame(platform.speechEngine, composition!!.speechEngine)
+        assertSame(platform.voicePermissions, composition.voicePermissions)
+        assertSame(platform.pushRegistrar, composition.pushRegistrar)
+        assertSame(platform.updateChecker, composition.updateChecker)
+        assertSame(platform.attachmentReader, composition.attachmentReader)
+        assertEquals(BuildConfig.DEBUG, composition.updatePrompt == null)
+        assertNotNull(app.getSystemService(NotificationManager::class.java).getNotificationChannel(PushNotifier.CHANNEL_ID))
     }
 }

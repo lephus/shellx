@@ -159,6 +159,24 @@ class AppLifecycleTest {
         }
     }
 
+    /** 3D note 8: FCM may start the process in the background; its launch counts from the first start in front. */
+    @Test
+    fun aProcessAPushStartedMeasuresItsLaunchFromTheFirstStart() {
+        runTest {
+            val mac = FakeMac("MacBook Pro", backgroundScope)
+            val t = testComposition(folder.root, macs = listOf(mac))
+            val c = t.composition
+            t.clock.advance(30.seconds)
+
+            c.lifecycle.onStart()
+            assertTrue(waitFor { c.root.value == Routes.HOME })
+            t.clock.advance(400.milliseconds)
+            c.real.launch.homeShown()
+
+            assertEquals(400.milliseconds, c.latency.summary(LatencyMetric.LAUNCH_TO_HOME)?.p50)
+        }
+    }
+
     @Test
     fun aHubMadeAfterTheAppStoppedClosesItsLinksAfterTheGrace() {
         runTest {
