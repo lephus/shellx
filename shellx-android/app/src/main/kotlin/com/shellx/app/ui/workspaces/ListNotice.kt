@@ -1,5 +1,17 @@
 package com.shellx.app.ui.workspaces
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -34,4 +46,20 @@ class ListNotice {
         /** How long a notice shows (the iPhone's `AgentView.noticeDuration`). */
         val DURATION: Duration = 4.seconds
     }
+}
+
+/** The notice as the list (and plan 3E's agent screen) shows it: a capsule over the bottom edge, read out politely. */
+@Composable
+fun NoticeCapsule(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier
+            .padding(vertical = 6.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag("workspaces.notice"),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
 }
