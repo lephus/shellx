@@ -6,8 +6,11 @@ import com.shellx.link.core.TerminalViewPush.Opened
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /** Plan 3G Task 4b: the client's terminal pushes are bounded, and frames it drops become one resync. */
@@ -107,6 +110,23 @@ class TerminalPushQueueTest {
                 queue.close()
                 queue.offer(Opened("t-2"))
                 assertEquals(listOf<TerminalViewPush>(Opened("t-1")), queue.pushes.toList())
+            }
+        }
+    }
+
+    /** Review A, I-2: the next collector gets the frame, and its weight is never lost (Task 6 cancels at every STOP). */
+    @Test
+    fun aCancelledCollectorGivesItsFrameBack() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                val waiting = launch(start = CoroutineStart.UNDISPATCHED) { queue.pushes.first() }
+                queue.offer(Frame("t-1", snapshot(1, "$")))
+                waiting.cancel()
+                waiting.join()
+                assertEquals(Frame("t-1", snapshot(1, "$")), queue.pushes.first())
+                assertEquals(0, queue.queuedWeight)
+                assertEquals(0, queue.queuedPushes)
             }
         }
     }
