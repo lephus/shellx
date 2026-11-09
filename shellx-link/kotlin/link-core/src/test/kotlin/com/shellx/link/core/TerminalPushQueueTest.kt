@@ -185,6 +185,27 @@ class TerminalPushQueueTest {
         }
     }
 
+    /** The weight [TerminalPushQueue] gives [part], read off an empty queue. */
+    private fun weightOf(part: TerminalFramePart) = TerminalPushQueue().apply { offer(Frame("t-9", part)) }.queuedWeight
+
+    /**
+     * Re-review A, I-1: only the parts a snapshot still lacks, in order, skip the bound. A part sent again, out of
+     * order or after the snapshot is complete follows the bound like a delta, so the bound holds whatever the host
+     * sends.
+     */
+    @Test
+    fun aSnapshotPartRepeatedPastItsCountStaysBounded() {
+        val queue = TerminalPushQueue()
+        queue.offer(Opened("t-1"))
+        val head = TerminalFrameHead(TerminalFrameKind.SNAPSHOT, 80, 1, cursor = TerminalCursor(0, 0), palette = palette)
+        val part0 = TerminalFramePart(2, part = 0, parts = 2, head = head)
+        val part1 = TerminalFramePart(2, part = 1, parts = 2, lines = listOf(TerminalLine(0, listOf(TerminalRun(text = "x".repeat(60_000))))))
+        queue.offer(Frame("t-1", part0))
+        repeat(100) { queue.offer(Frame("t-1", part1)) }
+        val bound = TerminalPushQueue.MAX_QUEUED_WEIGHT + weightOf(part0) + weightOf(part1)
+        assertTrue(queue.queuedWeight <= bound, "${queue.queuedWeight} > $bound")
+    }
+
     /** Review A, m5: no frame from the wire can equal LOST, because the codec refuses its fields both ways. */
     @Test
     fun lostIsNoFrameTheCodecTakes() {
