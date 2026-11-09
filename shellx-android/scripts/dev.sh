@@ -17,7 +17,8 @@
 #       ~/.config/shellx/android-serial, then the only phone `adb devices` lists.
 #   dev.sh build-release
 #       Unsigned release build (R8 on), then checks app id com.shellx.prod, label "ShellX", the version in
-#       version.properties, the min and target SDK, the locale config, and that it is not debuggable.
+#       version.properties, the min and target SDK, the locale config, the permissions (check-release-permissions),
+#       no cleartext, and that it is not debuggable.
 #   dev.sh lock
 #       Rewrites every gradle.lockfile after a dependency change. Then update
 #       scripts/shellx/android-license-allowlist.txt until check-android-license.sh passes.
@@ -131,6 +132,29 @@ aapt2_path() {
   printf '%s\n' "$ANDROID_HOME/build-tools/$tools/aapt2"
 }
 
+# The release APK's permissions (3D): network, network state and the camera for the pairing QR code, the camera
+# optional, and no storage, media, biometric or fingerprint access. androidx.credentials pulls androidx.biometric,
+# whose manifest asks for USE_BIOMETRIC and USE_FINGERPRINT; app/src/main/AndroidManifest.xml removes them (review A I-3).
+check_release_permissions() {
+  local apk="$1" aapt2 badging want
+  aapt2="$(aapt2_path)" || exit 1
+  badging="$("$aapt2" dump badging "$apk")" || die "aapt2 dump badging failed on $apk"
+  for want in INTERNET ACCESS_NETWORK_STATE CAMERA; do
+    contains "$badging" "uses-permission: name='android.permission.$want'" \
+      || die "release APK: expected uses-permission: name='android.permission.$want'"
+  done
+  if grep -qE "uses-permission: name='android\.permission\.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_[A-Z_]*)'" <<<"$badging"; then
+    die "release APK: expected no storage or media permission (READ_/WRITE_/MANAGE_EXTERNAL_STORAGE, READ_MEDIA_*)"
+  fi
+  for want in USE_BIOMETRIC USE_FINGERPRINT; do
+    if contains "$badging" "uses-permission: name='android.permission.$want'"; then
+      die "release APK: expected no android.permission.$want (the app has no biometric sign-in)"
+    fi
+  done
+  contains "$badging" "uses-feature-not-required: name='android.hardware.camera'" \
+    || die "release APK: expected uses-feature-not-required: name='android.hardware.camera' (the camera is optional)"
+}
+
 # Each step checks its own status: cmd_test runs this in a subshell after `||`, where set -e does not apply.
 cmd_build_release() {
   check_java
@@ -150,16 +174,7 @@ cmd_build_release() {
     contains "$badging" "$want" || die "release APK: expected $want"
   done
   if contains "$badging" "application-debuggable"; then die "release APK is debuggable"; fi
-  # The shell's permissions (3D): network, network state and the camera for the pairing QR code, no storage access.
-  for want in INTERNET ACCESS_NETWORK_STATE CAMERA; do
-    contains "$badging" "uses-permission: name='android.permission.$want'" \
-      || die "release APK: expected uses-permission: name='android.permission.$want'"
-  done
-  if grep -qE "uses-permission: name='android\.permission\.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_[A-Z_]*)'" <<<"$badging"; then
-    die "release APK: expected no storage or media permission (READ_/WRITE_/MANAGE_EXTERNAL_STORAGE, READ_MEDIA_*)"
-  fi
-  contains "$badging" "uses-feature-not-required: name='android.hardware.camera'" \
-    || die "release APK: expected uses-feature-not-required: name='android.hardware.camera' (the camera is optional)"
+  check_release_permissions "$apk"
   manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk")" || die "aapt2 dump xmltree failed on $apk"
   contains "$manifest" "localeConfig" || die "release APK: the manifest has no localeConfig"
   if contains "$manifest" "networkSecurityConfig" || contains "$manifest" "usesCleartextTraffic"; then
@@ -391,5 +406,6 @@ case "$command" in
   device) cmd_device "$@" ;;
   clean) cmd_clean ;;
   check-apk) [ $# -eq 2 ] || usage 2; check_apk "$@" ;;
+  check-release-permissions) [ $# -eq 1 ] || usage 2; check_release_permissions "$1" ;;
   *) echo "dev.sh: unknown command: $command" >&2; usage 2 ;;
 esac

@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Scanning a Mac's pairing QR code. Phones without a camera can still paste the code or open its link. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- androidx.credentials pulls androidx.biometric, whose manifest asks for these. Google's sign-in sheet needs
+         neither, and the app has no biometric prompt (review A I-3; dev.sh build-release refuses them). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
