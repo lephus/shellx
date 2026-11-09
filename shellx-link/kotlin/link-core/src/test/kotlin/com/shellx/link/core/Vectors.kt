@@ -12,6 +12,7 @@ object Vectors {
     fun json(relative: String): JsonObject = Json.parseToJsonElement(file(relative).readText()).jsonObject
 
     val messages: JsonObject get() = json("../../spec/vectors/messages.json")
+    val noise: JsonObject get() = json("../../vectors/noise_xx.json")
 
     fun hex(text: String): ByteArray = hexToBytesOrNull(text) ?: error("bad hex")
 
