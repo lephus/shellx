@@ -25,7 +25,7 @@ class SystemVoicePermissionsTest {
     private fun permissions(): SystemVoicePermissions {
         val requester = PermissionRequester(app)
         requester.attach(registry, owner)
-        owner.start()
+        owner.resume()
         return SystemVoicePermissions(requester)
     }
 
