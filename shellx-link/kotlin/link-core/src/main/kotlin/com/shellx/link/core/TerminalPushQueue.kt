@@ -2,6 +2,8 @@ package com.shellx.link.core
 
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 
@@ -28,11 +30,13 @@ import kotlinx.coroutines.flow.FlowCollector
  * A frame's weight is about the size of its JSON: the UTF-8 bytes of its texts, counted exactly, and a fixed estimate
  * for the rest. So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of each view opened while the
  * consumer lagged (the phone opens views, one at a time). PROTOCOL.md 11.4 caps a snapshot at 256 parts of one frame
- * each; a snapshot of the largest grid a phone asks for, 300 × 120 with 240 history rows, is far smaller. Decoded, a frame takes about 1 to 3 times its weight in memory (the most for many
- * one-cell runs: an object and a string per run), so the bound holds a session's queued terminal output to about 2 to
- * 6 MiB, plus that one snapshot.
+ * each; a snapshot of the largest grid a phone asks for, 300 × 120 with 240 history rows, is far smaller. Decoded, a
+ * frame takes about 1 to 3 times its weight in memory (the most for many one-cell runs: an object and a string per
+ * run), so the bound holds a session's queued terminal output to about 2 to 6 MiB, plus one snapshot of each view
+ * opened while the consumer lags.
  *
- * A collector cancelled while it waits takes nothing: what was queued stays for the next one.
+ * A collector cancelled while it waits, or while it handles a push, takes nothing more: what was queued stays for the
+ * next one.
  */
 class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     companion object {
@@ -71,8 +75,10 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
      * goes on where the one before stopped. Completes after [close], once the queued pushes are taken.
      *
      * A push taken for a collector is handed straight to its code, with no cancellation check in between (a `flow {}`
-     * builder would check), so a collector cancelled from another thread loses no push, a LOST part included. Collect
-     * it directly: a `buffer`, `flowOn` or `shareIn` between this and the assembler can lose what it holds at a cancel.
+     * builder would check), so a collector cancelled from another thread loses no push, a LOST part included. A
+     * cancelled collector takes no further push: the check comes before each take. Collect it directly: nothing built
+     * on `flow {}` or on a channel (`transform`, `buffer`, `flowOn`, `shareIn`, `produceIn`) between this and the
+     * assembler, which can lose what it holds at a cancel.
      */
     val pushes: Flow<TerminalViewPush> = object : Flow<TerminalViewPush> {
         override suspend fun collect(collector: FlowCollector<TerminalViewPush>) = deliver(collector)
@@ -80,6 +86,8 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
 
     private suspend fun deliver(collector: FlowCollector<TerminalViewPush>) {
         while (true) {
+            // Before the take, never between the take and the emit: a cancelled collector leaves the rest queued.
+            currentCoroutineContext().ensureActive()
             val entry = synchronized(lock) {
                 entries.removeFirstOrNull()?.also { weight -= it.weight } ?: if (closed) return else null
             }
