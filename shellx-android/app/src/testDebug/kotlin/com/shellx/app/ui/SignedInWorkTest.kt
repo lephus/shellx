@@ -54,6 +54,7 @@ import com.shellx.link.core.LinkWorkspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.junit.After
@@ -173,6 +174,21 @@ class SignedInWorkTest {
 
         tick++
         waitUntil { shown("tick 1") }
+        assertEquals(listOf("signedIn", "askPermission"), calls)
+    }
+
+    /** Final review m-4: the permission ask never waits behind the token fetch and the relay call (a slow or captive
+     *  network); on the iPhone the token only comes after the permission. */
+    @Test
+    fun theAskDoesNotWaitForTheRegistration() {
+        val calls = mutableListOf<String>()
+        rule.setContent {
+            PushRegistrationEffect(false, {
+                calls += "signedIn"
+                awaitCancellation()
+            }, { calls += "askPermission" })
+        }
+        rule.waitForIdle()
         assertEquals(listOf("signedIn", "askPermission"), calls)
     }
 
