@@ -33,6 +33,7 @@ import com.shellx.core.workspaces.WorkspaceRef
 import com.shellx.core.workspaces.WorkspaceScreenModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * One workspace screen's model and what it holds across configuration changes: the last alert, whether the user closed
@@ -77,15 +78,16 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
 
     val leave by rememberUpdatedState(back)
     val phase = model.phase
-    LaunchedEffect(phase) {
-        when (phase) {
-            WorkspaceScreenModel.Phase.DISMISSED -> {
-                WorkspaceView.leavingNotice(holder.closedHere || model.lastTabClosedHere, res)?.let(scope.listNotice::show)
-                leave()
-            }
-            WorkspaceScreenModel.Phase.MACHINE_REMOVED -> leave()
-            WorkspaceScreenModel.Phase.WAITING, WorkspaceScreenModel.Phase.SHOWING, WorkspaceScreenModel.Phase.NOT_FOUND -> Unit
+    LaunchedEffect(phase, lifecycle) {
+        val gone = phase == WorkspaceScreenModel.Phase.DISMISSED || phase == WorkspaceScreenModel.Phase.MACHINE_REMOVED
+        if (!gone) return@LaunchedEffect
+        // The navigator goes back only from the page in front: a page still sliding back in (STARTED, after the page
+        // that covered it went) leaves once it is there.
+        lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+        if (phase == WorkspaceScreenModel.Phase.DISMISSED) {
+            WorkspaceView.leavingNotice(holder.closedHere || model.lastTabClosedHere, res)?.let(scope.listNotice::show)
         }
+        leave()
     }
     val closedCount = model.shownPaneClosed
     LaunchedEffect(closedCount) {
