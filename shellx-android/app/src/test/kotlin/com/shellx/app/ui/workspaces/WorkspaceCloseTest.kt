@@ -16,6 +16,7 @@ import com.shellx.link.core.LinkWorkspace
 import com.shellx.link.core.WorkspaceControlOutcome
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -220,6 +221,33 @@ class WorkspaceCloseTest {
             assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.REFUSED_CLOSE_TAB), feedback)
             assertEquals(listOf(WorkspaceAlert.REFUSED_CLOSE_TAB), alerts)
             assertEquals("the tab stays", listOf("t1", "t2"), tabs(hub, mac))
+        }
+    }
+
+    /**
+     * Review C m-1: a close asked for after the hub's scope ended never starts, and its key goes all the same, so the
+     * agent and the tab can be closed again (a `finally` inside the task never runs when the task never starts).
+     */
+    @Test
+    fun aCloseWhoseHubStoppedLeavesNoKeyBehind() {
+        runTest {
+            val mac = macWithTabs()
+            val hub = hubOver(listOf(mac))
+            assertTrue(running(hub))
+            hub.scope.cancel()
+
+            closeAgent(mac, hub)
+            closeTab(mac, hub, "t1")
+            assertEquals(2, tasks.size)
+            assertTrue(waitFor { tasks.all { it.isCompleted } })
+
+            closeAgent(mac, hub)
+            closeTab(mac, hub, "t1")
+            assertEquals("the agent and the tab can be closed again", 4, tasks.size)
+            assertTrue(waitFor { tasks.all { it.isCompleted } })
+            assertTrue("none of them ran", tasks.all { it.isCancelled })
+            assertEquals(emptyList<String>(), mac.agentCloses)
+            assertEquals(emptyList<String>(), terminalCloses(mac))
         }
     }
 

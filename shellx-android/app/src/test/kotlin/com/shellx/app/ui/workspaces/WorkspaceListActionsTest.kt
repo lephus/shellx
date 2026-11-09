@@ -21,6 +21,7 @@ import com.shellx.link.core.LinkWorkspace
 import com.shellx.link.core.WorkspaceControlOutcome
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -174,6 +175,24 @@ class WorkspaceListActionsTest {
 
             assertEquals(listOf("create"), mac.workspaceCalls)
             assertFalse(rig.creating.value)
+        }
+    }
+
+    /** Review C m-1: a ＋ tapped after the hub's scope ended never starts, and ＋ works again all the same. */
+    @Test
+    fun plusWorksAgainWhenTheHubStoppedBeforeTheCreate() {
+        runTest {
+            val mac = macWithWorkspaces(listOf("shellx"))
+            val rig = makeRig(listOf(mac))
+            assertTrue(online(rig))
+            rig.hub.scope.cancel()
+
+            rig.actions.create(mac.machine.machineId)
+            assertTrue(waitFor { rig.tasks.size == 1 && rig.tasks.last().isCompleted })
+
+            assertTrue("it never ran", rig.tasks.last().isCancelled)
+            assertFalse("＋ is on again", rig.creating.value)
+            assertEquals(emptyList<String>(), mac.workspaceCalls)
         }
     }
 
