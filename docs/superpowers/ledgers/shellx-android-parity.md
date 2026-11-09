@@ -43,12 +43,12 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 
 | # | Rule | iPhone | Android | Plan | State |
 | --- | --- | --- | --- | --- | --- |
-| 6.2-1 | "Just finished": idle within 3 600 s of when the phone saw the session finish | `ShellXAppCore/Home/HomeFocus.swift` (`justDoneFor`) | `core:home/HomeFocus.kt` | 3C | todo |
+| 6.2-1 | "Just finished": idle within 3 600 s of when the phone saw the session finish | `ShellXAppCore/Home/HomeFocus.swift` (`justDoneFor`) | `core:home/HomeFocus.kt` | 3C | done (3C) |
 | 6.2-2 | Finishes are detected; each session keeps its last 2 | `ShellXAppCore/Home/SessionFinishDetector.swift` | `core:home/SessionFinishDetector.kt` | 3C | done (3C) |
-| 6.2-3 | "Ended": shown for 43 200 s (12 h) after the end | `ShellXAppCore/Home/HomeFocus.swift` (`endedFor`) | `core:home/HomeFocus.kt` | 3C | todo |
-| 6.2-4 | Ended rows are dismissed per Mac | `ShellXAppCore/Home/EndedDismissals.swift` | `core:home/EndedDismissals.kt` | 3C | todo |
-| 6.2-5 | A gone session removed from the phone stays removed for 30 days | `ShellXAppCore/Home/GoneRemovals.swift` | `core:home/GoneRemovals.kt` | 3C | todo |
-| 6.2-6 | A needs-you item belongs to the newest live session of the same Mac, workspace and agent | `ShellXAppCore/Home/HomeFocus.swift` | `core:home/HomeFocus.kt` | 3C | todo |
+| 6.2-3 | "Ended": shown for 43 200 s (12 h) after the end | `ShellXAppCore/Home/HomeFocus.swift` (`endedFor`) | `core:home/HomeFocus.kt` | 3C | done (3C) |
+| 6.2-4 | Ended rows are dismissed per Mac | `ShellXAppCore/Home/EndedDismissals.swift` | `core:home/EndedDismissals.kt` | 3C | done (3C) |
+| 6.2-5 | A gone session removed from the phone stays removed for 30 days | `ShellXAppCore/Home/GoneRemovals.swift` | `core:home/GoneRemovals.kt` | 3C | done (3C) |
+| 6.2-6 | A needs-you item belongs to the newest live session of the same Mac, workspace and agent | `ShellXAppCore/Home/HomeFocus.swift` | `core:home/HomeFocus.kt` | 3C | done (3C) |
 | 6.2-7 | The home re-sorts every 30 s | `ShellX/UI/Workspaces/WorkspaceListView.swift` | `app:ui/workspaces/WorkspaceListView.kt` | 3D | todo |
 | 6.2-8 | Reconnects after 0.5, 1, 2, 4, 8 and 15 s, then every 30 s, each ±20 %; back to the start on `welcome` | `ShellXAppCore/Link/ReconnectSchedule.swift`, `MachineConnection.swift` | `core:link/ReconnectSchedule.kt`, `MachineConnection.kt` | 3C | done (3C) |
 | 6.2-9 | A revision ≤ the current one is dropped, the next one is applied, a gap forces a full resync | `ShellXAppCore/Link/RevisionGate.swift` | `core:link/RevisionGate.kt` | 3C | done (3C) |
