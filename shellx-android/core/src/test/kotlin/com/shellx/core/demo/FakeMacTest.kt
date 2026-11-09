@@ -42,20 +42,34 @@ class FakeMacTest {
         acceptsAttachments: Boolean = true,
         servesWorkspaces: Boolean = true,
         acceptsWorkspaceControl: Boolean = true,
+        servesTerminalViews: Boolean = true,
+        acceptsTerminalCreate: Boolean = true,
     ): Set<String> = connect(
         FakeMac(
             "MacBook Pro", backgroundScope, servesSessionsAndChat = servesSessionsAndChat,
             acceptsAttachments = acceptsAttachments, servesWorkspaces = servesWorkspaces,
-            acceptsWorkspaceControl = acceptsWorkspaceControl,
+            acceptsWorkspaceControl = acceptsWorkspaceControl, servesTerminalViews = servesTerminalViews,
+            acceptsTerminalCreate = acceptsTerminalCreate,
         ),
     ).hostFeatures
 
     @Test fun featuresFollowWhatTheMacServes() { runTest {
-        assertEquals(setOf("attachments", "workspaces", "workspace_control", "agent_close", "terminal_close"), features())
-        assertEquals(setOf("workspaces", "workspace_control", "terminal_close"), features(servesSessionsAndChat = false))
+        assertEquals(
+            setOf(
+                "attachments", "workspaces", "workspace_control", "agent_close", "terminal_close", "terminal_view",
+                "terminal_create",
+            ),
+            features(),
+        )
+        assertEquals(
+            setOf("workspaces", "workspace_control", "terminal_close", "terminal_view", "terminal_create"),
+            features(servesSessionsAndChat = false),
+        )
         assertEquals(setOf("attachments", "agent_close"), features(servesWorkspaces = false))
         assertFalse("attachments" in features(acceptsAttachments = false))
         assertFalse("workspace_control" in features(acceptsWorkspaceControl = false))
+        assertFalse("terminal_view" in features(servesTerminalViews = false))
+        assertFalse("terminal_create" in features(acceptsTerminalCreate = false))
     } }
 
     @Test fun connectCountsEveryAttemptAndFailsAsTold() { runTest {
