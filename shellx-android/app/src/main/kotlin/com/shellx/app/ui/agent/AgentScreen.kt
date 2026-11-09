@@ -37,7 +37,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,13 +53,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import com.shellx.app.R
+import com.shellx.app.platform.AndroidClock
 import com.shellx.app.ui.components.ConfirmDialog
 import com.shellx.app.ui.components.HomeTicks
 import com.shellx.app.ui.components.Spinner
+import com.shellx.app.ui.components.rememberNowMs
 import com.shellx.app.ui.composer.ComposerBar
 import com.shellx.app.ui.home.NeedsYouBar
 import com.shellx.app.ui.theme.ShellXTheme
@@ -74,6 +72,7 @@ import com.shellx.core.home.AgentStatusRow
 import com.shellx.core.link.MachinePendingItem
 import com.shellx.core.link.SessionRef
 import com.shellx.core.pending.AgentLabel
+import com.shellx.core.platform.Clock
 import com.shellx.link.core.ChatEntry
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
@@ -151,6 +150,8 @@ fun AgentScreen(
     canRemoveFromPhone: Boolean = false,
     actions: AgentScreenActions = AgentScreenActions(),
     back: () -> Unit = {},
+    /** The clock the header's "Running for" is read against, again every second. */
+    clock: Clock = AndroidClock,
 ) {
     var confirmsForceStop by rememberSaveable { mutableStateOf(false) }
     // The name in the Close Agent confirmation while it is up.
@@ -163,7 +164,7 @@ fun AgentScreen(
 
     val body = @Composable { modifier: Modifier ->
         Column(modifier.fillMaxSize().imePadding()) {
-            Top(place, row, gone, offline, pending, showsMachineName, embedded && canStop, offersRemove, actions, askForceStop)
+            Top(place, row, gone, offline, pending, showsMachineName, embedded && canStop, offersRemove, actions, askForceStop, clock)
             Chat(entries, agent, emptyState, machineName, older, loadingOlder, actions, Modifier.weight(1f))
             notice?.let {
                 Box(
@@ -231,13 +232,14 @@ private fun Top(
     offersRemove: Boolean,
     actions: AgentScreenActions,
     askForceStop: () -> Unit,
+    clock: Clock,
 ) {
-    val tick = rememberSecondTick()
+    val now = rememberNowMs(clock, remember { HomeTicks.every(1.seconds) })
     Column(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Read again every second, for the "Running for" time.
-                val current = remember(tick, row) { row() }
+                val current = remember(now, row) { row() }
                 AgentHeader(place, current, gone, offline, Modifier.weight(1f))
                 if (showsStop) StopButton(actions.stop, askForceStop)
             }
@@ -248,17 +250,6 @@ private fun Top(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
-}
-
-/** A counter that goes up every second while the screen is started. */
-@Composable
-private fun rememberSecondTick(): Int {
-    var tick by remember { mutableIntStateOf(0) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { HomeTicks.every(1.seconds).collect { tick++ } }
-    }
-    return tick
 }
 
 @Composable

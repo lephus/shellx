@@ -174,6 +174,7 @@ fun AgentView(scope: SignedInScope, ref: SessionRef, open: (String) -> Unit, bac
             },
         ),
         back = back,
+        clock = scope.clock,
     )
     WorkspaceAlertDialog(holder.alert) { holder.alert = null }
 }
