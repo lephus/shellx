@@ -62,7 +62,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | 6.2-17 | A workspace the Mac has not listed is waited for 5 s before the Mac is asked again | `ShellXAppCore/Workspaces/WorkspaceScreenModel.swift` (`patience`) | `core:workspaces/WorkspaceScreenModel.kt` | 3C | done (3C) |
 | 6.2-18 | A notice over the composer shows for 4 s | `ShellX/UI/Agent/AgentView.swift` (`noticeDuration`) | `app:ui/agent/AgentView.kt` | 3E | todo |
 | 6.2-19 | "Nothing needs you" shows for 0.7 s before the page goes back | `ShellX/UI/Pending/PendingListView.swift` (`leaveDelay`) | `app:ui/pending/PendingListView.kt` | 3E | todo |
-| 6.2-20 | A voice result settles after 1.5 s (regular recognizer) or 2 s (on-device recognizer) | `ShellX/Voice/LegacyTranscriber.swift` (`finalResultTimeout`), `AnalyzerTranscriber.swift` (`finalizeTimeout`) | `app:voice/…` (`SpeechRecognizer`) | 3E | todo |
+| 6.2-20 | A voice result settles after 1.5 s (regular recognizer) or 2 s (on-device recognizer) | `ShellX/Voice/LegacyTranscriber.swift` (`finalResultTimeout`), `AnalyzerTranscriber.swift` (`finalizeTimeout`) | `app:voice/SpeechRecognizerEngine.kt` (`finalTimeout`) | 3E | done (3E) |
 | 6.2-21 | Voice capabilities are cached for 30 s | `ShellXAppCore/Voice/VoiceCapabilityCache.swift` (`defaultReuse`) | `core:voice/VoiceCapabilityCache.kt` | 3C | done (3C) |
 
 ## Android-only differences
@@ -90,6 +90,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-19 | A secret that can never be decrypted again (a damaged file, a lost or permanently invalidated Keystore key, a keystore2 error that will not pass) is deleted and reads as absent, so the phone shows sign-in. A Keystore error that may pass keeps the secrets and the launch screen waits for the next start. An unclear one (every key error before API 33 that names no keystore2 error, and on API 33+ a Keystore system or authentication error) reads as lost only after three app starts in a row saw it | The iPhone's Keychain has no lost-key case. Android's Keystore loses keys on restore or cleared credentials, and deleting on an error that passes would also lose the phone's Link key, so every Mac would need pairing again (review A I-2) | `app:platform/KeystoreSecretStore.kt` | 3D | differs (3D): by design |
 | A-20 | Pairing is a full-screen page (route `pairing`) with a Close button, not a sheet; system Back cancels the attempt as the iPhone's swipe-down does | Contracts §5 names the route; a camera preview inside a draggable sheet fights the drag | `app:ui/pairing/PairingScreen.kt` | 3D | differs (3D): by design |
 | A-21 | Delete Account… is a dialog: the question, then Google's sheet for a fresh sign-in, then the deletion; Google only, and no 'switch to Google first' step | S1 §6.8; an Android session is always Google (contracts §5) | `app:ui/settings/DeleteAccountDialog.kt` | 3D | differs (3D): by design |
+| A-23 | While the mic is held, the recognizer starts listening again after each pause that produced words; a silent stretch ends the dictation and keeps the words | Android's SpeechRecognizer ends a segment at every pause | `app:voice/SpeechRecognizerEngine.kt` | 3E | differs (3E): by design |
 
 ## Test devices
 
