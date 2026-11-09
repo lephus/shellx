@@ -45,4 +45,24 @@ final class TerminalPaneTests: XCTestCase {
         XCTAssertTrue(
             released, "first responder: \(surface.isFirstResponder), height \(surface.bounds.height) of \(unfocused)")
     }
+
+    /// Keys typed into the surface of a page that is no longer the one shown are dropped: they never reach the terminal
+    /// shown now (final review, app M3; base spec §4).
+    func testAPageNoLongerShownSendsNoKeys() async throws {
+        let (rig, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+
+        model.show("t-claude")
+        surface.insertText("x")
+        surface.insertText("\n")
+
+        let opened = await eventually { await rig.mac.terminalViewOpens.contains { $0.terminalId == "t-claude" } }
+        XCTAssertTrue(opened)
+        try await Task.sleep(for: .milliseconds(300))
+        let reached = await rig.mac.terminalViewInputs("t-claude")
+        XCTAssertEqual(reached, [])
+    }
 }
