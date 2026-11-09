@@ -516,3 +516,21 @@ Behaviour Android (3G) mirrors:
   Robolectric 4.17, Roborazzi 1.78.0, activity-compose 1.13.0, google-services 4.5.0, API 36.
 - Firebase: `google-services.json` for `com.shellx.prod` is committed (see §12); only the phone dogfood is still the user's.
 - User decision 2026-11-09: no `com.shellx.dev` anywhere; debug builds on Android and iPhone use `com.shellx.prod`.
+
+## 23. Additions from plan 2C at landing (34d42258b9), for 3G
+
+- **Pane sizing.** The page of the terminal shown always holds the terminal surface, also under its loading,
+  offline, unavailable and old-Mac cards; the surface's size is the phone grid every open needs (R1, R11). A pane
+  that shows a message *instead of* the surface before the first snapshot never opens.
+- **Who takes input.** `TerminalViewModel.acceptsInput`: true while `.live`, and while `.connecting` once a screen
+  came and a view open is in flight (resume, reconnect, `not_open` reopen) — input then queues behind the open
+  (R10) and the keyboard and key bar stay. False in waits with no view in flight (the 1 s failed-open retry, busy
+  gaps, `notSent`, offline) and under every card; the surface resigns the keyboard then.
+- **Surface owns its terminal.** Each surface knows its pane's `terminalId` and drops input, keys, paste and scroll
+  when it is not the terminal shown (base spec §4).
+- **Typing settles the screen.** Typing in or focusing a terminal settles the workspace screen, so an agent that
+  starts waiting never moves the selection away from it (＋ and the successor after a close still move it).
+- **＋ chip.** Dimmed while a create is in flight; a pick made meanwhile cancels the pending `expect`.
+- **Budgets.** A lost session restores the open budgets (busy ×5, one failed retry); a `not_open` reopen after
+  `.opened` has its own budget. `terminalFirstScreen` restarts on the open that actually produces the screen (not
+  counting time offline or in the background).

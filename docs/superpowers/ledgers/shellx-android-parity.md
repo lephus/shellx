@@ -82,6 +82,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | `ShellX_Dev_API_26` (emulator) | Pixel 5 profile | 8.0 (26) | lowest supported version | no | emulator ok (2026-11-09) |
 | `ShellX_Dev_API_36` (emulator) | Pixel 5 profile | 16 (36) | newest version | no | emulator ok (2026-11-09) |
 | The user's phone | vsmart Live | 10 (29) | camera, voice, notifications, Vietnamese keyboard | no | pending (USER) |
+| The user's second phone | Google Pixel 3 (`blueline`) | 12 (31) | real-phone dogfood, Android 12 splash | no | light ok (2026-11-09, debug `com.shellx.prod` via `dev.sh device`); dark pending (USER) |
 
 ## iPhone changes since the reference
 
