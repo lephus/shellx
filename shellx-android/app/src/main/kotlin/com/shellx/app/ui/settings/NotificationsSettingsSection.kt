@@ -39,14 +39,18 @@ import com.shellx.app.R
 import com.shellx.app.platform.NotificationPermission
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.core.platform.CoreLog
+import com.shellx.core.platform.KeyValueStore
 
 /**
  * Settings › Notifications (S3 §7.4c; ledger A-1, A-28): whether alerts are on, Turn On when they are off, and
  * "Notifications arriving late?" with this phone maker's steps. Read again each time the screen resumes, so a change
  * made in the system's settings shows on return.
+ *
+ * [settings] (the phone's): Turn On's dialog is one of the two Android shows, so it spends the automatic ask too
+ * ([NotificationPermission.ASKED_KEY], review C m-8). Null records nothing.
  */
 @Composable
-fun NotificationsSettingsSection() {
+fun NotificationsSettingsSection(settings: KeyValueStore? = null) {
     val context = LocalContext.current
     var on by remember { mutableStateOf(NotificationPermission.isOn(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { on = NotificationPermission.isOn(context) }
@@ -66,6 +70,7 @@ fun NotificationsSettingsSection() {
                 open(context, NotificationSettingsIntents.appNotifications(context))
             } else {
                 ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+                settings?.putBoolean(NotificationPermission.ASKED_KEY, true)
             }
         },
         openAppSettings = { open(context, NotificationSettingsIntents.appDetails(context)) },

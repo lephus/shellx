@@ -170,6 +170,8 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
                     version = versionText(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toLong()),
                     openMachines = navigator::openMachines,
                     back = navigator::back,
+                    // The real account's, as the automatic ask's (SignedInFrame).
+                    settings = composition.settings,
                 )
             }
         }

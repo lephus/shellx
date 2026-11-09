@@ -38,12 +38,13 @@ import androidx.compose.ui.unit.dp
 import com.shellx.app.R
 import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.platform.KeyValueStore
 import com.shellx.core.voice.VoiceService
 
 /**
  * Settings (`SettingsView.swift`; contracts §15's order): Your Macs, Account, Appearance, Voice (while [voice] is set,
  * that is once the mic is set up), Notifications (plan 3E's slot) and About. [account] null is the demo: only the
- * e-mail shows.
+ * e-mail shows. [settings] are the phone's, where Notifications records that Android's dialog showed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +57,7 @@ fun SettingsScreen(
     version: String,
     openMachines: () -> Unit,
     back: () -> Unit,
+    settings: KeyValueStore? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val background = MaterialTheme.colorScheme.background
@@ -93,7 +95,7 @@ fun SettingsScreen(
             item(key = "account") { AccountSection(email, account) }
             item(key = "appearance") { AppearanceSection(appearance, onAppearance) }
             if (voice != null) item(key = "voice") { VoiceSection(voice) }
-            item(key = "notifications") { NotificationsSettingsSection() }
+            item(key = "notifications") { NotificationsSettingsSection(settings) }
             item(key = "about") { AboutSection(version) }
         }
     }
