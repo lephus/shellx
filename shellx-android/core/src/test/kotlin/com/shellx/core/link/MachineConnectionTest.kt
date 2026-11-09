@@ -11,6 +11,7 @@ import com.shellx.core.testing.assertSameCase
 import com.shellx.core.testing.chatEntry
 import com.shellx.core.testing.eventually
 import com.shellx.core.testing.instantSleep
+import com.shellx.core.testing.linkTerminal
 import com.shellx.core.testing.linkWorkspace
 import com.shellx.core.testing.pendingItem
 import com.shellx.link.account.RelayApiException
@@ -19,6 +20,7 @@ import com.shellx.link.core.LinkDecision
 import com.shellx.link.core.NoiseStaticKey
 import com.shellx.link.core.PermissionMode
 import com.shellx.link.core.ReplyOutcome
+import com.shellx.link.core.TerminalViewPush
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,9 +32,12 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 
 class MachineConnectionTest {
     private val phone = NoiseStaticKey.generate()
@@ -176,6 +181,26 @@ class MachineConnectionTest {
 
         val drained = eventually(timeout = 30.seconds) { log.chatEntries == 10_000 && log.pendingIds == listOf("r1") }
         assertTrue(drained, "chat ${log.chatEntries}, pending ${log.pendingIds}")
+    } }
+
+    /**
+     * Plan 3G Decision 1: the connection hands on the live session's terminal pushes, once per session and before its
+     * Online, and reads none of them itself. They stay in the session's bounded queue, in order, until a terminal page
+     * collects them.
+     */
+    @Test fun terminalPushesStayInTheSessionsQueueInOrder() { runTest {
+        val mac = FakeMac("MacBook Pro", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace("a", terminals = listOf(linkTerminal("t1")))))
+        val (connection, log) = connect(mac)
+        assertTrue(eventually { log.isOnline })
+        val pushes = assertNotNull(log.terminalSessions.singleOrNull())
+
+        connection.call { it.openTerminalView("t1", 30, 6) }
+        runCurrent()
+
+        val first = withTimeout(5.seconds) { pushes.take(2).toList() }
+        assertEquals(TerminalViewPush.Opened("t1"), first[0])
+        assertIs<TerminalViewPush.Frame>(first[1])
     } }
 
     // Reconnect
