@@ -2,6 +2,7 @@ package com.shellx.core.link
 
 import com.shellx.core.account.AccountVault
 import com.shellx.core.account.RelayAccountCalling
+import com.shellx.core.composer.OutgoingAttachment
 import com.shellx.core.diagnostics.LatencyLog
 import com.shellx.core.home.SessionFinishDetector
 import com.shellx.core.pending.DecisionSending
@@ -16,12 +17,14 @@ import com.shellx.link.account.PairedMachineListing
 import com.shellx.link.account.RelayApiException
 import com.shellx.link.core.AgentSession
 import com.shellx.link.core.AgentState
+import com.shellx.link.core.ChatAttachment
 import com.shellx.link.core.ChatHistoryPage
 import com.shellx.link.core.ChatInterruptOutcome
 import com.shellx.link.core.ChatSendOutcome
 import com.shellx.link.core.LinkClientException
 import com.shellx.link.core.LinkDecision
 import com.shellx.link.core.LinkSession
+import com.shellx.link.core.MessageUploadException
 import com.shellx.link.core.ReplyOutcome
 import com.shellx.link.core.ShellXLink
 import kotlin.coroutines.cancellation.CancellationException
@@ -502,6 +505,59 @@ class MachineHub(
 
     suspend fun chatSend(ref: SessionRef, text: String): ChatSendOutcome =
         withLink(ref.machineId) { it.chatSend(ref.sessionId, text) }
+
+    /**
+     * Sends [text] with [attachments] (none: as `chatSend(ref, text)`). Each attachment is uploaded in turn, then one
+     * `chat.send` names them all, inside one call on the Mac's session: an upload id is valid only in the session that
+     * made it. The Link client holds its upload turn for the whole message, so two messages sent at once go one after
+     * the other. Nothing is uploaded to a Mac whose session did not list the attachments feature.
+     *
+     * [progress] gets the bytes uploaded so far over the bytes of every attachment, after each chunk the Mac took (1
+     * once the last one is up). It may run on any thread (3B calls it on Dispatchers.Default).
+     *
+     * Throws LinkCallException when nothing was sent, as `chatSend(ref, text)` does, and [AttachmentSendException] when
+     * the message surely did not reach the session: Refused("unsupported") when the session does not take
+     * attachments; a MessageUploadException whose cause is Remote(code) → Refused(code); any other
+     * MessageUploadException → UploadFailed; LinkClientException.Remote(code) → Refused(code) (an error answer comes
+     * before anything is typed). A CancellationException propagates. Any other error comes after the message left: it
+     * may have arrived. A refusal logs counts and sizes only, never a name or a byte.
+     */
+    suspend fun chatSend(
+        ref: SessionRef,
+        text: String,
+        attachments: List<OutgoingAttachment>,
+        progress: (Double) -> Unit,
+    ): ChatSendOutcome {
+        if (attachments.isEmpty()) return chatSend(ref, text)
+        val total = attachments.sumOf { it.data.size.toLong() }
+        try {
+            return withLink(ref.machineId) { session ->
+                if (ShellXLink.ATTACHMENTS_FEATURE !in session.hostFeatures) throw AttachmentSendException.Refused("unsupported")
+                val uploads = attachments.map { ChatAttachment(it.kind, it.name, it.data) }
+                try {
+                    // One call: the client keeps its upload turn until the Mac answers the message, so another message to
+                    // this Mac never makes the Mac drop one of these uploads.
+                    session.chatSend(ref.sessionId, text, uploading = uploads) { sent ->
+                        progress(if (total > 0) sent.toDouble() / total else 1.0)
+                    }
+                } catch (e: MessageUploadException) {
+                    val cause = e.cause
+                    if (cause is LinkClientException.Remote) throw AttachmentSendException.Refused(cause.code)
+                    // A timeout or the session closed: the message never left.
+                    throw AttachmentSendException.UploadFailed()
+                } catch (e: LinkClientException.Remote) {
+                    throw AttachmentSendException.Refused(e.code)
+                }
+            }
+        } catch (e: AttachmentSendException) {
+            val reason = when (e) {
+                is AttachmentSendException.UploadFailed -> "upload_failed"
+                is AttachmentSendException.Refused -> "refused code=${e.code}"
+            }
+            CoreLog.log("attach_send_failed count=${attachments.size} bytes=$total $reason")
+            throw e
+        }
+    }
 
     suspend fun chatInterrupt(ref: SessionRef, hard: Boolean): ChatInterruptOutcome =
         withLink(ref.machineId) { it.chatInterrupt(ref.sessionId, hard) }
