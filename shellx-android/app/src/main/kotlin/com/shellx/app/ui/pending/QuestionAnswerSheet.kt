@@ -1,6 +1,7 @@
 package com.shellx.app.ui.pending
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -284,7 +287,7 @@ fun QuestionAnswerSheet(
 private fun Prompt(question: PendingQuestion) {
     val accent = ShellXTheme.colors.accentText
     Column(
-        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp)).padding(16.dp),
+        Modifier.fillMaxWidth().sheetCard(RoundedCornerShape(12.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         question.header?.takeIf { it.isNotEmpty() }?.let { header ->
@@ -321,7 +324,7 @@ private fun Options(
     focused: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))) {
+        Column(Modifier.fillMaxWidth().sheetCard(RoundedCornerShape(12.dp))) {
             for (option in question.options) {
                 val selected = answers.isSelected(question.id, option.label)
                 ChoiceRow(
@@ -396,6 +399,20 @@ private fun Options(
             }
         }
     }
+}
+
+/**
+ * An inner card of a sheet: `surfaceContainerHigh` in [shape], with a 1 dp hairline of `onSurface` at 10 %. ShellX's
+ * colours make every `surfaceContainer*` role one colour, so without the hairline the card has no edge on the sheet.
+ */
+@Composable
+internal fun Modifier.sheetCard(shape: Shape): Modifier =
+    background(MaterialTheme.colorScheme.surfaceContainerHigh, shape).border(1.dp, SheetCardOutline.color(), shape)
+
+/** The hairline around a sheet's inner surfaces: `onSurface` at 10 %. */
+internal object SheetCardOutline {
+    @Composable
+    fun color(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
 }
 
 /** The sheets' bottom bar (the iPhone's `.bar`): on the cards' colour, a hairline over it, outside the scrolling part. */

@@ -167,7 +167,7 @@ fun PlanReviewSheet(
                 )
                 val plan = item.item.planPreview
                 if (!plan.isNullOrEmpty()) {
-                    PlanMarkdownText(plan, color = MaterialTheme.colorScheme.onSurface)
+                    PlanMarkdownText(plan, color = MaterialTheme.colorScheme.onSurface, outlinesCode = true)
                     if (PendingItem.previewMayBeCut(plan)) CutNotice()
                 } else {
                     val secondary = MaterialTheme.colorScheme.onSurfaceVariant

@@ -96,7 +96,7 @@ private fun Monospaced(text: String) {
         text,
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(10.dp))
+            .sheetCard(RoundedCornerShape(10.dp))
             .padding(12.dp),
         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
     )

@@ -1,6 +1,7 @@
 package com.shellx.app.ui.pending
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,10 +40,11 @@ import com.shellx.core.platform.CoreLog
  * An agent's plan, drawn from its Markdown (`PlanMarkdownText.swift`): headings, bullet and numbered lists, code
  * blocks, rules and paragraphs, with inline styles (bold, italic, code, links). The lines are sorted into blocks
  * first ([PlanMarkdownText.blocks]); each block's inline marks become spans ([PlanMarkdownText.inline]). Selectable
- * for copying. A tapped link opens only when it is a web link ([PlanMarkdownText.open]).
+ * for copying. A tapped link opens only when it is a web link ([PlanMarkdownText.open]). On a sheet, where the code
+ * block's colour is the sheet's own, [outlinesCode] gives it a hairline edge.
  */
 @Composable
-fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
+fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified, outlinesCode: Boolean = false) {
     val typography = MaterialTheme.typography
     val accent = ShellXTheme.colors.accentText
     val uriHandler = LocalUriHandler.current
@@ -83,6 +85,7 @@ fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Col
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(8.dp))
+                            .then(if (outlinesCode) Modifier.border(1.dp, SheetCardOutline.color(), RoundedCornerShape(8.dp)) else Modifier)
                             .padding(10.dp),
                         color = color,
                         style = typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
