@@ -15,6 +15,7 @@ import com.shellx.link.core.AgentState
 import com.shellx.link.core.LinkTerminal
 import com.shellx.link.core.LinkWorkspace
 import java.io.IOException
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -89,11 +90,17 @@ class WorkspaceListModelTest {
     fun aMacNotOnlineYetIsNotCalledOld() {
         runTest {
             val mac = macWithWorkspaces(listOf("shellx"))
+            // The Mac cannot be reached yet (review C m-2: read it before it is online, or the check never runs).
+            mac.failNextConnects(IOException("offline"), 1000)
             val hub = hubOver(listOf(mac))
+            assertTrue(waitFor { hub.machines.isNotEmpty() })
             // Before the first connection finishes, the Mac has not said what it lists.
-            val before = WorkspaceListModel.groups(hub.state.value, GoneRemovals.NONE).firstOrNull()
-            if (before != null && before.state != MachineLinkState.Online) assertTrue(before.listsWorkspaces)
-            assertTrue(waitFor { hub.machines.firstOrNull()?.state == MachineLinkState.Online })
+            val before = WorkspaceListModel.groups(hub.state.value, GoneRemovals.NONE).single()
+            assertTrue("not online yet: ${before.state}", before.state != MachineLinkState.Online)
+            assertTrue("a Mac not online yet is not called old", before.listsWorkspaces)
+
+            mac.failNextConnects(IOException("offline"), 0)
+            assertTrue(waitFor(60.seconds) { hub.machines.firstOrNull()?.state == MachineLinkState.Online })
             assertEquals(true, WorkspaceListModel.groups(hub.state.value, GoneRemovals.NONE).first().listsWorkspaces)
         }
     }
