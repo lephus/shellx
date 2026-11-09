@@ -1,6 +1,7 @@
 package com.shellx.link.core
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /** The full pending set and its revision (`agent.snapshot`). */
 data class PendingSnapshot(val revision: Long, val pending: List<PendingItem>)
@@ -29,6 +30,24 @@ data class ChatHistoryPage(val entries: List<ChatEntry>, val hasMore: Boolean)
 
 /** The answer to `workspace.create`: [workspaceId] is set only when [outcome] is `ok`. */
 data class WorkspaceCreated(val outcome: WorkspaceControlOutcome, val workspaceId: String?)
+
+/** A terminal push from the host, in arrival order (PROTOCOL.md 11.1). */
+sealed interface TerminalViewPush {
+    val terminalId: String
+
+    /**
+     * This session's open of [terminalId] was answered `ok`: start a fresh [TerminalFrameAssembler]; every later frame
+     * of [terminalId] is the new view's.
+     */
+    data class Opened(override val terminalId: String) : TerminalViewPush
+
+    data class Frame(override val terminalId: String, val part: TerminalFramePart) : TerminalViewPush
+
+    data class Ended(override val terminalId: String, val reason: TerminalViewEndReason) : TerminalViewPush
+}
+
+/** The answer to `terminal.create`: [terminalId] is set only when [outcome] is `ok`, as the host sends it. */
+data class TerminalCreated(val outcome: WorkspaceControlOutcome, val terminalId: String?)
 
 /** One `chat.entries` or `chat.reset` push. */
 sealed interface ChatPush {
@@ -185,6 +204,48 @@ interface LinkSession {
     suspend fun closeAgent(sessionId: String): WorkspaceControlOutcome
 
     suspend fun closeTerminal(workspaceId: String, terminalId: String): WorkspaceControlOutcome
+
+    // Terminal views (PROTOCOL.md section 11). The defaults are a session without them, so fakes and wrappers that
+    // predate them keep compiling.
+
+    /**
+     * Every `terminal.view.frame` and `terminal.view.ended`, and [TerminalViewPush.Opened] right before the first frame
+     * of a view this session opened, in arrival order. Single consumer; completes when the session ends.
+     */
+    val terminalPushes: Flow<TerminalViewPush> get() = emptyFlow()
+
+    /**
+     * `terminal.view.open` at the grid the phone can show (the host clamps it). On `ok`, `Opened(terminalId)` is on
+     * [terminalPushes] before this returns; an `ok` that arrives after a timeout is not announced (close the view).
+     * [LinkClientException.Remote] `unsupported` from a host without [ShellXLink.TERMINAL_VIEW_FEATURE], `bad_request`
+     * for [cols] or [rows] below 1. A session views one terminal: close the first before opening another (`busy`).
+     */
+    suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome =
+        throw LinkClientException.Remote("unsupported", "this session has no terminal views")
+
+    // The four below send without an answer; they throw SessionClosed when the session has ended.
+
+    /** `terminal.view.close`. The tab stays on the Mac. */
+    suspend fun closeTerminalView(terminalId: String) {}
+
+    /**
+     * `terminal.view.input`, after [TerminalInputCheck]: a [TerminalInputException] means nothing was sent. Send only
+     * committed text; a Return key is `Key(ENTER)`, never a line break in `Text`.
+     */
+    suspend fun sendTerminalInput(terminalId: String, units: List<TerminalInputUnit>) {}
+
+    /** `terminal.view.resize`: the grid the phone can show; the host clamps it. */
+    suspend fun resizeTerminalView(terminalId: String, cols: Int, rows: Int) {}
+
+    /** `terminal.view.resync`, once per gap, as [TerminalFrameAssembler] says. */
+    suspend fun resyncTerminalView(terminalId: String) {}
+
+    /**
+     * `terminal.create` (PROTOCOL.md 11.9). Not safe to repeat: after a timeout it is unknown whether the Mac acted.
+     * `unsupported` from a host without [ShellXLink.TERMINAL_CREATE_FEATURE].
+     */
+    suspend fun createTerminal(workspaceId: String): TerminalCreated =
+        throw LinkClientException.Remote("unsupported", "this session takes no terminal creation")
 
     /** Ends the session: pending calls throw SessionClosed, every Flow completes, the circuit closes. Idempotent. */
     fun close()

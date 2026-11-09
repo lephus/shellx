@@ -31,7 +31,10 @@ class LinkClient private constructor(
     private val scope: CoroutineScope,
     private val watchdog: Job,
 ) : LinkSession {
-    /** Guards [nextCallNumber], [waiters] and [endError]. Never held across a suspension or a deferred completion. */
+    /**
+     * Guards [nextCallNumber], [waiters], [openingViews] and [endError]. Never held across a suspension or a deferred
+     * completion.
+     */
     private val lock = Any()
     private var nextCallNumber = 0L
 
@@ -39,15 +42,20 @@ class LinkClient private constructor(
     private val waiters = HashMap<String, CompletableDeferred<LinkMessage>>()
     private var endError: LinkClientException? = null
 
+    /** The `terminal_id` of each `terminal.view.open` still waiting for its answer, by `call_id`. */
+    private val openingViews = HashMap<String, String>()
+
     private val changeQueue = Channel<PendingChange>(Channel.UNLIMITED)
     private val sessionQueue = Channel<SessionChange>(Channel.UNLIMITED)
     private val workspaceQueue = Channel<WorkspaceChange>(Channel.UNLIMITED)
     private val chatQueue = Channel<ChatPush>(Channel.UNLIMITED)
+    private val terminalQueue = Channel<TerminalViewPush>(Channel.UNLIMITED)
 
     override val changes: Flow<PendingChange> = changeQueue.receiveAsFlow()
     override val sessionChanges: Flow<SessionChange> = sessionQueue.receiveAsFlow()
     override val workspaceChanges: Flow<WorkspaceChange> = workspaceQueue.receiveAsFlow()
     override val chatEntries: Flow<ChatPush> = chatQueue.receiveAsFlow()
+    override val terminalPushes: Flow<TerminalViewPush> = terminalQueue.receiveAsFlow()
 
     /**
      * The upload turn, a fair (FIFO) lock. An upload holds it from `attach.begin` to its end, and a message from its
@@ -149,16 +157,40 @@ class LinkClient private constructor(
     override suspend fun closeTerminal(workspaceId: String, terminalId: String): WorkspaceControlOutcome =
         ask<LinkMessage.TerminalCloseResult> { LinkMessage.TerminalClose(it, workspaceId, terminalId) }.outcome
 
+    override suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome =
+        (call(openingView = terminalId) { LinkMessage.TerminalViewOpen(it, terminalId, cols, rows) } as? LinkMessage.TerminalViewOpenResult)
+            ?.outcome ?: throw LinkClientException.UnexpectedAnswer()
+
+    override suspend fun closeTerminalView(terminalId: String) = post(LinkMessage.TerminalViewClose(terminalId))
+
+    override suspend fun sendTerminalInput(terminalId: String, units: List<TerminalInputUnit>) {
+        TerminalInputCheck.check(units)
+        post(LinkMessage.TerminalViewInput(terminalId, units))
+    }
+
+    override suspend fun resizeTerminalView(terminalId: String, cols: Int, rows: Int) =
+        post(LinkMessage.TerminalViewResize(terminalId, cols, rows))
+
+    override suspend fun resyncTerminalView(terminalId: String) = post(LinkMessage.TerminalViewResync(terminalId))
+
+    override suspend fun createTerminal(workspaceId: String): TerminalCreated =
+        ask<LinkMessage.TerminalCreateResult> { LinkMessage.TerminalCreate(it, workspaceId) }
+            .let { TerminalCreated(it.outcome, it.terminalId) }
+
     override fun close() = end(LinkClientException.SessionClosed())
 
     override fun toString(): String = "LinkClient(features=$hostFeatures)"
 
     /** [call], requiring an answer of type [T]. */
     private suspend inline fun <reified T : LinkMessage> ask(noinline make: (callId: String) -> LinkMessage): T =
-        call(make) as? T ?: throw LinkClientException.UnexpectedAnswer()
+        call(make = make) as? T ?: throw LinkClientException.UnexpectedAnswer()
 
-    /** Sends `make(callId)` and returns the one answer that carries `callId`. */
-    internal suspend fun call(make: (callId: String) -> LinkMessage): LinkMessage {
+    /**
+     * Sends `make(callId)` and returns the one answer that carries `callId`. [openingView] is the terminal of a
+     * `terminal.view.open`: recorded with the waiter, and dropped with it, so only an `ok` this call still waits for
+     * is announced as [TerminalViewPush.Opened].
+     */
+    internal suspend fun call(openingView: String? = null, make: (callId: String) -> LinkMessage): LinkMessage {
         // As Swift's checkOpen(): a caller that is already cancelled sends nothing. The send lock's free fast path
         // and the NonCancellable send would otherwise carry the request out.
         currentCoroutineContext().ensureActive()
@@ -166,7 +198,10 @@ class LinkClient private constructor(
         val callId = synchronized(lock) {
             endError?.let { throw it.fresh() }
             nextCallNumber += 1
-            "c$nextCallNumber".also { waiters[it] = answer }
+            "c$nextCallNumber".also {
+                waiters[it] = answer
+                if (openingView != null) openingViews[it] = openingView
+            }
         }
         try {
             val request = make(callId)
@@ -179,9 +214,34 @@ class LinkClient private constructor(
             } catch (_: Exception) {
                 throw synchronized(lock) { endError?.fresh() } ?: LinkClientException.SessionClosed()
             }
-            return withTimeoutOrNull(timings.requestTimeout) { answer.await() } ?: throw LinkClientException.TimedOut()
+            withTimeoutOrNull(timings.requestTimeout) { answer.await() }?.let { return it }
+            // The reader (or the session's end) may have taken this call's waiter just as the timeout fired. Its
+            // answer is then this call's result: an `ok` it already announced as Opened is never reported as a timeout.
+            if (synchronized(lock) { waiters[callId] === answer }) throw LinkClientException.TimedOut()
+            return answer.await()
         } finally {
-            synchronized(lock) { if (waiters[callId] === answer) waiters.remove(callId) }
+            synchronized(lock) {
+                if (waiters[callId] === answer) waiters.remove(callId)
+                openingViews.remove(callId)
+            }
+        }
+    }
+
+    /**
+     * Sends a message that expects no answer. Throws the session's end error when it has ended; a
+     * [LinkCodecException] propagates (nothing was sent), and any other failure is [LinkClientException.SessionClosed].
+     */
+    internal suspend fun post(message: LinkMessage) {
+        currentCoroutineContext().ensureActive()
+        endErrorOrNull()?.let { throw it }
+        try {
+            channel.send(message)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: LinkCodecException) {
+            throw e
+        } catch (_: Exception) {
+            throw LinkClientException.SessionClosed()
         }
     }
 
@@ -260,6 +320,14 @@ class LinkClient private constructor(
     /** Applies one received frame. False when the session is over. */
     private suspend fun handle(message: LinkMessage): Boolean {
         when (message) {
+            is LinkMessage.TerminalViewOpenResult -> {
+                val (waiter, terminalId) = synchronized(lock) { waiters.remove(message.callId) to openingViews[message.callId] }
+                // The `ok` is announced first, so every frame of the new view comes after Opened (PROTOCOL.md 11.1).
+                if (waiter != null && message.outcome == TerminalViewOpenOutcome.OK && terminalId != null) {
+                    terminalQueue.trySend(TerminalViewPush.Opened(terminalId))
+                }
+                waiter?.complete(message)
+            }
             // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
             is LinkMessage.Answer -> takeWaiter(message.callId)?.complete(message)
             is LinkMessage.Changed -> changeQueue.trySend(PendingChange(message.revision, message.added, message.resolved))
@@ -269,6 +337,8 @@ class LinkClient private constructor(
                 workspaceQueue.trySend(WorkspaceChange(message.revision, message.upserted, message.removed))
             is LinkMessage.ChatEntries -> chatQueue.trySend(ChatPush.Upsert(message.sessionId, message.entries))
             is LinkMessage.ChatReset -> chatQueue.trySend(ChatPush.Reset(message.sessionId))
+            is LinkMessage.TerminalViewFrame -> terminalQueue.trySend(TerminalViewPush.Frame(message.terminalId, message.frame))
+            is LinkMessage.TerminalViewEnded -> terminalQueue.trySend(TerminalViewPush.Ended(message.terminalId, message.reason))
             is LinkMessage.Ping -> try {
                 channel.send(LinkMessage.Pong(message.nonce))
             } catch (e: CancellationException) {
@@ -288,7 +358,8 @@ class LinkClient private constructor(
                     LinkLog.event("host reported error ${message.code}")
                 }
             }
-            // Pong, Unknown, Hello, Welcome and the client-only types are ignored (PROTOCOL.md section 7).
+            // Pong, Unknown, Hello, Welcome and the client-only types (the terminal ones too) are ignored (PROTOCOL.md
+            // section 7).
             else -> Unit
         }
         return true
@@ -306,6 +377,7 @@ class LinkClient private constructor(
         sessionQueue.close()
         workspaceQueue.close()
         chatQueue.close()
+        terminalQueue.close()
         pinger.cancel()
         watchdog.cancel()
         channel.close()
