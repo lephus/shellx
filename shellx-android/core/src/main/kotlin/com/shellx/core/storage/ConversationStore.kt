@@ -4,6 +4,7 @@ import com.shellx.core.account.LocalDataWiping
 import com.shellx.core.platform.Clock
 import com.shellx.core.platform.CoreLog
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -19,9 +20,10 @@ import kotlinx.serialization.json.Json
  * nothing is backed up). A corrupt file is dropped, never fatal. Pending items and agent state are not stored here;
  * they are always fetched from the Mac.
  *
- * A thread is `threads/<sha256-hex("<machineId>\u0000<sessionId>")>.json`, replaced atomically (a temp file, then
- * Files.move(…, ATOMIC_MOVE, REPLACE_EXISTING)), with its last-modified time set to clock.nowMs(). Only the newest
- * [maxThreads] files are kept, and the file just written is never evicted.
+ * A thread is `threads/<sha256-hex("<machineId>\u0000<sessionId>")>.json`, replaced atomically (a temp file synced
+ * to disk, then Files.move(…, ATOMIC_MOVE, REPLACE_EXISTING)), with its last-modified time set to clock.nowMs(). Only
+ * the newest [maxThreads] files are kept, and the file just written is never evicted. The first file work of each
+ * store deletes the temp files a process killed mid-write left (review 3b m-3); the app makes one store per directory.
  *
  * Writes go through a [Writer] bound to an epoch; [wipe] ends the epoch, so a write that was in flight at sign-out
  * cannot recreate the previous account's history.
@@ -38,6 +40,9 @@ class ConversationStore(
     private val mutex = Mutex()
     private var epoch = 0
 
+    /** This store's first file work swept the temp files left by a killed write. */
+    private var swept = false
+
     /** The newest claim on each document ([writer] with a claim). */
     private val claims = HashMap<StoreDocument, Int>()
 
@@ -46,6 +51,7 @@ class ConversationStore(
     /** The stored document, or null when there is none or it is unreadable (an unreadable file is removed). */
     suspend fun <T> load(doc: StoreDocument, codec: JsonCodec<T>): T? = mutex.withLock {
         withContext(io) {
+            sweepLeftoverTemps()
             val file = fileOf(doc)
             val text = try {
                 file.readText()
@@ -132,6 +138,7 @@ class ConversationStore(
         mutex.withLock {
             if (!current(doc, writerEpoch, claim, "remove")) return@withLock
             withContext(io) {
+                sweepLeftoverTemps()
                 try {
                     Files.deleteIfExists(fileOf(doc).toPath())
                 } catch (_: IOException) {
@@ -145,6 +152,7 @@ class ConversationStore(
         mutex.withLock {
             if (!current(doc, writerEpoch, claim, "write")) return@withLock
             withContext(io) {
+                sweepLeftoverTemps()
                 try {
                     val text = codec.encode(value).toString()
                     val threads = threadsDirectory
@@ -152,7 +160,11 @@ class ConversationStore(
                     val file = fileOf(doc)
                     val temp = File.createTempFile("write-", ".tmp", threads)
                     try {
-                        temp.writeText(text)
+                        // Synced before the move: a power loss soon after must not leave the renamed file empty.
+                        FileOutputStream(temp).use { out ->
+                            out.write(text.encodeToByteArray())
+                            out.fd.sync()
+                        }
                         Files.move(temp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
                     } finally {
                         temp.delete()
@@ -166,6 +178,20 @@ class ConversationStore(
                 }
             }
         }
+    }
+
+    /**
+     * Once per store, under the lock and on [io]: deletes `threads/write-*.tmp`. Only a save makes one, and it holds the
+     * lock until the temp file is moved or deleted, so every one found here was left by a process killed mid-write.
+     */
+    private fun sweepLeftoverTemps() {
+        if (swept) return
+        swept = true
+        val leftovers = threadsDirectory.listFiles { file ->
+            file.isFile && file.name.startsWith("write-") && file.name.endsWith(".tmp")
+        } ?: return
+        for (file in leftovers) file.delete()
+        if (leftovers.isNotEmpty()) CoreLog.log("store_temps_swept count=${leftovers.size}")
     }
 
     /** Keeps the [maxThreads] most recently written thread files; the file just written is never evicted, even if the
