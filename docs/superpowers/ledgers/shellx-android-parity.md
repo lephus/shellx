@@ -80,6 +80,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-9 | A photo's file extension comes from the picked item's MIME type; the image bytes are not inspected | Android's Photo Picker reports a MIME type and has no ImageIO | `core:composer/AttachmentChecks.kt` | 3C | differs (3C): by design |
 | A-10 | Voice: the on-device recognizer comes first (API 31+), then the standard `SpeechRecognizer`. There is no separate speech permission. The microphone and level meter belong to the recognizer, so the iPhone's audio-route and level-throttle rules do not apply | S3 §7.3 replaces the iPhone's recognizers with `SpeechRecognizer` | `core:voice/VoiceCapabilities.kt`, `FallbackTranscriber.kt`, `VoiceService.kt` | 3C | differs (3C): by design |
 | A-11 | A push is an FCM data message that carries `agent` and `workspace_title`, and the phone builds the alert text itself | Contracts §8: data-only messages | `core:push/PushPayload.kt` | 3C | differs (3C): by design |
+| A-12 | The update prompt compares Play `versionCode`s from Play In-App Updates; there is no store-page URL | S3 §7.3: flexible in-app update instead of the App Store lookup | `core:update/UpdatePrompt.kt` | 3C | differs (3C): by design |
 
 ## Test devices
 
