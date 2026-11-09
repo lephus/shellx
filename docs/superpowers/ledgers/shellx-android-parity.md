@@ -74,6 +74,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-3 | No Apple sign-in and no password sign-in | S3 §3; contracts §5 (no Apple methods, no password session) | `shellx-android/scripts/strings-ios-only.txt` (the Apple-link and password-switch strings) | — | differs (S3): by design |
 | A-4 | Nothing is backed up or moved to a new phone (`allowBackup="false"`, and `data_extraction_rules.xml` excludes everything) | Secrets never go into a backup (S3 §7.3) | `AndroidManifest.xml`, `res/xml/data_extraction_rules.xml` | 3A | done (3A) |
 | A-5 | On Android 12 and later, a system splash (the app icon on the ShellX background) shows before the launch screen | Android always shows one | `res/values*/themes.xml` | 3A | done (3A) |
+| A-6 | A debug build reads its relay from the `shellxApiBase` Gradle property, not an environment variable. A relay on the Mac is reached through `adb reverse tcp:<port> tcp:<port>` at `http://127.0.0.1:<port>`, because `10.0.2.2` is refused like any other non-loopback http address | Android apps have no launch environment | `core:config/ShellXEndpoints.kt` | 3C | differs (3C): by design |
 
 ## Test devices
 
