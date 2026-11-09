@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shellx.app.R
+import com.shellx.app.ui.components.topBarHeight
 import com.shellx.core.link.MachineHub
 import com.shellx.core.link.MachinePendingItem
 import com.shellx.core.pairing.SheetPresence
@@ -101,6 +102,7 @@ fun PendingListView(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                     }
                 },
+                expandedHeight = topBarHeight(),
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
             )
         },

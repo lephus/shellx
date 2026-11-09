@@ -1,6 +1,7 @@
 package com.shellx.app.ui.pending
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shellx.app.R
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.core.link.MachineHub
 import com.shellx.core.pairing.SheetPresence
 import com.shellx.core.pending.DecisionCenter
@@ -45,11 +47,14 @@ fun PendingSheetHost(route: PendingRoute, hub: MachineHub, center: DecisionCente
     // The sheet's own state (page, picks, typed answers, feedback, the last decision) is kept with the page, not with
     // the bottom sheet's window: the window keeps its state apart, which a rebuilt screen does not give back (RF 3).
     val kept = rememberSaveableStateHolder()
+    val compact = isCompactHeight()
     val item = route.model.opened ?: return
     ModalBottomSheet(
         onDismissRequest = close,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        // A short window (a phone in landscape) leaves the 48 dp handle out: Close and a swipe down still close it.
+        dragHandle = if (compact) null else ({ BottomSheetDefaults.DragHandle() }),
     ) {
         kept.SaveableStateProvider("${route.kind}/${route.id.machineId}/${route.id.requestId}") {
             Box {
