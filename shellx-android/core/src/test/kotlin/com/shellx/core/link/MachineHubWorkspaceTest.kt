@@ -1,6 +1,7 @@
 package com.shellx.core.link
 
 import com.shellx.core.demo.FakeMac
+import com.shellx.core.home.HomeFocus
 import com.shellx.core.testing.ManualClock
 import com.shellx.core.testing.ManualSleeper
 import com.shellx.core.testing.agentSession
@@ -387,10 +388,7 @@ class MachineHubWorkspaceTest {
         mac.setWorkspaces(listOf(linkWorkspace("shellx")))
         mac.upsertSession(agentSession("s1", state = AgentState.WORKING))
         val hub = makeHub(mac)
-        val running = eventually {
-            isOnline(hub) && hub.liveSessions.map { it.session.sessionId } == listOf("s1") &&
-                sessionState(hub, "s1") == AgentState.WORKING
-        }
+        val running = eventually { isOnline(hub) && focus(hub).running.map { it.session.session.sessionId } == listOf("s1") }
         assertTrue(running)
 
         val closed = hub.closeAgent(sessionRef(mac))
@@ -399,12 +397,14 @@ class MachineHubWorkspaceTest {
         assertEquals(listOf("s1"), mac.agentCloses)
         // The Mac reports the session ended, the way its liveness sweep does: it leaves Running for Ended.
         assertTrue(eventually { sessionState(hub, "s1") == AgentState.ENDED }, "${sessionState(hub, "s1")}")
-        assertEquals(emptyList(), hub.liveSessions.map { it.session.sessionId })
-        assertEquals(
-            listOf("s1"),
-            hub.reachableSessions.filter { it.session.state == AgentState.ENDED }.map { it.session.sessionId },
-        )
+        val afterwards = focus(hub)
+        assertEquals(emptyList(), afterwards.running.map { it.session.session.sessionId })
+        assertEquals(listOf("s1"), afterwards.ended.map { it.session.session.sessionId })
     } }
+
+    /** The home's groups for the hub's sessions now, by the wall clock (the fake Mac stamps its ends with it). */
+    private fun focus(hub: MachineHub): HomeFocus =
+        HomeFocus.make(hub.reachableSessions, emptyList(), hub.finishTimes, nowMs = System.currentTimeMillis())
 
     @Test fun closeAgentOutcomesMapToResults() { runTest {
         val mac = FakeMac("MacBook Pro", backgroundScope)
