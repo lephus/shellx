@@ -1,5 +1,6 @@
 package com.shellx.core.composer
 
+import java.util.Collections
 import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,14 +38,19 @@ class UploadProgressTest {
 
     /**
      * Review Focus 4: 3B calls progress on Dispatchers.Default. It runs on a real single-thread "main" dispatcher,
-     * because the point is a progress call from another thread: it is applied on the model's scope, only upward, and
-     * never after its send ended. (Real threads: no virtual time here.)
+     * because the point is a progress call from another thread: it is applied on the model's scope (every change
+     * reaches onChange on "main", review 3b m-1), only upward, and never after its send ended. (Real threads: no
+     * virtual time here.)
      */
     @Test fun progressFromAnotherThreadNeverOutlivesItsSend() {
         val main = Executors.newSingleThreadExecutor { Thread(it, "main") }.asCoroutineDispatcher()
+        // Under -ea, kotlinx-coroutines' debug mode appends " @coroutine#N" to the name while a coroutine runs.
+        val changedOn = Collections.synchronizedList(mutableListOf<Pair<Double?, String>>())
         try {
             runBlocking(main) {
-                val upload = UploadProgress(CoroutineScope(SupervisorJob() + main))
+                val upload = UploadProgress(CoroutineScope(SupervisorJob() + main)) { value ->
+                    changedOn += value to Thread.currentThread().name.substringBefore(" @coroutine#")
+                }
                 var late: ((Double) -> Unit)? = null
                 val result = upload.track { progress ->
                     late = progress
@@ -57,6 +63,7 @@ class UploadProgressTest {
                 withContext(Dispatchers.Default) { late!!(0.9) }
                 delay(50)
                 assertNull(upload.fraction.value)
+                assertEquals(listOf(0.0 to "main", 0.5 to "main", null to "main"), changedOn.toList())
             }
         } finally {
             main.close()
