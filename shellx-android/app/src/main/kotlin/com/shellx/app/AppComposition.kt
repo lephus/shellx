@@ -198,6 +198,9 @@ class AppComposition(
 
     private class HubAndState(val hub: MachineHub, val state: HubState)
 
+    /** The process lifecycle's hook ([ShellXApplication] feeds it ON_START and ON_STOP). */
+    val lifecycle: AppLifecycle = AppLifecycle(this)
+
     /**
      * Takes a waiting link when the active account is real, signed in, its hub loaded and its scope's sheets closed:
      * the pairing model begins with it (the confirmation step; nothing reaches the relay before Pair) and this returns

@@ -9,6 +9,7 @@
 
     <!-- Nothing is backed up or moved to a new phone: secrets and paired Macs stay on this device (S3 §7.3). -->
     <application
+        android:name=".ShellXApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
