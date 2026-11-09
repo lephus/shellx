@@ -49,6 +49,23 @@ sealed interface ChatPush {
     }
 }
 
+/** A photo or file to upload with a message. Neither the name nor the bytes print. */
+data class ChatAttachment(val kind: AttachmentKind, val name: String, val data: ByteArray) {
+    override fun equals(other: Any?): Boolean =
+        other is ChatAttachment && kind == other.kind && name == other.name && data.contentEquals(other.data)
+
+    override fun hashCode(): Int = (kind.hashCode() * 31 + name.hashCode()) * 31 + data.contentHashCode()
+
+    override fun toString(): String = "ChatAttachment(kind=${kind.wire}, name=<redacted>, data=<${data.size} bytes>)"
+}
+
+/**
+ * An attachment of a message failed to go up, so the message's `chat.send` was never sent: nothing was typed, and
+ * sending it again is safe. [cause] is what the upload threw: a [LinkClientException] (`Remote` when the host refused
+ * a step) or a [LinkCodecException]. It never wraps a `CancellationException`, which propagates as it is.
+ */
+class MessageUploadException(override val cause: Exception) : Exception("message_upload", cause)
+
 /** Failures of a Link session. Host text ([ProtocolMismatch.detail], `detail` of the others) never prints. */
 sealed class LinkClientException(message: String) : Exception(message) {
     /** The host speaks another protocol version; the user should update the app (PROTOCOL.md section 7). */
@@ -126,6 +143,33 @@ interface LinkSession {
 
     /** Not safe to repeat: after a timeout it is unknown whether the host typed it. */
     suspend fun chatSend(sessionId: String, text: String, attachments: List<String> = emptyList()): ChatSendOutcome
+
+    /**
+     * Uploads a photo or file (PROTOCOL.md section 5, "Attachments") and returns the host's id, to name in [chatSend].
+     * Sends `attach.begin`, then chunks of at most [ShellXLink.MAX_ATTACHMENT_CHUNK_BYTES] bytes, each after the result
+     * of the one before, then `attach.end` with the SHA-256 of [data]. [progress] gets the bytes sent so far after each
+     * chunk's result, so its last value is `data.size`. Call it only when [hostFeatures] contains
+     * [ShellXLink.ATTACHMENTS_FEATURE].
+     *
+     * Uploads of one client run one at a time, in call order, and wait for a message of the `uploading` [chatSend] to
+     * be answered. A failed or cancelled upload gives up its turn; so does a caller cancelled while it waits. The host
+     * refuses a size outside 1 to [ShellXLink.MAX_ATTACHMENT_BYTES] with `too_large` or `bad_request` ([LinkClientException.Remote]).
+     */
+    suspend fun uploadAttachment(kind: AttachmentKind, name: String, data: ByteArray, progress: (Int) -> Unit = {}): String
+
+    /**
+     * Uploads [uploading] in order, then `chat.send` with their ids: one message, holding the upload turn from the first
+     * `attach.begin` until the `chat.send` is answered, so no other upload of this client comes in between. [progress]
+     * gets the bytes of all the attachments sent so far. An upload failure throws [MessageUploadException]: the
+     * `chat.send` never left, so nothing was typed. Otherwise as the [chatSend] with ids. Call it only when
+     * [hostFeatures] contains [ShellXLink.ATTACHMENTS_FEATURE].
+     */
+    suspend fun chatSend(
+        sessionId: String,
+        text: String,
+        uploading: List<ChatAttachment>,
+        progress: (Int) -> Unit = {},
+    ): ChatSendOutcome
 
     suspend fun chatInterrupt(sessionId: String, hard: Boolean): ChatInterruptOutcome
 

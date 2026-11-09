@@ -1,5 +1,6 @@
 package com.shellx.link.core
 
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineName
@@ -12,6 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -44,6 +46,14 @@ class LinkClient private constructor(
     override val workspaceChanges: Flow<WorkspaceChange> = workspaceQueue.receiveAsFlow()
     override val chatEntries: Flow<ChatPush> = chatQueue.receiveAsFlow()
 
+    /**
+     * The upload turn, a fair (FIFO) lock. An upload holds it from `attach.begin` to its end, and a message from its
+     * first upload until its `chat.send` is answered: the host drops an unfinished upload at every `attach.begin`, and
+     * the oldest finished one when it holds five (PROTOCOL.md section 5).
+     */
+    private val uploadTurn = Mutex()
+    private val waitingForTurn = AtomicInteger(0)
+
     private val pinger: Job = scope.launch { runPings(channel, timings.pingInterval) }
 
     init {
@@ -61,6 +71,9 @@ class LinkClient private constructor(
     /** How many calls wait for their answer. For tests. */
     internal val pendingCalls: Int get() = synchronized(lock) { waiters.size }
 
+    /** How many uploads and messages wait for the upload turn behind the one holding it. For tests. */
+    internal val uploadsWaiting: Int get() = waitingForTurn.get()
+
     override suspend fun snapshot(): PendingSnapshot =
         ask<LinkMessage.Snapshot> { LinkMessage.SnapshotGet(it) }.let { PendingSnapshot(it.revision, it.pending) }
 
@@ -76,6 +89,40 @@ class LinkClient private constructor(
 
     override suspend fun chatSend(sessionId: String, text: String, attachments: List<String>): ChatSendOutcome =
         ask<LinkMessage.ChatSendResult> { LinkMessage.ChatSend(it, sessionId, text, attachments) }.outcome
+
+    override suspend fun uploadAttachment(
+        kind: AttachmentKind,
+        name: String,
+        data: ByteArray,
+        progress: (Int) -> Unit,
+    ): String = withUploadTurn {
+        endErrorOrNull()?.let { throw it }
+        upload(kind, name, data.copyOf(), progress)
+    }
+
+    override suspend fun chatSend(
+        sessionId: String,
+        text: String,
+        uploading: List<ChatAttachment>,
+        progress: (Int) -> Unit,
+    ): ChatSendOutcome = withUploadTurn {
+        endErrorOrNull()?.let { throw MessageUploadException(it) }
+        val ids = ArrayList<String>(uploading.size)
+        var sent = 0
+        for (attachment in uploading) {
+            val before = sent
+            val data = attachment.data.copyOf()
+            ids += try {
+                upload(attachment.kind, attachment.name, data) { progress(before + it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw MessageUploadException(e)
+            }
+            sent += data.size
+        }
+        chatSend(sessionId, text, ids)
+    }
 
     override suspend fun chatInterrupt(sessionId: String, hard: Boolean): ChatInterruptOutcome =
         ask<LinkMessage.ChatInterruptResult> { LinkMessage.ChatInterrupt(it, sessionId, hard) }.outcome
@@ -130,6 +177,45 @@ class LinkClient private constructor(
         } finally {
             synchronized(lock) { if (waiters[callId] === answer) waiters.remove(callId) }
         }
+    }
+
+    /**
+     * Runs [block] holding the upload turn. Cancellation while waiting for it or holding it propagates and gives the
+     * turn up.
+     */
+    private suspend fun <T> withUploadTurn(block: suspend () -> T): T {
+        waitingForTurn.incrementAndGet()
+        try {
+            uploadTurn.lock()
+        } finally {
+            waitingForTurn.decrementAndGet()
+        }
+        try {
+            return block()
+        } finally {
+            uploadTurn.unlock()
+        }
+    }
+
+    /** One upload, `attach.begin` to `attach.end`. The caller holds the upload turn. */
+    private suspend fun upload(kind: AttachmentKind, name: String, data: ByteArray, progress: (Int) -> Unit): String {
+        val id = ask<LinkMessage.AttachReady> { LinkMessage.AttachBegin(it, kind, name, data.size) }.attachmentId
+        var offset = 0
+        while (offset < data.size) {
+            val start = offset
+            val end = minOf(start + ShellXLink.MAX_ATTACHMENT_CHUNK_BYTES, data.size)
+            val chunk = data.copyOfRange(start, end)
+            val answer = call { LinkMessage.AttachChunk(it, id, start, chunk) }
+            if (answer !is LinkMessage.AttachChunkResult || answer.attachmentId != id || answer.received != end) {
+                throw LinkClientException.UnexpectedAnswer()
+            }
+            offset = end
+            progress(offset)
+        }
+        val digest = sha256(data)
+        val finished = call { LinkMessage.AttachEnd(it, id, digest) }
+        if (finished !is LinkMessage.AttachEndResult || finished.attachmentId != id) throw LinkClientException.UnexpectedAnswer()
+        return id
     }
 
     /** The session's end error, or null while it runs. */
