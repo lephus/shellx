@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shellx.app.R
 import com.shellx.app.ui.components.PrimaryButton
+import com.shellx.app.ui.components.SavedTextSaver
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.app.ui.components.isLargeText
 import com.shellx.app.ui.composer.MicButton
@@ -94,9 +96,9 @@ fun PlanReviewSheet(
     voice: VoiceInputModel? = null,
 ) {
     var inRevise by rememberSaveable { mutableStateOf(revising) }
-    var text by rememberSaveable { mutableStateOf(feedback) }
-    // The decision last sent from here, for "Try again".
-    var last by remember { mutableStateOf<LinkDecision?>(null) }
+    var text by rememberSaveable(stateSaver = SavedTextSaver) { mutableStateOf(feedback) }
+    // The decision last sent from here, for "Try again"; kept when the screen is rebuilt, as the status line still offers it.
+    var last by rememberSaveable(stateSaver = PlanReviewSheet.DecisionSaver) { mutableStateOf<LinkDecision.ExitPlan?>(null) }
     val env = LocalVoice.current
     val own = remember(env?.service, voice == null) {
         if (voice == null) env?.service?.makeModel(DecisionCenter.MAX_FEEDBACK_BYTES) else null
@@ -117,7 +119,7 @@ fun PlanReviewSheet(
     val canSendFeedback = state.canSend && trimmed.isNotEmpty() && bytes <= DecisionCenter.MAX_FEEDBACK_BYTES
 
     fun decide(decision: LinkDecision) {
-        last = decision
+        last = decision as? LinkDecision.ExitPlan
         send(decision)
     }
 
@@ -350,6 +352,15 @@ private fun OtherModes(modes: List<ExitPlanMode>, enabled: Boolean, wide: Boolea
 }
 
 object PlanReviewSheet {
+    /** Keeps the last decision sent across recreation: its mode, and its feedback (already within the send limit). */
+    val DecisionSaver: Saver<LinkDecision.ExitPlan?, Any> = Saver(
+        save = { decision -> decision?.let { arrayListOf(it.mode.wire, it.feedback.orEmpty()) } },
+        restore = { saved ->
+            val (mode, feedback) = saved as List<*>
+            LinkDecision.ExitPlan(ExitPlanMode(mode as String), (feedback as String).ifEmpty { null })
+        },
+    )
+
     /** `auto_accept` → "Auto-accept edits", `ultraplan` → "Ultraplan", anything else → "Approve". */
     @StringRes
     fun title(mode: ExitPlanMode): Int = when (mode) {

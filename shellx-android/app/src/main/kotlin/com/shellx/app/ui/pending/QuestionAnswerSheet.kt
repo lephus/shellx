@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shellx.app.R
 import com.shellx.app.ui.components.PrimaryButton
+import com.shellx.app.ui.components.SavedTextMapSaver
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.app.ui.composer.MicButton
 import com.shellx.app.ui.composer.VoiceStatusView
@@ -106,7 +107,7 @@ fun QuestionAnswerSheet(
     }
     var shownPage by rememberSaveable { mutableIntStateOf(page) }
     var open by rememberSaveable(stateSaver = StringSetSaver) { mutableStateOf(typing) }
-    var typed by rememberSaveable(stateSaver = StringMapSaver) { mutableStateOf(freeText) }
+    var typed by rememberSaveable(stateSaver = SavedTextMapSaver) { mutableStateOf(freeText) }
     var noMatch by rememberSaveable(stateSaver = StringSetSaver) { mutableStateOf(unmatched) }
     // What TalkBack is told after a spoken answer (a polite live region).
     var announcement by remember { mutableStateOf("") }
@@ -466,6 +467,3 @@ object QuestionAnswerSheet {
 
 /** A set of strings (question ids) kept across recreation. */
 internal val StringSetSaver: Saver<Set<String>, ArrayList<String>> = Saver(save = { ArrayList(it) }, restore = { it.toSet() })
-
-/** A map of strings (typed answers by question id) kept across recreation. */
-internal val StringMapSaver: Saver<Map<String, String>, HashMap<String, String>> = Saver(save = { HashMap(it) }, restore = { it })
