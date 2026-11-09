@@ -86,6 +86,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-15 | The first launch deletes what the old Flutter app (same app id) left: `app_flutter/`, `shared_prefs/Flutter*`, its Keystore aliases | S3 §3: the native app reads none of the Flutter data and cleans it at first open | `app:platform/LegacyFlutterCleanup.kt` | 3D | done (3D) |
 | A-16 | A row's actions: a swipe from the end runs the primary one (the iPhone's first swipe button), a long press opens a menu of all of them, and TalkBack lists them as custom actions; touch targets are 48 dp, not 44 pt | S3 §7.2 (Android interactions; Material's minimum touch target) | `app:ui/components/ActionRow.kt`, `app:ui/components/RowActions.kt` | 3D | differs (3D): by design |
 | A-17 | The account launches at the app's first start in front, not at process start, and the network is watched only while the app is in front | S3 §4 (battery): a push (FCM) may start the process in the background, and nothing may connect then | `app:AppLifecycle.kt` | 3D | differs (3D): by design |
+| A-18 | Continue with Google uses the branding page's 'Android & Web' padding (12 / 10 / 12 dp around the 20 dp G; the iPhone's row is 16 / 12 / 16) and the Android + Web icons, and it is at least 48 dp high (the iPhone's is 44 pt, beside Apple's button) | Contracts §11 and Google's branding guidelines ('Padding'); the 48 dp touch target | `app:ui/signin/GoogleSignInButton.kt` | 3D | differs (3D): by design |
 
 ## Test devices
 

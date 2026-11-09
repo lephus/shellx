@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Google's G is looked up by name (GoogleBranding.mark), so the resource shrinker must keep it. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@drawable/ic_google_g" />
