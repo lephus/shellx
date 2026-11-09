@@ -154,11 +154,13 @@ class OkHttpRelaySocketsTest {
                 within { assertEquals(RelaySocketMessage.Text("open"), socket.receive()) }
                 val pending = async(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) { socket.receive() }
                 pending.cancel()
-                within {
-                    pending.join()
-                    assertEquals("failure", side.ended.await())
-                }
+                within { pending.join() }
                 assertTrue(pending.isCancelled)
+                // Closed at once, not only after OkHttp's reader thread has noticed the cancelled call.
+                assertFailsWith<RelayException.Closed> { socket.sendText("x") }
+                assertFailsWith<RelayException.Closed> { socket.sendBinary(byteArrayOf(1)) }
+                within { assertFailsWith<RelayException.Closed> { socket.receive() } }
+                assertEquals("failure", within { side.ended.await() })
                 assertFailsWith<RelayException.Closed> { socket.sendText("x") }
             }
         }
