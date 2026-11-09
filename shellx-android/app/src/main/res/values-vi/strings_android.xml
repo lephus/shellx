@@ -40,5 +40,5 @@
     <string name="update_message">Cập nhật ShellX trên Google Play để có các bản sửa lỗi và tính năng mới nhất.</string>
     <string name="update_restart">Khởi động lại</string>
     <string name="voice_denied">ShellX cần quyền micro để nghe bạn.</string>
-    <string name="voice_mic_hint">Giữ để nói, thả ra là xong. Với TalkBack, chạm hai lần để bắt đầu, chạm hai lần nữa là xong.</string>
+    <string name="voice_mic_hint">bắt đầu nói. Chạm hai lần nữa là xong.</string>
 </resources>
