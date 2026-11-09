@@ -2,6 +2,7 @@ package com.shellx.core.account
 
 import com.shellx.core.link.MachineHub
 import com.shellx.core.platform.CoreLog
+import com.shellx.core.platform.DetachedRun
 import com.shellx.core.platform.KeyValueStore
 import com.shellx.core.platform.rethrowIfCancelled
 import com.shellx.core.platform.runDetached
@@ -20,6 +21,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * (Back, a configuration change, a cleared viewModelScope) never leaves a sign-in, sign-out or deletion half done. A
  * hub's onUnauthorized calls [handleUnauthorized] from the hub's own scope, which the sign-out cancels; the work goes
  * on in [scope].
+ *
+ * A sign-in, sign-out or deletion runs once at a time (review 3a m-2): a call while the same action is still running
+ * (its screen went, and the next screen's tap came before the relay answered) waits for that run and gets its result,
+ * so there is never a second Google prompt, a second relay sign-in, or a device token left signed in.
  *
  * Nothing here logs a token, a key or an email; log lines carry event names only.
  */
@@ -53,6 +58,10 @@ class AppCoordinator(
     private var accountChangeInProgress = false
     private var unauthorizedDuringChange = false
 
+    private val signingIn = DetachedRun<Unit>()
+    private val signingOut = DetachedRun<Unit>()
+    private val deleting = DetachedRun<Unit>()
+
     /**
      * Reads the stored session. A secret store that is unavailable for now keeps the phase at Launching;
      * [protectedDataBecameAvailable] tries again.
@@ -71,7 +80,7 @@ class AppCoordinator(
      * [SignInException].
      */
     suspend fun signInWithGoogle() {
-        scope.runDetached {
+        signingIn.run(scope) {
             // A sign-out whose local wipe failed blocks every sign-in until the wipe succeeds.
             if (!retryPendingWipe()) throw SignInException.LocalWipePending()
             val key = phoneKey()
@@ -92,7 +101,7 @@ class AppCoordinator(
      * logout), then forgets everything local.
      */
     suspend fun signOut() {
-        scope.runDetached {
+        signingOut.run(scope) {
             stopHub()
             val token = try {
                 vault.session()?.token
@@ -147,7 +156,7 @@ class AppCoordinator(
      * failure the session and the hub stay, unless the relay refused the stored token.
      */
     suspend fun deleteAccount() {
-        scope.runDetached {
+        deleting.run(scope) {
             val stored = try {
                 vault.session()
             } catch (e: Exception) {
