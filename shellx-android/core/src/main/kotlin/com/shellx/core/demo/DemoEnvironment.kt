@@ -64,15 +64,17 @@ class DemoEnvironment(
     private var playing: Job? = null
 
     /**
-     * Once (seeding again would drop a Mac paired since): stores `StoredSession("demo", "demo-phone", "demo-token",
+     * Once it succeeded (seeding again would drop a Mac paired since): stores `StoredSession("demo", "demo-phone", "demo-token",
      * EMAIL)` and `[first.machine]` owned by "demo", then, with `runsScript`, starts the script and gives the first Mac
      * [WORKSPACES]. The caller then calls `coordinator.launch()`.
      */
     suspend fun prepare() {
         if (prepared) return
-        prepared = true
         vault.setSession(StoredSession("demo", "demo-phone", "demo-token", EMAIL))
         vault.setMachines(listOf(first.machine), "demo")
+        // Only once the writes are done: a first call cancelled meanwhile (3D's effect, a configuration change) is
+        // done again by the next one (review 4 M-3). Nothing below suspends.
+        prepared = true
         if (runsScript) {
             playing = script.start(scope, sleep)
             // The Mac's sidebar as the design shows it, over the script's two sessions.

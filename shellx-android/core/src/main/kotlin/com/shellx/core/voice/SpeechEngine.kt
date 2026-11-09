@@ -25,9 +25,11 @@ interface SpeechEngine {
     suspend fun start(run: SpeechRunId, language: VoiceLanguage, contextualStrings: List<String>): ReceiveChannel<String>
 
     /** Stops listening as [run] and returns its final text: "" when nothing was heard, or for a run that is not the one
-     *  listening. */
+     *  listening. Gives the mic back, also when it is cancelled, and should not throw: VoiceInputModel logs a
+     *  failure, keeps the words heard and cancels the run. */
     suspend fun finish(run: SpeechRunId): String
 
-    /** Stops listening as [run] and drops what was heard. Does nothing for any other run. */
+    /** Stops listening as [run] and drops what was heard. Does nothing for any other run. Should not throw:
+     *  VoiceInputModel logs a failure and goes on. */
     suspend fun cancel(run: SpeechRunId)
 }

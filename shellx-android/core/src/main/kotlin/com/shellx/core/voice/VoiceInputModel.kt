@@ -3,6 +3,7 @@ package com.shellx.core.voice
 import com.shellx.core.diagnostics.LatencyLog
 import com.shellx.core.diagnostics.LatencyMetric
 import com.shellx.core.home.ComposerValidation
+import com.shellx.core.platform.CoreLog
 import com.shellx.core.platform.rethrowIfCancelled
 import com.shellx.core.platform.runDetached
 import com.shellx.core.text.cutToUtf8
@@ -12,12 +13,14 @@ import kotlin.time.Duration
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** What a mic shows (`VoiceInputModel.state`). */
 data class VoiceInputState(
@@ -42,8 +45,12 @@ data class VoiceInputState(
  *   never logged and never print.
  * - The microphone is always given back: on release, cancel, [typeInstead], and when the recognizer's channel closes
  *   by itself. Each press is its own [SpeechRunId], so stopping an old press never stops a newer one.
- * - Android only: the recognizer's finish runs in `scope` ([release]), so a caller cancelled meanwhile never leaves
- *   the mic stuck in [Phase.Finishing].
+ * - Android only: a screen's coroutine can be cancelled in the middle of a call (the iPhone never cancels a view's
+ *   Task). The recognizer's finish and every give-back of the mic run in `scope`, so a cancelled caller never leaves
+ *   the mic stuck in [Phase.Finishing] or a recognizer listening behind an idle mic (review 4 I-1). A press whose
+ *   caller is cancelled while it starts is dropped, and its run gives the mic back (M-2). An engine whose `finish` or
+ *   `cancel` throws is logged by code (`voice_finish_failed`, `voice_cancel_failed`) and the dictation still ends
+ *   (M-1).
  *
  * Main-confined. The reader of the recognizer's channel runs in `scope`.
  */
@@ -158,24 +165,29 @@ class VoiceInputModel(
             it.copy(phase = Phase.Listening(""), wantsKeyboard = false, firstWordLatency = null, limitReached = false)
         }
 
-        // A system prompt's time is not speech latency: that press records no first-word sample.
-        if (permissions.needsPrompt() && attempt == current) elapsed = null
-        if (!permissions.microphone()) return refuse(current, Phase.Denied(VoicePermission.MICROPHONE))
-        if (!permissions.speech()) return refuse(current, Phase.Denied(VoicePermission.SPEECH))
-        if (capabilities(language).engine == null) return refuse(current, Phase.Unavailable)
-        if (attempt != current || released) return
+        try {
+            // A system prompt's time is not speech latency: that press records no first-word sample.
+            if (permissions.needsPrompt() && attempt == current) elapsed = null
+            if (!permissions.microphone()) return refuse(current, Phase.Denied(VoicePermission.MICROPHONE))
+            if (!permissions.speech()) return refuse(current, Phase.Denied(VoicePermission.SPEECH))
+            if (capabilities(language).engine == null) return refuse(current, Phase.Unavailable)
+            if (attempt != current || released) return
 
-        val channel = try {
-            engine.start(run, language, contextualStrings())
-        } catch (e: Exception) {
-            rethrowIfCancelled(e)
-            return refuse(current, Phase.Unavailable)
+            val channel = try {
+                engine.start(run, language, contextualStrings())
+            } catch (e: Exception) {
+                rethrowIfCancelled(e)
+                return refuse(current, Phase.Unavailable)
+            }
+            // Released while the recognizer started: the release already cancelled this run, so the engine refused
+            // it the microphone; nothing more to stop.
+            if (attempt != current || released) return
+            recognition = Recognition.RUNNING
+            reader = scope.launch { read(channel, current, run) }
+        } catch (e: Throwable) {
+            abandon(current)
+            throw e
         }
-        // Released while the recognizer started: the release already cancelled this run, so the engine refused it
-        // the microphone; nothing more to stop.
-        if (attempt != current || released) return
-        recognition = Recognition.RUNNING
-        reader = scope.launch { read(channel, current, run) }
     }
 
     /** The finger moved by ([dx], [dy]) dp from where it went down. */
@@ -184,7 +196,7 @@ class VoiceInputModel(
         if (dy <= -KEYBOARD_DISTANCE && isBlank(text)) {
             wantsKeyboard = true
             val run = drop()
-            if (run != null) scope.launch { engine.cancel(run) }
+            if (run != null) scope.launch { cancelQuietly(run) }
             return
         }
         setPhase(if (dx <= -CANCEL_DISTANCE) Phase.CancelArmed(text) else Phase.Listening(text))
@@ -196,7 +208,7 @@ class VoiceInputModel(
         when (phase) {
             is Phase.Listening -> Unit
             is Phase.CancelArmed -> {
-                drop()?.let { engine.cancel(it) }
+                drop()?.let { giveBack(it) }
                 return null
             }
             else -> {
@@ -207,7 +219,7 @@ class VoiceInputModel(
         return when (recognition) {
             Recognition.STARTING -> {
                 // Cancelled now, while it starts: the engine never gives it the microphone.
-                drop()?.let { engine.cancel(it) }
+                drop()?.let { giveBack(it) }
                 null
             }
             Recognition.STOPPED, Recognition.FINISHING -> {
@@ -220,12 +232,21 @@ class VoiceInputModel(
                 recognition = Recognition.FINISHING
                 // In the model's scope: a caller cancelled while the recognizer finishes still leaves the mic idle.
                 scope.runDetached {
-                    val finalText = engine.finish(run)
-                    recognition = Recognition.STOPPED
-                    reader?.cancel()
-                    reader = null
+                    var finalText = ""
+                    try {
+                        finalText = engine.finish(run)
+                    } catch (e: Exception) {
+                        rethrowIfCancelled(e)
+                        // The words heard so far stay; the run is cancelled so the mic is given back.
+                        CoreLog.log("voice_finish_failed")
+                        cancelQuietly(run)
+                    } finally {
+                        recognition = Recognition.STOPPED
+                        reader?.cancel()
+                        reader = null
+                        setPhase(Phase.Idle)
+                    }
                     val words = if (isBlank(finalText)) text else finalText
-                    setPhase(Phase.Idle)
                     nonBlank(cut(words))
                 }
             }
@@ -247,7 +268,7 @@ class VoiceInputModel(
     /** Stops listening at once and drops the words: the mic's screen went away, the audio was interrupted or the app
      *  left the foreground. Does nothing while nothing listens. */
     suspend fun cancel() {
-        if (phase is Phase.Listening || phase is Phase.CancelArmed) drop()?.let { engine.cancel(it) }
+        if (phase is Phase.Listening || phase is Phase.CancelArmed) drop()?.let { giveBack(it) }
     }
 
     /** Clears a denied or unavailable message (the user typed instead, or closed it). */
@@ -267,6 +288,31 @@ class VoiceInputModel(
         if (attempt != current) return
         recognition = Recognition.STOPPED
         _state.update { it.copy(phase = reason, wantsKeyboard = if (reason == Phase.Unavailable) true else it.wantsKeyboard) }
+    }
+
+    /** A press that left while it started (its caller was cancelled, or a check threw): drops it, and gives its run's
+     *  mic back in the model's scope, in case the engine already granted it (review 4 M-2). A newer press, or a
+     *  release that already dropped this one, is left alone. */
+    private fun abandon(current: Int) {
+        if (attempt != current || recognition != Recognition.STARTING) return
+        val run = drop() ?: return
+        scope.launch { cancelQuietly(run) }
+    }
+
+    /** Gives [run]'s mic back in the model's scope and waits for it: a caller cancelled meanwhile still releases the
+     *  mic (review 4 I-1). */
+    private suspend fun giveBack(run: SpeechRunId) {
+        scope.runDetached { cancelQuietly(run) }
+    }
+
+    /** The engine's cancel. A failure is logged by code, never thrown (review 4 M-1). */
+    private suspend fun cancelQuietly(run: SpeechRunId) {
+        try {
+            engine.cancel(run)
+        } catch (e: Exception) {
+            rethrowIfCancelled(e)
+            CoreLog.log("voice_cancel_failed")
+        }
     }
 
     /** Stops listening now and drops the words. Returns the run when its recognizer was running or still starting: the
@@ -300,7 +346,8 @@ class VoiceInputModel(
                 _state.update { it.copy(phase = Phase.Unavailable, wantsKeyboard = true) }
             }
         }
-        engine.cancel(run)
+        // A drop() meanwhile cancels this reader; the give-back still finishes.
+        withContext(NonCancellable) { cancelQuietly(run) }
     }
 
     private fun take(update: String) {
@@ -321,7 +368,7 @@ class VoiceInputModel(
         if (limitReached && recognition == Recognition.RUNNING && run != null) {
             // Stop listening at the limit; the kept words stay until release.
             recognition = Recognition.STOPPED
-            scope.launch { engine.cancel(run) }
+            scope.launch { cancelQuietly(run) }
         }
     }
 
