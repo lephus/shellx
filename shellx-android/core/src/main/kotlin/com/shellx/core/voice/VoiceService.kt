@@ -85,9 +85,18 @@ class VoiceService(
         _state.update { it.copy(engine = found, engineKnown = true) }
     }
 
-    /** Stops every mic that listens now and drops its words. */
+    /** Stops every mic that listens now and drops its words. Every mic is reached also when one call throws (this
+     *  caller was cancelled meanwhile): the first failure is thrown after the last mic (final review I-1). */
     suspend fun cancelAll() {
-        for (model in made.mapNotNull { it.get() }) model.cancel()
+        var failure: Exception? = null
+        for (model in made.mapNotNull { it.get() }) {
+            try {
+                model.cancel()
+            } catch (e: Exception) {
+                if (failure == null) failure = e
+            }
+        }
+        failure?.let { throw it }
     }
 
     /** The on-device recognizer failed to start for [language] (FallbackTranscriber's `primaryFailed`), so presses go

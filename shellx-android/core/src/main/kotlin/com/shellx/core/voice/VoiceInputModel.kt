@@ -12,6 +12,7 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -51,6 +52,9 @@ data class VoiceInputState(
  *   caller is cancelled while it starts is dropped, and its run gives the mic back (M-2). An engine whose `finish` or
  *   `cancel` throws is logged by code (`voice_finish_failed`, `voice_cancel_failed`) and the dictation still ends
  *   (M-1).
+ * - `scope` is hub.scope, which a refused token (401), a sign-out, a deletion and the demo's Exit cancel. A press that
+ *   listens or starts then is dropped, shows [Phase.Idle] and gives the mic back, and later calls never throw into a
+ *   caller that was not cancelled (final review I-1).
  *
  * Main-confined. The reader of the recognizer's channel runs in `scope`.
  */
@@ -183,7 +187,9 @@ class VoiceInputModel(
             // it the microphone; nothing more to stop.
             if (attempt != current || released) return
             recognition = Recognition.RUNNING
-            reader = scope.launch { read(channel, current, run) }
+            // UNDISPATCHED: the reader's finally is in place before press returns, also when `scope` already ended (a
+            // plain launch on an ended scope never runs, and the run would keep the mic).
+            reader = scope.launch(start = CoroutineStart.UNDISPATCHED) { read(channel, current, run) }
         } catch (e: Throwable) {
             abandon(current)
             throw e
@@ -195,8 +201,7 @@ class VoiceInputModel(
         if (phase !is Phase.Listening && phase !is Phase.CancelArmed) return
         if (dy <= -KEYBOARD_DISTANCE && isBlank(text)) {
             wantsKeyboard = true
-            val run = drop()
-            if (run != null) scope.launch { cancelQuietly(run) }
+            drop()?.let { startGiveBack(it) }
             return
         }
         setPhase(if (dx <= -CANCEL_DISTANCE) Phase.CancelArmed(text) else Phase.Listening(text))
@@ -295,15 +300,21 @@ class VoiceInputModel(
      *  release that already dropped this one, is left alone. */
     private fun abandon(current: Int) {
         if (attempt != current || recognition != Recognition.STARTING) return
-        val run = drop() ?: return
-        scope.launch { cancelQuietly(run) }
+        drop()?.let { startGiveBack(it) }
     }
 
-    /** Gives [run]'s mic back in the model's scope and waits for it: a caller cancelled meanwhile still releases the
-     *  mic (review 4 I-1). */
+    /** Gives [run]'s mic back and waits for it. A caller cancelled meanwhile still releases the mic (review 4 I-1), and
+     *  a caller that was not cancelled never gets a CancellationException, also once `scope` ended (`join` throws only
+     *  for the caller's own cancellation; final review I-1). */
     private suspend fun giveBack(run: SpeechRunId) {
-        scope.runDetached { cancelQuietly(run) }
+        startGiveBack(run).join()
     }
+
+    /** Starts giving [run]'s mic back in the model's scope, at once in the caller's frame. It finishes when the scope
+     *  ends meanwhile (NonCancellable), and runs also when the scope already ended (UNDISPATCHED starts the block even
+     *  for a cancelled job), so an engine whose cancel suspends still releases. */
+    private fun startGiveBack(run: SpeechRunId): Job =
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) { cancelQuietly(run) } }
 
     /** The engine's cancel. A failure is logged by code, never thrown (review 4 M-1). */
     private suspend fun cancelQuietly(run: SpeechRunId) {
@@ -328,8 +339,11 @@ class VoiceInputModel(
     }
 
     /** Takes the run's updates. When the channel closes by itself (an error, a time limit), the words heard stay for
-     *  release, and the run is cancelled so the microphone is given back at once. */
+     *  release, and the run is cancelled so the microphone is given back at once. When the reader is cancelled while
+     *  the run listens and nobody took the run (no drop(), no release: `scope` ended), the dictation is dropped and the
+     *  microphone given back too (final review I-1). */
     private suspend fun read(channel: ReceiveChannel<String>, current: Int, run: SpeechRunId) {
+        var giveBack = false
         try {
             for (update in channel) {
                 if (attempt != current || (recognition != Recognition.RUNNING && recognition != Recognition.FINISHING)) return
@@ -337,17 +351,22 @@ class VoiceInputModel(
             }
             if (attempt != current || recognition != Recognition.RUNNING) return
             recognition = Recognition.STOPPED
+            giveBack = true
         } catch (e: Exception) {
             rethrowIfCancelled(e)
             if (attempt != current || recognition != Recognition.RUNNING) return
             recognition = Recognition.STOPPED
+            giveBack = true
             // Nothing heard: no recognizer works right now. Otherwise the words stay to be sent.
             if (isBlank(text) && phase is Phase.Listening) {
                 _state.update { it.copy(phase = Phase.Unavailable, wantsKeyboard = true) }
             }
+        } finally {
+            // drop() and release set the recognition before they cancel this reader: still RUNNING means `scope` ended.
+            if (attempt == current && recognition == Recognition.RUNNING) giveBack = drop() != null
+            // The reader may be cancelled (a drop() meanwhile, the scope's end); the give-back still finishes.
+            if (giveBack) withContext(NonCancellable) { cancelQuietly(run) }
         }
-        // A drop() meanwhile cancels this reader; the give-back still finishes.
-        withContext(NonCancellable) { cancelQuietly(run) }
     }
 
     private fun take(update: String) {
@@ -368,7 +387,7 @@ class VoiceInputModel(
         if (limitReached && recognition == Recognition.RUNNING && run != null) {
             // Stop listening at the limit; the kept words stay until release.
             recognition = Recognition.STOPPED
-            scope.launch { cancelQuietly(run) }
+            startGiveBack(run)
         }
     }
 
