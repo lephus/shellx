@@ -164,6 +164,38 @@ class ImportStringsTests(unittest.TestCase):
     def test_refuses_vietnamese_with_other_arguments(self):
         self.assertRefused(self.tree({"a.b %@": entry("Hi %@", "Xin chào")}), "a.b %@")
 
+    def test_plural_form_may_omit_the_count(self):
+        key = "workspaces.count %lld"
+        root = self.tree({key: entry(plural(one="One workspace", other="%lld workspaces"),
+                                     plural(other="%lld workspace"))})
+        self.assertWrites(root)
+        out = self.generated(root, "values")
+        self.assertIn('<item quantity="one">One workspace</item>', out)
+        self.assertIn('<item quantity="other">%1$d workspaces</item>', out)
+        # A language that drops the count from every form still differs.
+        self.assertRefused(self.tree({key: entry(plural(one="One workspace", other="%lld workspaces"),
+                                                 plural(other="workspace"))}), key)
+        # One argument cannot change its type between forms.
+        self.assertRefused(self.tree({key: entry(plural(one="%lld workspace", other="%@ workspaces"),
+                                                 plural(other="%lld workspace"))}), key)
+
+    def test_refuses_plural_forms_android_ignores(self):
+        key = "workspaces.count %lld"
+        zero_en = entry(plural(zero="No workspaces", one="%lld workspace", other="%lld workspaces"),
+                        plural(other="%lld workspace"))
+        self.assertRefused(self.tree({key: zero_en}), key, "zero", "strings_android.xml")
+        one_vi = entry(plural(one="%lld workspace", other="%lld workspaces"),
+                       plural(one="%lld workspace", other="%lld workspace"))
+        self.assertRefused(self.tree({key: one_vi}), key, "one")
+        # An override in strings_android.xml is the way out.
+        root = self.tree({key: zero_en},
+                         android_en='    <plurals name="workspaces_count">\n'
+                                    '        <item quantity="one">%1$d workspace</item>\n'
+                                    '        <item quantity="other">%1$d workspaces</item>\n    </plurals>\n',
+                         android_vi='    <plurals name="workspaces_count">\n'
+                                    '        <item quantity="other">%1$d workspace</item>\n    </plurals>\n')
+        self.assertWrites(root)
+
     def test_refuses_a_missing_translation(self):
         self.assertRefused(self.tree({"a.b": entry("Hi")}), "a.b")
 
