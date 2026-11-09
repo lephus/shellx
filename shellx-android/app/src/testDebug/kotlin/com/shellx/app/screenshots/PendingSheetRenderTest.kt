@@ -2,6 +2,7 @@ package com.shellx.app.screenshots
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.VoiceRig
@@ -24,7 +25,6 @@ import com.shellx.link.core.PendingItem
 import com.shellx.link.core.PendingKind
 import com.shellx.link.core.PendingQuestion
 import com.shellx.link.core.PendingQuestionOption
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -169,20 +169,24 @@ class PendingSheetRenderTest {
         true,
     )
 
-    /** A rig and its model made once per capture (each capture composes anew), [prepare]d first. */
+    /** A rig and its model made once per capture (each capture composes anew), [prepare]d by an effect: nothing blocks
+     *  the composition. */
     @Composable
-    private fun WithMic(maxBytes: Int, prepare: (VoiceRig, VoiceInputModel) -> Unit = { _, _ -> }, content: @Composable (VoiceInputModel) -> Unit) {
+    private fun WithMic(
+        maxBytes: Int,
+        prepare: suspend (VoiceRig, VoiceInputModel) -> Unit = { _, _ -> },
+        content: @Composable (VoiceInputModel) -> Unit,
+    ) {
         val (rig, model) = remember {
             val rig = VoiceRig.make()
-            val model = rig.model(maxBytes)
-            prepare(rig, model)
-            rig to model
+            rig to rig.model(maxBytes)
         }
+        LaunchedEffect(model) { prepare(rig, model) }
         CompositionLocalProvider(LocalVoice provides rig.env) { content(model) }
     }
 
-    private fun listen(words: String): (VoiceRig, VoiceInputModel) -> Unit = { rig, model ->
-        runBlocking { model.press() }
+    private fun listen(words: String): suspend (VoiceRig, VoiceInputModel) -> Unit = { rig, model ->
+        model.press()
         rig.engine.say(words)
     }
 
