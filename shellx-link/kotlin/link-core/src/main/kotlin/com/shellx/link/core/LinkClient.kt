@@ -10,6 +10,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -156,6 +158,9 @@ class LinkClient private constructor(
 
     /** Sends `make(callId)` and returns the one answer that carries `callId`. */
     internal suspend fun call(make: (callId: String) -> LinkMessage): LinkMessage {
+        // As Swift's checkOpen(): a caller that is already cancelled sends nothing. The send lock's free fast path
+        // and the NonCancellable send would otherwise carry the request out.
+        currentCoroutineContext().ensureActive()
         val answer = CompletableDeferred<LinkMessage>()
         val callId = synchronized(lock) {
             endError?.let { throw it.fresh() }
@@ -191,6 +196,8 @@ class LinkClient private constructor(
             waitingForTurn.decrementAndGet()
         }
         try {
+            // Mutex.lock() takes a free lock without checking for cancellation.
+            currentCoroutineContext().ensureActive()
             return block()
         } finally {
             uploadTurn.unlock()

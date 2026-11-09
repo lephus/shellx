@@ -113,7 +113,8 @@ internal fun LinkClientException.fresh(): LinkClientException = when (this) {
  * [LinkClientException.TimedOut] after the request timeout (the session stays usable), the session's end error
  * ([LinkClientException.SessionClosed] by default) when the session ends first, [LinkClientException.UnexpectedAnswer]
  * for an answer of another type, and a [LinkCodecException] when the request cannot be encoded (nothing is sent).
- * A call made after the session ended throws the end error at once.
+ * A call made after the session ended throws the end error at once. A call from a coroutine that is already cancelled
+ * throws `CancellationException` and sends nothing.
  */
 interface LinkSession {
     /** `welcome.features`; strings this version does not know are kept. */
