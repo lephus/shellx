@@ -1,5 +1,6 @@
 package com.shellx.app.screenshots
 
+import android.animation.ValueAnimator
 import androidx.compose.runtime.Composable
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.shellx.app.ui.theme.ShellXTheme
@@ -32,8 +33,14 @@ object ShellXSnapshots {
     /** An iPhone 16's screen, 393 × 852 dp at 3x, the size the iPhone render tests draw at. */
     const val DEVICE_QUALIFIERS = "w393dp-h852dp-xxhdpi"
 
-    /** Renders [content] inside [ShellXTheme] for light-en, dark-en, light-vi and dark-vi, in that order. */
-    fun capture(name: String, content: @Composable () -> Unit): List<Snapshot> {
+    /**
+     * Renders [content] inside [ShellXTheme] for light-en, dark-en, light-vi and dark-vi, in that order. Each is one
+     * still frame: the system's animations are off while capturing (as with "Remove animations"), so a view that would
+     * turn forever (the waiting border) draws its still frame, and Roborazzi's wait for an idle main looper ends.
+     */
+    fun capture(name: String, content: @Composable () -> Unit): List<Snapshot> = withoutAnimations { render(name, content) }
+
+    private fun render(name: String, content: @Composable () -> Unit): List<Snapshot> {
         val dir = System.getProperty("shellx.snapshot.dir")
             ?: error("shellx.snapshot.dir is not set; run shellx-android/scripts/dev.sh test screenshots")
         val folder = File(dir).apply { mkdirs() }
@@ -51,5 +58,17 @@ object ShellXSnapshots {
             }
         }
         return shots
+    }
+
+    /** `ValueAnimator.setDurationScale` is hidden; Robolectric runs it (its shadow) for the test's sandbox only. */
+    private fun <T> withoutAnimations(block: () -> T): T {
+        val setScale = ValueAnimator::class.java.getMethod("setDurationScale", Float::class.javaPrimitiveType)
+        val before = ValueAnimator.getDurationScale()
+        setScale.invoke(null, 0f)
+        try {
+            return block()
+        } finally {
+            setScale.invoke(null, before)
+        }
     }
 }
