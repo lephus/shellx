@@ -7,7 +7,10 @@ shellx-android/app/src/main/res/values/strings.xml and values-vi/strings.xml.
 Rules:
 - Name: the key without its argument signature, camelCase split, dots to underscores (RENAMES wins).
 - Formats: only %@, %lld and %d (plain or positional) are supported; they become %n$s and %n$d.
-  The (position, type) set must be equal in en, vi and every plural form.
+  The (position, type) set must be equal in en and vi. A plural form may leave an argument out (one = "One
+  workspace"), but the forms of a language together use the same set, with one type per position.
+- Plurals: only the forms Android uses for the language are allowed (CLDR: en one/other, vi other); a zero
+  form is never used for en or vi, so it needs an override.
 - Escaping: backslash, &, <, >, ', ", newline, tab, and a leading @ or ?. Edge or double spaces are refused.
 - Keys with shouldTranslate=false get translatable="false" and are left out of values-vi.
 - Keys in scripts/strings-ios-only.txt are skipped; a listed key missing from the catalog is refused.
@@ -29,6 +32,8 @@ from pathlib import Path
 
 RENAMES = {"agent.state.running %@": "agent_state_running_for"}
 CLDR = ["zero", "one", "two", "few", "many", "other"]
+# The plural forms Android picks from for each language (CLDR cardinal rules); any other form is never shown.
+ANDROID_QUANTITIES = {"en": {"one", "other"}, "vi": {"other"}}
 IOS_WORDING = re.compile(r"\b(?:iPhone|iPad|iOS|App Store|TestFlight|Apple|VoiceOver|Face ID|Touch ID|Keychain|iCloud|Siri)\b")
 WORDING_HELP = ("add an Android override in strings_android.xml (values and values-vi) "
                 "or list the key in shellx-android/scripts/strings-ios-only.txt")
@@ -199,6 +204,12 @@ def build(root: Path, problems: Problems):
                 if not any(q == "other" for q, _ in forms):
                     problems.add(key, "%s plural has no 'other' form" % lang)
                     continue
+                unused = [q for q, _ in forms if q not in ANDROID_QUANTITIES[lang]]
+                if unused and not overridden:
+                    problems.add(key, "%s plural form %s is never used by Android for this language (it uses %s); "
+                                      "override the name in strings_android.xml (values and values-vi)"
+                                 % (lang, ", ".join(unused), ", ".join(sorted(ANDROID_QUANTITIES[lang]))))
+                    continue
             else:
                 problems.add(key, "%s uses a variation Android cannot take (only plural is supported)" % lang)
                 continue
@@ -215,21 +226,27 @@ def build(root: Path, problems: Problems):
                 done.append((quantity, prepared[0], prepared[1]))
             if done is None:
                 continue
+            used = set()
             for _, _, args in done:
-                arg_sets.append(args)
+                used |= args
+            if len(set(pos for pos, _ in used)) != len(used):
+                problems.add(key, "%s uses one argument position with two types" % lang)
+                continue
+            arg_sets.append(used)
             pending.append((folder, kind, [(q, t) for q, t, _ in done]))
         if arg_sets and any(a != arg_sets[0] for a in arg_sets):
-            problems.add(key, "format arguments differ between languages or plural forms")
+            problems.add(key, "format arguments differ between languages")
             continue
         if overridden:
             expected = arg_sets[0] if arg_sets else None
             for label, table in (("values", over_en), ("values-vi", over_vi)):
                 if name in table and expected is not None:
-                    for found in android_args(table[name][1]):
-                        if found != expected:
-                            problems.add(name, "override in %s/strings_android.xml keeps different arguments "
-                                         "than the iPhone string %r" % (label, key))
-                            break
+                    found = android_args(table[name][1])
+                    if table[name][0] == "plurals":
+                        found = [set().union(*found)] if found else [set()]
+                    if any(f != expected for f in found):
+                        problems.add(name, "override in %s/strings_android.xml keeps different arguments "
+                                     "than the iPhone string %r" % (label, key))
             continue
         for folder, kind, items in pending:
             if kind == "string":
