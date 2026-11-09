@@ -25,7 +25,8 @@ object NetworkPaths {
 
 /**
  * NetworkMonitor (contracts §5) over ConnectivityManager.registerDefaultNetworkCallback (S3 §7.3; the iPhone's
- * NWPathMonitor in NetworkPathWatcher.swift). The current path first, then one per change; unregisters when collection
+ * NWPathMonitor in NetworkPathWatcher.swift). The current path first, then one per change of the default network once
+ * its capabilities and link properties are both known, and "unsatisfied" when it is lost; unregisters when collection
  * ends. What counts as a change, and the settling, is 3C's NetworkChangeFilter.
  */
 class NetworkPathWatcher(private val connectivity: ConnectivityManager) : NetworkMonitor {
@@ -49,12 +50,22 @@ class NetworkPathWatcher(private val connectivity: ConnectivityManager) : Networ
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                 follow(network)
                 caps = networkCapabilities
-                trySend(NetworkPaths.of(caps, link))
+                sendWhenKnown()
             }
 
             override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
                 follow(network)
                 link = linkProperties
+                sendWhenKnown()
+            }
+
+            /**
+             * Sends only once both halves of the followed network are known. Registering replays the current network
+             * (capabilities, then link properties), and a capabilities-only path would read as a change (review A I-1).
+             */
+            private fun sendWhenKnown() {
+                val caps = caps ?: return
+                val link = link ?: return
                 trySend(NetworkPaths.of(caps, link))
             }
 
