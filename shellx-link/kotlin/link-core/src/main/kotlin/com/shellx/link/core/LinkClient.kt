@@ -49,13 +49,14 @@ class LinkClient private constructor(
     private val sessionQueue = Channel<SessionChange>(Channel.UNLIMITED)
     private val workspaceQueue = Channel<WorkspaceChange>(Channel.UNLIMITED)
     private val chatQueue = Channel<ChatPush>(Channel.UNLIMITED)
-    private val terminalQueue = Channel<TerminalViewPush>(Channel.UNLIMITED)
+    /** Bounded: frames over its bound are dropped and become one resync (plan 3G Task 4b). */
+    private val terminalQueue = TerminalPushQueue()
 
     override val changes: Flow<PendingChange> = changeQueue.receiveAsFlow()
     override val sessionChanges: Flow<SessionChange> = sessionQueue.receiveAsFlow()
     override val workspaceChanges: Flow<WorkspaceChange> = workspaceQueue.receiveAsFlow()
     override val chatEntries: Flow<ChatPush> = chatQueue.receiveAsFlow()
-    override val terminalPushes: Flow<TerminalViewPush> = terminalQueue.receiveAsFlow()
+    override val terminalPushes: Flow<TerminalViewPush> = terminalQueue.pushes
 
     /**
      * The upload turn, a fair (FIFO) lock. An upload holds it from `attach.begin` to its end, and a message from its
@@ -81,6 +82,9 @@ class LinkClient private constructor(
 
     /** How many calls wait for their answer. For tests. */
     internal val pendingCalls: Int get() = synchronized(lock) { waiters.size }
+
+    /** The weight of the terminal frames queued for [terminalPushes]. For tests. */
+    internal val terminalQueuedWeight: Int get() = terminalQueue.queuedWeight
 
     /** How many uploads and messages wait for the upload turn behind the one holding it. For tests. */
     internal val uploadsWaiting: Int get() = waitingForTurn.get()
@@ -324,7 +328,7 @@ class LinkClient private constructor(
                 val (waiter, terminalId) = synchronized(lock) { waiters.remove(message.callId) to openingViews[message.callId] }
                 // The `ok` is announced first, so every frame of the new view comes after Opened (PROTOCOL.md 11.1).
                 if (waiter != null && message.outcome == TerminalViewOpenOutcome.OK && terminalId != null) {
-                    terminalQueue.trySend(TerminalViewPush.Opened(terminalId))
+                    terminalQueue.offer(TerminalViewPush.Opened(terminalId))
                 }
                 waiter?.complete(message)
             }
@@ -337,8 +341,8 @@ class LinkClient private constructor(
                 workspaceQueue.trySend(WorkspaceChange(message.revision, message.upserted, message.removed))
             is LinkMessage.ChatEntries -> chatQueue.trySend(ChatPush.Upsert(message.sessionId, message.entries))
             is LinkMessage.ChatReset -> chatQueue.trySend(ChatPush.Reset(message.sessionId))
-            is LinkMessage.TerminalViewFrame -> terminalQueue.trySend(TerminalViewPush.Frame(message.terminalId, message.frame))
-            is LinkMessage.TerminalViewEnded -> terminalQueue.trySend(TerminalViewPush.Ended(message.terminalId, message.reason))
+            is LinkMessage.TerminalViewFrame -> terminalQueue.offer(TerminalViewPush.Frame(message.terminalId, message.frame))
+            is LinkMessage.TerminalViewEnded -> terminalQueue.offer(TerminalViewPush.Ended(message.terminalId, message.reason))
             is LinkMessage.Ping -> try {
                 channel.send(LinkMessage.Pong(message.nonce))
             } catch (e: CancellationException) {

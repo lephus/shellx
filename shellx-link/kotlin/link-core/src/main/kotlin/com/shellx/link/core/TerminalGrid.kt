@@ -112,7 +112,16 @@ data class TerminalFramePart(
     val head: TerminalFrameHead? = null,
     val styles: List<TerminalStyle> = emptyList(),
     val lines: List<TerminalLine> = emptyList(),
-)
+) {
+    companion object {
+        /**
+         * Stands where this phone dropped frames before they reached the assembler ([TerminalPushQueue] was full; plan
+         * 3G Task 4b). A later part of no frame being assembled, so [TerminalFrameAssembler] takes it as a gap and asks
+         * for one resync. Never sent, and never applied.
+         */
+        val LOST = TerminalFramePart(revision = Long.MAX_VALUE, part = 1, parts = 2)
+    }
+}
 
 /** One whole frame, all parts merged: what the assembler hands out and the screen applies. */
 data class TerminalGridFrame(
