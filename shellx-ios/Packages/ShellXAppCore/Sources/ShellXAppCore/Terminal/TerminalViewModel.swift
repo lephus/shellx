@@ -58,9 +58,10 @@ public enum TerminalViewPhase: Equatable, Sendable {
 ///   on the main screen: `topShift −= max(0, before + min(scroll, rows) + min(history, max(0, scroll − rows)) − after)`
 ///   (`before`/`after`: history row counts around the apply; `scroll`, `rows`, `history` from the head). Every apply
 ///   records `terminalFrameApply` (assemble plus apply); the first apply after an echo start records `terminalKeyEcho`.
-/// - **R8 Mac state** `.state(machineID, s)`: not `.online` → forget the view without a close (its session is gone) and,
-///   unless the phase is `.unavailable` or `.unsupported`, set `.offline`; the screen stays. `.online` → reconcile (a new
-///   open).
+/// - **R8 Mac state** `.state(machineID, s)`: not `.online` → forget the view without a close (its session is gone),
+///   restore both retry budgets (an open lost with the session, answered `.noAnswer` before the hub saw the drop, is no
+///   failure of the Mac's) and, unless the phase is `.unavailable` or `.unsupported`, set `.offline`; the screen stays.
+///   `.online` → reconcile (a new open).
 /// - **R9 run().** Subscribes to `link.terminalEvents()`, sets running, reconciles, handles events until cancelled, then
 ///   clears running and reconciles (the close is queued and still goes out). A `run()` that starts while an older one is
 ///   still finishing (SwiftUI restarts `.task`) takes over: only the newest handles events and owns running; an older one
@@ -562,6 +563,8 @@ public final class TerminalViewModel {
         guard state == .online else {
             forgetView()   // its session is gone: nothing to close
             firstScreenStart = nil   // the open once it is back starts the clock again
+            // An open lost with the session was no failure of the Mac's: the next session starts with both retries.
+            restoreBudgets()
             switch phase {
             case .unavailable, .unsupported: break
             default: phase = .offline
