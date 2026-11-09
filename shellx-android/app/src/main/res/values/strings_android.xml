@@ -10,6 +10,8 @@
     <string name="machine_state_revoked">This Mac removed this phone</string>
     <string name="machines_unpair_message">This phone will stop getting requests from this Mac. To use it again, pair again.</string>
     <string name="nav_back">Back</string>
+    <string name="notification_channel_needs_you">Needs you</string>
+    <string name="notification_channel_needs_you_description">When an agent on your Mac is waiting for you</string>
     <string name="pairing_error_needs_update">This code is from a newer ShellX. Update ShellX on this phone.</string>
     <string name="pairing_instructions">On your Mac, open ShellX, right-click “This Mac” and choose Pair Phone…</string>
     <string name="pairing_waiting_detail">Keep ShellX open on this phone until the Mac answers.</string>

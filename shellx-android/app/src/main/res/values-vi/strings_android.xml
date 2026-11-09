@@ -7,6 +7,8 @@
     <string name="machine_state_revoked">Mac này đã gỡ điện thoại này</string>
     <string name="machines_unpair_message">Điện thoại này sẽ không còn nhận việc chờ từ Mac này. Muốn dùng lại thì ghép cặp lại.</string>
     <string name="nav_back">Quay lại</string>
+    <string name="notification_channel_needs_you">Cần bạn</string>
+    <string name="notification_channel_needs_you_description">Khi agent trên Mac đang chờ bạn</string>
     <string name="pairing_error_needs_update">Mã này từ bản ShellX mới hơn. Hãy cập nhật ShellX trên điện thoại này.</string>
     <string name="pairing_instructions">Trên Mac, mở ShellX, bấm chuột phải vào “Mac này” rồi chọn Ghép cặp điện thoại…</string>
     <string name="pairing_waiting_detail">Giữ ShellX mở trên điện thoại này cho tới khi Mac trả lời.</string>
