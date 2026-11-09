@@ -220,9 +220,18 @@ class LinkClient private constructor(
                 throw synchronized(lock) { endError?.fresh() } ?: LinkClientException.SessionClosed()
             }
             withTimeoutOrNull(timings.requestTimeout) { answer.await() }?.let { return it }
-            // The reader (or the session's end) may have taken this call's waiter just as the timeout fired. Its
-            // answer is then this call's result: an `ok` it already announced as Opened is never reported as a timeout.
-            if (synchronized(lock) { waiters[callId] === answer }) throw LinkClientException.TimedOut()
+            // Whoever takes the waiter owns the outcome, in one step under the lock. Still here, the call times out,
+            // and a later answer finds no waiter (so no Opened). Taken by the reader (or the session's end) just as the
+            // timeout fired, its answer is this call's result: an `ok` announced as Opened is never a timeout.
+            val timedOut = synchronized(lock) {
+                (waiters[callId] === answer).also { mine ->
+                    if (mine) {
+                        waiters.remove(callId)
+                        openingViews.remove(callId)
+                    }
+                }
+            }
+            if (timedOut) throw LinkClientException.TimedOut()
             return answer.await()
         } finally {
             synchronized(lock) {
