@@ -15,6 +15,8 @@ struct TerminalPane: View {
     let title: String
     /// Tests: the key bar shows without focus (Task 9).
     var showsKeyBar = false
+    /// Says a line to VoiceOver; tests count the lines.
+    var announce: @MainActor (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
 
     @State private var focused = false
     @State private var notice: AgentScreen.Notice?
@@ -37,7 +39,7 @@ struct TerminalPane: View {
         .onChange(of: model.pasteTooLarge) { _, _ in
             let text = String(localized: "terminal.paste.tooLarge")
             notice = AgentScreen.Notice(text: text)
-            AccessibilityNotification.Announcement(text).post()
+            announce(text)
         }
         .task(id: notice?.id) {
             guard notice != nil else { return }
