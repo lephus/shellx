@@ -73,6 +73,7 @@ enum DemoComposition {
                     await script.start()
                     // The Mac's sidebar as the design shows it, over the script's two sessions.
                     await first.setWorkspaces(Self.workspaces)
+                    await first.setTerminalFixtures(Self.terminals)
                 }
             },
             teardown: {
@@ -102,6 +103,15 @@ enum DemoComposition {
         LinkWorkspace(
             workspaceId: "ws-notes", title: "notes", order: 3, directory: "~",
             terminals: [LinkTerminal(terminalId: "demo-notes-t1", title: "zsh", order: 0, selected: true)]),
+    ]
+
+    /// What the demo Mac's terminals show ("Try without an account" and `SHELLX_DEMO=1`): the agents' terminals an
+    /// agent's screen, the shells a session, a dev server that keeps logging, and a note in Vietnamese, Chinese,
+    /// Japanese, Korean and emoji.
+    static let terminals: [String: DemoTerminalFixture] = [
+        "demo-shellx-t1": DemoTerminalScreens.agent, "demo-shellx-t2": DemoTerminalScreens.shell,
+        "demo-relay-t1": DemoTerminalScreens.devServer, "demo-web-t1": DemoTerminalScreens.agent,
+        "demo-notes-t1": DemoTerminalScreens.wide,
     ]
 }
 
