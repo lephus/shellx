@@ -3,6 +3,7 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    `java-library`
     alias(libs.plugins.kotlin.jvm)
 }
 
@@ -20,6 +21,10 @@ kotlin {
 }
 
 dependencies {
+    api(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.bouncycastle.bcprov)
+    testImplementation(kotlin("test"))
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -27,6 +32,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // The vectors live outside this build (contracts §5), so a test run is never up to date.
+    outputs.upToDateWhen { false }
 }
 
 tasks.withType<Test>().configureEach {

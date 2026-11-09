@@ -3,6 +3,7 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    `java-library`
     alias(libs.plugins.kotlin.jvm)
 }
 
@@ -21,6 +22,10 @@ kotlin {
 
 dependencies {
     api(project(":link-core"))
+    api(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(kotlin("test"))
+    testImplementation(libs.okhttp.mockwebserver3)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -28,6 +33,8 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // The vectors live outside this build (contracts §5), so a test run is never up to date.
+    outputs.upToDateWhen { false }
 }
 
 tasks.withType<Test>().configureEach {
