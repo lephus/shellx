@@ -1,6 +1,23 @@
 package com.shellx.app.ui.workspaces
 
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
+import com.shellx.app.testing.FakeResultRegistry
+import com.shellx.app.ui.composer.LocalAttachmentReader
+import com.shellx.core.composer.AttachmentChecks
+import com.shellx.link.core.AttachmentKind
+import com.shellx.core.composer.AttachmentPick
+import com.shellx.core.composer.AttachmentReader
+import com.shellx.core.composer.OutgoingAttachment
+import kotlinx.coroutines.CompletableDeferred
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -129,5 +146,48 @@ class WorkspaceViewTest {
         compose.runOnIdle { entry.registry.currentState = Lifecycle.State.RESUMED }
         until { backs == 1 }
         assertEquals(context.getString(R.string.workspace_closed_on_mac), rig.scope.listNotice.current.value?.text)
+    }
+
+    /** Names a photo as AttachmentPreparer does, once [gate] opens (a HEIC conversion or a cloud file takes seconds). */
+    private class GatedReader(val gate: CompletableDeferred<Unit>) : AttachmentReader {
+        override suspend fun read(pick: AttachmentPick, taken: List<String>): OutgoingAttachment {
+            val name = AttachmentChecks.photoName("jpg", taken)
+            gate.await()
+            return OutgoingAttachment(kind = AttachmentKind.IMAGE, name = name, data = byteArrayOf(1, 2, 3))
+        }
+    }
+
+    private fun tagged(tag: String): Boolean = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+
+    /** Final review m-3: a photo still being read when the user swipes to another pane is added once the read ends:
+     *  the read belongs to the pane's holder, not to the composer shown. */
+    @Test
+    fun aPickStillBeingReadSurvivesASwipeToAnotherPane() {
+        val gate = CompletableDeferred<Unit>()
+        val registry = FakeResultRegistry().apply { answer = { listOf(Uri.parse("content://com.shellx.test.attachments/IMG_1")) } }
+        compose.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(
+                    LocalAttachmentReader provides GatedReader(gate),
+                    LocalActivityResultRegistryOwner provides registry.owner,
+                ) {
+                    WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = { backs++ })
+                }
+            }
+        }
+        until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        compose.onNodeWithTag("workspace.chip.t-claude").performClick()
+        until { tagged("composer.attach") }
+        compose.onNodeWithTag("composer.attach").performClick()
+        compose.onNodeWithText(context.getString(R.string.composer_attach_photos)).performClick()
+        until { tagged("composer.attachments") }
+
+        compose.onNodeWithTag("workspace.pager").performTouchInput { swipeLeft() }
+        until { shown(context.getString(R.string.workspace_shell_placeholder)) && !tagged("composer.attach") }
+        compose.onNodeWithTag("workspace.pager").performTouchInput { swipeRight() }
+        until { tagged("composer.attach") }
+        compose.runOnUiThread { gate.complete(Unit) }
+
+        until { compose.onAllNodesWithContentDescription("photo-1.jpg").fetchSemanticsNodes().isNotEmpty() }
     }
 }
