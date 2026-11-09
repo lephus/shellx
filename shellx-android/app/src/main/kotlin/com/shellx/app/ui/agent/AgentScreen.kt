@@ -60,6 +60,7 @@ import com.shellx.app.ui.components.HomeTicks
 import com.shellx.app.ui.components.Spinner
 import com.shellx.app.ui.components.rememberNowMs
 import com.shellx.app.ui.composer.ComposerBar
+import com.shellx.app.ui.composer.ComposerBarState
 import com.shellx.app.ui.home.NeedsYouBar
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.app.ui.workspaces.AgentCloseConfirmation
@@ -152,6 +153,8 @@ fun AgentScreen(
     back: () -> Unit = {},
     /** The clock the header's "Running for" is read against, again every second. */
     clock: Clock = AndroidClock,
+    /** The composer's state beyond its composition, from the screen's holder ([ComposerBar]'s `state`). */
+    composer: ComposerBarState? = null,
 ) {
     var confirmsForceStop by rememberSaveable { mutableStateOf(false) }
     // The name in the Close Agent confirmation while it is up.
@@ -174,7 +177,7 @@ fun AgentScreen(
             }
             ComposerBar(
                 draft, onDraftChange, send = actions.send, attachmentsEnabled = attachmentsEnabled, sending = sending,
-                sendVoice = actions.sendVoice,
+                sendVoice = actions.sendVoice, state = composer,
             )
         }
     }

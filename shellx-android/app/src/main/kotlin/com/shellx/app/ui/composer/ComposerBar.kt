@@ -70,6 +70,7 @@ import com.shellx.core.voice.VoiceInputModel
 import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
@@ -87,7 +88,9 @@ import kotlinx.coroutines.launch
  * - While [sending], the bar is locked and Send is a ring that fills. A message with attachments stays in the bar;
  *   the owner clears it once the Mac took it. A message of text only leaves the field at once.
  *
- * [voice] is the dictation for render tests; otherwise one is made from `LocalVoice.current.service`.
+ * [voice] is the dictation for render tests; otherwise one is made from `LocalVoice.current.service`. [state] is what the
+ * bar keeps beyond its own composition (the picks still being read among it): a screen's holder passes its own, so a
+ * read outlives the bar shown (a pane swiped away, a rotated screen); without one the bar keeps its own.
  */
 @Composable
 fun ComposerBar(
@@ -99,6 +102,7 @@ fun ComposerBar(
     sending: Double? = null,
     sendVoice: ((String) -> Unit)? = null,
     voice: VoiceInputModel? = null,
+    state: ComposerBarState? = null,
 ) {
     val env = LocalVoice.current
     val service = env?.service
@@ -106,20 +110,19 @@ fun ComposerBar(
     val model = voice ?: own
     val localScope = rememberCoroutineScope()
     val voiceScope = env?.scope ?: localScope
-    val picks = remember { PendingPicks(localScope) }
+    val kept = state ?: remember { ComposerBarState(localScope, draft) }
+    val picks = kept.picks
     val loading by picks.ids.collectAsStateWithLifecycle()
     val voiceState = model?.let { it.state.collectAsStateWithLifecycle().value }
     // A dictation cut at the limit, put in the field: the limit line shows while the field holds it.
     var cutText by rememberSaveable { mutableStateOf<String?>(null) }
-    // Why something picked was not added.
-    var attachNote by rememberSaveable { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val res = LocalContext.current.resources
     val locale = AppLanguage.current()
     val colors = ShellXTheme.colors
     // Every edit starts from the newest draft, the one an edit made a moment before included (review A I-1).
-    val live = remember { LiveDraft(draft) }
+    val live = kept.live
     SideEffect { live.hosted(draft) }
     val hostChange by rememberUpdatedState(onDraftChange)
     val sendNow by rememberUpdatedState(send)
@@ -168,7 +171,7 @@ fun ComposerBar(
         if (checked !is ComposerValidation.Ok || picks.count > 0) return
         val carried = current.attachments
         sendNow(checked.text, carried)
-        attachNote = null
+        kept.attachNote = null
         // With attachments the bar keeps the message while it goes up; the owner clears it.
         if (carried.isNotEmpty()) return
         change(live.value.copy(text = ""))
@@ -209,7 +212,7 @@ fun ComposerBar(
                 draft.attachments,
                 onRemove = { id ->
                     change(live.value.let { d -> d.copy(attachments = d.attachments.filterNot { it.id == id }) })
-                    attachNote = null
+                    kept.attachNote = null
                 },
                 locked = sending != null,
                 loading = loading,
@@ -221,7 +224,7 @@ fun ComposerBar(
                 AttachMenu(
                     draft.attachments,
                     onAdd = { a -> change(live.value.let { d -> d.copy(attachments = d.attachments + a) }) },
-                    picks, side, enabled = sending == null, note = { attachNote = it },
+                    picks, side, enabled = sending == null, note = { kept.attachNote = it },
                     attached = { live.value.attachments },
                 )
             }
@@ -232,7 +235,7 @@ fun ComposerBar(
                 else -> SendButton(enabled = validation is ComposerValidation.Ok && loading.isEmpty(), side, ::sendTyped)
             }
         }
-        val problem = ComposerBar.problem(validation, res) ?: attachNote
+        val problem = ComposerBar.problem(validation, res) ?: kept.attachNote
         when {
             validation is ComposerValidation.TooLong -> Text(
                 stringResource(
@@ -276,12 +279,26 @@ fun ComposerValidation.Companion.byteCount(count: Int, locale: Locale): String {
 }
 
 /**
+ * What a [ComposerBar] keeps beyond one composition (final review m-3): the picks still being read ([picks], in
+ * [scope]), the draft its edits start from, and why a pick was not added ([attachNote]). A screen's holder makes one
+ * on its own scope, so a read that ends after its bar left (a pane swiped away, a rotated screen) still lands: its
+ * result goes onto this draft and through the host's draft change, which reach the holder, not the bar that left.
+ */
+class ComposerBarState(scope: CoroutineScope, initial: ComposerDraft = ComposerDraft()) {
+    val picks: PendingPicks = PendingPicks(scope)
+    internal val live: LiveDraft = LiveDraft(initial)
+
+    /** Why something picked was not added; a new pick or a send clears it. */
+    var attachNote: String? by mutableStateOf(null)
+}
+
+/**
  * The draft the composer's edits start from (review A I-1). The host's draft reaches the bar only when it recomposes,
  * up to a frame after an edit, while picks are read and keys typed in between. So an edit is taken at once ([edit]),
  * and the host's draft only when it changes ([hosted]): an outside change (the owner cleared the bar) wins, and a host
  * whose state comes a frame late never rolls an edit back.
  */
-private class LiveDraft(initial: ComposerDraft) {
+internal class LiveDraft(initial: ComposerDraft) {
     var value: ComposerDraft = initial
         private set
     private var fromHost: ComposerDraft = initial
