@@ -8,10 +8,10 @@ import java.lang.ref.WeakReference
 /**
  * The current (latest started or resumed, not destroyed) activity, weakly held; registered by ShellXApplication
  * (Task 8). Google's sign-in sheet needs an activity to show over, and sign-in and deletion outlive their screen, so
- * they ask for the activity when they need it instead of holding one. Main thread only, like the callbacks.
+ * they ask for the activity when they need it instead of holding one. Set on the main thread, read from any.
  */
 object ActivityTracker : Application.ActivityLifecycleCallbacks {
-    private var current: WeakReference<Activity>? = null
+    @Volatile private var current: WeakReference<Activity>? = null
 
     fun current(): Activity? = current?.get()
 
