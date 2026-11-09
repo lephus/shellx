@@ -48,7 +48,11 @@ class AppCoordinator(
 
     private val _hub = MutableStateFlow<MachineHub?>(null)
 
-    /** The paired Macs and their links; non-null exactly while signed in. */
+    /**
+     * The paired Macs and their links. Non-null while signed in, with one gap: a sign-out, an account deletion and a
+     * refused token stop the hub and set this to null first, while [phase] still says SignedIn until their work ends
+     * (as on the iPhone). A screen treats a null hub as "nothing to show", never as signed out.
+     */
     val hub: StateFlow<MachineHub?> = _hub.asStateFlow()
 
     /**
