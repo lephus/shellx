@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.shellx.app.demo
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -13,6 +15,7 @@ import com.shellx.core.platform.KeyValueStore
 import com.shellx.core.platform.MemoryKeyValueStore
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
