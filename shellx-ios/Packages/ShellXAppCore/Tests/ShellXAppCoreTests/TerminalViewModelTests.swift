@@ -400,4 +400,20 @@ final class TerminalViewModelTests: XCTestCase {
         XCTAssertTrue(retried, "the first failure after the reconnect is retried: \(model.phase)")
         XCTAssertEqual(model.phase, .connecting)
     }
+
+    /// A Mac that keeps ending its views `not_open` before any screen cannot make the phone open them forever: the
+    /// second one without a snapshot between ends in Try Again (final review, core M5).
+    func testRepeatedNotOpenEndsInTryAgain() async {
+        let link = ScriptedTerminalLink(); let model = makeModel(link)
+        await live(model, link)
+        emit(link, .ended(terminalId: "t1", reason: .notOpen))
+        let reopened = await eventually { link.opens == ["t1", "t1"] }
+        XCTAssertTrue(reopened)
+        emit(link, .opened(terminalId: "t1"))
+        emit(link, .ended(terminalId: "t1", reason: .notOpen))
+        let stopped = await eventually(timeout: .seconds(2)) { model.phase == .unavailable(.failed) }
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(stopped, "\(model.phase) \(link.opens.count) opens")
+        XCTAssertEqual(link.opens, ["t1", "t1"])
+    }
 }
