@@ -22,7 +22,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.shellx.app.NoPushRegistrar
 import com.shellx.app.PlatformServices
+import com.shellx.app.testing.ScriptedRelay
 import com.shellx.app.testing.VoiceRig
 import com.shellx.app.testing.WorkRig
 import com.shellx.app.testing.mainComposition
@@ -33,8 +35,11 @@ import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXAppTheme
 import com.shellx.app.voice.LocalVoice
 import com.shellx.app.voice.VoiceEnvironment
+import com.shellx.core.account.AccountVault
 import com.shellx.core.composer.AttachmentReader
+import com.shellx.core.demo.DemoSecretStore
 import com.shellx.core.demo.FakeMac
+import com.shellx.core.push.PushRegistration
 import com.shellx.link.core.LinkTerminal
 import com.shellx.link.core.LinkWorkspace
 import kotlinx.coroutines.CoroutineScope
@@ -72,7 +77,11 @@ class SignedInWorkTest {
         appScope.cancel()
     }
 
-    private fun rig(voice: VoiceRig? = null) = WorkRig.make(voice = voice?.service).also { rigs += it }
+    private fun rig(voice: VoiceRig? = null, started: Boolean = true) =
+        WorkRig.make(voice = voice?.service, started = started).also { rigs += it }
+
+    /** The real account's registration (the demo has none); nothing here is signed in, so it sends nothing. */
+    private val push = PushRegistration(ScriptedRelay(), AccountVault(DemoSecretStore(), Dispatchers.IO), NoPushRegistrar)
 
     /** A real-time wait that runs the main looper meanwhile (the account's work is posted to it). */
     private fun waitUntil(condition: () -> Boolean) {
@@ -91,7 +100,7 @@ class SignedInWorkTest {
         var tick by mutableIntStateOf(0)
         platform.pushTaps.receive()
         rule.setContent {
-            SignedInWork(rig.scope, platform, null, rig.settings, openPending = { opened++ }) { Text("tick $tick") }
+            SignedInWork(rig.scope, platform, push, rig.settings, openPending = { opened++ }) { Text("tick $tick") }
         }
         waitUntil { opened == 1 }
         assertFalse("the tap is taken", platform.pushTaps.hasTap.value)
@@ -99,6 +108,42 @@ class SignedInWorkTest {
         tick++
         waitUntil { shown("tick 1") }
         assertEquals("a recomposition opens nothing more", 1, opened)
+    }
+
+    /** Review C m-9: the tap waits while the hub has loaded no Mac, then while the root is not in place (openPending
+     *  null), and is taken once both hold. */
+    @Test
+    fun aTapWaitsUntilTheMacsAreLoadedAndTheRootIsInPlace() {
+        val rig = rig(started = false)
+        var opened = 0
+        var rootReady by mutableStateOf(false)
+        platform.pushTaps.receive()
+        rule.setContent {
+            SignedInWork(rig.scope, platform, push, rig.settings, openPending = if (rootReady) ({ opened++ }) else null) {}
+        }
+        rule.waitForIdle()
+        assertEquals("no Mac loaded yet", 0, opened)
+
+        rule.runOnUiThread { rig.hub.scope.launch { rig.hub.start() } }
+        waitUntil { rig.hub.state.value.machines.isNotEmpty() }
+        assertEquals("the root is not in place yet", 0, opened)
+        assertTrue(platform.pushTaps.hasTap.value)
+
+        rootReady = true
+        waitUntil { opened == 1 }
+        assertFalse(platform.pushTaps.hasTap.value)
+    }
+
+    /** Review C m-4: without a registration (the demo) a tap is never taken, even with Macs and the root in place. */
+    @Test
+    fun theDemoNeverTakesATap() {
+        val rig = rig()
+        var opened = 0
+        platform.pushTaps.receive()
+        rule.setContent { SignedInWork(rig.scope, platform, null, rig.settings, openPending = { opened++ }) {} }
+        rule.waitForIdle()
+        assertEquals(0, opened)
+        assertTrue(platform.pushTaps.hasTap.value)
     }
 
     @Test

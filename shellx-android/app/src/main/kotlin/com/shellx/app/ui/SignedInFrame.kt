@@ -1,12 +1,16 @@
 package com.shellx.app.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import com.shellx.app.AppComposition
 import com.shellx.app.PlatformServices
+import com.shellx.app.ui.nav.Routes
 import com.shellx.app.ui.nav.WorkRoutes
 import com.shellx.app.ui.nav.bottomRoute
 
@@ -16,8 +20,11 @@ import com.shellx.app.ui.nav.bottomRoute
  * destination. [ShellXApp] passes [content] as movable content, and each branch calls it exactly once, so the NavHost
  * keeps its pages and their state when the wrapper appears or goes (3D note 7).
  *
- * A tapped alert opens the waiting requests right above the stack's real bottom ([bottomRoute], else [root]: the two
- * differ while a `first_mac`↔`home` swap waits), dropping the pages between (3D note 6).
+ * A tapped alert opens the waiting requests right above the stack's real bottom ([bottomRoute], else [root]), dropping
+ * the pages between (3D note 6). It is taken only once that bottom is the signed-in root itself (`home` or `first_mac`,
+ * equal to [root]): a window starts on `launch`, and RootSync's swap to the root replaces the whole stack, which would
+ * wipe a page opened before it (review C I-1: a tap that starts the app or recreates its window). While a
+ * `first_mac`↔`home` swap waits for the page on top to close, the tap waits for it too.
  * [platform] null (3D's host tests) leaves the wrapper out.
  */
 @Composable
@@ -31,6 +38,11 @@ fun SignedInFrame(
     val active by composition.active.collectAsStateWithLifecycle()
     val scope by active.scopes.current.collectAsStateWithLifecycle()
     val currentRoot by rememberUpdatedState(root)
+    // The whole stack, as RootSync reads it: its bottom entry is the root once RootSync is done.
+    @SuppressLint("RestrictedApi") // No public API gives the whole stack; RootSyncTest guards Navigation upgrades.
+    val stack by nav.currentBackStack.collectAsState()
+    val bottom = stack.firstOrNull { it.destination !is NavGraph }?.destination?.route
+    val rootReady = root in Routes.SIGNED_IN_ROOTS && bottom == root
     val current = scope
     if (current == null || platform == null) {
         content()
@@ -40,10 +52,14 @@ fun SignedInFrame(
             platform = platform,
             push = active.push, // null in the demo
             settings = composition.settings,
-            openPending = {
-                nav.navigate(WorkRoutes.pending()) {
-                    popUpTo(bottomRoute(nav) ?: currentRoot)
-                    launchSingleTop = true
+            openPending = if (!rootReady) {
+                null
+            } else {
+                {
+                    nav.navigate(WorkRoutes.pending()) {
+                        popUpTo(bottomRoute(nav) ?: currentRoot)
+                        launchSingleTop = true
+                    }
                 }
             },
         ) { content() }

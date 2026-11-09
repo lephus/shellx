@@ -69,6 +69,8 @@ class WorkRig(
             acceptsTerminalClose: Boolean = true,
             acceptsAttachments: Boolean = true,
             voice: VoiceService? = null,
+            /** False: the hub is not started, so it has loaded no Mac yet (the test starts it). */
+            started: Boolean = true,
         ): WorkRig {
             val main = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val mac = FakeMac(
@@ -122,6 +124,7 @@ class WorkRig(
                 hub, relay, vault, history, latency, LaunchMark(latency, TestClock), settings, TestClock, voice,
             )
             scope.start()
+            if (!started) return WorkRig(scope, mac, settings, main, directory)
             main.launch { hub.start() }
             val id = mac.machine.machineId
             check(eventually { hub.workspaceRows(id).size == 2 && hub.liveSessions.size == 1 }) { "the rig's Mac did not come online" }

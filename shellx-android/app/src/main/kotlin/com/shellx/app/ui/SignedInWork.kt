@@ -23,7 +23,10 @@ import com.shellx.core.push.PushRegistration
  * - the account's mic ([LocalVoice]) and the attachment reader ([LocalAttachmentReader]);
  * - once a Mac exists, the push registration and the one automatic notification-permission ask (not in the demo,
  *   which has no [push]);
- * - a tap on a "needs you" alert opens the waiting requests ([openPending]) once the Macs are loaded.
+ * - a tap on a "needs you" alert opens the waiting requests ([openPending]) once the Macs are loaded and the stack
+ *   stands on the signed-in root ([openPending] is null until then: RootSync's swap of the root would wipe the page).
+ *   The demo ([push] null) never takes a tap: it waits for the real account, as the iPhone's DemoRootView has its own
+ *   empty inbox (review C m-4).
  *
  * The decision center is synced by `SignedInScope.start()`, and `AppLifecycle.onStop` stops every mic when the app
  * leaves the foreground, so neither happens here (3D's 3E-fit notes 2 and 4).
@@ -34,7 +37,7 @@ fun SignedInWork(
     platform: PlatformServices,
     push: PushRegistration?,
     settings: KeyValueStore,
-    openPending: () -> Unit,
+    openPending: (() -> Unit)?,
     content: @Composable () -> Unit,
 ) {
     val hub by scope.hub.state.collectAsStateWithLifecycle()
@@ -50,11 +53,13 @@ fun SignedInWork(
         )
     }
 
-    // A tap that started the app waits here until the Macs are loaded.
+    // A tap that started the app waits here until the Macs are loaded and the root is in place (review C I-1).
     val hasTap by platform.pushTaps.hasTap.collectAsStateWithLifecycle()
     val currentOpenPending by rememberUpdatedState(openPending)
-    LaunchedEffect(hasTap, machinesEmpty) {
-        if (hasTap && !machinesEmpty && platform.pushTaps.take()) currentOpenPending()
+    LaunchedEffect(hasTap, machinesEmpty, openPending != null, push != null) {
+        if (push == null || !hasTap || machinesEmpty) return@LaunchedEffect
+        val open = currentOpenPending ?: return@LaunchedEffect
+        if (platform.pushTaps.take()) open()
     }
 
     val voice = remember(scope, platform) { VoiceEnvironment(scope.voice, platform.voice.meter, scope.hub.scope) }
