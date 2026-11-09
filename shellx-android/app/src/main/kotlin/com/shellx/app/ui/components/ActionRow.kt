@@ -91,9 +91,11 @@ fun ActionRow(
             onLongClick = if (hasMenu) openMenu else null,
             onClick = onClick,
         )
+        // A row without a click is still one TalkBack stop, as combinedClickable makes the others: its words and the
+        // custom actions on one node (review C I-1).
         hasMenu -> Modifier
             .pointerInput(Unit) { detectTapGestures(onLongPress = { currentOpenMenu() }) }
-            .semantics { onLongClick(actionsLabel) { openMenu(); true } }
+            .semantics(mergeDescendants = true) { onLongClick(actionsLabel) { openMenu(); true } }
         else -> Modifier
     }
     val customActions = if (hasMenu) {
