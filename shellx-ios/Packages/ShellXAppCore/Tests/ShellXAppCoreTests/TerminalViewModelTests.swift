@@ -417,4 +417,31 @@ final class TerminalViewModelTests: XCTestCase {
         XCTAssertTrue(stopped, "\(model.phase) \(link.opens.count) opens")
         XCTAssertEqual(link.opens, ["t1", "t1"])
     }
+
+    /// Review Focus 1, A → B → A: the late pushes of B and of A's first view never reach the screen, and keys go to
+    /// the view of A that is open now (final review, core M8).
+    func testSwipingBackAndForthKeepsFramesAndKeysOnTheTerminalShown() async {
+        let link = ScriptedTerminalLink(); let model = makeModel(link)
+        _ = await eventually { link.subscriberCount == 1 }
+        model.setPhoneGrid(cols: 50, rows: 20); model.show("t1"); model.show("t2"); model.show("t1")
+        let ordered = await eventually {
+            link.calls == [
+                .open("t1", cols: 50, rows: 20), .close("t1"), .open("t2", cols: 50, rows: 20), .close("t2"),
+                .open("t1", cols: 50, rows: 20),
+            ]
+        }
+        XCTAssertTrue(ordered, "\(link.calls)")
+        emit(link, .opened(terminalId: "t2"))
+        emit(link, .frame(terminalId: "t2", part: snapshotPart(revision: 1, cols: 50, rows: 20, text: ["two"])))
+        emit(link, .opened(terminalId: "t1"))
+        emit(link, .frame(terminalId: "t1", part: snapshotPart(revision: 1, cols: 50, rows: 20, text: ["one"])))
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        emit(link, .frame(terminalId: "t2", part: deltaPart(revision: 2, cols: 50, rows: 20, replacing: [0: "late two"])))
+        model.insertText("x")
+        let sent = await eventually { link.calls.last == .input("t1", [.text("x")]) }
+        XCTAssertTrue(sent, "\(link.calls)")
+        XCTAssertEqual(model.screen.screenText().first, "one")
+        XCTAssertFalse(link.calls.contains { if case .input("t2", _) = $0 { true } else { false } })
+    }
 }

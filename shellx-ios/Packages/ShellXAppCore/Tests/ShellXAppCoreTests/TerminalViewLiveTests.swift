@@ -91,4 +91,22 @@ final class TerminalViewLiveTests: XCTestCase {
         let inputs = await mac.terminalViewInputs("t1")
         XCTAssertEqual(inputs, [[.text("ls")], [.key(.enter, mods: [])]])
     }
+
+    /// Review Focus 1, A → B → A through a real hub and Link host: the keys typed after the last swipe reach A only
+    /// (final review, core M8).
+    func testSwipingBackAndForthTypesIntoTheTerminalShown() async throws {
+        let mac = await makeMac()
+        let rig = try await HubRig.make([mac], in: self)
+        let up = await rig.online(sessions: 0); XCTAssertTrue(up)
+        let model = makeModel(mac, rig)
+        model.setPhoneGrid(cols: 30, rows: 6)
+        model.show("t1"); model.show("t2"); model.show("t1")
+        let shown = await eventually { model.phase == .live && model.terminalId == "t1" }
+        XCTAssertTrue(shown, "\(model.phase)")
+        model.insertText("ab")
+        let typed = await eventually { await mac.terminalViewInputs("t1") == [[.text("ab")]] }
+        XCTAssertTrue(typed)
+        let other = await mac.terminalViewInputs("t2")
+        XCTAssertEqual(other, [])
+    }
 }
