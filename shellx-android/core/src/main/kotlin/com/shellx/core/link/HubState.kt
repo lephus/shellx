@@ -1,7 +1,9 @@
 package com.shellx.core.link
 
-import com.shellx.link.core.AgentState
+import com.shellx.core.workspaces.WorkspaceRow
 import com.shellx.link.core.AgentSession
+import com.shellx.link.core.AgentState
+import com.shellx.link.core.ShellXLink
 
 /** One snapshot of everything the hub shows. Derived values are computed once per instance (lazy, NONE). */
 data class HubState(
@@ -65,6 +67,62 @@ data class HubState(
      */
     fun leftWhileSynced(key: PendingKey): Boolean = key in handledKeys
 
+    /**
+     * The Mac's workspaces as rows, in the Mac's order, each with the state worked out from the Mac's sessions, pending
+     * requests and [finishedSessionIds]. An offline Mac's rows are its last known ones. Empty for a Mac that lists no
+     * workspaces, and for an unknown one.
+     */
+    fun workspaceRows(machineId: String): List<WorkspaceRow> {
+        val model = machine(machineId) ?: return emptyList()
+        val pending = model.pending.items.map { MachinePendingItem(model.id, model.name, it, model.pendingActionable) }
+        return WorkspaceRow.rows(model.workspaces, model.sessions.sessions, pending, finishedSessionIds(machineId), machineId)
+    }
+
+    /**
+     * The Mac's sessions that have not ended and that no terminal of its workspaces names (`LinkTerminal.sessionId`):
+     * the ones with no terminal chip, among them sessions whose workspace is gone or was never named. Most recent
+     * activity first.
+     */
+    fun otherSessions(machineId: String): List<MachineSession> {
+        val model = machine(machineId) ?: return emptyList()
+        val named = namedSessionIds(model)
+        return model.sessions.sessions
+            .filter { it.state != AgentState.ENDED && it.sessionId !in named }
+            .map { session(model, it) }
+    }
+
+    /**
+     * True when a terminal of the Mac's listed workspaces names the session: the Mac finds the session's tab there,
+     * which an agent close needs. False for an unknown Mac.
+     */
+    fun hasListedTerminal(ref: SessionRef): Boolean =
+        machine(ref.machineId)?.let { ref.sessionId in namedSessionIds(it) } ?: false
+
+    /**
+     * The Mac's sessions that finished a turn (went from working or waiting to idle) and have not started again since,
+     * until `markSeen` clears their workspace or the one session. WorkspaceRow shows them as DONE. Only what this
+     * launch saw; nothing is saved.
+     */
+    fun finishedSessionIds(machineId: String): Set<String> = finishTimes[machineId]?.keys?.toSet() ?: emptySet()
+
+    /** True when the Mac listed `workspace_control` when it was last online. False for a Mac never online yet. */
+    fun supportsWorkspaceControl(machineId: String): Boolean = listed(machineId, ShellXLink.WORKSPACE_CONTROL_FEATURE)
+
+    /** True when the Mac listed `agent_close` when it was last online. False for a Mac never online yet. */
+    fun supportsAgentClose(machineId: String): Boolean = listed(machineId, ShellXLink.AGENT_CLOSE_FEATURE)
+
+    /** True when the Mac listed `terminal_close` when it was last online. False for a Mac never online yet. */
+    fun supportsTerminalClose(machineId: String): Boolean = listed(machineId, ShellXLink.TERMINAL_CLOSE_FEATURE)
+
+    /**
+     * True when the Mac listed `attachments` when it was last online: the composer offers photos and files for its
+     * sessions only then. False for a Mac never online yet.
+     */
+    fun acceptsAttachments(machineId: String): Boolean = listed(machineId, ShellXLink.ATTACHMENTS_FEATURE)
+
+    private fun listed(machineId: String, feature: String): Boolean =
+        machine(machineId)?.hostFeatures?.contains(feature) ?: false
+
     private companion object {
         val REACHABLE = setOf(MachineLinkState.Online, MachineLinkState.Connecting, MachineLinkState.Reconnecting)
 
@@ -76,5 +134,9 @@ data class HubState(
 
         fun session(model: MachineModel, session: AgentSession): MachineSession =
             MachineSession(model.id, model.name, model.state == MachineLinkState.Online, session)
+
+        /** The sessions a terminal of the Mac's listed workspaces names. */
+        fun namedSessionIds(model: MachineModel): Set<String> =
+            model.workspaces.workspaces.flatMap { it.terminals }.mapNotNull { it.sessionId }.toSet()
     }
 }

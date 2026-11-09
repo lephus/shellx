@@ -8,6 +8,9 @@ import com.shellx.core.pending.DecisionSending
 import com.shellx.core.platform.Clock
 import com.shellx.core.platform.CoreLog
 import com.shellx.core.platform.KeyValueStore
+import com.shellx.core.workspaces.WorkspaceCommandResult
+import com.shellx.core.workspaces.WorkspaceRef
+import com.shellx.core.workspaces.WorkspaceRow
 import com.shellx.link.account.PairedMachine
 import com.shellx.link.account.PairedMachineListing
 import com.shellx.link.account.RelayApiException
@@ -16,9 +19,11 @@ import com.shellx.link.core.AgentState
 import com.shellx.link.core.ChatHistoryPage
 import com.shellx.link.core.ChatInterruptOutcome
 import com.shellx.link.core.ChatSendOutcome
+import com.shellx.link.core.LinkClientException
 import com.shellx.link.core.LinkDecision
 import com.shellx.link.core.LinkSession
 import com.shellx.link.core.ReplyOutcome
+import com.shellx.link.core.ShellXLink
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
@@ -29,6 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -108,6 +114,102 @@ class MachineHub(
     val reachableSessions: List<MachineSession> get() = state.value.reachableSessions
 
     fun leftWhileSynced(key: PendingKey): Boolean = state.value.leftWhileSynced(key)
+
+    // Workspaces (the queries read state.value through HubState)
+
+    fun workspaceRows(machineId: String): List<WorkspaceRow> = state.value.workspaceRows(machineId)
+
+    fun otherSessions(machineId: String): List<MachineSession> = state.value.otherSessions(machineId)
+
+    fun hasListedTerminal(ref: SessionRef): Boolean = state.value.hasListedTerminal(ref)
+
+    fun finishedSessionIds(machineId: String): Set<String> = state.value.finishedSessionIds(machineId)
+
+    fun supportsWorkspaceControl(machineId: String): Boolean = state.value.supportsWorkspaceControl(machineId)
+
+    fun supportsAgentClose(machineId: String): Boolean = state.value.supportsAgentClose(machineId)
+
+    fun supportsTerminalClose(machineId: String): Boolean = state.value.supportsTerminalClose(machineId)
+
+    fun acceptsAttachments(machineId: String): Boolean = state.value.acceptsAttachments(machineId)
+
+    /** The user looked at the workspace (its screen opened): its finished sessions stop counting as DONE, until one
+     *  of them finishes again. */
+    fun markSeen(ref: WorkspaceRef) {
+        val model = state.value.machine(ref.machineId) ?: return
+        val finished = state.value.finishTimes[ref.machineId] ?: return
+        val terminals = model.workspaces.workspace(ref.workspaceId)?.terminals ?: emptyList()
+        val mine = WorkspaceRow.sessionIds(ref.workspaceId, terminals, model.sessions.sessions)
+        val rest = finished.filterKeys { it !in mine }
+        if (rest.size != finished.size) setFinishes(ref.machineId, rest)
+    }
+
+    /** The user opened one agent: that session stops counting as finished, until it finishes again. */
+    fun markSeen(ref: SessionRef) {
+        val finished = state.value.finishTimes[ref.machineId] ?: return
+        if (ref.sessionId !in finished) return
+        setFinishes(ref.machineId, finished - ref.sessionId)
+    }
+
+    /**
+     * Asks the Mac ([machineId]), or every online Mac, for its workspace list again: a pull to refresh, or a command
+     * that found its workspace gone. The list is kept in sync by pushes, so this changes something only when one was
+     * missed. Returns when the answers are in.
+     */
+    suspend fun refreshWorkspaces(machineId: String? = null) {
+        val live = state.value.machines
+            .filter { it.state == MachineLinkState.Online && (machineId == null || it.id == machineId) }
+            .mapNotNull { connections[it.id] }
+        coroutineScope { for (connection in live) launch { connection.refreshWorkspaces() } }
+    }
+
+    /**
+     * Makes a workspace on the Mac, which chooses its directory. Ok carries the new workspace's id; it joins
+     * [workspaceRows] when the Mac's list change arrives.
+     *
+     * The workspace commands are sent once, never again: when the link drops while waiting the result is Unknown (the
+     * Mac may have acted: look at the list), and nothing is sent to a Mac that is not Online (Offline) or that did not
+     * list `workspace_control` (Failed).
+     */
+    suspend fun createWorkspace(machineId: String): WorkspaceCommandResult =
+        workspaceCommand(machineId, ShellXLink.WORKSPACE_CONTROL_FEATURE) { session ->
+            val answer = session.createWorkspace()
+            WorkspaceCommandResult.of(answer.outcome, answer.workspaceId)
+        }
+
+    /** Renames a workspace on its Mac. [title] is at most `ShellXLink.MAX_WORKSPACE_TITLE_BYTES` UTF-8 bytes (a longer
+     *  one is Failed). See [createWorkspace]. */
+    suspend fun renameWorkspace(ref: WorkspaceRef, title: String): WorkspaceCommandResult =
+        workspaceCommand(ref.machineId, ShellXLink.WORKSPACE_CONTROL_FEATURE) {
+            WorkspaceCommandResult.of(it.renameWorkspace(ref.workspaceId, title))
+        }
+
+    /** Closes a workspace and its terminals on its Mac, which keeps its own rules (Refused for its last workspace, for
+     *  one). The row leaves when the Mac's list change arrives, not before. See [createWorkspace]. */
+    suspend fun closeWorkspace(ref: WorkspaceRef): WorkspaceCommandResult =
+        workspaceCommand(ref.machineId, ShellXLink.WORKSPACE_CONTROL_FEATURE) {
+            WorkspaceCommandResult.of(it.closeWorkspace(ref.workspaceId))
+        }
+
+    /**
+     * Closes the terminal an agent runs in on its Mac, which keeps its own rules. Ok means the Mac closed it; the
+     * session turns ENDED when the Mac's list change arrives, not before. A Mac that did not list `agent_close` gets
+     * nothing and the result is Failed. Sent once, like the workspace commands.
+     */
+    suspend fun closeAgent(ref: SessionRef): WorkspaceCommandResult =
+        workspaceCommand(ref.machineId, ShellXLink.AGENT_CLOSE_FEATURE) {
+            WorkspaceCommandResult.of(it.closeAgent(ref.sessionId))
+        }
+
+    /**
+     * Closes one terminal tab of a workspace on its Mac, which keeps its own rules (the workspace goes with its last
+     * tab). Ok means the Mac closed it; the tab leaves [workspaceRows] when the Mac's list change arrives, not before. A
+     * Mac that did not list `terminal_close` gets nothing and the result is Failed. Sent once.
+     */
+    suspend fun closeTerminal(machineId: String, workspaceId: String, terminalId: String): WorkspaceCommandResult =
+        workspaceCommand(machineId, ShellXLink.TERMINAL_CLOSE_FEATURE) {
+            WorkspaceCommandResult.of(it.closeTerminal(workspaceId, terminalId))
+        }
 
     /**
      * How many times the session's transcript was reset (`chat.reset`) since the hub started, counted as each reset
@@ -616,6 +718,34 @@ class MachineHub(
     }
 
     /**
+     * Runs one command that needs the Mac's [feature] on its live session, and says how it went. It is never sent twice:
+     * after a timeout or a lost link the Mac may or may not have acted (PROTOCOL.md section 7). LinkCallException (any
+     * case: nothing was sent) → Offline; LinkClientException.Remote (the Mac answered with an error, so it did not act)
+     * → Failed; any other failure → Unknown. A CancellationException is rethrown.
+     */
+    internal suspend fun workspaceCommand(
+        machineId: String,
+        feature: String,
+        body: suspend (LinkSession) -> WorkspaceCommandResult,
+    ): WorkspaceCommandResult {
+        val model = state.value.machine(machineId)
+        if (model == null || model.state != MachineLinkState.Online) return WorkspaceCommandResult.Offline
+        if (feature !in model.hostFeatures) return WorkspaceCommandResult.Failed
+        return try {
+            withLink(machineId, body)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: LinkCallException) {
+            WorkspaceCommandResult.Offline
+        } catch (e: LinkClientException.Remote) {
+            WorkspaceCommandResult.Failed
+        } catch (e: Exception) {
+            // The request timed out or the session closed while waiting.
+            WorkspaceCommandResult.Unknown
+        }
+    }
+
+    /**
      * The relay refused the account token (401): tells the app once, which signs out to the "session expired" sign-in.
      * Also used by PairingModel for a 401 while pairing. After a stop (a sign-out), a late 401 answers a request made
      * with the dropped token, so it is not reported.
@@ -624,6 +754,13 @@ class MachineHub(
         if (unauthorizedReported || stopped) return
         unauthorizedReported = true
         onUnauthorized()
+    }
+
+    private fun setFinishes(machineId: String, finished: Map<String, Long>) {
+        _state.update {
+            val times = if (finished.isEmpty()) it.finishTimes - machineId else it.finishTimes + (machineId to finished)
+            it.copy(finishTimes = times)
+        }
     }
 
     private fun updateModel(machineId: String, change: (MachineModel) -> MachineModel) {
