@@ -166,6 +166,9 @@ sealed interface LinkMessage {
 
     data class TerminalViewEnded(val terminalId: String, val reason: TerminalViewEndReason) : LinkMessage
 
+    /** One part of a frame of the open view (PROTOCOL.md 11.4). Its runs print their sizes, never their text. */
+    data class TerminalViewFrame(val terminalId: String, val frame: TerminalFramePart) : LinkMessage
+
     /** Opens a terminal tab in a workspace (PROTOCOL.md 11.9). */
     data class TerminalCreate(val callId: String, val workspaceId: String) : LinkMessage
 

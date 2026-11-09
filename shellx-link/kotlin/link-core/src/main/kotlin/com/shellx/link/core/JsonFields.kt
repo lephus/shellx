@@ -103,6 +103,7 @@ internal fun JsonObject.optStr(key: String): String? = get(key).present()?.asStr
 internal fun JsonObject.long(key: String): Long = required(key).asLong()
 internal fun JsonObject.optLong(key: String): Long? = get(key).present()?.asLong()
 internal fun JsonObject.int(key: String): Int = required(key).asInt()
+internal fun JsonObject.optInt(key: String): Int? = get(key).present()?.asInt()
 internal fun JsonObject.uLong(key: String): ULong = required(key).asULong()
 internal fun JsonObject.bool(key: String): Boolean = required(key).asBool()
 internal fun JsonObject.optBool(key: String): Boolean? = get(key).present()?.asBool()

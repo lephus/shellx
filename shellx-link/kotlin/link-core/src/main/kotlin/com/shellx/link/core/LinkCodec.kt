@@ -199,6 +199,55 @@ object LinkCodec {
         }
     }
 
+    private fun head(h: TerminalFrameHead): JsonObject = buildJsonObject {
+        put("kind", h.kind.wire)
+        put("cols", h.cols)
+        put("rows", h.rows)
+        put("alt", h.alt)
+        h.cursor?.let { c ->
+            put("cursor", buildJsonObject {
+                put("x", c.x)
+                put("y", c.y)
+                put("shape", c.shape.wire)
+                put("visible", c.visible)
+                put("blink", c.blink)
+            })
+        }
+        h.palette?.let { p ->
+            put("palette", buildJsonObject {
+                put("fg", p.fg)
+                put("bg", p.bg)
+                putOpt("cursor", p.cursor)
+                put("colors", strings(p.colors))
+            })
+        }
+        if (h.history != 0) put("history", h.history)
+        if (h.scroll != 0) put("scroll", h.scroll)
+    }
+
+    private fun style(s: TerminalStyle): JsonObject = buildJsonObject {
+        put("id", s.id)
+        putOpt("fg", s.fg?.toLong())
+        putOpt("fg_rgb", s.fgRgb)
+        putOpt("bg", s.bg?.toLong())
+        putOpt("bg_rgb", s.bgRgb)
+        if (s.attrs.isNotEmpty()) put("attrs", strings(s.attrs.map { it.wire }))
+    }
+
+    private fun line(l: TerminalLine): JsonObject = buildJsonObject {
+        put("y", l.y)
+        if (l.runs.isNotEmpty()) {
+            put("runs", list(l.runs) { r ->
+                buildJsonObject {
+                    putOpt("x", r.x?.toLong())
+                    put("t", r.text)
+                    putOpt("s", r.style?.toLong())
+                    putOpt("w", r.width?.toLong())
+                }
+            })
+        }
+    }
+
     private fun toJson(m: LinkMessage): JsonObject = when (m) {
         is LinkMessage.Hello -> frame(T.HELLO) {
             put("client_version", m.clientVersion)
@@ -347,6 +396,19 @@ object LinkCodec {
             put("terminal_id", m.terminalId)
             put("reason", m.reason.wire)
         }
+        is LinkMessage.TerminalViewFrame -> {
+            val f = m.frame
+            if (!f.isValid()) throw LinkCodecException.BadJson(null)
+            frame(T.TERMINAL_VIEW_FRAME) {
+                put("terminal_id", m.terminalId)
+                put("revision", f.revision)
+                put("part", f.part)
+                put("parts", f.parts)
+                f.head?.let { put("head", head(it)) }
+                if (f.styles.isNotEmpty()) put("styles", list(f.styles, ::style))
+                if (f.lines.isNotEmpty()) put("lines", list(f.lines, ::line))
+            }
+        }
         is LinkMessage.TerminalCreate -> frame(T.TERMINAL_CREATE, m.callId) { put("workspace_id", m.workspaceId) }
         is LinkMessage.TerminalCreateResult -> frame(T.TERMINAL_CREATE_RESULT, m.callId) {
             put("outcome", m.outcome.wire)
@@ -448,6 +510,53 @@ object LinkCodec {
         else -> TerminalInputUnit.Other(k)
     }
 
+    private fun head(o: JsonObject) = TerminalFrameHead(
+        kind = TerminalFrameKind(o.str("kind")),
+        cols = o.int("cols"),
+        rows = o.int("rows"),
+        alt = o.bool("alt"),
+        cursor = o.optObj("cursor")?.let {
+            TerminalCursor(it.int("x"), it.int("y"), TerminalCursorShape(it.str("shape")), it.bool("visible"), it.bool("blink"))
+        },
+        palette = o.optObj("palette")?.let {
+            TerminalPalette(it.str("fg"), it.str("bg"), it.optStr("cursor"), it.array("colors").strings())
+        },
+        history = o.optInt("history") ?: 0,
+        scroll = o.optInt("scroll") ?: 0,
+    )
+
+    private fun style(o: JsonObject) = TerminalStyle(
+        id = o.int("id"),
+        fg = o.optInt("fg"),
+        fgRgb = o.optStr("fg_rgb"),
+        bg = o.optInt("bg"),
+        bgRgb = o.optStr("bg_rgb"),
+        attrs = o.optArray("attrs")?.strings()?.map(::TerminalAttribute) ?: emptyList(),
+    )
+
+    private fun line(o: JsonObject) = TerminalLine(
+        y = o.int("y"),
+        runs = o.optArray("runs")?.map {
+            val r = it.asObj()
+            TerminalRun(r.optInt("x"), r.str("t"), r.optInt("s"), r.optInt("w"))
+        } ?: emptyList(),
+    )
+
+    /** Every structural violation is BadJson(null), as on encode. */
+    private fun frameMessage(o: JsonObject): LinkMessage.TerminalViewFrame {
+        val part = TerminalFramePart(
+            revision = o.long("revision"),
+            part = o.int("part"),
+            parts = o.int("parts"),
+            head = o.optObj("head")?.let(::head),
+            styles = o.optArray("styles")?.map { style(it.asObj()) } ?: emptyList(),
+            lines = o.optArray("lines")?.map { line(it.asObj()) } ?: emptyList(),
+        )
+        val terminalId = o.str("terminal_id")
+        if (!part.isValid()) throw LinkCodecException.BadJson(null)
+        return LinkMessage.TerminalViewFrame(terminalId, part)
+    }
+
     private fun chunkData(text: String): ByteArray = canonicalBase64ToBytesOrNull(text) ?: throw FieldError()
 
     private fun digest(text: String): ByteArray {
@@ -516,6 +625,7 @@ object LinkCodec {
         T.TERMINAL_VIEW_RESYNC -> LinkMessage.TerminalViewResync(o.str("terminal_id"))
         T.TERMINAL_VIEW_CLOSE -> LinkMessage.TerminalViewClose(o.str("terminal_id"))
         T.TERMINAL_VIEW_ENDED -> LinkMessage.TerminalViewEnded(o.str("terminal_id"), TerminalViewEndReason(o.str("reason")))
+        T.TERMINAL_VIEW_FRAME -> frameMessage(o)
         T.TERMINAL_CREATE -> LinkMessage.TerminalCreate(o.callId(), o.str("workspace_id"))
         T.TERMINAL_CREATE_RESULT -> LinkMessage.TerminalCreateResult(o.callId(), outcome(o), o.optStr("terminal_id"))
         else -> null
@@ -570,6 +680,7 @@ object LinkCodec {
         const val TERMINAL_VIEW_RESYNC = "terminal.view.resync"
         const val TERMINAL_VIEW_CLOSE = "terminal.view.close"
         const val TERMINAL_VIEW_ENDED = "terminal.view.ended"
+        const val TERMINAL_VIEW_FRAME = "terminal.view.frame"
         const val TERMINAL_CREATE = "terminal.create"
         const val TERMINAL_CREATE_RESULT = "terminal.create.result"
     }
