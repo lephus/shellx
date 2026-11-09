@@ -3,6 +3,7 @@ package com.shellx.core.voice
 import com.shellx.core.diagnostics.LatencyLog
 import com.shellx.core.diagnostics.LatencyMetric
 import com.shellx.core.home.ComposerValidation
+import com.shellx.core.platform.CoreLog
 import com.shellx.core.testing.FakeTranscriber
 import com.shellx.core.testing.FakeVoicePermissions
 import com.shellx.core.testing.Gate
@@ -20,7 +21,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -594,6 +598,130 @@ class VoiceInputModelTest {
         assertTrue(released, "the caller's wait ends at once")
         assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase, "the dictation still ends")
         assertNull(rig.transcriber.activeRun, "the microphone is given back")
+        rig.model.press()
+        assertEquals(VoiceInputModel.Phase.Listening(""), rig.model.phase, "the next press listens")
+        assertEquals(2, rig.transcriber.starts.size)
+    } }
+
+    /** An engine whose `cancel` waits at [gate], then hops once (a recognizer's teardown on the main thread), before it
+     *  tears the run down. */
+    private class GatedCancel(private val base: FakeTranscriber, private val gate: Gate) : SpeechEngine by base {
+        override suspend fun cancel(run: SpeechRunId) {
+            gate.wait()
+            yield()
+            base.cancel(run)
+        }
+    }
+
+    /** Android only (review 4 I-1): the caller of `cancel()`, `typeInstead()` or a release can be cancelled while the
+     *  recognizer tears down (a `pointerInput` restart, the screen leaving). The mic still goes back: never a live
+     *  recognizer behind an idle mic. */
+    @Test fun aCancelledCancelStillGivesTheMicBack() { runTest {
+        for (path in listOf("cancel", "armed release", "release while starting")) {
+            val gate = Gate()
+            val rig = makeRig(engine = { GatedCancel(it, gate) })
+            val press = backgroundScope.launch { rig.model.press() }
+            if (path == "release while starting") {
+                rig.transcriber.holdStarts()
+            }
+            runCurrent()
+            if (path == "release while starting") {
+                assertEquals(1, rig.transcriber.startsWaiting, path)
+            } else {
+                rig.transcriber.say("xoá nhánh")
+                waitForPhase(rig.model, VoiceInputModel.Phase.Listening("xoá nhánh"))
+            }
+            val call = backgroundScope.async {
+                when (path) {
+                    "cancel" -> rig.model.cancel()
+                    "armed release" -> {
+                        rig.model.drag(dx = -100.0, dy = 0.0)
+                        rig.model.release()
+                    }
+                    else -> rig.model.release()
+                }
+            }
+            runCurrent()
+            assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase, path)
+            call.cancel()
+            runCurrent()
+            gate.open()
+            runCurrent()
+            rig.transcriber.releaseStarts()
+            press.join()
+            runCurrent()
+            assertNull(rig.transcriber.activeRun, "$path: the mic is given back")
+            assertFalse(rig.transcriber.isRunning, path)
+        }
+    } }
+
+    /** Review 4 M-1: an engine whose finish or cancel throws never leaves the mic stuck, never crashes the model's
+     *  scope, and is logged by code only. */
+    @Test fun aFailingEngineNeverLeavesTheMicStuck() { runTest {
+        val lines = mutableListOf<String>()
+        CoreLog.sink = { synchronized(lines) { lines += it } }
+        try {
+            val finishing = makeRig(engine = { base ->
+                object : SpeechEngine by base {
+                    override suspend fun finish(run: SpeechRunId): String = throw IOException("offline")
+                }
+            })
+            finishing.model.press()
+            finishing.transcriber.say("chạy test")
+            waitForPhase(finishing.model, VoiceInputModel.Phase.Listening("chạy test"))
+            assertEquals("chạy test", finishing.model.release(), "the words heard are kept")
+            assertEquals(VoiceInputModel.Phase.Idle, finishing.model.phase)
+            assertFalse(finishing.model.isActive)
+            assertNull(finishing.transcriber.activeRun, "the mic is given back")
+            finishing.model.press()
+            assertEquals(VoiceInputModel.Phase.Listening(""), finishing.model.phase, "the next press listens")
+
+            val cancelling = makeRig(engine = { base ->
+                object : SpeechEngine by base {
+                    override suspend fun cancel(run: SpeechRunId): Unit = throw IOException("offline")
+                }
+            })
+            cancelling.model.press()
+            cancelling.transcriber.say("xoá nhánh")
+            waitForPhase(cancelling.model, VoiceInputModel.Phase.Listening("xoá nhánh"))
+            cancelling.model.cancel()
+            assertEquals(VoiceInputModel.Phase.Idle, cancelling.model.phase)
+            // The swipe up's cancel runs in the model's scope: its failure must not reach the scope.
+            cancelling.model.press()
+            cancelling.model.drag(dx = 0.0, dy = -60.0)
+            runCurrent()
+            assertTrue(cancelling.model.wantsKeyboard)
+            assertEquals(VoiceInputModel.Phase.Idle, cancelling.model.phase)
+        } finally {
+            CoreLog.sink = {}
+        }
+        val codes = synchronized(lines) { lines.filter { it.startsWith("voice_") } }
+        assertEquals(listOf("voice_finish_failed", "voice_cancel_failed", "voice_cancel_failed"), codes)
+    } }
+
+    /** Review 4 M-2: a press whose caller is cancelled while the recognizer starts (after it took the mic) is
+     *  dropped, and its run gives the mic back: no run holds the mic with nobody reading it. */
+    @Test fun aPressCancelledWhileStartingGivesTheMicBack() { runTest {
+        var starts = 0
+        val rig = makeRig(engine = { base ->
+            object : SpeechEngine by base {
+                override suspend fun start(run: SpeechRunId, language: VoiceLanguage, contextualStrings: List<String>): ReceiveChannel<String> {
+                    val channel = base.start(run, language, contextualStrings)
+                    starts += 1
+                    if (starts == 1) awaitCancellation()      // the mic is taken; the start's last step never ends
+                    return channel
+                }
+            }
+        })
+        val press = backgroundScope.launch { rig.model.press() }
+        assertTrue(eventually { rig.transcriber.activeRun != null })
+        press.cancel()
+        press.join()
+        runCurrent()
+        assertNull(rig.transcriber.activeRun, "the mic is given back")
+        assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase)
+        assertFalse(rig.model.isActive)
+
         rig.model.press()
         assertEquals(VoiceInputModel.Phase.Listening(""), rig.model.phase, "the next press listens")
         assertEquals(2, rig.transcriber.starts.size)

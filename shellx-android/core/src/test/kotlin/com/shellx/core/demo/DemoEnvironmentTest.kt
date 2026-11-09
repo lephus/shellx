@@ -24,7 +24,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.io.TempDir
@@ -122,5 +125,22 @@ class DemoEnvironmentTest {
         assertFalse(demoDir.exists())                                 // the demo's own history was wiped
         // The demo relay refuses every account call (DemoRelay.REFUSAL): signing in again never leaves the process.
         assertSameCase(SignInException.Server("demo"), assertFails { env.coordinator.signInWithGoogle() })
+    } }
+
+    /** Review 4 M-3: a first `prepare()` cancelled during its vault writes (a configuration change in 3D's effect)
+     *  leaves nothing half done: the next call seeds the demo account. */
+    @Test fun aCancelledPrepareIsDoneAgainByTheNextCall(@TempDir root: File) { runTest {
+        val env = environment(File(root, "ShellXDemo"), runsScript = false)
+        val first = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { env.prepare() }
+        first.cancel()
+        first.join()
+        runCurrent()
+
+        env.prepare()
+        env.coordinator.launch()
+
+        assertEquals(AppPhase.SignedIn(DemoEnvironment.EMAIL), env.coordinator.phase.value)
+        val hub = assertNotNull(env.coordinator.hub.value)
+        assertEquals(listOf(DemoEnvironment.FIRST_NAME), hub.machines.map { it.name })
     } }
 }
