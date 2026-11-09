@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The window theme. Compose draws everything else with ShellXTheme; the window background matches it, so
+         nothing flashes white before the first frame, and the Android 12+ splash uses the same colour. -->
+    <style name="Theme.ShellX" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/shellx_background</item>
+    </style>
+</resources>

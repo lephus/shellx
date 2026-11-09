@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon background: the logo's gradient and glow, moved by the same 128-unit offset as the foreground. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="768"
+    android:viewportHeight="768">
+    <path android:pathData="M0,0H768V768H0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="0" android:startY="128" android:endX="0" android:endY="640"
+                android:startColor="#FF1C1438" android:endColor="#FF0B0716" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M0,0H768V768H0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="343.04" android:centerY="363.52" android:gradientRadius="215.04"
+                android:startColor="#384AF2A1" android:endColor="#004AF2A1" />
+        </aapt:attr>
+    </path>
+</vector>

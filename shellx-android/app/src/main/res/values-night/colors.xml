@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The window behind Compose and the Android 12+ splash: ShellXColors.Dark.background. -->
+    <color name="shellx_background">#0B0716</color>
+</resources>

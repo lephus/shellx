@@ -491,3 +491,27 @@ Behaviour Android (3G) mirrors:
 - Android-only strings (`strings_android.xml`): `terminal_paste` and three key-bar labels.
 - The terminal view runs while the screen is STARTED; a rotation reopens the view.
 - Parity-ledger rows A-g1 to A-g5.
+
+## 22. Additions from plan 3A (Tasks 6–11, landed 7b2c58fdd6)
+
+- SDK pins: `compileSdk = targetSdk = 36`. The Compose BOM stays on a release whose AARs need compileSdk ≤ 36
+  (2026.06.01, Compose 1.11.x) until the user installs `platforms/android-37` and this file allows compileSdk 37
+  with targetSdk 36.
+- `shellx-android/gradle.properties` sets `android.builder.sdkDownload=false` (Gradle never downloads SDK
+  packages); `check-android-license.sh` refuses the build without it.
+- Robolectric runs `:app` JVM tests on SDK 35 (`app/src/test/resources/robolectric.properties`) because SDK 36
+  needs Java 21 and Gradle runs on JDK 17. A test that needs another SDK uses `@Config(sdk = …)` ≤ 35.
+- `:app:testReleaseUnitTest` exists only because `app/build.gradle.kts` enables host tests for release (AGP 9 turns
+  them off); later plans keep that block.
+- Dependency locking is STRICT in every module; core library desugaring is refused; each Android lockfile must
+  name both the debug and the release runtime classpaths. Repository blocks hold only `google()` and
+  `mavenCentral()` (`gradlePluginPortal()` only in `pluginManagement`).
+- `dev.sh`: `test app` runs both variants with `--continue`; `emulator` prints only the serial on stdout;
+  `device` / `emulator` refuse an APK whose package is not `com.shellx.dev`; ShellX emulators are recognised by
+  AVD name, and `clean` waits for an emulator to exit before deleting its AVD.
+- Strings: the Apple-link keys, `appleLink.title`, `settings.account.delete.switchFirst` and the
+  `settings.account.switchToGoogle*` keys are iPhone-only (`strings-ios-only.txt`). Plural forms Android ignores
+  (en `zero`, vi `one`) are refused.
+- Versions pinned: AGP 9.5.1, Kotlin 2.4.21, Gradle 9.9.0, Compose BOM 2026.06.01, JUnit 5.14.4, JUnit 4.13.2,
+  Robolectric 4.17, Roborazzi 1.78.0, activity-compose 1.13.0, google-services 4.5.0, API 36.
+- Still the user's: Task 10 (Firebase `google-services.json` for both app ids) and the phone dogfood.
