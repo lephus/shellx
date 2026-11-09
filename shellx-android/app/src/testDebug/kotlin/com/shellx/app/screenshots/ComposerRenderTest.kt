@@ -12,6 +12,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.VoiceRig
@@ -48,11 +49,25 @@ class ComposerRenderTest {
         )
     }
 
-    /** The bar over [rig]'s mic, with the dictation [model] in the state the test put it in. */
-    private fun renderBar(name: String, rig: VoiceRig, model: VoiceInputModel? = null, draft: ComposerDraft = ComposerDraft(),
-                          attachmentsEnabled: Boolean = false, sending: Double? = null) {
+    /**
+     * The bar over a fresh [VoiceRig]'s mic, with the dictation [prepare] put in its state (null: no injected model).
+     * Each of the four captures composes anew, and the bar cancels its dictation when it leaves, so the rig and the
+     * dictation are made again for each capture.
+     */
+    private fun renderBar(
+        name: String,
+        rig: () -> VoiceRig = { VoiceRig.make() },
+        draft: ComposerDraft = ComposerDraft(),
+        attachmentsEnabled: Boolean = false,
+        sending: Double? = null,
+        prepare: ((VoiceRig, VoiceInputModel) -> Unit)? = null,
+    ) {
         assertRenders(name) {
-            CompositionLocalProvider(LocalVoice provides rig.env) {
+            val (made, model) = remember {
+                val made = rig()
+                made to prepare?.let { ready -> made.model().also { ready(made, it) } }
+            }
+            CompositionLocalProvider(LocalVoice provides made.env) {
                 Screen {
                     ComposerBar(draft, {}, send = { _, _ -> }, attachmentsEnabled = attachmentsEnabled, sending = sending, voice = model)
                 }
@@ -89,66 +104,59 @@ class ComposerRenderTest {
 
     @Test
     fun voiceIdle() {
-        renderBar("voice-idle", VoiceRig.make())
+        renderBar("voice-idle")
     }
 
     @Test
     fun voiceListening() {
-        val rig = VoiceRig.make()
-        val model = rig.model()
-        model.pressNow()
-        rig.engine.say(spoken)
-        renderBar("voice-listening", rig, model)
+        renderBar("voice-listening") { rig, model ->
+            model.pressNow()
+            rig.engine.say(spoken)
+        }
     }
 
     @Test
     fun voiceCancelArmed() {
-        val rig = VoiceRig.make()
-        val model = rig.model()
-        model.pressNow()
-        rig.engine.say(spoken)
-        model.drag(-120.0, 0.0)
-        renderBar("voice-cancel-armed", rig, model)
+        renderBar("voice-cancel-armed") { rig, model ->
+            model.pressNow()
+            rig.engine.say(spoken)
+            model.drag(-120.0, 0.0)
+        }
     }
 
     @Test
     fun voiceDenied() {
-        val rig = VoiceRig.make(microphone = false)
-        val model = rig.model()
-        model.pressNow()
-        renderBar("voice-denied", rig, model)
+        renderBar("voice-denied", rig = { VoiceRig.make(microphone = false) }) { _, model -> model.pressNow() }
     }
 
     @Test
     fun voiceUnavailable() {
-        val rig = VoiceRig.make(VoiceCapabilities.NONE)
-        val model = rig.model()
-        model.pressNow()
-        // The bar would focus its field (the keyboard); a focused field's cursor blinks forever, which a render cannot
-        // wait out. The keyboard path is ComposerBarTest.noRecognizerOpensTheKeyboard's.
-        model.wantsKeyboard = false
-        renderBar("voice-unavailable", rig, model)
+        renderBar("voice-unavailable", rig = { VoiceRig.make(VoiceCapabilities.NONE) }) { _, model ->
+            model.pressNow()
+            // The bar would focus its field (the keyboard); a focused field's cursor blinks forever, which a render
+            // cannot wait out. The keyboard path is ComposerBarTest.noRecognizerOpensTheKeyboard's.
+            model.wantsKeyboard = false
+        }
     }
 
     @Test
     fun voiceLimit() {
-        val rig = VoiceRig.make()
-        val model = rig.model()
-        model.pressNow()
-        rig.engine.say("giữ route v1, đừng xoá. ".repeat(700))
-        assertTrue(model.limitReached)
-        renderBar("voice-limit", rig, model)
+        renderBar("voice-limit") { rig, model ->
+            model.pressNow()
+            rig.engine.say("giữ route v1, đừng xoá. ".repeat(700))
+            assertTrue(model.limitReached)
+        }
     }
 
     @Test
     fun composerAttachments() {
-        renderBar("composer-attachments", VoiceRig.make(), draft = ComposerDraft(attachments = both()), attachmentsEnabled = true)
+        renderBar("composer-attachments", draft = ComposerDraft(attachments = both()), attachmentsEnabled = true)
     }
 
     @Test
     fun composerSending() {
         renderBar(
-            "composer-sending", VoiceRig.make(), draft = ComposerDraft(text = "Sửa lỗi này giúp mình", attachments = both()),
+            "composer-sending", draft = ComposerDraft(text = "Sửa lỗi này giúp mình", attachments = both()),
             attachmentsEnabled = true, sending = 0.4,
         )
     }
@@ -169,6 +177,6 @@ class ComposerRenderTest {
     @Test
     fun composerTooMany() {
         val six = (1..6).map { log("log-$it.txt") }
-        renderBar("composer-too-many", VoiceRig.make(), draft = ComposerDraft(attachments = six), attachmentsEnabled = true)
+        renderBar("composer-too-many", draft = ComposerDraft(attachments = six), attachmentsEnabled = true)
     }
 }
