@@ -75,10 +75,11 @@ class PhonePairingTest {
         offerUri: String = offer.uri,
         pollInterval: Duration = 5.milliseconds,
         timeout: Duration = PairingOffer.LIFETIME,
+        api: RelayApi = api(),
         onRequested: (String) -> Unit = {},
     ): PairedMachine {
         server.dispatcher = relay
-        return PhonePairing.pair(offerUri, clientKey, api(), "tok", pollInterval, timeout, onRequested)
+        return PhonePairing.pair(offerUri, clientKey, api, "tok", pollInterval, timeout, onRequested)
     }
 
     @Test
@@ -193,7 +194,10 @@ class PhonePairingTest {
                         else -> approved()
                     }
                 }
-                assertEquals(machineId, s.pair(relay).machineId)
+                // OkHttp would retry the dropped GET on its own and hide the IOException from PhonePairing.
+                val noRetry = s.client.newBuilder().retryOnConnectionFailure(false).build()
+                assertEquals(machineId, s.pair(relay, api = RelayApi(s.base, noRetry, "9.9.9")).machineId)
+                assertEquals(4, relay.gets.size, "each transient failure is its own poll")
                 assertEquals(0, relay.denyCalls.get())
             }
         }
