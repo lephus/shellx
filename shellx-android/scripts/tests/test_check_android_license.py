@@ -231,12 +231,22 @@ class CheckAndroidLicenseTests(unittest.TestCase):
         settings = CLEAN["shellx-android/settings.gradle.kts"]
         for text in ('repositories { maven("https://jitpack.io") }\n',
                      'repositories { maven { url = uri("https://jitpack.io") } }\n',
-                     "repositories { mavenLocal() }\n", "repositories { jcenter() }\n", "repositories { ivy { } }\n"):
+                     "repositories { mavenLocal() }\n", "repositories { jcenter() }\n", "repositories { ivy { } }\n",
+                     'repositories { google { url = uri("https://jitpack.io") } }\n',
+                     'repositories { mavenCentral { url = uri("https://repo.example.com") } }\n',
+                     'repositories { google(); exclusiveContent { forRepository { google() } } }\n',
+                     'repositories {\n    google()\n    val extra = uri("https://jitpack.io")\n}\n',
+                     "dependencyResolutionManagement { repositories { gradlePluginPortal() } }\n"):
             with self.subTest(text=text):
                 self.assertFails(self.tree({"shellx-android/settings.gradle.kts": settings + text}),
                                  "settings.gradle.kts")
         self.assertFails(self.tree({"shellx-android/app/build.gradle.kts": "repositories { gradlePluginPortal() }\n"}),
                          "gradlePluginPortal")
+        self.assertFails(self.tree({APP: CLEAN[APP] + 'repositories.google { url = uri("https://jitpack.io") }\n'}),
+                         APP, "google")
+        self.assertPasses(self.tree({"shellx-android/settings.gradle.kts": settings + (
+            "buildCache { local { } }\n"
+            "dependencyResolutionManagement {\n    repositories {\n        google()\n        mavenCentral()\n    }\n}\n")}))
 
     def test_groovy_scripts_and_vendored_binaries_fail(self):
         self.assertFails(self.tree({"shellx-android/extra.gradle": "apply plugin: 'x'\n"}), "shellx-android/extra.gradle")
