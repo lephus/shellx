@@ -341,7 +341,7 @@ class VoiceInputModel(
     }
 
     /** Takes the run's updates. When the channel closes by itself (an error, a time limit), the words heard stay for
-     *  release, and the run is cancelled so the microphone is given back at once. When the reader is cancelled while
+     *  release (with none heard, the mic shows idle), and the run is cancelled so the microphone is given back at once. When the reader is cancelled while
      *  the run listens and nobody took the run (no drop(), no release: `scope` ended), the dictation is dropped and the
      *  microphone given back too (final review I-1). */
     private suspend fun read(channel: ReceiveChannel<String>, current: Int, run: SpeechRunId) {
@@ -354,6 +354,9 @@ class VoiceInputModel(
             if (attempt != current || recognition != Recognition.RUNNING) return
             recognition = Recognition.STOPPED
             giveBack = true
+            // Android's recognizer ends at a silence: with nothing heard, nothing listens and nothing waits for the
+            // lift, so the mic is idle rather than "Listening…" (3E review A M-6).
+            if (isBlank(text)) setPhase(Phase.Idle)
         } catch (e: Exception) {
             rethrowIfCancelled(e)
             if (attempt != current || recognition != Recognition.RUNNING) return
