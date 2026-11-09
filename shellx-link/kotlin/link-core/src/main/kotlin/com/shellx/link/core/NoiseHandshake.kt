@@ -116,18 +116,22 @@ class NoiseHandshake internal constructor(
         }
     }
 
-    /** Runs one message step; any error poisons the handshake. Errors that are not Noise errors become BadMessage. */
+    /**
+     * Runs one message step; any throwable poisons the handshake. Cancellation and JVM errors (an `Error` from
+     * `trusts`, for example) are rethrown as they are; other exceptions that are not Noise errors become BadMessage.
+     */
     private inline fun <T> guarded(body: () -> T): T {
         if (failed) throw NoiseException.BadMessage()
         try {
             return body()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             failed = true
             localEphemeral = null
             ephemeralForTesting = null
             // `s` may have decrypted before the failure without the peer proving it owns the key.
             remote = null
             if (e is CancellationException) throw e
+            if (e !is Exception) throw e
             throw e as? NoiseException ?: NoiseException.BadMessage()
         }
     }
