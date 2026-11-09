@@ -27,8 +27,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * [RelayException.ProtocolViolation] for a URL that does not parse). Routes are joined under its path once, with or
  * without a trailing slash. Redirects are never followed: a 3xx is a [RelayApiException.Http]. Every call throws
  * [RelayApiException], or the transport's `IOException` unchanged.
+ *
+ * The API derives its own client from [okHttpClient] (`newBuilder()`), so it keeps that client's interceptors: never
+ * pass one with a header or body logging interceptor, which would log bearer tokens.
  */
-class RelayApi(val baseUrl: String, client: OkHttpClient, private val clientVersion: String) {
+class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clientVersion: String) {
     private val base: HttpUrl
     private val http: OkHttpClient
 
@@ -44,7 +47,7 @@ class RelayApi(val baseUrl: String, client: OkHttpClient, private val clientVers
         RelayTransportPolicy.requireHttps(uri)
         base = uri.toCheckedHttpUrl()
         // A redirect could carry the bearer token to another host: never follow one.
-        http = client.newBuilder()
+        http = okHttpClient.newBuilder()
             .followRedirects(false)
             .followSslRedirects(false)
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)

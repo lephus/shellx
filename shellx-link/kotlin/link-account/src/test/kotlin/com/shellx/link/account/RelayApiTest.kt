@@ -220,6 +220,8 @@ class RelayApiTest {
                 RelayApi("http://127.0.0.1:8080", s.client, "1")
                 RelayApi("http://localhost:8080", s.client, "1")
                 RelayApi("https://api.example.test", s.client, "1")
+                // Contracts §9 names the parameters.
+                RelayApi(baseUrl = "https://api.example.test", okHttpClient = s.client, clientVersion = "1")
             }
         }
     }
