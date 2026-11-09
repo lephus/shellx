@@ -34,6 +34,7 @@ internal class FakeMacWorkspaces(
     private val calls = ArrayList<String>()
     private var nextOutcome: WorkspaceControlOutcome? = null
     private var created = 0
+    private var addedTerminals = 0
     private val agentCalls = ArrayList<String>()
     private var nextAgentOutcome: WorkspaceControlOutcome? = null
     private val terminalCalls = ArrayList<FakeMac.TerminalCloseCall>()
@@ -84,6 +85,26 @@ internal class FakeMacWorkspaces(
             if (byId.remove(workspaceId) == null) return
             broadcastLocked(emptyList(), listOf(workspaceId))
         }
+    }
+
+    /** True when a workspace the Mac lists holds [terminalId]. */
+    fun listsTerminal(terminalId: String): Boolean = synchronized(lock) {
+        byId.values.any { workspace -> workspace.terminals.any { it.terminalId == terminalId } }
+    }
+
+    /**
+     * Appends `LinkTerminal("<workspaceId>-new-<n>" (n = 1, 2, … over the Mac's life), "zsh", the workspace's last order
+     * + 1, selected = false)` and broadcasts the change; null for a workspace the Mac does not list.
+     */
+    fun addTerminal(workspaceId: String): String? = synchronized(lock) {
+        val workspace = byId[workspaceId] ?: return null
+        addedTerminals += 1
+        val id = "$workspaceId-new-$addedTerminals"
+        val order = (workspace.terminals.maxOfOrNull { it.order } ?: -1) + 1
+        val grown = workspace.copy(terminals = workspace.terminals + LinkTerminal(id, "zsh", order, selected = false))
+        byId[workspaceId] = grown
+        broadcastLocked(listOf(grown), emptyList())
+        id
     }
 
     /** Raises the revision without telling anyone, so the next change skips one. */

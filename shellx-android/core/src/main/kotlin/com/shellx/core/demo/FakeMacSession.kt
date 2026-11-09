@@ -17,6 +17,12 @@ import com.shellx.link.core.ReplyOutcome
 import com.shellx.link.core.SessionChange
 import com.shellx.link.core.SessionList
 import com.shellx.link.core.ShellXLink
+import com.shellx.link.core.TerminalCreated
+import com.shellx.link.core.TerminalInputCheck
+import com.shellx.link.core.TerminalInputUnit
+import com.shellx.link.core.TerminalPushQueue
+import com.shellx.link.core.TerminalViewOpenOutcome
+import com.shellx.link.core.TerminalViewPush
 import com.shellx.link.core.WorkspaceChange
 import com.shellx.link.core.WorkspaceControlOutcome
 import com.shellx.link.core.WorkspaceCreated
@@ -43,6 +49,13 @@ import kotlinx.coroutines.yield
  * Uploads are the exception, as in 3B's client: the phone drives them chunk by chunk in the caller's coroutine, so a
  * cancelled caller or an ended session stops them, nothing is kept, and a message whose attachments did not all go up
  * is never sent (`MessageUploadException`).
+ *
+ * Terminal views (plan 3G Task 5): there is no `LinkHost` on Android, so this session is the host the phone talks to,
+ * with LinkHost.swift's checks (the feature first, then sizes of at least 1, clamped into `TERMINAL_COLUMNS` and
+ * `TERMINAL_ROWS`) before [FakeMacTerminals] acts, one terminal call at a time as the host's view slot takes them. An
+ * input `TerminalInputCheck` refuses throws on the phone's side, as 3B's client does: nothing was sent. The session's
+ * terminal pushes go through a [TerminalPushQueue], as 3B's client's do, so a terminal flood is bounded the same way;
+ * the queue closes when the session ends.
  */
 internal class FakeMacSession(private val mac: FakeMac, override val hostFeatures: Set<String>) : LinkSession {
     val pendingQueue = Channel<PendingChange>(Channel.UNLIMITED)
@@ -50,6 +63,10 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
     val workspaceQueue = Channel<WorkspaceChange>(Channel.UNLIMITED)
     val chatQueue = Channel<ChatPush>(Channel.UNLIMITED)
     private val ended = CompletableDeferred<Unit>()
+    private val terminalQueue = TerminalPushQueue()
+
+    /** The host's view slot takes one terminal call at a time (LinkHost handles an open inline). */
+    private val terminalTurn = Mutex()
 
     /** One upload at a time, a message's uploads and its send together (3B's upload turn). */
     private val uploadTurn = Mutex()
@@ -64,6 +81,13 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
     override val sessionChanges: Flow<SessionChange> = sessionQueue.receiveAsFlow()
     override val workspaceChanges: Flow<WorkspaceChange> = workspaceQueue.receiveAsFlow()
     override val chatEntries: Flow<ChatPush> = chatQueue.receiveAsFlow()
+    override val terminalPushes: Flow<TerminalViewPush> = terminalQueue.pushes
+
+    /** True once the session ended (either side). */
+    val hasEnded: Boolean get() = ended.isCompleted
+
+    /** The Mac's side: a push for this session's phone. */
+    fun offerTerminal(push: TerminalViewPush) = terminalQueue.offer(push)
 
     override suspend fun snapshot(): PendingSnapshot = ask { mac.feed.snapshot() }
 
@@ -182,6 +206,47 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         mac.workspaceSource.closeTerminal(workspaceId, terminalId)
     }
 
+    override suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome = ask {
+        if (!viewsTerminals()) throw LinkClientException.Remote("unsupported", "this host offers no terminal views")
+        if (cols < 1 || rows < 1) throw LinkClientException.Remote("bad_request", "cols and rows must be at least 1")
+        terminalTurn.withLock {
+            mac.terminals.open(this, terminalId, cols.coerceIn(ShellXLink.TERMINAL_COLUMNS), rows.coerceIn(ShellXLink.TERMINAL_ROWS))
+        }
+    }
+
+    override suspend fun closeTerminalView(terminalId: String) = ask {
+        if (viewsTerminals()) terminalTurn.withLock { mac.terminals.close(this, terminalId) }
+    }
+
+    override suspend fun sendTerminalInput(terminalId: String, units: List<TerminalInputUnit>) {
+        TerminalInputCheck.check(units)
+        ask { if (viewsTerminals()) terminalTurn.withLock { mac.terminals.input(this, terminalId, units) } }
+    }
+
+    override suspend fun resizeTerminalView(terminalId: String, cols: Int, rows: Int) = ask {
+        // The host answers sizes below 1 with an error frame that names no call: the phone sees nothing.
+        if (viewsTerminals() && cols >= 1 && rows >= 1) {
+            terminalTurn.withLock {
+                mac.terminals.resize(
+                    this, terminalId, cols.coerceIn(ShellXLink.TERMINAL_COLUMNS), rows.coerceIn(ShellXLink.TERMINAL_ROWS),
+                )
+            }
+        }
+    }
+
+    override suspend fun resyncTerminalView(terminalId: String) = ask {
+        if (viewsTerminals()) terminalTurn.withLock { mac.terminals.resync(this, terminalId) }
+    }
+
+    override suspend fun createTerminal(workspaceId: String): TerminalCreated = ask {
+        if (!(mac.servesWorkspaces && mac.acceptsTerminalCreate)) {
+            throw LinkClientException.Remote("unsupported", "this host takes no terminal creation")
+        }
+        val (outcome, terminalId) = mac.terminals.create(workspaceId)
+        // The new id goes out only with OK.
+        TerminalCreated(outcome, terminalId.takeIf { outcome == WorkspaceControlOutcome.OK })
+    }
+
     /** Ends the session from the phone's side. Idempotent. */
     override fun close() {
         end()
@@ -197,11 +262,16 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         sessionQueue.close()
         workspaceQueue.close()
         chatQueue.close()
+        // The view goes with its session; its pushes complete once taken.
+        mac.terminals.sessionEnded(this)
+        terminalQueue.close()
     }
 
     override fun toString(): String = "FakeMacSession(features=$hostFeatures)"
 
     private fun takesWorkspaceControl() = mac.servesWorkspaces && mac.acceptsWorkspaceControl
+
+    private fun viewsTerminals() = mac.servesWorkspaces && mac.servesTerminalViews
 
     private fun noChat() = LinkClientException.Remote("unsupported", "this host has no chat")
 

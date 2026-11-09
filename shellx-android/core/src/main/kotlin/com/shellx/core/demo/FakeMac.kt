@@ -16,6 +16,10 @@ import com.shellx.link.core.PairingOffer
 import com.shellx.link.core.PendingItem
 import com.shellx.link.core.ReplyOutcome
 import com.shellx.link.core.ShellXLink
+import com.shellx.link.core.TerminalGridFrame
+import com.shellx.link.core.TerminalInputUnit
+import com.shellx.link.core.TerminalViewEndReason
+import com.shellx.link.core.TerminalViewOpenOutcome
 import com.shellx.link.core.WorkspaceControlOutcome
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -57,6 +61,10 @@ class FakeMac(
     val acceptsAgentClose: Boolean = true,
     /** False: no `terminal_close` feature. A Mac without workspaces never advertises it either. */
     val acceptsTerminalClose: Boolean = true,
+    /** False: no `terminal_view` feature (a ShellX from before it). A Mac without workspaces never advertises it either. */
+    val servesTerminalViews: Boolean = true,
+    /** False: no `terminal_create` feature. A Mac without workspaces never advertises it either. */
+    val acceptsTerminalCreate: Boolean = true,
     internal val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     data class Decision(val requestId: String, val decision: LinkDecision)
@@ -71,6 +79,9 @@ class FakeMac(
 
     data class TerminalCloseCall(val workspaceId: String, val terminalId: String)
 
+    /** The grid of a terminal view open or resize, as the Mac took it (clamped). */
+    data class TerminalViewSize(val terminalId: String, val cols: Int, val rows: Int)
+
     private val live = FakeMacLive()
     private val lock = live.lock
     private var hostKey = NoiseStaticKey.generate()
@@ -83,6 +94,7 @@ class FakeMac(
     internal val sessionSource = FakeMacSessions(live, pushes = servesSessionsAndChat)
     internal val workspaceSource = FakeMacWorkspaces(live, pushes = servesWorkspaces, sessionSource, nowMs)
     internal val chat = FakeMacChat(live, pushes = servesSessionsAndChat)
+    internal val terminals = FakeMacTerminals(live, workspaceSource, scope)
 
     /** The pairing record a phone keeps for this Mac: machineId "mac-<id>", linkSlot "slot-<id>", the first host key. */
     val machine: PairedMachine
@@ -94,6 +106,8 @@ class FakeMac(
         if (servesWorkspaces && acceptsWorkspaceControl) add(ShellXLink.WORKSPACE_CONTROL_FEATURE)
         if (servesSessionsAndChat && acceptsAgentClose) add(ShellXLink.AGENT_CLOSE_FEATURE)
         if (servesWorkspaces && acceptsTerminalClose) add(ShellXLink.TERMINAL_CLOSE_FEATURE)
+        if (servesWorkspaces && servesTerminalViews) add(ShellXLink.TERMINAL_VIEW_FEATURE)
+        if (servesWorkspaces && acceptsTerminalCreate) add(ShellXLink.TERMINAL_CREATE_FEATURE)
     }
 
     init {
@@ -108,8 +122,9 @@ class FakeMac(
     val liveSessionCount: Int get() = live.count
 
     /**
-     * Every [LinkSession] call any phone made, over all sessions (close and the four Flows do not count). A test reads
-     * it before and after an action to show that nothing at all was sent.
+     * Every [LinkSession] call any phone made, over all sessions (close and the five Flows do not count, nor an input
+     * that `TerminalInputCheck` refuses: nothing was sent). A test reads it before and after an action to show that
+     * nothing at all was sent.
      */
     val phoneCallCount: Int get() = phoneCalls.get()
 
@@ -134,7 +149,7 @@ class FakeMac(
         synchronized(lock) { hostKey = NoiseStaticKey.generate() }
     }
 
-    /** Ends every live session from the Mac's side: each one's four Flows complete and its pending calls throw SessionClosed. */
+    /** Ends every live session from the Mac's side: each one's five Flows complete, its view closes, and its pending calls throw SessionClosed. */
     fun dropLiveSessions() {
         for (session in live.takeAll()) session.end()
     }
@@ -258,6 +273,46 @@ class FakeMac(
      */
     fun setNextTerminalCloseOutcome(outcome: WorkspaceControlOutcome) =
         workspaceSource.setNextTerminalCloseOutcome(outcome)
+
+    // Terminal views and terminal creation (FakeMacTerminals)
+
+    /** The content of each terminal by id; every other terminal shows `DemoTerminalScreens.prompt` at the size asked for. */
+    fun setTerminalFixtures(fixtures: Map<String, DemoTerminalFixture>) = terminals.setFixtures(fixtures)
+
+    /** From now on an open of [terminalId] answers [outcome] (OK counts as FAILED, as the Mac's view slot answers). */
+    fun refuseTerminalView(terminalId: String, outcome: TerminalViewOpenOutcome) = terminals.refuse(terminalId, outcome)
+
+    /** From now on terminal view opens are recorded in [terminalViewOpens] but not answered until released. */
+    fun holdTerminalViewOpens() = terminals.hold.hold()
+
+    fun releaseTerminalViewOpens() = terminals.hold.release()
+
+    /** [frame] goes out as the next revision of every view of [terminalId] (the Mac's terminal printed something). */
+    fun emitTerminalFrame(terminalId: String, frame: TerminalGridFrame) = terminals.emit(terminalId, frame)
+
+    /** Every session viewing [terminalId] gets `terminal.view.ended` with [reason], and those views close. */
+    fun endTerminalView(terminalId: String, reason: TerminalViewEndReason) = terminals.end(terminalId, reason)
+
+    /** The next `terminal.create` answers [outcome] and, unless it is `OK`, adds nothing. */
+    fun setNextTerminalCreateOutcome(outcome: WorkspaceControlOutcome) = terminals.setNextCreateOutcome(outcome)
+
+    /** Every terminal view open the Mac took, in order, refused ones too (not one answered `busy`). */
+    val terminalViewOpens: List<TerminalViewSize> get() = terminals.viewOpens
+
+    /** Every resize of a viewed terminal, in order. */
+    val terminalViewResizes: List<TerminalViewSize> get() = terminals.viewResizes
+
+    /** The terminal id of every view that closed, in order: by the phone, a new open of it, its end or its session's. */
+    val terminalViewCloses: List<String> get() = terminals.viewCloses
+
+    /** Every input message applied to a view of [terminalId], in order. */
+    fun terminalViewInputs(terminalId: String): List<List<TerminalInputUnit>> = terminals.viewInputs(terminalId)
+
+    /** How many resyncs of a view of [terminalId] the Mac answered. */
+    fun terminalViewSnapshotRequests(terminalId: String): Int = terminals.viewSnapshotRequests(terminalId)
+
+    /** The workspace id of every `terminal.create` the Mac took, in order. */
+    val terminalCreates: List<String> get() = terminals.createCalls
 
     // Chat (FakeMacChat)
 
