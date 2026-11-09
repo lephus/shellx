@@ -16,6 +16,13 @@ struct TerminalSurface: UIViewRepresentable {
     let title: String
     @Binding var focused: Bool
 
+    /// What `updateUIView` last saw of `focused`.
+    final class Coordinator {
+        var focused = false
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> TerminalSurfaceView {
         TerminalSurfaceView(model: model, terminalId: terminalId)
     }
@@ -27,15 +34,20 @@ struct TerminalSurface: UIViewRepresentable {
         view.update(
             revision: revision, snapshots: snapshots, topShift: topShift, phase: phase, typing: typing,
             sentInputs: sentInputs)
-        // The keyboard follows `focused`: the key bar's hide key sets it false; a tap on the surface sets it true.
-        if focused, !view.isFirstResponder, view.window != nil {
+        // The keyboard follows `focused`: the key bar's hide key sets it false; a tap on the surface sets it true. The
+        // surface takes the keyboard only when `focused` turns true: after another field took it, `focused` is still
+        // true until the surface's loss reaches the pane, and a redraw meanwhile (a terminal that keeps printing) must
+        // not take it back.
+        let turnedOn = focused && !context.coordinator.focused
+        context.coordinator.focused = focused
+        if turnedOn, !view.isFirstResponder, view.window != nil {
             view.becomeFirstResponder()
         } else if !focused, view.isFirstResponder {
             view.resignFirstResponder()
         }
     }
 
-    static func dismantleUIView(_ view: TerminalSurfaceView, coordinator: ()) {
+    static func dismantleUIView(_ view: TerminalSurfaceView, coordinator: Coordinator) {
         view.onFocusChange = { _ in }
         view.resignFirstResponder()
     }
