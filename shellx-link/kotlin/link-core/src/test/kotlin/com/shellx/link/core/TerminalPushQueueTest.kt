@@ -5,6 +5,7 @@ import com.shellx.link.core.TerminalViewPush.Frame
 import com.shellx.link.core.TerminalViewPush.Opened
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
@@ -182,6 +183,17 @@ class TerminalPushQueueTest {
                 assertEquals(listOf(Opened("t-1"), Frame("t-1", big.copy(revision = r - 1))), queue.pushes.take(2).toList())
             }
         }
+    }
+
+    /** Review A, m5: no frame from the wire can equal LOST, because the codec refuses its fields both ways. */
+    @Test
+    fun lostIsNoFrameTheCodecTakes() {
+        val lost = TerminalFramePart.LOST
+        val encoded = assertFailsWith<LinkCodecException> { LinkCodec.encode(LinkMessage.TerminalViewFrame("t-1", lost)) }
+        assertEquals(LinkCodecException.BadJson(null), encoded)
+        val json = """{"v":1,"t":"terminal.view.frame","terminal_id":"t-1","revision":${lost.revision},"part":${lost.part},"parts":${lost.parts}}"""
+        val decoded = assertFailsWith<LinkCodecException> { LinkCodec.decode(json.encodeToByteArray()) }
+        assertEquals(LinkCodecException.BadJson(null), decoded)
     }
 
     /** Review A, I-2: the next collector gets the frame, and its weight is never lost (Task 6 cancels at every STOP). */
