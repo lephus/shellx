@@ -177,6 +177,38 @@ adb_serials() {
   printf '%s\n' "$out" | awk -v want="${1:-}" 'NR > 1 && NF >= 2 && (want == "" || $2 == want) { print $1 }'
 }
 
+# The AVD name an emulator serial runs ("" when it does not answer). A port alone does not say whose it is.
+avd_name() {
+  local out try=0
+  while [ "$try" -lt 5 ]; do
+    out="$("$ADB" -s "$1" emu avd name 2>/dev/null)" || out=""
+    out="$(printf '%s\n' "$out" | sed -n '1p' | tr -d '\r')"
+    if [ -n "$out" ]; then printf '%s\n' "$out"; return 0; fi
+    try=$((try + 1)); sleep 1
+  done
+  return 0
+}
+
+# The serial of the running emulator whose AVD is $1, or nothing.
+serial_of_avd() {
+  local s
+  for s in $(adb_serials | grep '^emulator-' || true); do
+    if [ "$(avd_name "$s")" = "$1" ]; then printf '%s\n' "$s"; return 0; fi
+  done
+  return 0
+}
+
+# Shuts down the ShellX emulator on <serial> (AVD <name>) and waits up to 60 s for it to exit.
+stop_emulator() {
+  local serial="$1" name="$2" waited=0
+  note "shutting down $name on $serial"
+  "$ADB" -s "$serial" emu kill >/dev/null 2>&1 || true
+  while has_line "$(adb_serials)" "$serial"; do
+    [ "$waited" -lt 60 ] || die "$name on $serial did not shut down"
+    sleep 2; waited=$((waited + 2))
+  done
+}
+
 # Builds the debug app, installs it on <serial> and opens it. Only com.shellx.dev is ever installed: the APK's
 # package is checked first, so a phone never gets com.shellx.prod from this script.
 build_and_open() {
@@ -201,14 +233,14 @@ cmd_emulator() {
       *) die "emulator: unknown option $1 (use --api <26|36> [--headless])" 2 ;;
     esac
   done
-  local port other
+  local port other_api
   case "$api" in
-    26) port=5580; other=5582 ;;
-    36) port=5582; other=5580 ;;
+    26) port=5580; other_api=36 ;;
+    36) port=5582; other_api=26 ;;
     *) die "emulator: --api must be 26 or 36" 2 ;;
   esac
   check_java
-  local name="ShellX_Dev_API_$api" serial="emulator-$port" tag="" t avds config log pid waited boot
+  local name="ShellX_Dev_API_$api" serial="emulator-$port" tag="" t avds config log pid waited boot running other
   for t in google_apis_playstore google_apis default; do
     if [ -d "$ANDROID_HOME/system-images/android-$api/$t/arm64-v8a" ]; then tag="$t"; break; fi
   done
@@ -225,18 +257,18 @@ cmd_emulator() {
     printf 'hw.ramSize=2048\nhw.keyboard=yes\n' >>"$config"
   fi
 
-  if has_line "$(adb_serials)" "emulator-$other"; then
-    note "shutting down emulator-$other (one ShellX emulator at a time)"
-    "$ADB" -s "emulator-$other" emu kill >/dev/null 2>&1 || true
-    waited=0
-    while has_line "$(adb_serials)" "emulator-$other"; do
-      [ "$waited" -lt 60 ] || die "emulator-$other did not shut down"
-      sleep 2; waited=$((waited + 2))
-    done
-  fi
+  # One ShellX emulator at a time: the other ShellX AVD is shut down, on whatever port it runs. Emulators of
+  # other AVDs are never touched, even on a ShellX port.
+  other="$(serial_of_avd "ShellX_Dev_API_$other_api")"
+  [ -z "$other" ] || stop_emulator "$other" "ShellX_Dev_API_$other_api"
 
   pid=""
-  if ! has_line "$(adb_serials)" "$serial"; then
+  running="$(serial_of_avd "$name")"
+  if [ -n "$running" ]; then
+    serial="$running"
+  elif has_line "$(adb_serials)" "$serial"; then
+    die "$serial runs another emulator ($(avd_name "$serial")), not $name; stop it or free port $port"
+  else
     mkdir -p "$ANDROID_DIR/build/dev"
     log="$ANDROID_DIR/build/dev/emulator-$api.log"
     note "starting $name on $serial (log: $log)"
@@ -293,11 +325,10 @@ cmd_device() {
 
 cmd_clean() {
   local api serial avds dir
-  for serial in emulator-5580 emulator-5582; do
-    if has_line "$(adb_serials)" "$serial"; then
-      note "shutting down $serial"
-      "$ADB" -s "$serial" emu kill >/dev/null 2>&1 || true
-    fi
+  # Only ShellX AVDs are shut down (by name, on any port), and each one has exited before its AVD is deleted.
+  for api in 26 36; do
+    serial="$(serial_of_avd "ShellX_Dev_API_$api")"
+    [ -z "$serial" ] || stop_emulator "$serial" "ShellX_Dev_API_$api"
   done
   if [ -x "$AVDMANAGER" ]; then
     check_java
