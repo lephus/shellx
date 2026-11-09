@@ -25,15 +25,15 @@
 #       Deletes the private emulators and the build/ folders of both builds.
 #
 # JAVA_HOME defaults to Android Studio's JDK and ANDROID_HOME to ~/Library/Android/sdk. The script never
-# downloads SDK packages (the user installs them with sdkmanager), never installs com.shellx.prod on a phone,
+# downloads SDK packages (the user installs them with sdkmanager), never installs a release (non-debuggable) APK on a phone,
 # and keeps at most one ShellX emulator running.
 set -euo pipefail
 
 ANDROID_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 REPO_ROOT="$(cd "$ANDROID_DIR/.." && pwd -P)"
 LINK_DIR="$REPO_ROOT/shellx-link/kotlin"
-DEBUG_APP_ID="com.shellx.dev"
-RELEASE_APP_ID="com.shellx.prod"
+APP_ID="com.shellx.prod"
+RELEASE_APP_ID="$APP_ID"
 MAIN_ACTIVITY="com.shellx.app.MainActivity"
 SERIAL_FILE="$HOME/.config/shellx/android-serial"
 
@@ -153,7 +153,7 @@ cmd_build_release() {
   manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk")" || die "aapt2 dump xmltree failed on $apk"
   contains "$manifest" "localeConfig" || die "release APK: the manifest has no localeConfig"
   [ -f "$mapping" ] || die "release APK: $mapping is missing (R8 did not run)"
-  if [ ! -f "$ANDROID_DIR/app/src/debug/google-services.json" ] || [ ! -f "$ANDROID_DIR/app/src/release/google-services.json" ]; then
+  if [ ! -f "$ANDROID_DIR/app/google-services.json" ]; then
     note "Firebase: not configured (no google-services.json); push stays off in this build"
   fi
   note "release checks passed ($RELEASE_APP_ID $VN ($VC), target SDK $T)"
@@ -209,19 +209,31 @@ stop_emulator() {
   done
 }
 
-# Builds the debug app, installs it on <serial> and opens it. Only com.shellx.dev is ever installed: the APK's
-# package is checked first, so a phone never gets com.shellx.prod from this script.
-build_and_open() {
-  local serial="$1" apk="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk" aapt2 badging out
-  gradle_android :app:assembleDebug >&2 || die "debug build failed"
+# Refuses an APK that must not go onto <target> (phone or emulator). Debug and release share the id
+# com.shellx.prod, so the package alone cannot tell them apart: a phone gets only a debuggable APK, and a
+# release build never lands on a real phone from this script. An emulator takes any com.shellx.prod APK
+# (the plan's debug-signed release build included).
+check_apk() {
+  local target="$1" apk="$2" aapt2 badging
+  case "$target" in phone|emulator) ;; *) die "check-apk: target must be phone or emulator" 2 ;; esac
   aapt2="$(aapt2_path)" || exit 1
   badging="$("$aapt2" dump badging "$apk")" || die "aapt2 dump badging failed on $apk"
-  contains "$badging" "package: name='$DEBUG_APP_ID' " || die "$apk is not $DEBUG_APP_ID; refusing to install it"
-  "$ADB" -s "$serial" install -r "$apk" >&2 || die "could not install $DEBUG_APP_ID on $serial"
-  out="$("$ADB" -s "$serial" shell am start -W -S -n "$DEBUG_APP_ID/$MAIN_ACTIVITY" 2>&1)" \
-    || die "could not start $DEBUG_APP_ID on $serial: $out"
+  contains "$badging" "package: name='$APP_ID' " || die "$apk is not $APP_ID; refusing to install it"
+  if [ "$target" = "phone" ] && ! contains "$badging" "application-debuggable"; then
+    die "$apk is not debuggable (a release build); refusing to install it on a phone"
+  fi
+}
+
+# Builds the debug app, installs it on <serial> (a phone or an emulator, see check_apk) and opens it.
+build_and_open() {
+  local serial="$1" target="$2" apk="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk" out
+  gradle_android :app:assembleDebug >&2 || die "debug build failed"
+  check_apk "$target" "$apk"
+  "$ADB" -s "$serial" install -r "$apk" >&2 || die "could not install $APP_ID on $serial"
+  out="$("$ADB" -s "$serial" shell am start -W -S -n "$APP_ID/$MAIN_ACTIVITY" 2>&1)" \
+    || die "could not start $APP_ID on $serial: $out"
   printf '%s\n' "$out" >&2
-  contains "$out" "Status: ok" || die "$DEBUG_APP_ID did not start on $serial"
+  contains "$out" "Status: ok" || die "$APP_ID did not start on $serial"
 }
 
 cmd_emulator() {
@@ -290,7 +302,7 @@ cmd_emulator() {
     sleep 2; waited=$((waited + 2))
   done
 
-  build_and_open "$serial"
+  build_and_open "$serial" emulator
   note "ShellX Dev is running on $serial"
   echo "$serial"
 }
@@ -319,7 +331,7 @@ cmd_device() {
   check_java
   [ "$("$ADB" -s "$serial" get-state 2>/dev/null | tr -d '\r')" = "device" ] \
     || die "phone $serial is not ready: unlock it and allow USB debugging"
-  build_and_open "$serial"
+  build_and_open "$serial" phone
   note "ShellX Dev is running on $serial"
 }
 
@@ -365,5 +377,6 @@ case "$command" in
   emulator) cmd_emulator "$@" ;;
   device) cmd_device "$@" ;;
   clean) cmd_clean ;;
+  check-apk) [ $# -eq 2 ] || usage 2; check_apk "$@" ;;
   *) echo "dev.sh: unknown command: $command" >&2; usage 2 ;;
 esac
