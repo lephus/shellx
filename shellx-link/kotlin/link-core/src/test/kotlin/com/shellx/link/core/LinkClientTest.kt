@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -26,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -402,6 +404,37 @@ class LinkClientTest {
                 channel.send(LinkMessage.Snapshot(get.callId, 5, emptyList()))
                 // Both late answers were dropped.
                 assertEquals(5, next.await().revision)
+                client.close()
+            }
+        }
+    }
+
+    /** As Swift's `checkOpen()`: a call or upload from a coroutine that is already cancelled sends nothing. */
+    @Test
+    fun alreadyCancelledCallerSendsNothing() {
+        runBlocking {
+            within {
+                val rig = HostRig(features = listOf(ShellXLink.ATTACHMENTS_FEATURE))
+                val host = async { rig.host() }
+                val client = rig.client()
+                val (channel, _) = host.await()
+                val cancelled = launch {
+                    coroutineContext.job.cancel()
+                    assertFailsWith<CancellationException> { client.chatSend("s1", "typed") }
+                    assertFailsWith<CancellationException> { client.reply("r1", once) }
+                    assertFailsWith<CancellationException> { client.uploadAttachment(AttachmentKind.FILE, "a", byteArrayOf(1)) }
+                    assertFailsWith<CancellationException> {
+                        client.chatSend("s1", "with a photo", listOf(ChatAttachment(AttachmentKind.IMAGE, "p.jpg", byteArrayOf(2))))
+                    }
+                }
+                cancelled.join()
+                assertEquals(0, client.pendingCalls)
+                // Frames arrive in order, so the first one the host sees must be this snapshot's.
+                val snapshot = async { client.snapshot() }
+                val first = channel.request()
+                assertIs<LinkMessage.SnapshotGet>(first, "a cancelled caller sent ${first::class.simpleName}")
+                channel.send(LinkMessage.Snapshot(first.callId, 4, emptyList()))
+                assertEquals(4, snapshot.await().revision)
                 client.close()
             }
         }
