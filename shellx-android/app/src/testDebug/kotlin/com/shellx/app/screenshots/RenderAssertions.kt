@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
  * 1179 px wide (393 dp at xxhdpi), and light differs from dark in each language.
  */
 fun assertRenders(name: String, content: @Composable () -> Unit): List<Snapshot> {
-    val shots = ShellXSnapshots.capture(name, content)
+    val shots = ShellXSnapshots.capture(name, content = content)
     assertEquals(listOf("light-en", "dark-en", "light-vi", "dark-vi"), shots.map { "${it.theme}-${it.language}" })
     for (shot in shots) {
         assertTrue("${shot.file} was written", shot.file.isFile)
