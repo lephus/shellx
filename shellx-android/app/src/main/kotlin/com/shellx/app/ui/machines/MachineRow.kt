@@ -72,7 +72,7 @@ private fun Details(name: String, state: MachineLinkState, isDefault: Boolean, l
     val spoken = listOfNotNull(name, style.text, defaultWord.takeIf { isDefault }).joinToString(", ")
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        modifier = Modifier.clearAndSetSemantics { contentDescription = spoken }.testTag("machine.row"),
+        modifier = Modifier.testTag("machine.row").clearAndSetSemantics { contentDescription = spoken },
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
