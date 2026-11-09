@@ -41,6 +41,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * A phone in landscape (851 × 393 dp, the Pixel 5 turned): the work screens keep a usable chat, and both pending sheets
@@ -51,6 +52,7 @@ import org.robolectric.annotation.Config
  * above a landscape keyboard (about 170 dp: 393 dp less the status bar and a 200 dp keyboard).
  */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics, so the bars are as tall as on a phone.
 @Config(qualifiers = "w851dp-h393dp-land")
 class CompactHeightTest {
     @get:Rule val compose = createComposeRule()
