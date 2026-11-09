@@ -167,15 +167,6 @@ final class TerminalPaneTests: XCTestCase {
             released, "first responder: \(surface.isFirstResponder), height \(surface.bounds.height) of \(unfocused)")
     }
 
-    /// Only a live page takes input (final review, app I1): the key bar and the keyboard need an open view.
-    func testOnlyALivePageTakesInput() {
-        XCTAssertTrue(TerminalSurfaceView.takesInput(.live))
-        let others: [TerminalViewPhase] = [
-            .connecting, .offline, .unsupported, .unavailable(.gone), .unavailable(.refused), .unavailable(.failed),
-        ]
-        for phase in others { XCTAssertFalse(TerminalSurfaceView.takesInput(phase), "\(phase)") }
-    }
-
     /// Review Focus 1 through the screen: after A → B → A there is exactly one surface, on the page shown, and keys typed
     /// into it reach A only (final review, app M8).
     func testSwipingBackAndForthLeavesOneSurfaceOnThePageShown() async throws {

@@ -13,6 +13,8 @@ struct TerminalSurface: UIViewRepresentable {
     let typing: TerminalTyping
     let phase: TerminalViewPhase
     let sentInputs: Int
+    /// `TerminalViewModel.acceptsInput`, so a change reaches `updateUIView` even when the phase stays.
+    let acceptsInput: Bool
     let title: String
     @Binding var focused: Bool
 
@@ -41,8 +43,8 @@ struct TerminalSurface: UIViewRepresentable {
         let turnedOn = focused && !context.coordinator.focused
         context.coordinator.focused = focused
         if !view.canBecomeFirstResponder {
-            // The page stopped taking input (it reopens, the Mac went offline, a card covers it): the keyboard goes,
-            // and `focused` follows when the loss reaches the pane, which hides the key bar.
+            // The page stopped taking input (a retry wait with no view, the Mac went offline, a card covers it): the
+            // keyboard goes, and `focused` follows when the loss reaches the pane, which hides the key bar.
             if view.isFirstResponder { view.resignFirstResponder() }
         } else if turnedOn, !view.isFirstResponder, view.window != nil {
             view.becomeFirstResponder()

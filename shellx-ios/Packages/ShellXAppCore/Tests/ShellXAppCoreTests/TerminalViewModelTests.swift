@@ -444,4 +444,40 @@ final class TerminalViewModelTests: XCTestCase {
         XCTAssertEqual(model.screen.screenText().first, "one")
         XCTAssertFalse(link.calls.contains { if case .input("t2", _) = $0 { true } else { false } })
     }
+
+    /// Input is taken while live, or while a view reopens after a screen came (it queues behind the open, R10); not
+    /// before the first screen, in the wait before a failed view is reopened, nor offline (final review follow-up).
+    func testAcceptsInputWhileLiveOrReopeningAView() async {
+        let link = ScriptedTerminalLink(); let sleeper = ManualSleeper(); let model = makeModel(link, sleeper: sleeper)
+        model.setPhoneGrid(cols: 50, rows: 20); model.show("t1")
+        _ = await eventually { link.opens == ["t1"] }
+        XCTAssertFalse(model.acceptsInput, "before the first screen the loading card covers the page")
+        emit(link, .opened(terminalId: "t1"))
+        emit(link, .frame(terminalId: "t1", part: snapshotPart(revision: 1, cols: 50, rows: 20, text: ["$"])))
+        _ = await eventually { model.phase == .live }
+        XCTAssertTrue(model.acceptsInput)
+
+        model.suspend()
+        XCTAssertTrue(model.acceptsInput, "the background keeps the keyboard as it was")
+        let gate = Gate(); link.openGate = gate
+        model.resume()
+        _ = await eventually { link.opens.count == 2 }
+        XCTAssertEqual(model.phase, .connecting)
+        XCTAssertTrue(model.acceptsInput, "a view is opening: input queues behind it")
+        model.insertText("x")
+        gate.open()
+        let queued = await eventually { link.calls.last == .input("t1", [.text("x")]) }
+        XCTAssertTrue(queued, "\(link.calls)")
+        emit(link, .opened(terminalId: "t1"))
+        emit(link, .frame(terminalId: "t1", part: snapshotPart(revision: 1, cols: 50, rows: 20, text: ["$"])))
+        _ = await eventually { model.phase == .live }
+
+        emit(link, .ended(terminalId: "t1", reason: .failed))
+        _ = await eventually { sleeper.waiting.contains(TerminalViewModel.failedRetryDelay) }
+        XCTAssertEqual(model.phase, .connecting)
+        XCTAssertFalse(model.acceptsInput, "the retry wait has no view")
+        link.online = false; link.emit(.state(machineID: "m1", .reconnecting))
+        _ = await eventually { model.phase == .offline }
+        XCTAssertFalse(model.acceptsInput)
+    }
 }

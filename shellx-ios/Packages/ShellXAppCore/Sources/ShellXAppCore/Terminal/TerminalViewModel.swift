@@ -118,6 +118,19 @@ public final class TerminalViewModel {
     /// is sent, and the pane shows `terminal.paste.tooLarge`.
     public private(set) var pasteTooLarge = 0
 
+    /// Whether what is typed goes anywhere, so the page keeps or takes the keyboard and shows the key bar: `.live`, or
+    /// `.connecting` after a screen came while a view is opening (input queues behind the open, R10: a resume, a
+    /// reconnect, a `not_open` reopen). Not in the wait before a busy or failed open is retried, nor while waiting for
+    /// the Mac after a `.notSent` (no view to type into), offline, unsupported, unavailable, or before the first screen
+    /// (the loading card covers the surface). The background keeps the phase, and so the keyboard, as it was.
+    public var acceptsInput: Bool {
+        switch phase {
+        case .live: true
+        case .connecting: snapshots > 0 && retryWait == nil && !waitingForMac
+        case .offline, .unsupported, .unavailable: false
+        }
+    }
+
     private struct GridSize: Equatable {
         var cols: Int
         var rows: Int
@@ -150,12 +163,12 @@ public final class TerminalViewModel {
     @ObservationIgnored private var running = false
     @ObservationIgnored private var suspended = false
     /// After a `.notSent` (or `.noAnswer` while not online): no open until this Mac's next `.state`, `show`, `retry` or
-    /// `resume` (R3).
-    @ObservationIgnored private var waitingForMac = false
+    /// `resume` (R3). Observed: `acceptsInput` reads it.
+    private var waitingForMac = false
     @ObservationIgnored private var busyRetriesUsed = 0
     @ObservationIgnored private var failedRetriesUsed = 0
-    /// A busy or failed open waiting out its delay: no open meanwhile.
-    @ObservationIgnored private var retryWait: Task<Void, Never>?
+    /// A busy or failed open waiting out its delay: no open meanwhile. Observed: `acceptsInput` reads it.
+    private var retryWait: Task<Void, Never>?
     @ObservationIgnored private var retryToken = 0
     /// The first-screen clock (R2, R7): running from a show or a reopen until a snapshot is applied.
     @ObservationIgnored private var firstScreenStart: ContinuousClock.Instant?
