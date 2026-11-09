@@ -59,7 +59,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | 6.2-14 | An answer ≤ 1 024 bytes | `ShellXAppCore/Pending/QuestionDraft.swift` | `core:pending/QuestionDraft.kt` | 3C | done (3C) |
 | 6.2-15 | Attachments: at most 5, 10 MiB each | `shellx-link/Sources/ShellXLinkCore/ShellXLink.swift` | `shellx-link/kotlin/link-core/src/main/kotlin/com/shellx/link/core/ShellXLink.kt` | 3B | done (3B) |
 | 6.2-16 | The chat copy is saved at most 500 ms after its last change | `ShellXAppCore/Agent/AgentThreadModel.swift` (`saveDelay`) | `core:agent/AgentThreadModel.kt` | 3C | done (3C) |
-| 6.2-17 | A workspace the Mac has not listed is waited for 5 s before the Mac is asked again | `ShellXAppCore/Workspaces/WorkspaceScreenModel.swift` (`patience`) | `core:workspaces/WorkspaceScreenModel.kt` | 3C | todo |
+| 6.2-17 | A workspace the Mac has not listed is waited for 5 s before the Mac is asked again | `ShellXAppCore/Workspaces/WorkspaceScreenModel.swift` (`patience`) | `core:workspaces/WorkspaceScreenModel.kt` | 3C | done (3C) |
 | 6.2-18 | A notice over the composer shows for 4 s | `ShellX/UI/Agent/AgentView.swift` (`noticeDuration`) | `app:ui/agent/AgentView.kt` | 3E | todo |
 | 6.2-19 | "Nothing needs you" shows for 0.7 s before the page goes back | `ShellX/UI/Pending/PendingListView.swift` (`leaveDelay`) | `app:ui/pending/PendingListView.kt` | 3E | todo |
 | 6.2-20 | A voice result settles after 1.5 s (regular recognizer) or 2 s (on-device recognizer) | `ShellX/Voice/LegacyTranscriber.swift` (`finalResultTimeout`), `AnalyzerTranscriber.swift` (`finalizeTimeout`) | `app:voice/…` (`SpeechRecognizer`) | 3E | todo |
