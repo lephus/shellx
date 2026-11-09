@@ -13,6 +13,7 @@ object Vectors {
 
     val messages: JsonObject get() = json("../../spec/vectors/messages.json")
     val noise: JsonObject get() = json("../../vectors/noise_xx.json")
+    val pairing: JsonObject get() = json("../../spec/vectors/pairing.json")
 
     fun hex(text: String): ByteArray = hexToBytesOrNull(text) ?: error("bad hex")
 
