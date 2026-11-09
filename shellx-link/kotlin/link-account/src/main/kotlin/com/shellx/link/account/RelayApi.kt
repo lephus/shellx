@@ -2,6 +2,7 @@ package com.shellx.link.account
 
 import com.shellx.link.core.PairingOffer
 import com.shellx.link.core.RelayException
+import com.shellx.link.core.RelaySocketFactory
 import com.shellx.link.core.RelayTicket
 import com.shellx.link.core.RelayTransportPolicy
 import java.net.URI
@@ -31,6 +32,9 @@ class RelayApi(val baseUrl: String, client: OkHttpClient, private val clientVers
     private val base: HttpUrl
     private val http: OkHttpClient
 
+    /** Relay sockets over this API's client: no redirects, the same connect and write timeouts. */
+    val relaySockets: RelaySocketFactory
+
     init {
         val uri = try {
             URI(baseUrl)
@@ -47,6 +51,7 @@ class RelayApi(val baseUrl: String, client: OkHttpClient, private val clientVers
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build()
+        relaySockets = OkHttpRelaySockets(http)
     }
 
     /** Asks the machine in [offer] to approve this phone; returns the pairing id to poll. */
