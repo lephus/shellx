@@ -77,11 +77,11 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 
 ## Test devices
 
-| Device | Maker and model | Android (API) | Used for | S3 §7.4c test |
-| --- | --- | --- | --- | --- |
-| `ShellX_Dev_API_26` (emulator) | Pixel 5 profile | 8.0 (26) | lowest supported version | no |
-| `ShellX_Dev_API_36` (emulator) | Pixel 5 profile | 16 (36) | newest version | no |
-| The user's phone | vsmart Live | 10 (29) | camera, voice, notifications, Vietnamese keyboard | no |
+| Device | Maker and model | Android (API) | Used for | S3 §7.4c test | 3A dogfood |
+| --- | --- | --- | --- | --- | --- |
+| `ShellX_Dev_API_26` (emulator) | Pixel 5 profile | 8.0 (26) | lowest supported version | no | emulator ok (2026-11-09) |
+| `ShellX_Dev_API_36` (emulator) | Pixel 5 profile | 16 (36) | newest version | no | emulator ok (2026-11-09) |
+| The user's phone | vsmart Live | 10 (29) | camera, voice, notifications, Vietnamese keyboard | no | pending (USER) |
 
 ## iPhone changes since the reference
 
