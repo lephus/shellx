@@ -37,7 +37,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | 6.1-14 | Settings › Voice: language picker, shown only once the mic works | `ShellX/UI/Settings/VoiceSection.swift` | `app:ui/settings/VoiceSection.kt` | 3D (section), 3E (engine) | todo |
 | 6.1-15 | Update prompt: Update / Later, at launch and on every return; never in debug | `ShellX/UI/Update/UpdateAlert.swift`, `ShellXAppCore/Update/UpdatePrompt.swift`, `AppStoreRelease.swift` | `app:ui/update/UpdateAlert.kt` (Play In-App Updates, flexible flow), `core:update/UpdatePrompt.kt` | 3C (rules), 3E (UI) | todo |
 | 6.1-16 | Notifications: `needs_you` (a tap opens Needs you) and `resolved` (removes the alert); none while the app is in front | `ShellX/Platform/PushAppDelegate.swift`, `ShellXAppCore/Push/PushRegistration.swift`, `PushPayload.swift` | `app:platform/…` (FCM, contracts §8) | 3E (app), 3F (relay) | todo |
-| 6.1-17 | Demo without an account: a text button on sign-in and on "no Mac yet"; a fake Mac with workspaces, agents and needs-you items; a "Demo · Exit" banner; nothing goes to the network | `ShellX/Debug/DemoComposition.swift`, `DemoScript.swift` | `core:demo/DemoScript.kt`, entry points in `app:ui/signin/` and `app:ui/onboarding/` (route `demo`) | 3C (data), 3D (entry points) | todo |
+| 6.1-17 | Demo without an account: a text button on sign-in and on "no Mac yet"; a fake Mac with workspaces, agents and needs-you items; a "Demo · Exit" banner; nothing goes to the network | `ShellX/Demo/DemoComposition.swift`, `DemoScript.swift`, `shellx-ios/Packages/ShellXAppCore/Sources/ShellXDemo/` | `core:demo/DemoScript.kt`, entry points in `app:ui/signin/` and `app:ui/onboarding/` (route `demo`) | 3C (data), 3D (entry points) | todo |
 
 ## Behaviour rules (S3 §6.2)
 
@@ -70,8 +70,8 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | # | Difference | Why | Android | Plan | State |
 | --- | --- | --- | --- | --- | --- |
 | A-1 | Settings › Notifications › "Notifications arriving late?": a short guide per phone maker and a button that opens the app's system settings; no `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Xiaomi, OPPO and vivo hold FCM for apps swiped away (S3 §7.4c) | `app:ui/settings/…` | 3E | todo |
-| A-2 | iPhone wording replaced in 14 strings: "iPhone" → "phone", "App Store" → "Google Play", "VoiceOver" → "TalkBack", Apple's servers → the phone's speech service. Names: `first_mac_step2`, `first_mac_subtitle`, `machine_state_revoked`, `machines_unpair_message`, `pairing_error_needs_update`, `pairing_instructions`, `pairing_waiting_detail`, `settings_account_sign_out_confirm`, `settings_appearance_system`, `settings_voice_on_device`, `settings_voice_server`, `signin_error_local_wipe_pending`, `update_message`, `voice_mic_hint` | The words match the iPhone's, except for platform names (S3 §7.2) | `shellx-android/app/src/main/res/values*/strings_android.xml` | 3A | done (3A) |
-| A-3 | No Apple sign-in and no password sign-in | S3 §3 | — | — | differs (S3): by design |
+| A-2 | iPhone wording replaced in 17 strings: "iPhone" → "phone", "App Store" → "Google Play", "VoiceOver" → "TalkBack", Apple's servers → the phone's speech service, and sign-in names Google only (A-3). Names: `first_mac_step2`, `first_mac_subtitle`, `machine_state_revoked`, `machines_unpair_message`, `pairing_error_needs_update`, `pairing_instructions`, `pairing_waiting_detail`, `settings_account_delete_message`, `settings_account_sign_out_confirm`, `settings_appearance_system`, `settings_voice_on_device`, `settings_voice_server`, `signin_error_local_wipe_pending`, `signin_error_reauth_required`, `signin_subtitle`, `update_message`, `voice_mic_hint` | The words match the iPhone's, except for platform names (S3 §7.2) | `shellx-android/app/src/main/res/values*/strings_android.xml` | 3A | done (3A) |
+| A-3 | No Apple sign-in and no password sign-in | S3 §3; contracts §5 (no Apple methods, no password session) | `shellx-android/scripts/strings-ios-only.txt` (the Apple-link and password-switch strings) | — | differs (S3): by design |
 | A-4 | Nothing is backed up or moved to a new phone (`allowBackup="false"`, and `data_extraction_rules.xml` excludes everything) | Secrets never go into a backup (S3 §7.3) | `AndroidManifest.xml`, `res/xml/data_extraction_rules.xml` | 3A | done (3A) |
 | A-5 | On Android 12 and later, a system splash (the app icon on the ShellX background) shows before the launch screen | Android always shows one | `res/values*/themes.xml` | 3A | done (3A) |
 
@@ -87,3 +87,17 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 
 | Commit | iPhone change | Android row | State |
 | --- | --- | --- | --- |
+| `e299e66f17`, `d3559df034` | Google OAuth with PKCE and the identity-provider seam | 6.1-3 | todo (3D) |
+| `96ddabdd0c`, `7b70255952` | Sessions remember how they signed in; relay calls and errors for Google and Apple | 6.1-3, A-3 | todo (3D) for Google; Apple differs (A-3) |
+| `b02771794b`, `cf149f5a8e` | Connect to Your Mac links an Apple ID through the Mac's pairing code | A-3 | differs (S3): no Apple sign-in; `appleLink.*` in `strings-ios-only.txt` |
+| `a324e35db1`, `4613359cd9` | The coordinator signs in with Google and Apple and links Apple IDs | 6.1-3, A-3 | todo (3D) for Google; Apple differs (A-3) |
+| `c327fd0112`, `6d24a4eaab` | Switch a password session to Google; delete the account | 6.1-13, A-3 | todo (3D) for Delete Account; the switch differs (A-3): its strings are in `strings-ios-only.txt` |
+| `74d2418b80`, `570fb670f6` | Google and Apple sign-in on the system sheets, a Google client per build | 6.1-3 | todo (3D) for Google; Apple differs (A-3) |
+| `8bfe3a7bb3`, `349118fbaf` | Sign-in screen: Continue with Google or Apple, no password field | 6.1-3, A-2 | todo (3D); `signin_subtitle` has Android wording: done (3A) |
+| `7459004aab`, `2d7975d29d` | Connect to Your Mac after Sign in with Apple; pairing names the Mac's Pair Phone… item | A-3, 6.1-4 | Apple flow differs (A-3); `pairing_instructions` already names Pair Phone…: done (3A) |
+| `fa4ef23f06`, `bebd292139` | Settings › Account: Switch to Google and Delete Account… | 6.1-13, A-2 | todo (3D); `settings_account_delete_message` and `signin_error_reauth_required` have Android wording: done (3A) |
+| `7d6c2d3679`, `c9013596fa` | The demo's Mac moves to a `ShellXDemo` package target | 6.1-17 | todo (3C): row 6.1-17 names the new iPhone paths |
+| `90f371c2a4`, `a21f210078` | Try without an account opens the demo in every build | 6.1-17 | todo (3C data, 3D entry points) |
+| `ec4aa9e64e`, `3829c7c69b` | The demo keeps its own wipe-pending defaults | 6.1-17 | todo (3C) |
+| `2a5382ab66` | Release check tests: a stray fence fixed | — | no Android change (iPhone tests only) |
+| `4fc0e27051` | `PendingPicksTests` compiles on Swift 6.3 | — | no Android change (iPhone tests only) |

@@ -1,2 +1,16 @@
 # iPhone catalog keys the Android app never shows (an iPhone-only feature, such as Sign in with Apple).
 # import-strings.py leaves them out of strings.xml. One key per line, exactly as in Localizable.xcstrings.
+
+# Sign in with Apple and linking an Apple ID to a Mac (contracts §5: no Apple methods on Android).
+appleLink.intro
+appleLink.title
+signin.apple.linkDenied
+signin.apple.linkExpired
+signin.apple.linkFailed
+
+# Switching a password session to Google (contracts §5: Android never holds a password session).
+settings.account.delete.switchFirst
+settings.account.switchToGoogle
+settings.account.switchToGoogle.detail
+switchToGoogle.banner.later
+switchToGoogle.banner.switch
