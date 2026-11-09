@@ -9,7 +9,6 @@ import kotlin.test.fail
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -26,7 +25,6 @@ class LinkCodecVectorTest {
         val seen = mutableSetOf<String>()
         for (v in entries("vectors")) {
             val case = v.getValue("message").jsonObject.text("case")
-            if (case in Vectors.TERMINAL_VIEW_CASES) continue
             val name = v.text("name")
             seen += case
             val expected = VectorMessages.fromVector(v.getValue("message").jsonObject)
@@ -41,7 +39,6 @@ class LinkCodecVectorTest {
         val seen = mutableSetOf<String>()
         for (v in entries("decode_only")) {
             val case = v.getValue("message").jsonObject.text("case")
-            if (case in Vectors.TERMINAL_VIEW_CASES) continue // 2A appends terminal entries here too
             seen += case
             assertEquals(
                 VectorMessages.fromVector(v.getValue("message").jsonObject),
@@ -57,7 +54,6 @@ class LinkCodecVectorTest {
         for (v in entries("decode_errors")) {
             val name = v.text("name")
             val json = v["json"]?.jsonObject
-            if (Vectors.isTerminalViewFrame(json?.get("t")?.jsonPrimitive?.contentOrNull)) continue
             val bytes = v["json_text"]?.jsonPrimitive?.content?.encodeToByteArray() ?: frame(json!!)
             val error = assertFailsWith<LinkCodecException>(name) { LinkCodec.decode(bytes) }
             when (v.text("error")) {

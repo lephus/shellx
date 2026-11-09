@@ -12,7 +12,7 @@ import kotlinx.serialization.json.long
 
 /** Builds the message a `messages.json` entry describes, by hand and key by key. It never calls [LinkCodec]. */
 object VectorMessages {
-    /** The 49 sendable cases of the plans' tables (3B's 40 and 3G's nine call messages): every case except `unknown`. */
+    /** The 50 sendable cases of the plans' tables (3B's 40 and 3G's ten): every case except `unknown`. */
     val SENDABLE_CASES: Set<String> = setOf(
         "hello", "welcome", "error", "snapshot_get", "snapshot", "changed", "reply", "reply_result", "ping", "pong",
         "sessions_get", "sessions", "sessions_changed", "chat_history_get", "chat_history", "chat_entries",
@@ -23,6 +23,7 @@ object VectorMessages {
         "agent_close", "agent_close_result", "terminal_close", "terminal_close_result",
         "terminal_view_open", "terminal_view_open_result", "terminal_view_input", "terminal_view_resize",
         "terminal_view_resync", "terminal_view_close", "terminal_view_ended", "terminal_create", "terminal_create_result",
+        "terminal_view_frame",
     )
 
     private fun JsonObject.s(key: String): String = getValue(key).jsonPrimitive.content
@@ -30,6 +31,7 @@ object VectorMessages {
     private fun JsonObject.l(key: String): Long = getValue(key).jsonPrimitive.long
     private fun JsonObject.ol(key: String): Long? = get(key)?.jsonPrimitive?.long
     private fun JsonObject.i(key: String): Int = getValue(key).jsonPrimitive.int
+    private fun JsonObject.oi(key: String): Int? = get(key)?.jsonPrimitive?.int
     private fun JsonObject.b(key: String): Boolean = getValue(key).jsonPrimitive.boolean
     private fun JsonObject.ob(key: String): Boolean? = get(key)?.jsonPrimitive?.boolean
     private fun JsonObject.strings(key: String): List<String> = getValue(key).jsonArray.map { it.jsonPrimitive.content }
@@ -87,6 +89,28 @@ object VectorMessages {
             "scroll" -> TerminalInputUnit.Scroll(u.i("lines"))
             else -> TerminalInputUnit.Other(k)
         }
+    }
+
+    /** As 2A's `terminalFramePart`: absent arrays are empty, absent `history` and `scroll` are 0. */
+    private fun terminalFramePart(m: JsonObject): TerminalFramePart {
+        fun head(h: JsonObject) = TerminalFrameHead(
+            kind = TerminalFrameKind(h.s("kind")), cols = h.i("cols"), rows = h.i("rows"), alt = h.b("alt"),
+            cursor = h["cursor"]?.jsonObject?.let { c ->
+                TerminalCursor(c.i("x"), c.i("y"), TerminalCursorShape(c.s("shape")), c.b("visible"), c.b("blink"))
+            },
+            palette = h["palette"]?.jsonObject?.let { p -> TerminalPalette(p.s("fg"), p.s("bg"), p.os("cursor"), p.strings("colors")) },
+            history = h.oi("history") ?: 0, scroll = h.oi("scroll") ?: 0,
+        )
+        val styles = m["styles"]?.jsonArray?.map { it.jsonObject }?.map { s ->
+            TerminalStyle(
+                s.i("id"), s.oi("fg"), s.os("fg_rgb"), s.oi("bg"), s.os("bg_rgb"),
+                s["attrs"]?.jsonArray?.map { TerminalAttribute(it.jsonPrimitive.content) } ?: emptyList(),
+            )
+        } ?: emptyList()
+        val lines = m["lines"]?.jsonArray?.map { it.jsonObject }?.map { l ->
+            TerminalLine(l.i("y"), l["runs"]?.jsonArray?.map { it.jsonObject }?.map { r -> TerminalRun(r.oi("x"), r.s("t"), r.oi("s"), r.oi("w")) } ?: emptyList())
+        } ?: emptyList()
+        return TerminalFramePart(m.l("revision"), m.i("part"), m.i("parts"), m["head"]?.jsonObject?.let(::head), styles, lines)
     }
 
     fun fromVector(m: JsonObject): LinkMessage = when (val case = m.s("case")) {
@@ -149,6 +173,7 @@ object VectorMessages {
         "terminal_view_resync" -> LinkMessage.TerminalViewResync(m.s("terminal_id"))
         "terminal_view_close" -> LinkMessage.TerminalViewClose(m.s("terminal_id"))
         "terminal_view_ended" -> LinkMessage.TerminalViewEnded(m.s("terminal_id"), TerminalViewEndReason(m.s("reason")))
+        "terminal_view_frame" -> LinkMessage.TerminalViewFrame(m.s("terminal_id"), terminalFramePart(m))
         "terminal_create" -> LinkMessage.TerminalCreate(m.s("call_id"), m.s("workspace_id"))
         "terminal_create_result" ->
             LinkMessage.TerminalCreateResult(m.s("call_id"), WorkspaceControlOutcome(m.s("outcome")), m.os("terminal_id"))
