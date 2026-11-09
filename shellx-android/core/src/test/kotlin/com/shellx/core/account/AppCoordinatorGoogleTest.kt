@@ -1,6 +1,7 @@
 package com.shellx.core.account
 
 import com.shellx.core.demo.FakeMac
+import com.shellx.core.link.MachineHub
 import com.shellx.core.platform.MemoryKeyValueStore
 import com.shellx.core.testing.CoordinatorRig
 import com.shellx.core.testing.FakeRelayAccount.Call
@@ -27,6 +28,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -54,6 +56,13 @@ class AppCoordinatorGoogleTest {
 
     private fun assertNothingStored(rig: CoordinatorRig) {
         for (item in SecretItem.entries) assertNull(rig.store.read(item), "$item")
+    }
+
+    /** Every phase from now on, each one as it is set: an unconfined collector misses none. */
+    private fun TestScope.recordPhases(rig: CoordinatorRig): List<AppPhase> {
+        val phases = mutableListOf<AppPhase>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { rig.coordinator.phase.collect { phases += it } }
+        return phases
     }
 
     @Test fun googleSignInSendsTheNonceTheTokenAndThePhoneKey() { runTest {
@@ -185,14 +194,48 @@ class AppCoordinatorGoogleTest {
         assertEquals(listOf(mac.machine), rig.vault.machines())
     } }
 
+    /**
+     * A 401 while the deletion is on the relay answers the token being deleted, so it is only remembered (review 3a
+     * I-1): the hub stays, and "session expired" never shows on the way to SignedOut(false).
+     */
     @Test fun unauthorizedDuringDeleteEndsSignedOutNotExpired() { runTest {
         val rig = signedInRig()
-        rig.relay.setHook({ rig.coordinator.handleUnauthorized() }, Function.DELETE_ACCOUNT)
+        val hub = assertNotNull(rig.coordinator.hub.value)
+        val phases = recordPhases(rig)
+        var phaseAfter401: AppPhase? = null
+        var hubAfter401: MachineHub? = null
+        rig.relay.setHook({
+            rig.coordinator.handleUnauthorized()
+            phaseAfter401 = rig.coordinator.phase.value
+            hubAfter401 = rig.coordinator.hub.value
+        }, Function.DELETE_ACCOUNT)
 
         rig.coordinator.deleteAccount()
 
+        assertEquals(AppPhase.SignedIn("g@example.com"), phaseAfter401, "the 401 is only remembered")
+        assertSame(hub, hubAfter401, "the hub is not stopped before the relay answered")
+        assertFalse(AppPhase.SignedOut(true) in phases, "$phases")
         assertEquals(AppPhase.SignedOut(false), rig.coordinator.phase.value)
         assertNothingStored(rig)
+    } }
+
+    /** Review 3a I-1: a 401 raced the deletion, which then failed: the stored token is dead, so it signs out as expired. */
+    @Test fun unauthorizedDuringAFailedDeleteSignsOutAsExpired() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        val rig = rig(listOf(mac))
+        rig.vault.setSession(StoredSession("u1", "d1", "tok-old", "g@example.com"))
+        rig.vault.setMachines(listOf(mac.machine), "u1")
+        rig.coordinator.launch()
+        rig.relay.setHook({ rig.coordinator.handleUnauthorized() }, Function.DELETE_ACCOUNT)
+        rig.relay.setError(RelayApiException.Http(500, "internal"), Function.DELETE_ACCOUNT)
+
+        assertSameCase(SignInException.Server("internal"), assertFails { rig.coordinator.deleteAccount() })
+
+        assertEquals(AppPhase.SignedOut(true), rig.coordinator.phase.value)
+        assertNull(rig.coordinator.hub.value)
+        assertNull(rig.vault.session())
+        assertEquals(listOf(mac.machine), rig.vault.machines(), "the Macs stay, as after any 401")
+        assertEquals(0, rig.wiper.wipes)
     } }
 
     @Test fun deleteWithoutASessionIsSignedOut() { runTest {
