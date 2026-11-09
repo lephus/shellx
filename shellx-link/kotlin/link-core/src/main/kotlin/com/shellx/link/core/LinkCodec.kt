@@ -176,6 +176,29 @@ object LinkCodec {
         })
     }
 
+    private fun unit(u: TerminalInputUnit): JsonObject = buildJsonObject {
+        when (u) {
+            is TerminalInputUnit.Text -> {
+                put("k", "text")
+                put("text", u.text)
+            }
+            is TerminalInputUnit.Key -> {
+                put("k", "key")
+                put("key", u.key.wire)
+                if (u.mods.isNotEmpty()) put("mods", strings(u.mods.map { it.wire }))
+            }
+            is TerminalInputUnit.Paste -> {
+                put("k", "paste")
+                put("text", u.text)
+            }
+            is TerminalInputUnit.Scroll -> {
+                put("k", "scroll")
+                put("lines", u.lines)
+            }
+            is TerminalInputUnit.Other -> put("k", u.kind)
+        }
+    }
+
     private fun toJson(m: LinkMessage): JsonObject = when (m) {
         is LinkMessage.Hello -> frame(T.HELLO) {
             put("client_version", m.clientVersion)
@@ -303,6 +326,32 @@ object LinkCodec {
             put("terminal_id", m.terminalId)
         }
         is LinkMessage.TerminalCloseResult -> frame(T.TERMINAL_CLOSE_RESULT, m.callId) { put("outcome", m.outcome.wire) }
+        is LinkMessage.TerminalViewOpen -> frame(T.TERMINAL_VIEW_OPEN, m.callId) {
+            put("terminal_id", m.terminalId)
+            put("cols", m.cols)
+            put("rows", m.rows)
+        }
+        is LinkMessage.TerminalViewOpenResult -> frame(T.TERMINAL_VIEW_OPEN_RESULT, m.callId) { put("outcome", m.outcome.wire) }
+        is LinkMessage.TerminalViewInput -> frame(T.TERMINAL_VIEW_INPUT) {
+            put("terminal_id", m.terminalId)
+            put("units", list(m.units, ::unit))
+        }
+        is LinkMessage.TerminalViewResize -> frame(T.TERMINAL_VIEW_RESIZE) {
+            put("terminal_id", m.terminalId)
+            put("cols", m.cols)
+            put("rows", m.rows)
+        }
+        is LinkMessage.TerminalViewResync -> frame(T.TERMINAL_VIEW_RESYNC) { put("terminal_id", m.terminalId) }
+        is LinkMessage.TerminalViewClose -> frame(T.TERMINAL_VIEW_CLOSE) { put("terminal_id", m.terminalId) }
+        is LinkMessage.TerminalViewEnded -> frame(T.TERMINAL_VIEW_ENDED) {
+            put("terminal_id", m.terminalId)
+            put("reason", m.reason.wire)
+        }
+        is LinkMessage.TerminalCreate -> frame(T.TERMINAL_CREATE, m.callId) { put("workspace_id", m.workspaceId) }
+        is LinkMessage.TerminalCreateResult -> frame(T.TERMINAL_CREATE_RESULT, m.callId) {
+            put("outcome", m.outcome.wire)
+            putOpt("terminal_id", m.terminalId)
+        }
         is LinkMessage.Unknown -> throw LinkCodecException.CannotEncodeUnknown()
     }
 
@@ -384,6 +433,21 @@ object LinkCodec {
     private fun workspaceList(o: JsonObject, key: String) = o.array(key).map { workspace(it.asObj()) }
     private fun outcome(o: JsonObject) = WorkspaceControlOutcome(o.str("outcome"))
 
+    /**
+     * A `terminal.view.input` unit. `lines` is any JSON integer a 64-bit host may send; one outside Int's range is held
+     * as Int.MIN_VALUE or Int.MAX_VALUE, which [TerminalInputCheck] refuses as it refuses the value itself.
+     */
+    private fun unit(o: JsonObject): TerminalInputUnit = when (val k = o.str("k")) {
+        "text" -> TerminalInputUnit.Text(o.str("text"))
+        "key" -> TerminalInputUnit.Key(
+            TerminalKey(o.str("key")),
+            o.optArray("mods")?.strings()?.map(::TerminalModifier) ?: emptyList(),
+        )
+        "paste" -> TerminalInputUnit.Paste(o.str("text"))
+        "scroll" -> TerminalInputUnit.Scroll(o.long("lines").coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
+        else -> TerminalInputUnit.Other(k)
+    }
+
     private fun chunkData(text: String): ByteArray = canonicalBase64ToBytesOrNull(text) ?: throw FieldError()
 
     private fun digest(text: String): ByteArray {
@@ -445,6 +509,15 @@ object LinkCodec {
         T.AGENT_CLOSE_RESULT -> LinkMessage.AgentCloseResult(o.callId(), outcome(o))
         T.TERMINAL_CLOSE -> LinkMessage.TerminalClose(o.callId(), o.str("workspace_id"), o.str("terminal_id"))
         T.TERMINAL_CLOSE_RESULT -> LinkMessage.TerminalCloseResult(o.callId(), outcome(o))
+        T.TERMINAL_VIEW_OPEN -> LinkMessage.TerminalViewOpen(o.callId(), o.str("terminal_id"), o.int("cols"), o.int("rows"))
+        T.TERMINAL_VIEW_OPEN_RESULT -> LinkMessage.TerminalViewOpenResult(o.callId(), TerminalViewOpenOutcome(o.str("outcome")))
+        T.TERMINAL_VIEW_INPUT -> LinkMessage.TerminalViewInput(o.str("terminal_id"), o.array("units").map { unit(it.asObj()) })
+        T.TERMINAL_VIEW_RESIZE -> LinkMessage.TerminalViewResize(o.str("terminal_id"), o.int("cols"), o.int("rows"))
+        T.TERMINAL_VIEW_RESYNC -> LinkMessage.TerminalViewResync(o.str("terminal_id"))
+        T.TERMINAL_VIEW_CLOSE -> LinkMessage.TerminalViewClose(o.str("terminal_id"))
+        T.TERMINAL_VIEW_ENDED -> LinkMessage.TerminalViewEnded(o.str("terminal_id"), TerminalViewEndReason(o.str("reason")))
+        T.TERMINAL_CREATE -> LinkMessage.TerminalCreate(o.callId(), o.str("workspace_id"))
+        T.TERMINAL_CREATE_RESULT -> LinkMessage.TerminalCreateResult(o.callId(), outcome(o), o.optStr("terminal_id"))
         else -> null
     }
 
@@ -490,5 +563,14 @@ object LinkCodec {
         const val AGENT_CLOSE_RESULT = "agent.close.result"
         const val TERMINAL_CLOSE = "terminal.close"
         const val TERMINAL_CLOSE_RESULT = "terminal.close.result"
+        const val TERMINAL_VIEW_OPEN = "terminal.view.open"
+        const val TERMINAL_VIEW_OPEN_RESULT = "terminal.view.open.result"
+        const val TERMINAL_VIEW_INPUT = "terminal.view.input"
+        const val TERMINAL_VIEW_RESIZE = "terminal.view.resize"
+        const val TERMINAL_VIEW_RESYNC = "terminal.view.resync"
+        const val TERMINAL_VIEW_CLOSE = "terminal.view.close"
+        const val TERMINAL_VIEW_ENDED = "terminal.view.ended"
+        const val TERMINAL_CREATE = "terminal.create"
+        const val TERMINAL_CREATE_RESULT = "terminal.create.result"
     }
 }

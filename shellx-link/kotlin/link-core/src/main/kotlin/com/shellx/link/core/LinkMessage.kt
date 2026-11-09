@@ -148,6 +148,34 @@ sealed interface LinkMessage {
 
     data class TerminalCloseResult(override val callId: String, val outcome: WorkspaceControlOutcome) : Answer
 
+    /** Starts a view of a terminal at the grid the phone can show (PROTOCOL.md 11.1); the host clamps it. */
+    data class TerminalViewOpen(val callId: String, val terminalId: String, val cols: Int, val rows: Int) : LinkMessage
+
+    data class TerminalViewOpenResult(override val callId: String, val outcome: TerminalViewOpenOutcome) : Answer
+
+    /** The units print as their sizes ([TerminalInputUnit.Text], [TerminalInputUnit.Paste]). */
+    data class TerminalViewInput(val terminalId: String, val units: List<TerminalInputUnit>) : LinkMessage
+
+    data class TerminalViewResize(val terminalId: String, val cols: Int, val rows: Int) : LinkMessage
+
+    /** Asks for a new snapshot after a gap (PROTOCOL.md 11.7). */
+    data class TerminalViewResync(val terminalId: String) : LinkMessage
+
+    /** Ends the view; the tab stays on the Mac. */
+    data class TerminalViewClose(val terminalId: String) : LinkMessage
+
+    data class TerminalViewEnded(val terminalId: String, val reason: TerminalViewEndReason) : LinkMessage
+
+    /** Opens a terminal tab in a workspace (PROTOCOL.md 11.9). */
+    data class TerminalCreate(val callId: String, val workspaceId: String) : LinkMessage
+
+    /** `terminalId` is the new terminal, present only when `outcome` is `ok`. */
+    data class TerminalCreateResult(
+        override val callId: String,
+        val outcome: WorkspaceControlOutcome,
+        val terminalId: String? = null,
+    ) : Answer
+
     /**
      * Decode-only: a well-formed frame whose `t` this version does not know. `callId` is the frame's `call_id` when
      * it is a valid one (1 to 64 UTF-8 bytes). [LinkCodec.encode] refuses it.
