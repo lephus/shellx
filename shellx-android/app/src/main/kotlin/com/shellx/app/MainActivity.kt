@@ -21,15 +21,16 @@ import kotlinx.coroutines.launch
 /**
  * The only activity, and the launcher. It shows the launch screen until the application has built the composition,
  * then [ShellXApp] in the chosen appearance, the system bars following it (Spec note 12). A `shellx-link` link that
- * opened it, or that reaches it later, goes to the pairing inbox; a recreated activity does not deliver its old intent
- * again. Plan 3E adds its permission and update registrations, the notification tap and its `UpdateAlert` here
+ * opened it, or that reaches it later, goes to the pairing inbox. A recreated activity does not deliver its old intent
+ * again, and neither does one relaunched from Recents (a task a link started keeps that link as its base intent).
+ * Plan 3E adds its permission and update registrations, the notification tap and its `UpdateAlert` here
  * (3E Task 12).
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) deliver(intent)
+        if (savedInstanceState == null && !launchedFromHistory(intent)) deliver(intent)
         val app = application as ShellXApplication
         setContent {
             val built by app.composition.collectAsStateWithLifecycle()
@@ -61,6 +62,9 @@ class MainActivity : ComponentActivity() {
         val uri = LinkIntents.uri(intent) ?: return
         lifecycleScope.launch { (application as ShellXApplication).awaitComposition().inbox.receive(uri) }
     }
+
+    private fun launchedFromHistory(intent: Intent?): Boolean =
+        intent != null && (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
 
     private companion object {
         /** `enableEdgeToEdge`'s own navigation-bar scrims (three-button navigation). */
