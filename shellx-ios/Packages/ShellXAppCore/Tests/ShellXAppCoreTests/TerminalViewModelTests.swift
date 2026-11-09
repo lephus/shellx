@@ -381,4 +381,23 @@ final class TerminalViewModelTests: XCTestCase {
         _ = await eventually { model.phase == .live }
         XCTAssertEqual(link.samples.filter { $0.metric == .terminalFirstScreen }.map(\.duration), [.milliseconds(200)])
     }
+
+    /// An open lost with its session (no answer while the hub still says online, then the reconnect) does not use up
+    /// the one retry of a failed open: the reconnect gives it back (final review, core M4).
+    func testAReconnectRestoresTheRetryBudget() async {
+        let link = ScriptedTerminalLink(); link.openAnswers = [.noAnswer, .outcome(.failed)]
+        let sleeper = ManualSleeper(); let model = makeModel(link, sleeper: sleeper)
+        model.setPhoneGrid(cols: 50, rows: 20); model.show("t1")
+        _ = await eventually { link.calls.contains(.close("t1")) }
+        link.online = false; link.emit(.state(machineID: "m1", .reconnecting))
+        _ = await eventually { model.phase == .offline }
+        link.online = true; link.emit(.state(machineID: "m1", .online))
+        try? await Task.sleep(for: .milliseconds(20))
+        sleeper.release { $0 == TerminalViewModel.failedRetryDelay }
+        let reopened = await eventually { link.opens.count == 2 }
+        XCTAssertTrue(reopened, "\(link.calls)")
+        let retried = await eventually(timeout: .seconds(2)) { sleeper.waiting.contains(TerminalViewModel.failedRetryDelay) }
+        XCTAssertTrue(retried, "the first failure after the reconnect is retried: \(model.phase)")
+        XCTAssertEqual(model.phase, .connecting)
+    }
 }
