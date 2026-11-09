@@ -392,8 +392,9 @@ final class TerminalViewModelTests: XCTestCase {
         link.online = false; link.emit(.state(machineID: "m1", .reconnecting))
         _ = await eventually { model.phase == .offline }
         link.online = true; link.emit(.state(machineID: "m1", .online))
-        try? await Task.sleep(for: .milliseconds(20))
-        sleeper.release { $0 == TerminalViewModel.failedRetryDelay }
+        // A wait left from before the reconnect would hold the reopen back: let it go only if nothing reopened.
+        let atOnce = await eventually(timeout: .milliseconds(500)) { link.opens.count == 2 }
+        if !atOnce { sleeper.release { $0 == TerminalViewModel.failedRetryDelay } }
         let reopened = await eventually { link.opens.count == 2 }
         XCTAssertTrue(reopened, "\(link.calls)")
         let retried = await eventually(timeout: .seconds(2)) { sleeper.waiting.contains(TerminalViewModel.failedRetryDelay) }
