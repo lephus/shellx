@@ -1,13 +1,13 @@
 package com.shellx.app.ui.pending
 
 import android.content.Context
-import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -24,10 +24,12 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 /** The Needs-you page over a signed-in rig: the cards decide, a workspace's page shows only its cards, the sheets
  *  open and close, and the page goes back once nothing is left. */
 @RunWith(AndroidJUnit4::class)
+@Config(qualifiers = "w400dp-h1600dp")
 class PendingListViewTest {
     @get:org.junit.Rule val compose = createComposeRule()
 
@@ -56,11 +58,7 @@ class PendingListViewTest {
 
     private fun shown(text: String): Boolean = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
 
-    private fun enabled(tag: String): Boolean = compose.onAllNodes(
-        SemanticsMatcher("$tag enabled") { node ->
-            node.config.getOrNull(SemanticsProperties.TestTag) == tag && !node.config.contains(SemanticsProperties.Disabled)
-        },
-    ).fetchSemanticsNodes().isNotEmpty()
+    private fun enabled(tag: String): Boolean = compose.onAllNodes(hasTestTag(tag) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
 
     private fun pending(count: Int) = until { rig.hub.pendingItems.size == count && rig.hub.pendingItems.all { it.actionable } }
 

@@ -50,34 +50,40 @@ class PendingCardRenderTest {
     }
 
     @Test
-    fun pendingKinds() = assertRenders("pending-kinds") {
-        Cards(listOf(mac(permission()) to null, mac(question()) to null, mac(plan()) to null))
+    fun pendingKinds() {
+        assertRenders("pending-kinds") {
+            Cards(listOf(mac(permission()) to null, mac(question()) to null, mac(plan()) to null))
+        }
     }
 
     @Test
-    fun pendingKindsMore() = assertRenders("pending-kinds-more") {
-        Cards(listOf(mac(edit) to null, mac(unknown) to null, mac(permission(preview = null)) to null), machines = true)
+    fun pendingKindsMore() {
+        assertRenders("pending-kinds-more") {
+            Cards(listOf(mac(edit) to null, mac(unknown) to null, mac(permission(preview = null)) to null), machines = true)
+        }
     }
 
-    private fun state(label: String, status: DecisionStatus?, actionable: Boolean) = assertRenders("pending-state-$label") {
-        Cards(listOf(mac(permission(), actionable) to status))
+    private fun state(label: String, status: DecisionStatus?, actionable: Boolean) {
+        assertRenders("pending-state-$label") { Cards(listOf(mac(permission(), actionable) to status)) }
     }
 
-    @Test fun stateSending() = state("sending", DecisionStatus.Sending, true)
+    @Test fun stateSending() { state("sending", DecisionStatus.Sending, true) }
 
-    @Test fun stateOffline() = state("offline", DecisionStatus.Failed(DecisionFailure.OFFLINE), false)
+    @Test fun stateOffline() { state("offline", DecisionStatus.Failed(DecisionFailure.OFFLINE), false) }
 
-    @Test fun stateNoAnswer() = state("no-answer", DecisionStatus.Failed(DecisionFailure.NO_ANSWER), true)
+    @Test fun stateNoAnswer() { state("no-answer", DecisionStatus.Failed(DecisionFailure.NO_ANSWER), true) }
 
-    @Test fun stateRejected() = state("rejected", DecisionStatus.Failed(DecisionFailure.REJECTED), true)
+    @Test fun stateRejected() { state("rejected", DecisionStatus.Failed(DecisionFailure.REJECTED), true) }
 
-    @Test fun stateHandledElsewhere() = state("handled-elsewhere", DecisionStatus.HandledElsewhere, true)
+    @Test fun stateHandledElsewhere() { state("handled-elsewhere", DecisionStatus.HandledElsewhere, true) }
 
-    @Test fun stateReconnecting() = state("reconnecting", null, false)
+    @Test fun stateReconnecting() { state("reconnecting", null, false) }
 
     @Test
-    fun pendingAx3() = assertRenders("pending-ax3") {
-        LargeText { Cards(listOf(mac(permission()) to null, mac(question()) to DecisionStatus.Failed(DecisionFailure.NO_ANSWER)), machines = true) }
+    fun pendingAx3() {
+        assertRenders("pending-ax3") {
+            LargeText { Cards(listOf(mac(permission()) to null, mac(question()) to DecisionStatus.Failed(DecisionFailure.NO_ANSWER)), machines = true) }
+        }
     }
 
     @Test
@@ -97,15 +103,21 @@ class PendingCardRenderTest {
     }
 
     @Test
-    fun pendingFullEdit() = assertRenders("pending-full-edit") { FullTextSheet(edit, close = {}) }
+    fun pendingFullEdit() {
+        assertRenders("pending-full-edit") { FullTextSheet(edit, close = {}) }
+    }
 
     @Test
-    fun pendingFullCut() = assertRenders("pending-full-cut") { FullTextSheet(permission(preview = "x".repeat(8192)), close = {}) }
+    fun pendingFullCut() {
+        assertRenders("pending-full-cut") { FullTextSheet(permission(preview = "x".repeat(8192)), close = {}) }
+    }
 
     @Test
-    fun needsYouBar() = assertRenders("needs-you-bar") {
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp)) {
-            NeedsYouBar(listOf(mac(permission()), mac(question())), showsMachineName = false, open = {})
+    fun needsYouBar() {
+        assertRenders("needs-you-bar") {
+            Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(16.dp)) {
+                NeedsYouBar(listOf(mac(permission()), mac(question())), showsMachineName = false, open = {})
+            }
         }
     }
 }
