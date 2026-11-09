@@ -88,10 +88,21 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.test.ext.junit)
+    testDebugImplementation(libs.roborazzi)
+    testDebugImplementation(libs.roborazzi.compose)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 tasks.withType<Test>().configureEach {
     maxHeapSize = "2g"
+    // Render tests (app/src/testDebug/.../screenshots) write PNGs; Roborazzi runs without its Gradle plugin, in
+    // record mode. `dev.sh screenshots record <dir>` passes -Pshellx.snapshot.dir.
+    systemProperty("roborazzi.test.record", "true")
+    systemProperty(
+        "shellx.snapshot.dir",
+        providers.gradleProperty("shellx.snapshot.dir")
+            .getOrElse(layout.buildDirectory.dir("shellx-snapshots").get().asFile.absolutePath),
+    )
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = TestExceptionFormat.FULL

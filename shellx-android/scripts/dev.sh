@@ -90,8 +90,7 @@ run_checks() {
 cmd_test() {
   local which="${1:-all}"
   case "$which" in
-    link|core|app|all) ;;
-    screenshots) die "test $which comes with a later task" 2 ;;
+    link|core|app|screenshots|all) ;;
     *) die "unknown test target: $which (link, core, app, screenshots or all)" 2 ;;
   esac
   check_java
@@ -101,6 +100,7 @@ cmd_test() {
     link) gradle_link test || status=$? ;;
     core) gradle_android :core:test || status=$? ;;
     app) gradle_android --continue :app:testDebugUnitTest :app:testReleaseUnitTest || status=$? ;;
+    screenshots) gradle_android :app:testDebugUnitTest --tests 'com.shellx.app.screenshots.*' || status=$? ;;
     all)
       python3 -m unittest discover -s "$ANDROID_DIR/scripts/tests" -t "$ANDROID_DIR/scripts/tests" || status=$?
       [ "$status" -ne 0 ] || gradle_link test || status=$?
@@ -150,6 +150,17 @@ cmd_build_release() {
   note "release checks passed ($RELEASE_APP_ID $VN ($VC), target SDK $T)"
 }
 
+cmd_screenshots() {
+  [ "${1:-}" = "record" ] && [ $# -eq 2 ] && [ -n "$2" ] || die "usage: dev.sh screenshots record <dir>" 2
+  local dir="$2"
+  mkdir -p "$dir" || die "cannot create $dir"
+  dir="$(cd "$dir" && pwd -P)" || die "cannot open $dir"
+  check_java
+  gradle_android :app:testDebugUnitTest --tests 'com.shellx.app.screenshots.*' --rerun -Pshellx.snapshot.dir="$dir" \
+    || die "render tests failed"
+  note "screenshots written to $dir"
+}
+
 cmd_lock() {
   check_java
   gradle_link :link-core:dependencies :link-account:dependencies --write-locks -q >/dev/null
@@ -164,6 +175,7 @@ case "$command" in
   test) cmd_test "$@" ;;
   lock) cmd_lock ;;
   build-release) cmd_build_release ;;
-  screenshots|emulator|device|clean) die "$command comes with a later task" 2 ;;
+  screenshots) cmd_screenshots "$@" ;;
+  emulator|device|clean) die "$command comes with a later task" 2 ;;
   *) echo "dev.sh: unknown command: $command" >&2; usage 2 ;;
 esac
