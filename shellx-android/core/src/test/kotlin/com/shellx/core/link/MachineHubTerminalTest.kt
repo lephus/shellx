@@ -205,8 +205,10 @@ class MachineHubTerminalTest {
 
     /**
      * A terminal flood while the page is busy stays in the session's bounded queue: the page gets a small part of it,
-     * then the queue's LOST part, asks for one resync, and the Mac's snapshot mends the screen. A hub that re-buffered
-     * the pushes (an unbounded channel read by the connection) would hand the page all 20 000 frames.
+     * then the queue's LOST part, asks for one resync, and the Mac's snapshot mends the screen. The flood comes in
+     * batches with the dispatcher run between them, as a reader thread delivers it: a hub that re-buffered the pushes
+     * (an unbounded channel filled by the connection, or a `buffer` before the page) would drain the queue each time
+     * and hand the page all 20 000 frames.
      */
     @Test fun aFloodThroughTheHubIsBoundedAndCostsOneResync() { runTest {
         val mac = makeMac()
@@ -221,8 +223,10 @@ class MachineHubTerminalTest {
 
         val gate = Gate()
         view.gate = gate
-        repeat(20_000) { mac.emitTerminalFrame("t1", flood) }
-        runCurrent()
+        repeat(200) {
+            repeat(100) { mac.emitTerminalFrame("t1", flood) }
+            runCurrent()
+        }
         gate.open()
 
         assertTrue(eventually { view.resyncs == 1 && !view.assembler.awaitingSnapshot }, "${view.resyncs}")
@@ -232,8 +236,10 @@ class MachineHubTerminalTest {
     } }
 
     /**
-     * A page that stops and starts its collection in the same main-loop turn (a restarted effect) loses no push: no
-     * resync. One that starts later finds the pushes made meanwhile dropped: at most one resync mends its screen.
+     * A page whose collection stops right after it handled a push, while the next ones have arrived, and starts again
+     * in the same main-loop turn (a restarted effect) loses none of them: no resync (the queue's own tests show why: a
+     * cancelled collector takes nothing more). One that starts later finds the pushes made meanwhile dropped: at most
+     * one resync mends its screen.
      */
     @Test fun aRestartedCollectionLosesNoPushAndALateOneCostsOneResync() { runTest {
         val mac = makeMac()
@@ -247,9 +253,8 @@ class MachineHubTerminalTest {
         assertTrue(eventually { view.screen.screenText().firstOrNull() == "$" })
         val before = view.frames
 
+        view.restartAfterNextFrame = true
         repeat(3) { mac.emitTerminalFrame("t1", row0("a$it")) }
-        view.stop()
-        view.start()
         runCurrent()
 
         assertTrue(eventually { view.screen.screenText().firstOrNull() == "a2" }, "${view.screen.screenText()}")
@@ -329,6 +334,9 @@ class MachineHubTerminalTest {
         var resyncs = 0
         val pushes = mutableListOf<TerminalViewPush>()
         var gate: Gate? = null
+
+        /** Set: right after the next frame, the collection stops and a new one starts, in the same turn. */
+        var restartAfterNextFrame = false
         private var job: Job? = null
 
         fun start() {
@@ -358,6 +366,11 @@ class MachineHubTerminalTest {
                         scope.launch { hub.resyncTerminalView(machineId, terminalId) }
                     }
                     result.frame?.let(screen::apply)
+                    if (restartAfterNextFrame) {
+                        restartAfterNextFrame = false
+                        stop()
+                        start()
+                    }
                 }
                 is TerminalViewPush.Ended -> Unit
             }
