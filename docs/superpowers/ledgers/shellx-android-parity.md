@@ -63,7 +63,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | 6.2-18 | A notice over the composer shows for 4 s | `ShellX/UI/Agent/AgentView.swift` (`noticeDuration`) | `app:ui/agent/AgentView.kt` | 3E | todo |
 | 6.2-19 | "Nothing needs you" shows for 0.7 s before the page goes back | `ShellX/UI/Pending/PendingListView.swift` (`leaveDelay`) | `app:ui/pending/PendingListView.kt` | 3E | todo |
 | 6.2-20 | A voice result settles after 1.5 s (regular recognizer) or 2 s (on-device recognizer) | `ShellX/Voice/LegacyTranscriber.swift` (`finalResultTimeout`), `AnalyzerTranscriber.swift` (`finalizeTimeout`) | `app:voice/…` (`SpeechRecognizer`) | 3E | todo |
-| 6.2-21 | Voice capabilities are cached for 30 s | `ShellXAppCore/Voice/VoiceCapabilityCache.swift` (`defaultReuse`) | `core:voice/VoiceCapabilityCache.kt` | 3C | todo |
+| 6.2-21 | Voice capabilities are cached for 30 s | `ShellXAppCore/Voice/VoiceCapabilityCache.swift` (`defaultReuse`) | `core:voice/VoiceCapabilityCache.kt` | 3C | done (3C) |
 
 ## Android-only differences
 
