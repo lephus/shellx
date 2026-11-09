@@ -17,7 +17,8 @@ Rules:
 - A name defined in values/strings_android.xml replaces the generated one (and is left out of both files).
   Every translatable Android name needs a values-vi/strings_android.xml twin, and an override keeps the
   iPhone string's arguments.
-- iPhone wording (iPhone, App Store, VoiceOver, ...) in a generated value is refused until an override exists.
+- iPhone wording (iPhone(s), App Store, VoiceOver, AirDrop, Safari, ...) in a generated value is refused until
+  an override exists.
 - Any problem is printed to stderr, nothing is written and the exit code is 1.
 Use --check to compare instead of writing.
 """
@@ -34,7 +35,8 @@ RENAMES = {"agent.state.running %@": "agent_state_running_for"}
 CLDR = ["zero", "one", "two", "few", "many", "other"]
 # The plural forms Android picks from for each language (CLDR cardinal rules); any other form is never shown.
 ANDROID_QUANTITIES = {"en": {"one", "other"}, "vi": {"other"}}
-IOS_WORDING = re.compile(r"\b(?:iPhone|iPad|iOS|App Store|TestFlight|Apple|VoiceOver|Face ID|Touch ID|Keychain|iCloud|Siri)\b")
+IOS_WORDING = re.compile(r"\b(?:iPhone|iPad|iOS|App Store|TestFlight|Apple|VoiceOver|Face ID|Touch ID|Keychain|iCloud|"
+                         r"Siri|AirDrop|Safari|Dynamic Island)s?\b|\bLive Activit(?:y|ies)\b")
 WORDING_HELP = ("add an Android override in strings_android.xml (values and values-vi) "
                 "or list the key in shellx-android/scripts/strings-ios-only.txt")
 HEADER = ('<?xml version="1.0" encoding="utf-8"?>\n'
