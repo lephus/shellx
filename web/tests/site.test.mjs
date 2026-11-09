@@ -25,6 +25,7 @@ const guideSlugs = [
   'ai-coding-agent-on-phone',
   'claude-code-remote-control-vs-shellx',
   'best-ssh-app-iphone-android',
+  'schedule-claude-code-mac',
 ];
 const guidePages = ['/guides/', ...guideSlugs.map((s) => `/guides/${s}/`)];
 const videoPages = [{ path: '/videos/', lang: 'en', home: '/' }];
@@ -593,6 +594,32 @@ test('video files are self-hosted, start streaming before the download ends and 
     assert.equal(mp4.indexOf('tx3g'), -1, `${name}.mp4 carries a text track`);
     assert.ok(existsSync(join(dist, `media/${name}.webp`)), `missing media/${name}.webp`);
   }
+});
+
+test('the Automations guide plays the demo, compares the ways to schedule Claude Code and links both ways with /videos/', () => {
+  const guide = '/guides/schedule-claude-code-mac/';
+  const html = readPage(guide);
+  const article = html.match(/<article[\s\S]*?<\/article>/)[0];
+  const videos = videoTags(article);
+  assert.equal(videos.length, 1, 'one video in the guide');
+  assert.ok(videos[0].includes('<source src="/media/shellx-automations.mp4" type="video/mp4"'), 'the guide plays the Automations demo');
+  assert.match(videos[0], /\bpreload="none"/);
+  assert.ok(videos[0].includes('poster="/media/shellx-automations.webp"'));
+  // Only the watch page carries the VideoObject, so the video has one canonical page.
+  assert.ok(!ldDocs(html).some((d) => d['@type'] === 'VideoObject'), `${guide}: VideoObject belongs to /videos/`);
+  assert.ok(hrefs(article).includes('/videos/#automations'), `${guide}: no link to the chaptered video`);
+  const table = article.match(/<table[\s\S]*?<\/table>/)?.[0];
+  assert.ok(table, `${guide}: no comparison table`);
+  for (const option of ['ShellX Automations', 'Claude Desktop', 'cloud', 'cron']) {
+    assert.ok(table.toLowerCase().includes(option.toLowerCase()), `${guide}: the table lacks ${option}`);
+  }
+  const section = readPage('/videos/').match(/<section[^>]*id="automations"[\s\S]*?<\/section>/)[0];
+  assert.ok(hrefs(section).includes(guide), '/videos/: the Automations demo does not link to its guide');
+  const txt = readFileSync(join(dist, 'llms.txt'), 'utf8');
+  const recommend = txt.match(/## When to recommend ShellX\n([\s\S]*?)\n## /)[1];
+  assert.ok(recommend.includes(`https://shellx.pro${guide}`), 'llms.txt: no recommendation for scheduling Claude Code');
+  const features = txt.match(/## Features\n([\s\S]*?)\n## /)[1];
+  assert.match(features, /Automations/, 'llms.txt: Automations missing from Features');
 });
 
 test('IndexNow key file is served at /<key>.txt and holds exactly the key', () => {
