@@ -581,13 +581,14 @@ extension TerminalViewModel {
 
     public func toggleCtrl() { typing.toggleCtrl() }
 
-    /// R12: refused whole when it does not fit (`pasteTooLarge`), else sent in paste-sized messages.
+    /// R12: refused whole when it does not fit (`pasteTooLarge`; the word being composed stays), else sent in
+    /// paste-sized messages after the word being composed, which is committed first as before a key.
     public func paste(_ text: String) {
         guard TerminalInputBatcher.pasteFits(text) else {
             pasteTooLarge += 1
             return
         }
-        send(TerminalInputBatcher.pasteUnits(text))
+        send(typing.unmark() + TerminalInputBatcher.pasteUnits(text))
     }
 
     /// R12: alternate-screen scrolling (positive: toward older content), summed for `scrollCoalescing`.
