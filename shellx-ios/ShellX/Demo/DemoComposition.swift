@@ -31,8 +31,9 @@ enum DemoComposition {
         let latency = LatencyLog()
         let launch = LaunchMark(latency: latency)
         let scopes = SignedInScope.Slot()
-        // Its own defaults, so the demo's default Mac never leaks into a real run.
-        let defaults = UserDefaults(suiteName: "com.shellx.dev.demo") ?? .standard
+        // Its own defaults, so the demo's default Mac never leaks into a real run (a suite named after the
+        // bundle id would be the app's own defaults).
+        let defaults = UserDefaults(suiteName: "com.shellx.prod.demo") ?? .standard
         AppComposition.removeMergedChatData(in: historyDirectory, defaults: defaults)
         let history = ConversationStore(directory: historyDirectory)
         let coordinator = AppCoordinator(

@@ -1,4 +1,3 @@
-import CoreText
 import SwiftUI
 import UIKit
 
@@ -18,16 +17,10 @@ struct GoogleSignInButton: View {
     /// Google's official "G" (asset `GoogleG`, 20 × 20 pt); nil until the asset is bundled.
     static var mark: UIImage? { UIImage(named: "GoogleG") }
 
-    /// Google Sans Medium 14 pt: the static `GoogleSans-Medium` face when bundled, else the bundled variable font
-    /// `GoogleSans-Regular` with its `wght` axis (tag 0x77676874) at 500, else the system's medium weight.
+    /// Google Sans Medium 14 pt: the bundled static face `Fonts/GoogleSans-Medium.ttf` (PostScript name
+    /// `GoogleSans-Medium`), else the system's medium weight.
     static func labelFont() -> UIFont {
-        if let font = UIFont(name: "GoogleSans-Medium", size: 14) { return font }
-        if let base = UIFont(name: "GoogleSans-Regular", size: 14) {
-            let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
-            let descriptor = base.fontDescriptor.addingAttributes([variation: [0x7767_6874: 500]])
-            return UIFont(descriptor: descriptor, size: 14)
-        }
-        return UIFont.systemFont(ofSize: 14, weight: .medium)
+        UIFont(name: "GoogleSans-Medium", size: 14) ?? UIFont.systemFont(ofSize: 14, weight: .medium)
     }
 
     var body: some View {

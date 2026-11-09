@@ -16,7 +16,7 @@ final class PushRegistrationTests: XCTestCase {
             try await vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "tok-1", email: "a@b.c"))
         }
         let relay = FakeRelayAccount()
-        return (PushRegistration(relay: relay, vault: vault, topic: "com.shellx.dev", environment: .sandbox), relay, vault)
+        return (PushRegistration(relay: relay, vault: vault, topic: "com.shellx.prod", environment: .sandbox), relay, vault)
     }
 
     private static func sets(_ relay: FakeRelayAccount) async -> [FakeRelayAccount.Call] {
@@ -29,7 +29,7 @@ final class PushRegistrationTests: XCTestCase {
         await push.tokenArrived(Self.token)
 
         let calls = await Self.sets(relay)
-        XCTAssertEqual(calls, [.setPushToken(hexToken: "00ff10ab", topic: "com.shellx.dev", environment: .sandbox, token: "tok-1")])
+        XCTAssertEqual(calls, [.setPushToken(hexToken: "00ff10ab", topic: "com.shellx.prod", environment: .sandbox, token: "tok-1")])
     }
 
     func testTheSameTokenForTheSameSignInIsSentOnce() async throws {
@@ -54,7 +54,7 @@ final class PushRegistrationTests: XCTestCase {
         await push.signedIn()
 
         let after = await Self.sets(relay)
-        XCTAssertEqual(after, [.setPushToken(hexToken: "00ff10ab", topic: "com.shellx.dev", environment: .sandbox, token: "tok-2")])
+        XCTAssertEqual(after, [.setPushToken(hexToken: "00ff10ab", topic: "com.shellx.prod", environment: .sandbox, token: "tok-2")])
     }
 
     func testAFailedSendIsTriedAgainNextTime() async throws {
@@ -77,7 +77,7 @@ final class PushRegistrationTests: XCTestCase {
 
         let calls = await Self.sets(relay)
         XCTAssertEqual(calls.count, 2)
-        XCTAssertEqual(calls.last, .setPushToken(hexToken: "00ff10ab", topic: "com.shellx.dev", environment: .sandbox, token: "tok-1"))
+        XCTAssertEqual(calls.last, .setPushToken(hexToken: "00ff10ab", topic: "com.shellx.prod", environment: .sandbox, token: "tok-1"))
     }
 
     func testComingBackToTheFrontWithoutATokenSendsNothing() async throws {
@@ -97,7 +97,7 @@ final class PushRegistrationTests: XCTestCase {
         await push.signedIn()
 
         let calls = await Self.sets(relay)
-        XCTAssertEqual(calls.last, .setPushToken(hexToken: "00ff10ab", topic: "com.shellx.dev", environment: .sandbox, token: "tok-3"))
+        XCTAssertEqual(calls.last, .setPushToken(hexToken: "00ff10ab", topic: "com.shellx.prod", environment: .sandbox, token: "tok-3"))
         XCTAssertEqual(calls.count, 2)
     }
 }

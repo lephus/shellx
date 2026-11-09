@@ -1,14 +1,15 @@
-// Debug: "ShellX Dev", installs next to the App Store / TestFlight build with its own Keychain.
+// Debug: "ShellX Dev". One app id everywhere (com.shellx.prod): on a phone it replaces the App Store /
+// TestFlight build "ShellX" and shares its Keychain items.
 
 #include "Base.xcconfig"
 
-PRODUCT_BUNDLE_IDENTIFIER = com.shellx.dev
+PRODUCT_BUNDLE_IDENTIFIER = com.shellx.prod
 SHELLX_DISPLAY_NAME = ShellX Dev
 // Push from paired Macs: Debug builds talk to the APNs sandbox (the relay sends their tokens there).
 SHELLX_APS_ENVIRONMENT = development
-// Google sign-in: the iOS OAuth client of com.shellx.dev without its ".apps.googleusercontent.com" suffix
-// (Info.plist ShellXGoogleClientID). Not a secret. The placeholder makes Continue with Google report
-// "not available in this build".
+// Google sign-in: the one iOS OAuth client of com.shellx.prod (Debug and Release use the same one) without
+// its ".apps.googleusercontent.com" suffix (Info.plist ShellXGoogleClientID). Not a secret. Until that client
+// exists, the placeholder makes Continue with Google report "not available in this build".
 SHELLX_GOOGLE_IOS_CLIENT = 0-shellx-placeholder
 // App Transport Security's local-network exception, for a relay on the Mac over plain HTTP
 // (SHELLX_API_BASE, honoured by Debug builds only). Release never has it: ios.sh --check-app refuses it.

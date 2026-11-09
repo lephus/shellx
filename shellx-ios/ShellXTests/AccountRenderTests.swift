@@ -57,11 +57,13 @@ final class AccountRenderTests: XCTestCase {
     }
 
     func testGoogleSansIsUsedOnceBundled() throws {
-        let font = Bundle.main.url(forResource: "GoogleSans", withExtension: "ttf")
-            ?? Bundle.main.url(forResource: "GoogleSans", withExtension: "ttf", subdirectory: "Fonts")
-        try XCTSkipIf(font == nil, "Task 9 Step 7 bundles Google Sans")
-        XCTAssertNotNil(UIFont(name: "GoogleSans-Regular", size: 14))
-        XCTAssertTrue(GoogleSignInButton.labelFont().fontName.hasPrefix("GoogleSans"), GoogleSignInButton.labelFont().fontName)
+        let font = Bundle.main.url(forResource: "GoogleSans-Medium", withExtension: "ttf")
+            ?? Bundle.main.url(forResource: "GoogleSans-Medium", withExtension: "ttf", subdirectory: "Fonts")
+        try XCTSkipIf(font == nil, "Task 9 Step 7 bundles Google Sans Medium")
+        // The bundled file is Google Fonts' static Google Sans Medium (wght 500 at opsz 18), PostScript name
+        // `GoogleSans-Medium`.
+        XCTAssertNotNil(UIFont(name: "GoogleSans-Medium", size: 14), "UIAppFonts registers the bundled font")
+        XCTAssertEqual(GoogleSignInButton.labelFont().fontName, "GoogleSans-Medium")
         XCTAssertEqual(GoogleSignInButton.labelFont().pointSize, 14)
     }
 

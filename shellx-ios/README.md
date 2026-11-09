@@ -36,8 +36,10 @@ new module means adding it to the script, in review.
 | `Packages/ShellXAppCore` | The app's logic, tested with `swift test` on the Mac. |
 | `scripts/` | `dev.sh`, `check-strings.py`, `strings-identity.txt`. |
 
-Debug builds are "ShellX Dev" (`com.shellx.dev`) and install next to the App Store / TestFlight
-build "ShellX" (`com.shellx.prod`), each with its own Keychain.
+There is one app id, `com.shellx.prod`, in every configuration. Debug builds are "ShellX Dev": on
+a phone they replace the App Store / TestFlight build "ShellX" and share its Keychain items, and an
+App Store or TestFlight install replaces them in turn. Debug builds register sandbox APNs tokens,
+App Store builds production ones.
 
 ## Building and testing: `scripts/dev.sh`
 
@@ -100,4 +102,4 @@ rounds the corners itself), with the alpha channel removed because App Store Con
 `Logo` is the same SVG as a 96 pt vector PDF, used by the launch screen and the first screen. The
 colour sets (`AccentColor`, `AccentText`, `Status*`) have a darker variant for the light appearance.
 
-`GoogleG` is Google's official "G", cropped unchanged (20 × 20 pt) from the Light, no-text, Square iOS icons of Google's sign-in bundle (https://developers.google.com/static/identity/images/signin-assets.zip, linked from https://developers.google.com/identity/branding-guidelines). `Fonts/GoogleSans.ttf` is Google Sans (SIL OFL 1.1, `Fonts/GoogleSans-OFL.txt`) from github.com/google/fonts. Both serve only the Continue with Google button, which follows that page. Never replace them with a Google logo from `ios/`, `Packages/` or `Sources/`, or with a drawn one.
+`GoogleG` is Google's official "G", cropped unchanged (20 × 20 pt) from the Light, no-text, Square iOS icons of Google's sign-in bundle (https://developers.google.com/static/identity/images/signin-assets.zip, linked from https://developers.google.com/identity/branding-guidelines). `Fonts/GoogleSans-Medium.ttf` is Google Sans Medium, the static face from Google Fonts' official download (SIL OFL 1.1, `Fonts/GoogleSans-OFL.txt`); it is a byte copy of `Resources/Fonts/GoogleSans-Medium.ttf`, which `scripts/shellx/fetch-google-branding.sh` fetched for the Mac and Windows apps. Both serve only the Continue with Google button, which follows that page. Never replace them with a Google logo from `ios/`, `Packages/` or `Sources/`, or with a drawn one.

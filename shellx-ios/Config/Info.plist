@@ -59,6 +59,10 @@
 	<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER).shared</string>
 	<key>ShellXGoogleClientID</key>
 	<string>$(SHELLX_GOOGLE_IOS_CLIENT).apps.googleusercontent.com</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>GoogleSans-Medium.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

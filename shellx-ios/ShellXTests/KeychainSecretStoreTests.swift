@@ -9,7 +9,7 @@ final class KeychainSecretStoreTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        service = "com.shellx.dev.tests.\(UUID().uuidString)"
+        service = "com.shellx.prod.tests.\(UUID().uuidString)"
         store = KeychainSecretStore(service: service, accessGroup: nil)
     }
 
@@ -59,7 +59,7 @@ final class ShippedKeychainGroupTests: XCTestCase {
         XCTAssertTrue(group.hasSuffix(".\(bundleID).shared"), group)
         XCTAssertFalse(group.hasPrefix("."), "AppIdentifierPrefix expanded to nothing: \(group)")
 
-        let store = KeychainSecretStore(service: "com.shellx.dev.tests.\(UUID().uuidString)", accessGroup: group)
+        let store = KeychainSecretStore(service: "com.shellx.prod.tests.\(UUID().uuidString)", accessGroup: group)
         defer { for item in SecretItem.allCases { try? store.delete(item) } }
         try store.write(Data("v".utf8), for: .session)
         XCTAssertEqual(try store.read(.session), Data("v".utf8))

@@ -34,7 +34,7 @@ SCHEME="ShellX"
 DERIVED="$IOS_DIR/.derived"
 CORE_PACKAGE="$IOS_DIR/Packages/ShellXAppCore"
 SIM_NAME="ShellX Dev"
-DEBUG_BUNDLE_ID="com.shellx.dev"
+DEBUG_BUNDLE_ID="com.shellx.prod"
 DEVICE_ID_FILE="$HOME/.config/shellx/iphone-device-id"
 
 die() { echo "dev.sh: $*" >&2; exit 1; }
