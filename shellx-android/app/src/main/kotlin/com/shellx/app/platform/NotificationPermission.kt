@@ -27,6 +27,14 @@ object NotificationPermission {
         requester.request(Manifest.permission.POST_NOTIFICATIONS) { settings.putBoolean(ASKED_KEY, true) }
     }
 
+    /**
+     * After an answer of "not granted": Android showed no dialog. It shows one only while it may still ask (never
+     * denied, or denied once); once denied twice it answers at once. Its rationale flag tells them apart: off before
+     * and after the launch means no dialog (the first dialog's "Don't allow" turns it on, the last one's turns it off
+     * again). [before] null (not known) counts as a dialog shown.
+     */
+    fun noDialogShown(before: Boolean?, after: Boolean): Boolean = before == false && !after
+
     /** The app's notifications are on (and, from Android 13, permitted), and the "Needs you" channel, once made, is
      *  not turned off. */
     fun isOn(context: Context): Boolean {
