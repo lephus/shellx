@@ -161,9 +161,10 @@ class LinkClient private constructor(
     override suspend fun closeTerminal(workspaceId: String, terminalId: String): WorkspaceControlOutcome =
         ask<LinkMessage.TerminalCloseResult> { LinkMessage.TerminalClose(it, workspaceId, terminalId) }.outcome
 
-    override suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome =
-        (call(openingView = terminalId) { LinkMessage.TerminalViewOpen(it, terminalId, cols, rows) } as? LinkMessage.TerminalViewOpenResult)
-            ?.outcome ?: throw LinkClientException.UnexpectedAnswer()
+    override suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome {
+        val answer = call(openingView = terminalId) { LinkMessage.TerminalViewOpen(it, terminalId, cols, rows) }
+        return (answer as? LinkMessage.TerminalViewOpenResult)?.outcome ?: throw LinkClientException.UnexpectedAnswer()
+    }
 
     override suspend fun closeTerminalView(terminalId: String) = post(LinkMessage.TerminalViewClose(terminalId))
 
