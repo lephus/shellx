@@ -16,6 +16,7 @@ import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -229,6 +230,59 @@ class SpeechRecognizerEngineTest {
             e.cancel(run)
             runCurrent()
             assertEquals(0f, meter.level.value, 0f)
+            assertTrue(ports[0].destroyed)
+        }
+    }
+
+    /** 3C final review, consumer fit 11: a cancel while the recognizer starts ends the start at once, and the
+     *  microphone goes back (the start never waits out READY_TIMEOUT). */
+    @Test
+    fun aCancelWhileTheRecognizerStartsGivesTheMicrophoneBack() {
+        runTest {
+            val slot = SpeechRunSlot()
+            val e = engine(slot = slot)
+            val run = SpeechRunId()
+            val started = async { e.start(run, VoiceLanguage.VIETNAMESE, emptyList()) }
+            runCurrent()
+            assertFalse(started.isCompleted)
+            e.cancel(run)
+            runCurrent()
+            assertTrue(started.isCompleted)
+            assertTrue(started.await().isClosedForReceive)
+            assertTrue(ports[0].destroyed)
+            assertNull(slot.active)
+        }
+    }
+
+    /** Consumer fit 12: a finish whose caller is cancelled while it waits for the final result still tears the
+     *  recognizer down. */
+    @Test
+    fun aFinishWhoseCallerIsCancelledStillGivesTheMicrophoneBack() {
+        runTest {
+            val e = engine()
+            val run = SpeechRunId()
+            listening(e, run)
+            val finishing = launch { e.finish(run) }
+            runCurrent()
+            assertEquals(1, ports[0].stops)
+            finishing.cancel()
+            runCurrent()
+            assertTrue(ports[0].destroyed)
+        }
+    }
+
+    /** An error right after the recognizer said it is ready ends the dictation with it: it no longer fails the start,
+     *  and the run never listens on a recognizer that stopped. */
+    @Test
+    fun anErrorRightAfterReadyEndsTheDictation() {
+        runTest {
+            val e = engine()
+            val started = async { e.start(SpeechRunId(), VoiceLanguage.ENGLISH, emptyList()) }
+            runCurrent()
+            ports[0].ready()
+            ports[0].error(SpeechRecognizer.ERROR_NETWORK)
+            val words = started.await()
+            assertTrue(words.receiveCatching().exceptionOrNull() is IOException)
             assertTrue(ports[0].destroyed)
         }
     }
