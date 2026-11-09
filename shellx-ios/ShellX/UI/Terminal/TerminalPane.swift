@@ -39,6 +39,8 @@ struct TerminalPane: View {
             if shown != terminalId { focused = false }
         }
         .onChange(of: model.pasteTooLarge) { _, _ in
+            // The model is every page's: only the page shown says it, once.
+            guard model.terminalId == terminalId else { return }
             let text = String(localized: "terminal.paste.tooLarge")
             notice = AgentScreen.Notice(text: text)
             announce(text)
