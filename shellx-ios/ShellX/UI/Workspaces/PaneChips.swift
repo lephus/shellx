@@ -18,6 +18,10 @@ struct PaneChips: View {
     let select: (String) -> Void
     /// The user chose "Close Tab…" on this chip; nil while its Mac cannot close tabs.
     var close: ((WorkspacePane) -> Void)? = nil
+    /// The user tapped ＋; nil leaves it out (the Mac takes no `terminal.create`).
+    var add: (() -> Void)? = nil
+    /// False dims ＋ (the Mac is not online).
+    var addEnabled = true
 
     private static let cornerRadius: CGFloat = 10
     private static let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -49,6 +53,7 @@ struct PaneChips: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(panes) { pane in closable(chip(pane), pane: pane).id(pane.id) }
+                    if let add { addChip(add) }
                 }
                 .padding(.horizontal, 12)
             }
@@ -112,5 +117,27 @@ struct PaneChips: View {
         .accessibilityValue(Text(verbatim: state?.text ?? ""))
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier("workspace.chip.\(pane.id)")
+    }
+
+    /// ＋ after the chips: a new terminal tab in this workspace on the Mac. A symbol in a text run, so it takes the
+    /// chips' line height at every text size.
+    private func addChip(_ add: @escaping () -> Void) -> some View {
+        Button(action: add) {
+            Text(Image(systemName: "plus"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.appSurface, in: Self.shape)
+                .overlay { Self.shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 1) }
+                // At least 44 by 44 points to touch (HIG: Buttons); the chip itself is smaller.
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!addEnabled)
+        .opacity(addEnabled ? 1 : 0.4)
+        .accessibilityLabel(Text(LocalizedStringResource("terminal.new")))
+        .accessibilityIdentifier("workspace.chip.add")
     }
 }

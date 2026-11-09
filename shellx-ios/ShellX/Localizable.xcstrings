@@ -5323,6 +5323,60 @@
           }
         }
       }
+    },
+    "terminal.new": {
+      "comment": "VoiceOver label of the ＋ chip at the end of the chip row: opens a new terminal tab in this workspace on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Terminal"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal mới"
+          }
+        }
+      }
+    },
+    "workspace.menu.viewAsTerminal": {
+      "comment": "Item of the ••• menu while the chip shown runs an agent: shows that agent's terminal instead of its chat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View as Terminal"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem dạng terminal"
+          }
+        }
+      }
+    },
+    "workspace.menu.viewAsChat": {
+      "comment": "Item of the ••• menu while an agent's chip shows its terminal: back to the agent's chat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View as Chat"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem dạng chat"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

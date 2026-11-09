@@ -66,13 +66,14 @@ enum WorkspaceMenuItem: CaseIterable {
 ///   monospace, and `•••` with "Rename Workspace", "View as Terminal" / "View as Chat" for an agent chip while
 ///   its Mac shows terminals (`canViewTerminals`), then, in red and each asking first, "Close Tab…" for
 ///   the chip shown while its Mac can close tabs (`canCloseTab`), and "Close Workspace…".
-/// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted, then ＋ (a new terminal tab)
-///   while the Mac takes `terminal.create` (`canCreateTerminal`), dimmed while it is not online. While the Mac is online
-///   and can close tabs, a long press on any chip offers "Close Tab…" for it too. Either way one
-///   confirmation names the tab and says what closing it stops (HIG: Action sheets).
+/// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted, then ＋ (a new
+///   terminal tab) while the Mac takes `terminal.create` (`canCreateTerminal`), dimmed while it is not
+///   online. While the Mac is online and can close tabs, a long press on any chip offers "Close Tab…" for
+///   it too. Either way one confirmation names the tab and says what closing it stops (HIG: Action sheets).
 /// - Below, one page per chip, swiped sideways like the chips are tapped: a chip that runs an agent
-///   shows the agent's chat (`agent`: the existing agent screen as a pane) unless it is shown as its terminal
-///   (`shownAsTerminal`); any other page is `shell` (the terminal, `TerminalPane`). While a mic listens (`pagingLocked`) the pages stay put.
+///   shows the agent's chat (`agent`: the existing agent screen as a pane) unless it is shown as its
+///   terminal (`shownAsTerminal`); any other page is `shell` (the terminal, `TerminalPane`). While a mic
+///   listens (`pagingLocked`) the pages stay put.
 /// - `notice`, when there is one, floats over the top of the pages (the pane shown was closed on the Mac).
 struct WorkspaceScreen<AgentPane: View, ShellPane: View>: View {
     let title: String
