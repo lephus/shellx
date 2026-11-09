@@ -172,6 +172,13 @@ public final class WorkspaceScreenModel {
         expected = nil
     }
 
+    /// The user tapped or typed into the terminal of the chip shown: it is chosen for good, like a pick, so an agent
+    /// that starts waiting for an answer no longer moves the screen away from a command being typed (an agent's chat
+    /// has the same protection while it is shown).
+    public func settle() {
+        settled = true
+    }
+
     /// Switches the agent chip `terminalId` to its terminal (true) or back to its chat; an id the workspace does
     /// not have is ignored.
     public func showAsTerminal(_ terminalId: String, _ on: Bool) {

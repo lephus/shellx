@@ -725,4 +725,23 @@ final class WorkspaceScreenModelTests: XCTestCase {
         try? await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(model.selectedTerminalId, "other")
     }
+
+    /// The user typing into the shell shown settles the screen on it, like a pick: an agent that starts asking later
+    /// does not move it (final review, app I2).
+    func testTypingIntoTheChipShownKeepsItWhenAnAgentAsks() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("zsh", "claude", agent: ["claude": "s1"], selected: "zsh"))
+        ])
+        let (model, hub, _) = try await makeModel(mac)
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+
+        model.settle()
+        await mac.upsertSession(agentSession("s1", state: .needsInput))
+        await mac.addPending(pendingItem("r1"))
+        let seen = await eventually { hub.pendingItems.count == 1 }
+        XCTAssertTrue(seen)
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+    }
 }

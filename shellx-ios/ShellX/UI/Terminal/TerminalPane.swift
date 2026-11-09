@@ -17,6 +17,8 @@ struct TerminalPane: View {
     var showsKeyBar = false
     /// Says a line to VoiceOver; tests count the lines.
     var announce: @MainActor (String) -> Void = { AccessibilityNotification.Announcement($0).post() }
+    /// The user took the keyboard on this page or sent it input (the workspace screen settles on its chip).
+    var engaged: @MainActor () -> Void = {}
 
     @State private var focused = false
     @State private var notice: AgentScreen.Notice?
@@ -37,6 +39,12 @@ struct TerminalPane: View {
         // A page that is not the one shown never keeps the keyboard.
         .onChange(of: model.terminalId) { _, shown in
             if shown != terminalId { focused = false }
+        }
+        .onChange(of: focused) { _, now in
+            if now { engaged() }
+        }
+        .onChange(of: model.sentInputs) { _, _ in
+            if model.terminalId == terminalId { engaged() }
         }
         .onChange(of: model.pasteTooLarge) { _, _ in
             // The model is every page's: only the page shown says it, once.

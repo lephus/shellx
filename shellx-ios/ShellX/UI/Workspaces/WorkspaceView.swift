@@ -70,7 +70,11 @@ struct WorkspaceView: View {
                             .id(session.ref)
                     },
                     shell: { pane in
-                        TerminalPane(model: terminal, terminalId: pane.id, title: PaneChips.label(for: pane))
+                        // Typing into a page settles the screen on it: an agent that starts asking does not pull
+                        // the keyboard away mid-command.
+                        TerminalPane(
+                            model: terminal, terminalId: pane.id, title: PaneChips.label(for: pane),
+                            engaged: { model.settle() })
                     })
             case .waiting:
                 WorkspaceWaitingView()
