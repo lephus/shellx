@@ -38,6 +38,7 @@ class TerminalPushQueueTest {
     @Test
     fun aFloodOfFramesIsBounded() {
         val queue = TerminalPushQueue()
+        queue.offer(Opened("t-1"))
         queue.offer(Frame("t-1", snapshot(1, "$")))
         for (r in 2L..20_001L) queue.offer(Frame("t-1", delta(r)))
         assertTrue(queue.queuedWeight <= TerminalPushQueue.MAX_QUEUED_WEIGHT, "${queue.queuedWeight}")
@@ -403,6 +404,31 @@ class TerminalPushQueueTest {
                 }.join()
                 val left = List(queue.queuedPushes) { queue.pushes.first() }
                 assertEquals(listOf(Opened("t-1"), Frame("t-1", TerminalFramePart.LOST)), seen + left)
+            }
+        }
+    }
+
+    /**
+     * Re-review A2, minor 1: a collector cancelled while it emits takes nothing more. What it has not taken stays
+     * queued for the next collector, a LOST part included.
+     */
+    @Test
+    fun aCancelledCollectorLeavesWhatItHasNotTaken() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                queue.offer(Frame("t-1", delta(2)))
+                queue.offer(Frame("t-1", TerminalFramePart.LOST))
+                val seen = mutableListOf<TerminalViewPush>()
+                launch {
+                    queue.pushes.collect {
+                        seen += it
+                        if (it is Opened) currentCoroutineContext().cancel()
+                    }
+                }.join()
+                assertEquals(listOf<TerminalViewPush>(Opened("t-1")), seen)
+                assertEquals(2, queue.queuedPushes)
             }
         }
     }
