@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -207,5 +210,99 @@ class AgentScreenTest {
         embedded = true
         compose.waitForIdle()
         assertTrue(!exists("agent.menu") && !exists("agent.removeFromPhone"))
+    }
+
+    private fun lines(range: IntRange): List<ChatEntry> =
+        range.map { entry(it, ChatEntryRole.AGENT, ChatEntryKind.PROSE, "Dòng $it của câu trả lời.\nThêm một dòng nữa.") }
+
+    /** The chat alone, as [show] draws it, for a [StateRestorationTester]. */
+    private val chat: @androidx.compose.runtime.Composable () -> Unit = {
+        ShellXTheme {
+            val row = AgentStatusRow.of(AgentFixtures.session, AgentFixtures.NOW_MS)
+            AgentScreen(
+                ref = ref, place = "Claude Code · MacBook Pro", row = { row }, gone = false, offline = false, pending = emptyList(),
+                showsMachineName = false, entries = entries, emptyState = null, machineName = "MacBook Pro",
+                older = AgentThreadModel.Older.NONE, loadingOlder = false, canStop = false, notice = null, draft = ComposerDraft(),
+                onDraftChange = {},
+            )
+        }
+    }
+
+    @Test
+    fun aTouchDuringAFollowScrollKeepsTheChatFollowing() {
+        entries = lines(1..40)
+        show()
+        until { displayed("agent.entry.e40") }
+        compose.mainClock.autoAdvance = false
+        entries = entries + lines(41..41)
+        Snapshot.sendApplyNotifications()
+        // The chat starts sliding down to the new entry; the user's finger stops it and drags up to older entries.
+        repeat(3) { compose.mainClock.advanceTimeByFrame() }
+        compose.onNodeWithTag("agent.chat").performTouchInput { swipeDown() }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        entries = entries + lines(42..42)
+        until { exists("agent.newMessages") }
+        assertTrue("never pulled down while reading older entries", !displayed("agent.entry.e42"))
+    }
+
+    @Test
+    fun theReadingPlaceSurvivesRecreation() {
+        val tester = StateRestorationTester(compose)
+        entries = lines(1..40)
+        tester.setContent(chat)
+        until { displayed("agent.entry.e40") }
+        compose.onNodeWithTag("agent.chat").performScrollToIndex(0)
+        compose.waitForIdle()
+        entries = entries + lines(41..41)
+        until { exists("agent.newMessages") }
+
+        tester.emulateSavedInstanceStateRestore()
+        compose.waitForIdle()
+        assertTrue("still on the older entries", displayed("agent.entry.e1") && !displayed("agent.entry.e40"))
+        assertTrue("still offers the new ones", exists("agent.newMessages"))
+        entries = entries + lines(42..42)
+        compose.waitForIdle()
+        assertTrue("still not following", displayed("agent.entry.e1") && !displayed("agent.entry.e42"))
+    }
+
+    @Test
+    fun olderEntriesComeInAboveTheEntryThatWasFirst() {
+        var loading by mutableStateOf(false)
+        entries = lines(21..60)
+        compose.setContent {
+            ShellXTheme {
+                AgentScreen(
+                    ref = ref, place = "Claude Code · MacBook Pro", row = { null }, gone = false, offline = false, pending = emptyList(),
+                    showsMachineName = false, entries = entries, emptyState = null, machineName = "MacBook Pro",
+                    older = AgentThreadModel.Older.LOADABLE, loadingOlder = loading, canStop = false, notice = null,
+                    draft = ComposerDraft(), onDraftChange = {},
+                    actions = AgentScreenActions(loadOlder = {
+                        olderAsks++
+                        loading = true
+                    }),
+                )
+            }
+        }
+        until { displayed("agent.entry.e60") }
+        assertEquals(0, olderAsks)
+        compose.onNodeWithTag("agent.chat").performScrollToIndex(0)
+        until { olderAsks == 1 }
+        // The top leaves the screen and comes back while the page is on its way: one ask.
+        compose.onNodeWithTag("agent.chat").performScrollToIndex(12)
+        compose.waitForIdle()
+        compose.onNodeWithTag("agent.chat").performScrollToIndex(0)
+        compose.waitForIdle()
+        assertEquals(1, olderAsks)
+
+        compose.runOnIdle {
+            entries = lines(1..60)
+            loading = false
+        }
+        compose.waitForIdle()
+        val chatTop = compose.onNodeWithTag("agent.chat").getUnclippedBoundsInRoot().top
+        val anchorTop = compose.onNodeWithTag("agent.entry.e21").getUnclippedBoundsInRoot().top
+        assertTrue("the entry that was first is at the top ($chatTop, $anchorTop)", anchorTop >= chatTop && anchorTop < chatTop + 40.dp)
+        assertTrue("the older ones are above it", !displayed("agent.entry.e1"))
     }
 }
