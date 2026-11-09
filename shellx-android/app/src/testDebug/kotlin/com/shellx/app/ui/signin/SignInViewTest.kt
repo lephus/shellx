@@ -1,17 +1,22 @@
 package com.shellx.app.ui.signin
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,7 +34,7 @@ import org.junit.runner.RunWith
 /** Continue with Google: one sign-in at a time, the failures in words, and "Try without an account". */
 @RunWith(AndroidJUnit4::class)
 class SignInViewTest {
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     private fun show(expired: Boolean = false, signIn: suspend () -> Unit, startDemo: (() -> Unit)? = {}) {
@@ -50,6 +55,40 @@ class SignInViewTest {
         rule.waitForIdle()
         assertEquals(1, calls)
         rule.onNodeWithTag("signin.demo").assertIsNotEnabled()
+
+        answer.complete(Unit)
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.demo").assertIsEnabled()
+        rule.onNodeWithTag("signin.google").assertIsEnabled()
+    }
+
+    @Test
+    fun aSignInInProgressSurvivesARotation() {
+        // Review B m-3 (carry 3D-3): the progress lives in a ViewModel, so a recreated activity still waits.
+        val answer = CompletableDeferred<Unit>()
+        var calls = 0
+        val screen: @Composable () -> Unit = {
+            ShellXTheme {
+                SignInView(expired = false, signIn = {
+                    calls++
+                    answer.await()
+                }, startDemo = {})
+            }
+        }
+        rule.setContent(screen)
+        rule.onNodeWithTag("signin.google").performClick()
+        rule.waitForIdle()
+        assertEquals(1, calls)
+
+        rule.activityRule.scenario.recreate()
+        rule.activityRule.scenario.onActivity { it.setContent(content = screen) }
+        rule.waitForIdle()
+
+        rule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate), useUnmergedTree = true).assertExists()
+        rule.onNodeWithTag("signin.demo").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.google").performClick()
+        rule.waitForIdle()
+        assertEquals("a tap after the rotation joins nothing new", 1, calls)
 
         answer.complete(Unit)
         rule.waitForIdle()

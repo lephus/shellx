@@ -103,6 +103,26 @@ class AppLifecycleTest {
     }
 
     @Test
+    fun aSettlePendingAtStopNeverReconnects() {
+        runTest {
+            val mac = FakeMac("MacBook Pro", backgroundScope)
+            val t = testComposition(folder.root, macs = listOf(mac))
+            val c = t.composition
+            c.lifecycle.onStart()
+            assertTrue(waitFor { online(c) })
+
+            // Two path changes start a 300 ms settle; the app stops before it ends (review B m-3).
+            t.network.flow.emit(path("wlan0"))
+            t.network.flow.emit(path("rmnet0"))
+            advanceTimeBy(100.milliseconds)
+            c.lifecycle.onStop()
+            advanceTimeBy(1.seconds)
+
+            assertEquals("a settle pending at ON_STOP never reconnects", 1, mac.connectCount)
+        }
+    }
+
+    @Test
     fun everyStartAsksAgain() {
         runTest {
             val mac = FakeMac("MacBook Pro", backgroundScope)
