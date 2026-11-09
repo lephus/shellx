@@ -1,6 +1,8 @@
 package com.shellx.core.link
 
 import com.shellx.link.core.ChatEntry
+import com.shellx.link.core.TerminalViewPush
+import kotlinx.coroutines.flow.Flow
 
 /** What a [MachineConnection] reports, in order (MachineEvent.swift). */
 sealed interface MachineEvent {
@@ -23,6 +25,13 @@ sealed interface MachineEvent {
 
     /** The session's transcript was replaced (`chat.reset`), in order with its [Chat] events. */
     data class ChatReset(val sessionId: String) : MachineEvent
+
+    /**
+     * The new session's terminal pushes (`LinkSession.terminalPushes`), once per session, just before its Online. Not
+     * each push (plan 3G Decision 1): they stay in the session's bounded queue until a terminal page collects them
+     * through the hub (`HubTerminals`), so nothing here buffers terminal output.
+     */
+    data class TerminalPushes(val pushes: Flow<TerminalViewPush>) : MachineEvent
 
     /** The relay refused the account token. The connection has stopped; the owner signs the user out. */
     data object SignedOut : MachineEvent

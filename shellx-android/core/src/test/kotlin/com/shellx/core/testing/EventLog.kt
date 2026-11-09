@@ -2,6 +2,7 @@ package com.shellx.core.testing
 
 import com.shellx.core.link.MachineEvent
 import com.shellx.core.link.MachineLinkState
+import com.shellx.link.core.TerminalViewPush
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -14,6 +15,7 @@ class EventLog(events: Flow<MachineEvent>, scope: CoroutineScope) {
     private val sessionList = mutableListOf<MachineEvent.Sessions>()
     private val workspaceList = mutableListOf<MachineEvent.Workspaces>()
     private val featureList = mutableListOf<Set<String>>()
+    private val terminalList = mutableListOf<Flow<TerminalViewPush>>()
     private var chatCount = 0
     private var resetCount = 0
     private var signedOutCount = 0
@@ -38,6 +40,9 @@ class EventLog(events: Flow<MachineEvent>, scope: CoroutineScope) {
     val workspaceIds: List<String> get() = workspaces?.set?.workspaces?.map { it.workspaceId } ?: emptyList()
     val features: Set<String>? get() = synchronized(lock) { featureList.lastOrNull() }
 
+    /** Each session's terminal pushes, as the connection handed them on (one per session); nothing read from them. */
+    val terminalSessions: List<Flow<TerminalViewPush>> get() = synchronized(lock) { terminalList.toList() }
+
     /** Chat entries seen, over every `Chat` event. */
     val chatEntries: Int get() = synchronized(lock) { chatCount }
     val chatResets: Int get() = synchronized(lock) { resetCount }
@@ -59,6 +64,7 @@ class EventLog(events: Flow<MachineEvent>, scope: CoroutineScope) {
                 is MachineEvent.Workspaces -> workspaceList += event
                 is MachineEvent.Chat -> chatCount += event.entries.size
                 is MachineEvent.ChatReset -> resetCount += 1
+                is MachineEvent.TerminalPushes -> terminalList += event.pushes
                 MachineEvent.SignedOut -> signedOutCount += 1
             }
         }

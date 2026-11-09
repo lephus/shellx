@@ -23,6 +23,15 @@ enum class LatencyMetric(val wire: String) {
 
     /** Start of speech to the first recognised word. */
     FIRST_WORD("firstWord"),
+
+    /** A terminal shown (the swipe or tap) to its first screen drawn. */
+    TERMINAL_FIRST_SCREEN("terminalFirstScreen"),
+
+    /** A key typed into a terminal to the next frame that changes its screen. */
+    TERMINAL_KEY_ECHO("terminalKeyEcho"),
+
+    /** Assembling and applying one terminal frame on the phone. */
+    TERMINAL_FRAME_APPLY("terminalFrameApply"),
 }
 
 data class LatencySummary(val count: Int, val p50: Duration, val p95: Duration)
