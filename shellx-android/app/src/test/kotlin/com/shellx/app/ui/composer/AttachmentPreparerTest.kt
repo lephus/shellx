@@ -142,4 +142,18 @@ class AttachmentPreparerTest {
             assertArrayEquals(byteArrayOf(7, 7, 7), a.data)
         }
     }
+
+    /** Review A M-4: a HEIF sequence that cannot be converted keeps its own type, never a `.jpg` name on HEIF bytes. */
+    @Test
+    fun aHeifSequenceThatCannotBeConvertedKeepsItsType() {
+        runTest {
+            val unable = AttachmentPreparer(context.contentResolver, Dispatchers.Unconfined) { null }
+            for ((i, mime) in listOf("image/heic-sequence", "image/heif-sequence").withIndex()) {
+                val uri = content("IMG_010$i", 3, mime, ByteArrayInputStream(byteArrayOf(7, 7, 7)))
+                val a = unable.read(AttachmentPick(uri, AttachmentKind.IMAGE), listOf("photo-1.heic"))
+                assertEquals(mime, "photo-2.heic", a.name)
+                assertArrayEquals(byteArrayOf(7, 7, 7), a.data)
+            }
+        }
+    }
 }
