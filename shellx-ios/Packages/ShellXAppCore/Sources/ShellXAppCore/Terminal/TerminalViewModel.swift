@@ -41,10 +41,10 @@ public enum TerminalViewPhase: Equatable, Sendable {
 ///   after 300 ms reconcile; after 5 such retries `.unavailable(.failed)`. `not_found` → forget, `.unavailable(.gone)`.
 ///   `refused` → forget, `.unavailable(.refused)`. `failed` (also the answer for a terminal the Mac lists but cannot
 ///   view, contracts §17), an unknown outcome, or `.noAnswer` while `link.isOnline` → forget; the first time, reconcile
-///   after 1 s; the second time `.unavailable(.failed)`. `.notSent`, or `.noAnswer` while not online → forget, and open
-///   again only after the next `.state` event of this Mac or a `show`, `retry` or `resume` (so a hub that still calls the
-///   Mac online during a reconnect cannot make the model ask in a loop); while `active`, R1 then sets `.offline` or
-///   `.unsupported`.
+///   after 1 s (`.connecting` meanwhile); the second time `.unavailable(.failed)`. `.notSent`, or `.noAnswer` while not
+///   online → forget, and open again only after the next `.state` event of this Mac or a `show`, `retry` or `resume`
+///   (so a hub that still calls the Mac online during a reconnect cannot make the model ask in a loop); while `active`,
+///   R1 then sets `.offline` or `.unsupported`.
 /// - **R4 `.opened(id)`** for the view's terminal on this Mac: a fresh `TerminalFrameAssembler`; frames count from now
 ///   on. Frames of that terminal before it are ignored. Every push for another terminal or another Mac is ignored.
 /// - **R5 Frames.** `assembler.receive(part)`; `resync` → queue `resync(id)`; a complete frame → R7.
@@ -457,13 +457,15 @@ public final class TerminalViewModel {
         }
     }
 
-    /// A failed open or a failed view: retried once after 1 s, then Try Again.
+    /// A failed open or a failed view: retried once after 1 s, then Try Again. The wait is `.connecting`: a view that
+    /// ended while live must not look live while nothing typed can reach the Mac (the pane takes input only `.live`).
     private func failedOpen() {
         forgetView()
         if failedRetriesUsed >= 1 {
             becomeUnavailable(.failed)
         } else {
             failedRetriesUsed += 1
+            phase = .connecting
             retry(after: Self.failedRetryDelay)
         }
     }
