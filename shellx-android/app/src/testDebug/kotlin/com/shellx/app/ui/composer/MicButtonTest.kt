@@ -8,6 +8,10 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -149,5 +153,26 @@ class MicButtonTest {
         val cancelLabel = ApplicationProvider.getApplicationContext<Context>().getString(R.string.common_cancel)
         mic.performCustomAccessibilityActionWithLabel(cancelLabel)
         until { rig.engine.cancelCalls.size == 1 }
+    }
+
+    /** Final review m-6: TalkBack hears the hint as what a double-tap does (the tap action's label, Android's place for
+     *  the iPhone's hint), never as the button's state; while listening the tap's label is "Finish talking". */
+    @Test
+    fun talkBackHearsTheHintAsTheTapsLabelNotAsAState() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val rig = VoiceRig.make()
+        val model = rig.model()
+        show(rig, model)
+        mic.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        mic.assertContentDescriptionEquals(context.getString(R.string.voice_mic))
+        assertEquals(context.getString(R.string.voice_mic_hint), mic.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
+
+        mic.performSemanticsAction(SemanticsActions.OnClick)
+        until { rig.engine.starts.size == 1 }
+        rig.engine.say("một")
+        until { model.phase == VoiceInputModel.Phase.Listening("một") }
+        mic.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        mic.assertContentDescriptionEquals(context.getString(R.string.voice_mic_stop))
+        assertEquals(context.getString(R.string.voice_mic_stop), mic.fetchSemanticsNode().config[SemanticsActions.OnClick].label)
     }
 }
