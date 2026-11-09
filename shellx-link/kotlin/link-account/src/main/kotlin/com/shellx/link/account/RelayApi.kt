@@ -127,6 +127,64 @@ class RelayApi(val baseUrl: String, client: OkHttpClient, private val clientVers
         send("DELETE", "/v2/phone-grants/$grantId", token, null)
     }
 
+    // Account (contracts §2, §5, §8). Android has no password login, no Apple sign-in and no Google link.
+
+    /** A fresh single-use nonce for the next sign-in: 1–128 characters of the base64url alphabet. */
+    suspend fun nonce(): String {
+        val nonce = sendJson("POST", "/v1/auth/nonce", null, JsonObject(emptyMap())).str("nonce")
+        if (nonce.length !in 1..128 || !nonce.all { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == '-' || it == '_' }) {
+            throw RelayApiException.BadResponse()
+        }
+        return nonce
+    }
+
+    /** Signs this phone in with a Google ID token minted for [nonce]; [clientKey] is the phone's Noise public key. */
+    suspend fun signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: ByteArray): AccountSignIn {
+        val body = buildJsonObject {
+            put("id_token", idToken)
+            put("nonce", nonce)
+            put(
+                "device",
+                buildJsonObject {
+                    put("kind", "mobile")
+                    put("name", deviceName)
+                    put("platform", "android")
+                    put("public_key", Base64.getUrlEncoder().withoutPadding().encodeToString(clientKey))
+                },
+            )
+        }
+        val reply = sendJson("POST", "/v1/auth/google", null, body)
+        return AccountSignIn(AccountSession(reply.str("user_id"), reply.str("device_id"), reply.str("token")), reply.str("email"))
+    }
+
+    /** Deletes the account, proven by a fresh ID token of its identity (`DELETE /v1/account`). */
+    suspend fun deleteAccount(idToken: String, nonce: String, token: String) {
+        val body = buildJsonObject {
+            put("id_token", idToken)
+            put("nonce", nonce)
+        }
+        send("DELETE", "/v1/account", token, body)
+    }
+
+    /** Gives the relay this phone's FCM registration token, so paired Macs can reach it while the app is closed. */
+    suspend fun setPushToken(fcmToken: String, token: String) {
+        val body = buildJsonObject {
+            put("token", fcmToken)
+            put("platform", "android")
+        }
+        send("PUT", "/v1/devices/me/push-token", token, body)
+    }
+
+    /** Removes this phone's push token from the relay. */
+    suspend fun unsetPushToken(token: String) {
+        send("DELETE", "/v1/devices/me/push-token", token, null)
+    }
+
+    /** Signs this phone out: the relay deletes the token and this device's push token. */
+    suspend fun logout(token: String) {
+        send("POST", "/v1/auth/logout", token, null)
+    }
+
     // Transport
 
     internal suspend fun sendJson(method: String, path: String, token: String?, body: JsonObject?): ApiJson =
