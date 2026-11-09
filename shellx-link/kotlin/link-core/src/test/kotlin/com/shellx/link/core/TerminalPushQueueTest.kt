@@ -92,12 +92,16 @@ class TerminalPushQueueTest {
         runBlocking {
             within {
                 val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
                 for (r in 1L..20_000L) queue.offer(Frame("t-1", delta(r)))
                 queue.offer(Ended("t-1", TerminalViewEndReason.GONE))
                 queue.offer(Opened("t-2"))
                 for (r in 1L..20_000L) queue.offer(Frame("t-2", delta(r)))
                 val all = queue.pushes.take(queue.queuedPushes).toList()
-                assertEquals(listOf(Ended("t-1", TerminalViewEndReason.GONE), Opened("t-2")), all.filter { it !is Frame })
+                assertEquals(
+                    listOf(Opened("t-1"), Ended("t-1", TerminalViewEndReason.GONE), Opened("t-2")),
+                    all.filter { it !is Frame },
+                )
                 assertTrue(all.indexOf(Ended("t-1", TerminalViewEndReason.GONE)) < all.indexOf(Opened("t-2")))
                 // Each terminal's dropped run ends in one lost part, after the frames kept before it.
                 assertEquals(Frame("t-1", TerminalFramePart.LOST), all[all.indexOf(Ended("t-1", TerminalViewEndReason.GONE)) - 1])
@@ -245,6 +249,37 @@ class TerminalPushQueueTest {
                 assertEquals(Frame("t-1", snapshot(1, "$")), queue.pushes.first())
                 assertEquals(0, queue.queuedWeight)
                 assertEquals(0, queue.queuedPushes)
+            }
+        }
+    }
+
+    /**
+     * Re-review A, m4: frames of a terminal other than the one viewed follow the bound and leave nothing behind, so a
+     * host that names many terminals grows neither the queue's markers nor its state. The viewed terminal's state goes
+     * with its Ended.
+     */
+    @Test
+    fun onlyTheTerminalViewedLeavesStateBehind() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                val wide = TerminalFramePart(1, part = 0, parts = 2, lines = listOf(TerminalLine(0, listOf(TerminalRun(text = "x".repeat(60_000))))))
+                repeat(1_000) { queue.offer(Frame("x-$it", wide)) }
+                assertTrue(queue.queuedWeight <= TerminalPushQueue.MAX_QUEUED_WEIGHT)
+                val others = List(queue.queuedPushes) { queue.pushes.first() }
+                assertEquals(0, others.count { it is Frame && it.part == TerminalFramePart.LOST }, "LOST parts of terminals not viewed")
+                assertTrue(others.size < 40, "${others.size}")
+
+                queue.offer(Frame("t-1", snapshot(1, "$")))
+                var r = 2L
+                val dropped = queue.droppedFrames
+                while (queue.droppedFrames == dropped) queue.offer(Frame("t-1", delta(r++)))
+                queue.offer(Ended("t-1", TerminalViewEndReason.GONE))
+                List(queue.queuedPushes) { queue.pushes.first() }
+                // t-1 is no longer viewed and waits for no snapshot: its next frame is kept.
+                queue.offer(Frame("t-1", delta(r)))
+                assertEquals(listOf<TerminalViewPush>(Frame("t-1", delta(r))), List(queue.queuedPushes) { queue.pushes.first() })
             }
         }
     }
