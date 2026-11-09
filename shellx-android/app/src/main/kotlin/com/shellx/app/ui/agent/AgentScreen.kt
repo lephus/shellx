@@ -336,7 +336,8 @@ private fun Chat(
             state = list,
             modifier = Modifier.fillMaxSize().testTag("agent.chat"),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            // A short chat sits at the bottom, by the composer (the iPhone's bottom scroll anchor).
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
         ) {
             when (older) {
                 AgentThreadModel.Older.NONE -> Unit
