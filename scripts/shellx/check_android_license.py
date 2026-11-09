@@ -38,6 +38,10 @@ STRICT_LOCKING = re.compile(r"\blockMode\s*(?:\.\s*set\s*\(|=)\s*LockMode\s*\.\s
 DESUGARING = re.compile(r"\b(?:coreLibraryDesugaring|isCoreLibraryDesugaringEnabled)\b")
 ROOTS_TEXT = "shellx-android/, shellx-link/kotlin/, shellx-link/vectors/ and shellx-link/spec/"
 REPO_CALL = re.compile(r"\b(maven|mavenLocal|jcenter|ivy|flatDir)\s*[({]")
+REPO_CONFIGURED = re.compile(r"\b(google|mavenCentral|gradlePluginPortal)\s*\{")
+REPO_BLOCK = re.compile(r"\brepositories\s*\{")
+ALLOWED_REPO = re.compile(r"\b(?:google|mavenCentral|gradlePluginPortal)\s*\(\s*\)")
+PLUGIN_MANAGEMENT = re.compile(r"\bpluginManagement\s*\{")
 COMPANY = re.compile(r"(?<![A-Za-z0-9_])manaflow(?![A-Za-z0-9_])", re.IGNORECASE)
 GRADLE_PROPERTIES = "shellx-android/gradle.properties"
 SDK_DOWNLOAD = re.compile(r"^[ \t]*android\.builder\.sdkDownload[ \t]*[=:][ \t]*(\S*)[ \t]*$", re.MULTILINE)
@@ -159,6 +163,19 @@ def string_literals(code: str):
             i = j
         else:
             i += 1
+
+
+def block_end(bare: str, start: int) -> int:
+    """bare[start - 1] is an opening brace (strings blanked); return the index after its partner."""
+    depth = 1
+    i = start
+    while i < len(bare) and depth:
+        if bare[i] == "{":
+            depth += 1
+        elif bare[i] == "}":
+            depth -= 1
+        i += 1
+    return i
 
 
 def call_end(bare: str, start: int) -> int:
@@ -389,9 +406,22 @@ def check_kts(rel: str, text: str, report: Report) -> None:
     for m in DESUGARING.finditer(bare):
         report.add(rel, "core library desugaring is not allowed: it ships desugar_jdk_libs (GPLv2 with the "
                         "Classpath Exception) outside every lockfile", line_of(code, m.start()))
-    if posixpath.basename(rel) != "settings.gradle.kts":
-        for m in re.finditer(r"\bgradlePluginPortal\s*\(", bare):
-            report.add(rel, "gradlePluginPortal() is allowed only in settings.gradle.kts", line_of(code, m.start()))
+    for m in REPO_CONFIGURED.finditer(bare):
+        report.add(rel, "%s { … } can change the repository URL or content; write %s()" % (m.group(1), m.group(1)),
+                   line_of(code, m.start()))
+    for m in REPO_BLOCK.finditer(bare):
+        body = bare[m.end():block_end(bare, m.end()) - 1]
+        rest = re.sub(r"[\s;]+", " ", ALLOWED_REPO.sub(" ", body)).strip()
+        if rest:
+            report.add(rel, "repositories { } may hold only google(), mavenCentral() and, in pluginManagement, "
+                            "gradlePluginPortal(); found: %s" % rest[:60], line_of(code, m.start()))
+    plugin_blocks = []
+    if posixpath.basename(rel) == "settings.gradle.kts":
+        plugin_blocks = [(m.end(), block_end(bare, m.end())) for m in PLUGIN_MANAGEMENT.finditer(bare)]
+    for m in re.finditer(r"\bgradlePluginPortal\s*\(", bare):
+        if not any(a <= m.start() < b for a, b in plugin_blocks):
+            report.add(rel, "gradlePluginPortal() is allowed only in the pluginManagement { } block of "
+                            "settings.gradle.kts", line_of(code, m.start()))
     seen = set()
 
     def add(message: str, line: int) -> None:

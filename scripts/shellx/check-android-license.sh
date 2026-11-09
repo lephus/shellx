@@ -8,8 +8,9 @@
 #   3. the allowlist is malformed: duplicate keys, GPL/LGPL/AGPL, unknown scope or licence, stray wildcards,
 #      Google SDKs not listed by name
 #   4. a *.gradle (Groovy) script exists
-#   5. a build script adds a repository other than google() and mavenCentral() (gradlePluginPortal() only in
-#      settings.gradle.kts)
+#   5. a build script adds a repository other than google() and mavenCentral(), configures one with a block
+#      (google { url = … }), puts anything else in a repositories { } block, or uses gradlePluginPortal()
+#      outside the pluginManagement { } block of settings.gradle.kts
 #   6. a path in includeBuild/file/files/fileTree/File/srcDir/srcDirs/dir/resolve/resolveSibling/uri/from/
 #      apply/Paths.get/Path.of is not a plain string literal, is absolute, is built from the environment, is
 #      relative to the daemon's working directory (File("…")), or leaves shellx-android/, shellx-link/kotlin/,
@@ -34,7 +35,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     -h|--help)
-      sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
