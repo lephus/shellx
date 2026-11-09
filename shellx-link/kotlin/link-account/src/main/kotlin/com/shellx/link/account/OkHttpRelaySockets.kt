@@ -45,14 +45,20 @@ class OkHttpRelaySockets(client: OkHttpClient) : RelaySocketFactory {
 }
 
 /**
- * One OkHttp WebSocket. Incoming binary messages queue up to [MAX_QUEUED_BYTES] (plan 3G Task 4b): past that, OkHttp's
- * reader thread waits in [InboxBudget.take] until [receive] takes one, so TCP holds back the rest and the Mac's host
- * sends a slow phone fewer, larger deltas (PROTOCOL.md 11.4), as the iPhone's `URLSessionWebSocketTask`, which reads
- * only when asked, does. Nothing is ever dropped: binary messages are Noise ciphertext, and a lost one would break the
- * cipher stream. Text messages (relay control: pings, errors) never wait and are not counted; they are few and small.
- * The session's reader drains the inbox at decrypting speed (its terminal frames never wait: `TerminalPushQueue` drops
- * what its consumer cannot take), so the bound engages only when that reader falls behind, and a reply or ping waits
- * at most for the bytes queued ahead of it.
+ * One OkHttp WebSocket. Incoming binary messages queue up to [MAX_QUEUED_BYTES] (plan 3G Task 4b); past that, OkHttp's
+ * reader thread waits in [InboxBudget.take] until [receive] takes one, and TCP holds back the rest, as on the iPhone,
+ * whose `URLSessionWebSocketTask` reads only when asked. Nothing is ever dropped: binary messages are Noise ciphertext,
+ * and losing one would break the cipher stream.
+ *
+ * The bound engages only when the session's reader falls behind the network: that reader drains the inbox at the speed
+ * of decrypting and decoding, because its terminal frames never wait (`TerminalPushQueue` drops what its consumer
+ * cannot take). While it is engaged, replies, pings and relay control wait behind the binary messages ahead of them,
+ * in the order they came. The back-pressure stops at the relay: the relay does not slow the Mac, it queues at most 128
+ * frames or 2 MiB for this socket and ends the circuit when that queue is full. So a phone that stays behind for long
+ * loses the circuit, and the connection starts again.
+ *
+ * Text messages (relay control) are not counted and never wait for the budget, though they keep their place behind the
+ * binary messages ahead of them. They are not bounded; the relay sends few, of at most 16 KiB each.
  */
 internal class OkHttpRelaySocket(client: OkHttpClient, request: Request) : RelaySocket {
     companion object {
