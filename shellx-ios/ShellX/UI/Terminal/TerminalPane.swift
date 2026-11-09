@@ -6,7 +6,8 @@ import SwiftUI
 /// The page of the terminal shown draws it (`TerminalSurface`), or says why it cannot: the Mac's ShellX shows no
 /// terminals (`ShellPanePlaceholder`), the terminal is gone, refused or failed (with Try Again), it is opening, or the
 /// Mac is offline before any screen came. Once a screen came it stays: dimmed under a line while the Mac is offline,
-/// with a small spinner while it reopens. Any other page (a neighbour while swiping) is a plain card.
+/// with a small spinner while it reopens. Any other page (a neighbour while swiping) is a plain card. The page shown
+/// always holds the surface, under those cards too, because the surface's size is what the open asks for.
 struct TerminalPane: View {
     let model: TerminalViewModel
     let terminalId: String
@@ -50,26 +51,48 @@ struct TerminalPane: View {
         if model.terminalId != terminalId {
             if phase == .unsupported { ShellPanePlaceholder() } else { card { Color.appSurface } }
         } else {
-            switch phase {
-            case .unsupported:
-                ShellPanePlaceholder()
-            case .unavailable(.gone):
-                message(icon: "xmark.rectangle", text: LocalizedStringResource("terminal.gone"), id: "terminal.unavailable")
-            case .unavailable(.refused):
-                message(icon: "lock", text: LocalizedStringResource("workspaces.alert.refused.control"), id: "terminal.unavailable")
-            case .unavailable(.failed):
-                message(icon: "exclamationmark.triangle", text: LocalizedStringResource("terminal.failed"), id: "terminal.unavailable") {
-                    Button { model.retry() } label: { Text(LocalizedStringResource("terminal.retry")) }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .accessibilityIdentifier("terminal.retry")
+            // The surface is there in every state of the page shown, under the card that says why it shows no terminal
+            // (yet): its size is the grid every open asks for (R1, R11), so without it nothing would ever open. Covered,
+            // it is not drawn, touched or read out; it stays the same view from the first card to the live screen.
+            let covered = Self.covers(phase, snapshots: model.snapshots)
+            surfacePage(phase)
+                .opacity(covered ? 0 : 1)
+                .allowsHitTesting(!covered)
+                .accessibilityHidden(covered)
+                .overlay {
+                    if covered { cover(phase) }
                 }
-            case .connecting where model.snapshots == 0:
-                connecting
-            case .offline where model.snapshots == 0:
-                message(icon: "wifi.slash", text: LocalizedStringResource("workspaces.alert.offline"), id: "terminal.offline")
-            default:
-                surfacePage(phase)
+        }
+    }
+
+    /// Whether a card covers the surface of the page shown: the terminal cannot be shown, or no screen came yet.
+    static func covers(_ phase: TerminalViewPhase, snapshots: Int) -> Bool {
+        switch phase {
+        case .live: false
+        case .connecting, .offline: snapshots == 0
+        case .unsupported, .unavailable: true
+        }
+    }
+
+    /// The card over the surface (`covers(_:snapshots:)`).
+    @ViewBuilder private func cover(_ phase: TerminalViewPhase) -> some View {
+        switch phase {
+        case .unsupported:
+            ShellPanePlaceholder()
+        case .unavailable(.gone):
+            message(icon: "xmark.rectangle", text: LocalizedStringResource("terminal.gone"), id: "terminal.unavailable")
+        case .unavailable(.refused):
+            message(icon: "lock", text: LocalizedStringResource("workspaces.alert.refused.control"), id: "terminal.unavailable")
+        case .unavailable(.failed):
+            message(icon: "exclamationmark.triangle", text: LocalizedStringResource("terminal.failed"), id: "terminal.unavailable") {
+                Button { model.retry() } label: { Text(LocalizedStringResource("terminal.retry")) }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .accessibilityIdentifier("terminal.retry")
             }
+        case .offline:
+            message(icon: "wifi.slash", text: LocalizedStringResource("workspaces.alert.offline"), id: "terminal.offline")
+        case .connecting, .live:
+            connecting
         }
     }
 
