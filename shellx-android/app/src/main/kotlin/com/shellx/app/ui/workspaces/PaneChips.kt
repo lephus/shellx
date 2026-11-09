@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -28,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,13 +58,14 @@ import com.shellx.app.ui.theme.color
 import com.shellx.core.home.AgentStatusRow
 import com.shellx.core.pending.AgentLabel
 import com.shellx.core.workspaces.WorkspacePane
+import kotlin.math.abs
 
 private const val CHIP_RADIUS = 10
 
 /**
  * The row of chips under the workspace screen's top bar (`PaneChips.swift`): one per terminal of the workspace, in the
  * Mac's order, the one shown highlighted. An agent's chip has a dot in its state's tone, and while that agent waits for
- * the user the waiting border runs around it. The row scrolls sideways and keeps the chip shown in view.
+ * the user the waiting border runs around it. The row scrolls sideways and keeps the chip shown in its middle.
  *
  * While [close] is set, a long press on a chip opens a menu with "Close Tab…" (red; the caller confirms first); without
  * it a chip has no menu. [trailing] comes after the last chip (plan 3G's "＋").
@@ -75,13 +80,13 @@ fun PaneChips(
     trailing: @Composable () -> Unit = {},
 ) {
     val list = rememberLazyListState()
+    // The first time at once, then sliding (the iPhone's `onAppear` and `onChange`).
+    val placed = remember { BooleanArray(1) }
     LaunchedEffect(selected, panes.map { it.id }) {
         val index = panes.indexOfFirst { it.id == selected }
         if (index < 0) return@LaunchedEffect
-        val info = list.layoutInfo
-        val shown = info.visibleItemsInfo.firstOrNull { it.index == index }
-        val whole = shown != null && shown.offset >= info.viewportStartOffset && shown.offset + shown.size <= info.viewportEndOffset
-        if (!whole) list.animateScrollToItem(index)
+        list.centre(index, animated = placed[0])
+        placed[0] = true
     }
     LazyRow(
         state = list,
@@ -95,6 +100,21 @@ fun PaneChips(
         }
         item(key = "trailing") { trailing() }
     }
+}
+
+/** Scrolls item [index] to the middle of the row, as far as the row's ends allow. */
+private suspend fun LazyListState.centre(index: Int, animated: Boolean) {
+    // Before the first layout there is nothing to measure against; frames resume outside a layout pass.
+    while (layoutInfo.visibleItemsInfo.isEmpty()) withFrameNanos { }
+    fun shown() = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    val item = shown() ?: run {
+        if (animated) animateScrollToItem(index) else scrollToItem(index)
+        shown()
+    } ?: return
+    val info = layoutInfo
+    val off = item.offset + item.size / 2f - (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    if (abs(off) < 1f) return
+    if (animated) animateScrollBy(off) else scrollBy(off)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
