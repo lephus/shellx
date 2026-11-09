@@ -9,13 +9,17 @@ import com.shellx.core.testing.planItem
 import com.shellx.core.testing.questionItem
 import com.shellx.link.account.RelayApiException
 import com.shellx.link.core.LinkDecision
+import com.shellx.link.core.ReplyOutcome
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 /** The question and plan sheets stay open while the user reads: the item may be decided elsewhere meanwhile. */
@@ -58,6 +62,35 @@ class PendingSheetModelTest {
         assertNull(rig.center.status[key], "the center forgot it")
         assertFalse(sheet.handledElsewhere, "our own answer is not someone else's")
         assertEquals(DecisionStatus.Done, sheet.status)
+        assertFalse(sheet.canSend)
+    } }
+
+    /**
+     * Review 3a m-1: the screen that sent went while the answer was out, and the sheet's model lives on (hoisted into
+     * a ViewModel). Its own result is the final status, not "Sending", also once the center forgot the item.
+     */
+    @Test fun aCancelledSheetCallerStillEndsDone() { runTest {
+        val mac = FakeMac("MacBook Pro", backgroundScope)
+        mac.addPending(questionItem("q1"))
+        mac.setReplyOutcome(ReplyOutcome.DELIVERED, delay = 5.seconds)
+        val rig = pendingRig(listOf(mac))
+        assertTrue(rig.synced(1))
+        val key = rig.key(mac, "q1")
+        val sheet = PendingSheetModel(key, rig.hub, rig.center)
+
+        val caller = launch { sheet.send(LinkDecision.Question(listOf("Postgres"))) }
+        runCurrent()
+        assertEquals(DecisionStatus.Sending, sheet.status)
+        caller.cancel()
+        caller.join()
+
+        assertTrue(eventually { rig.center.status[key] == DecisionStatus.Done })
+        assertTrue(eventually { rig.hub.pendingItems.isEmpty() }, "the Mac resolved it")
+        rig.center.sync(rig.hub.pendingItems)
+        assertNull(rig.center.status[key], "the center forgot it")
+        assertEquals(DecisionStatus.Done, sheet.status)
+        assertFalse(sheet.state.value.sending)
+        assertFalse(sheet.handledElsewhere, "our own answer is not someone else's")
         assertFalse(sheet.canSend)
     } }
 
