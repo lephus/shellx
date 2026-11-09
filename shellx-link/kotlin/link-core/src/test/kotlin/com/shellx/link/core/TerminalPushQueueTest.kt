@@ -9,6 +9,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -242,6 +245,48 @@ class TerminalPushQueueTest {
                 assertEquals(Frame("t-1", snapshot(1, "$")), queue.pushes.first())
                 assertEquals(0, queue.queuedWeight)
                 assertEquals(0, queue.queuedPushes)
+            }
+        }
+    }
+
+    /**
+     * Re-review A, m2: two collectors wait; the offer's wake-up goes to the first, which is cancelled before it runs. The
+     * second still gets the push, with no other offer.
+     */
+    @Test
+    fun aTokenTakenByACancelledCollectorStillWakesTheNext() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                val first = launch(start = CoroutineStart.UNDISPATCHED) { queue.pushes.first() }
+                val second = async(start = CoroutineStart.UNDISPATCHED) { queue.pushes.first() }
+                queue.offer(Frame("t-1", snapshot(1, "$")))
+                first.cancel()
+                assertEquals(Frame("t-1", snapshot(1, "$")), second.await())
+            }
+        }
+    }
+
+    /**
+     * Re-review A, m2: a push the queue takes for a collector reaches that collector's code, even when the collector
+     * was cancelled since its last push (as from another thread). A LOST part lost there would freeze the view.
+     */
+    @Test
+    fun aCollectorCancelledBetweenTwoPushesLosesNeither() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                queue.offer(Frame("t-1", TerminalFramePart.LOST))
+                val seen = mutableListOf<TerminalViewPush>()
+                launch {
+                    queue.pushes.collect {
+                        seen += it
+                        if (it is Opened) currentCoroutineContext().cancel()
+                    }
+                }.join()
+                val left = List(queue.queuedPushes) { queue.pushes.first() }
+                assertEquals(listOf(Opened("t-1"), Frame("t-1", TerminalFramePart.LOST)), seen + left)
             }
         }
     }
