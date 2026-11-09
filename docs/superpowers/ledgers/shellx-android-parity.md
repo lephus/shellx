@@ -78,6 +78,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-7 | Coming back after 25 s or more in the background reconnects every Mac, measured with a clock that counts deep sleep, even when the grace timer never ran. A return within the 25 s probes each online Mac's session and replaces one that does not answer | Android freezes cached apps and Doze stops their timers, so the iPhone's background-task expiry has no Android signal; the Link client's liveness timers do not count deep sleep either (3B M-3) | `core:link/MachineHub.kt` (`appDidBecomeActive`), `core:link/MachineConnection.kt` (`checkAlive`) | 3C | differs (3C): by design |
 | A-8 | Sign-out also deletes this phone's FCM token on the relay before logging out | Contracts §8; the iPhone relies on logout alone | `core:account/AppCoordinator.kt` | 3C | differs (3C): by design |
 | A-9 | A photo's file extension comes from the picked item's MIME type; the image bytes are not inspected | Android's Photo Picker reports a MIME type and has no ImageIO | `core:composer/AttachmentChecks.kt` | 3C | differs (3C): by design |
+| A-10 | Voice: the on-device recognizer comes first (API 31+), then the standard `SpeechRecognizer`. There is no separate speech permission. The microphone and level meter belong to the recognizer, so the iPhone's audio-route and level-throttle rules do not apply | S3 §7.3 replaces the iPhone's recognizers with `SpeechRecognizer` | `core:voice/VoiceCapabilities.kt`, `FallbackTranscriber.kt`, `VoiceService.kt` | 3C | differs (3C): by design |
 
 ## Test devices
 
