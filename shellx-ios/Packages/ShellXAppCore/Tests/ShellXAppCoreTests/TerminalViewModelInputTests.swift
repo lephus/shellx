@@ -181,4 +181,18 @@ final class TerminalViewModelInputTests: XCTestCase {
         try? await Task.sleep(for: .milliseconds(50))
         XCTAssertFalse(link.latencies.contains(.terminalKeyEcho))
     }
+
+    /// A paste while a word is composed sends the word first, like a key does; a paste refused for its size leaves the
+    /// word composing (final review, core M2).
+    func testAPasteWhileComposingCommitsTheWordFirst() async {
+        let link = ScriptedTerminalLink(); let model = makeModel(link); await live(model, link)
+        model.setMarkedText("việ")
+        model.paste(String(repeating: "x", count: TerminalInputBatcher.maxPasteBytes + 1))
+        XCTAssertEqual(model.pasteTooLarge, 1)
+        XCTAssertEqual(model.typing.markedText, "việ", "a refused paste commits nothing")
+        model.paste("echo hi")
+        let sent = await eventually { link.inputs.flatMap { $0 } == [.text("việ"), .paste("echo hi")] }
+        XCTAssertTrue(sent, "\(link.inputs)")
+        XCTAssertEqual(model.typing.markedText, "")
+    }
 }
