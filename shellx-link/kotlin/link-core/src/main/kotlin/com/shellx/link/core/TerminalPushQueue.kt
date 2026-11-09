@@ -37,9 +37,10 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
 
     private class Entry(val push: TerminalViewPush, val weight: Int)
 
-    /** The frame of a terminal whose parts are arriving. */
+    /** The frame of a terminal whose parts are arriving; [next] is the index of the part it lacks first. */
     private class Arriving(val revision: Long, val parts: Int, val snapshot: Boolean) {
         var kept = true
+        var next = 1
     }
 
     private val lock = Any()
@@ -110,11 +111,15 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     private fun offerFrame(push: TerminalViewPush.Frame): Boolean {
         val id = push.terminalId
         val part = push.part
+        // A part belongs to the frame arriving only as the part it lacks next: a part sent again, out of order or
+        // after the frame is complete is no part of it, and follows the bound like a delta.
         val frame = if (part.part == 0) {
             Arriving(part.revision, part.parts, part.head?.kind == TerminalFrameKind.SNAPSHOT).also { arriving[id] = it }
         } else {
-            arriving[id]?.takeIf { it.revision == part.revision && it.parts == part.parts }
+            arriving[id]?.takeIf { it.revision == part.revision && it.parts == part.parts && it.next == part.part }
+                ?.also { it.next += 1 }
         }
+        if (frame != null && frame.next == frame.parts) arriving.remove(id)
         val snapshot = frame?.snapshot == true
         // The rest of a frame whose first part went, and what waits for a snapshot, go without another marker.
         if ((frame != null && !frame.kept) || (!snapshot && id in lost)) return drop(frame, null)
