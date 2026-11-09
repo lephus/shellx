@@ -28,7 +28,9 @@ import kotlinx.coroutines.withContext
  * The application (contracts §5): makes plan 3E's [PlatformServices] first, reads the settings snapshot and builds the
  * environment off the main thread, then makes the [AppComposition] with the platform's pieces and feeds it the process
  * lifecycle. It is the FCM service's [PushHost]: a push can start the process in the background, before the composition
- * exists, so the hooks wait for it ([awaitComposition]) rather than read it.
+ * exists, so the hooks wait for it ([awaitComposition]) rather than read it. Each sign-out of the real account turns
+ * FCM's auto-init off ([com.shellx.app.platform.FcmPushRegistrar.followSignOuts]). Open only for tests, whose
+ * applications override [makePlatform], [environment] and [relays] with fakes.
  */
 open class ShellXApplication : Application(), PushHost {
     private val _composition = MutableStateFlow<AppComposition?>(null)
@@ -49,7 +51,8 @@ open class ShellXApplication : Application(), PushHost {
 
     override val pushHooks: PushHooks by lazy {
         PushHooks(platform.makeNotifier { awaitComposition().vault }) { token ->
-            appScope.launch { awaitComposition().push?.tokenArrived(token) }
+            // On the main thread, in the app's scope: a service that stops waiting leaves the send running.
+            appScope.launch { awaitComposition().push?.tokenArrived(token) }.join()
         }
     }
 
@@ -101,6 +104,8 @@ open class ShellXApplication : Application(), PushHost {
                 makeVoice = platform::makeVoice,
                 relays = relays(environment),
             )
+            // Signed out: FCM stops syncing the token with Google (review C concern 7).
+            appScope.launch { platform.pushRegistrar.followSignOuts(composition.real.coordinator.phase) }
             heldLinks.forEach(composition.inbox::receive)
             heldLinks.clear()
             _composition.value = composition
