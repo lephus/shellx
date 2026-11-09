@@ -119,4 +119,29 @@ final class TerminalPaneTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(200))
         XCTAssertEqual(lines.items, ["t-zsh: \(String(localized: "terminal.paste.tooLarge"))"])
     }
+
+    /// A shell the user is typing into stays shown when an agent of the workspace starts waiting for an answer: the
+    /// keyboard is not pulled away mid-command (final review, app I2).
+    func testTypingIntoAShellKeepsItShownWhenAnAgentAsks() async throws {
+        let rig = try await WorkspaceRig.make(in: self)
+        let host = WindowHost(NavigationStack { WorkspaceView(scope: rig.scope, ref: rig.model.ref, open: { _ in }) }, in: self)
+        let surface = try await host.surface()
+        let live = await eventually { surface.model.phase == .live && surface.model.terminalId == "t-zsh" }
+        XCTAssertTrue(live, "the Mac's selection, a shell, is shown")
+        XCTAssertTrue(surface.becomeFirstResponder())
+        surface.insertText("ec")
+        let typed = await eventually { await rig.mac.terminalViewInputs("t-zsh") == [[.text("ec")]] }
+        XCTAssertTrue(typed)
+
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        await rig.mac.upsertSession(
+            AgentSession(
+                sessionId: "s1", agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx-ios",
+                state: .needsInput, stateSinceMs: nowMs, lastActivityMs: nowMs))
+        let asking = await eventually { rig.hub.liveSessions.first?.session.state == .needsInput }
+        XCTAssertTrue(asking)
+        try await Task.sleep(for: .milliseconds(300))
+
+        XCTAssertEqual(surface.model.terminalId, "t-zsh", "the shell being typed into stays shown")
+    }
 }
