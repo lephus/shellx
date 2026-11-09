@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -76,6 +77,8 @@ import com.shellx.core.pending.AgentLabel
 import com.shellx.link.core.ChatEntry
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -274,16 +277,22 @@ private fun Chat(
     // Opens at the bottom, as the iPhone's default scroll anchor.
     val list = rememberLazyListState(initialFirstVisibleItemIndex = olderRows + emptyRows + entries.size)
     val scope = rememberCoroutineScope()
-    val follow = remember { ChatFollow() }
-    var hasUnseen by remember { mutableStateOf(false) }
+    // Kept with the scroll position, so a rebuilt chat (rotation, theme, a page on top, a pane swiped away and back)
+    // neither pulls a reader down nor forgets the entries they have not seen.
+    val place = rememberSaveable(saver = ChatPlace.Saver) { ChatPlace() }
+    val follow = place.follow
+    var hasUnseen by remember { mutableStateOf(follow.hasUnseen) }
     // The first entry when older ones were asked for: the chat stays on it when they arrive.
-    var olderAnchor by remember { mutableStateOf<String?>(null) }
+    var olderAnchor by rememberSaveable { mutableStateOf<String?>(null) }
     val newestId by rememberUpdatedState(entries.lastOrNull()?.id)
     val currentEntries by rememberUpdatedState(entries)
     val currentOlderRows by rememberUpdatedState(olderRows)
     val askOlder by rememberUpdatedState(actions.loadOlder)
+    val loadingNow by rememberUpdatedState(loadingOlder)
 
     fun bottomIndex(): Int = (list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+
+    fun bottomShows(): Boolean = list.layoutInfo.visibleItemsInfo.any { it.key == BOTTOM }
 
     fun loadOlder() {
         olderAnchor = currentEntries.firstOrNull()?.id
@@ -293,31 +302,45 @@ private fun Chat(
     // A new newest entry is followed only while the bottom shows; otherwise "New messages". The newest entry is looked
     // at before the bottom's visibility, so an entry that pushed the bottom off screen is still followed.
     LaunchedEffect(list) {
-        var first = true
-        var seen: String? = null
-        snapshotFlow { Triple(newestId, list.layoutInfo.visibleItemsInfo.any { it.key == BOTTOM }, list.layoutInfo.totalItemsCount) }
+        // The scroll down to the newest entry, while it runs. The bottom is off screen on the way down, which is not the
+        // user leaving it; once the scroll ends, or a touch stops it, the chat looks again where it is.
+        var following: Job? = null
+        snapshotFlow { Triple(newestId, bottomShows(), list.layoutInfo.totalItemsCount) }
             .collect { (id, visible, total) ->
                 if (total == 0) return@collect
-                if (first || id != seen) {
-                    first = false
-                    seen = id
+                if (id != place.seen) {
+                    place.seen = id
                     if (follow.newest(id)) {
                         hasUnseen = follow.hasUnseen
-                        list.animateScrollToItem(bottomIndex())
+                        // Its own coroutine: a touch that interrupts the scroll ends the scroll, never this loop.
+                        val job = launch(start = CoroutineStart.LAZY) {
+                            try {
+                                list.animateScrollToItem(bottomIndex())
+                            } finally {
+                                if (following === coroutineContext[Job]) {
+                                    following = null
+                                    follow.bottomVisible(bottomShows())
+                                    hasUnseen = follow.hasUnseen
+                                }
+                            }
+                        }
+                        following = job
+                        job.start()
                         return@collect
                     }
                 }
+                if (following?.isActive == true) return@collect
                 follow.bottomVisible(visible)
                 hasUnseen = follow.hasUnseen
             }
     }
-    // The top asks for older entries each time it scrolls into view.
+    // The top asks for older entries each time it scrolls into view, unless a page is already on its way.
     LaunchedEffect(list, older) {
         if (older != AgentThreadModel.Older.LOADABLE) return@LaunchedEffect
         snapshotFlow { list.layoutInfo.visibleItemsInfo.any { it.key == OLDER } }
             .distinctUntilChanged()
             .filter { it }
-            .collect { loadOlder() }
+            .collect { if (!loadingNow) loadOlder() }
     }
     // Older entries came in above: stay on the entry that was first.
     var wasLoadingOlder by remember { mutableStateOf(loadingOlder) }
@@ -374,6 +397,32 @@ private fun Chat(
                 }
             }
         }
+    }
+}
+
+/**
+ * Where a chat is in its entries: 3C's [ChatFollow] and the newest entry it was told of. Saved with the screen and
+ * rebuilt by telling a new [ChatFollow] the same things again.
+ */
+private class ChatPlace(val follow: ChatFollow = ChatFollow(), var seen: String? = null) {
+    companion object {
+        val Saver: Saver<ChatPlace, Any> = Saver(
+            save = { arrayListOf(it.follow.atBottom, it.follow.hasUnseen, it.seen.orEmpty()) },
+            restore = { saved ->
+                val (atBottom, hasUnseen, seen) = saved as List<*>
+                val id = (seen as String).ifEmpty { null }
+                val follow = ChatFollow()
+                if (hasUnseen == true) {
+                    // Unseen entries came while the user read older ones.
+                    follow.bottomVisible(false)
+                    follow.newest(id)
+                } else {
+                    follow.newest(id)
+                    follow.bottomVisible(atBottom == true)
+                }
+                ChatPlace(follow, id)
+            },
+        )
     }
 }
 
