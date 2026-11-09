@@ -18,20 +18,40 @@ org.jetbrains.kotlinx:*      ship  Apache-2.0
 com.almworks.sqlite4java:sqlite4java                      test  Apache-2.0     # The Apache Software License, Version 2.0
 com.dropbox.differ:differ                                 test  Apache-2.0     # The Apache Software License, Version 2.0
 com.dropbox.differ:differ-jvm                             test  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.android.datatransport:transport-api            ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.android.datatransport:transport-backend-cct    ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.android.datatransport:transport-runtime        ship  Apache-2.0     # The Apache Software License, Version 2.0
 com.google.android.gms:play-services-auth                 ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-auth-api-phone       ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-auth-base            ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-auth-blockstore      ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-base                 ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-basement             ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-cloud-messaging      ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-fido                 ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-identity-credentials ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-stats                ship  Google-SDK     # Android Software Development Kit License
 com.google.android.gms:play-services-tasks                ship  Google-SDK     # Android Software Development Kit License
 com.google.android.libraries.identity.googleid:googleid   ship  Google-SDK     # Android Software Development Kit License
+com.google.android.play:app-update                        ship  Google-SDK     # Play Core Software Development Kit Terms of Service
+com.google.android.play:core-common                       ship  Google-SDK     # Play Core Software Development Kit Terms of Service
 com.google.auto.value:auto-value-annotations              ship  Apache-2.0     # Apache 2.0 (parent auto-value-parent)
 com.google.code.findbugs:jsr305                           ship  Apache-2.0     # The Apache Software License, Version 2.0
 com.google.dagger:dagger                                  ship  Apache-2.0     # Apache 2.0
 com.google.errorprone:error_prone_annotations             ship  Apache-2.0     # Apache 2.0
+com.google.firebase:firebase-annotations                  ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-bom                          ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-common                       ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-components                   ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-datatransport                ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-encoders                     ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-encoders-json                ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-encoders-proto               ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-iid-interop                  ship  Google-SDK     # Android Software Development Kit License
+com.google.firebase:firebase-installations                ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-installations-interop        ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.firebase:firebase-measurement-connector        ship  Google-SDK     # Android Software Development Kit License
+com.google.firebase:firebase-messaging                    ship  Apache-2.0     # The Apache Software License, Version 2.0
 com.google.guava:failureaccess                            ship  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
 com.google.guava:guava                                    ship  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
 com.google.guava:listenablefuture                         ship  Apache-2.0     # The Apache Software License, Version 2.0 (parent guava-parent)
