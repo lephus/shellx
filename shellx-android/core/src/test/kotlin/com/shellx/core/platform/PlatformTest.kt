@@ -1,15 +1,22 @@
 package com.shellx.core.platform
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.isActive
@@ -17,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 
 class PlatformTest {
     @Test fun memoryStoreKeepsStringsAndBooleans() {
@@ -47,6 +55,31 @@ class PlatformTest {
         // runTest's backgroundScope reports a failed child as the test's failure.
         assertEquals("boom", assertFailsWith<IllegalStateException> { backgroundScope.runDetached { error("boom") } }.message)
         assertTrue(backgroundScope.isActive)
+    } }
+
+    /**
+     * Review 1 M-3: a block that throws a CancellationException of its own (an inner timeout, a Deferred cancelled
+     * elsewhere) fails the caller's wait with an ordinary exception, so a caller that was not cancelled never ends
+     * silently as if it had been.
+     */
+    @Test fun aBlocksOwnCancellationIsAFailureForTheCaller() { runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val timedOut = assertFails { scope.runDetached { withTimeout(1.seconds) { awaitCancellation() } } }
+        assertFalse(timedOut is CancellationException, "$timedOut")
+        assertEquals("detached_work_cancelled", timedOut.message)
+        assertIs<TimeoutCancellationException>(timedOut.cause)
+
+        val other = CompletableDeferred<Unit>().apply { cancel() }
+        val awaited = assertFails { scope.runDetached { other.await() } }
+        assertFalse(awaited is CancellationException, "$awaited")
+        assertIs<CancellationException>(awaited.cause)
+        assertTrue(scope.isActive)
+
+        // The scope's own cancellation still ends the work cancelled.
+        val gate = CompletableDeferred<Unit>()
+        val caller = async { runCatching { scope.runDetached { gate.await() } }.exceptionOrNull() }
+        runCurrent(); scope.cancel(); runCurrent()
+        assertIs<CancellationException>(caller.await())
     } }
 
     @Test fun coreLogGoesToTheSink() {
