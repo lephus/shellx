@@ -41,7 +41,7 @@ import com.shellx.link.core.PendingItem
 fun FullTextSheet(item: PendingItem, close: () -> Unit) {
     val title = item.toolName?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.pending_full_text_title)
     val raw = item.toolInputPreview ?: item.previewText ?: ""
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         SheetTopBar(title, close)
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) { Fields(item, raw) }
     }
@@ -96,7 +96,7 @@ private fun Monospaced(text: String) {
         text,
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(10.dp))
             .padding(12.dp),
         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
     )

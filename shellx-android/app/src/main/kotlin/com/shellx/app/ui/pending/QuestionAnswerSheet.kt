@@ -192,7 +192,7 @@ fun QuestionAnswerSheet(
     } else {
         stringResource(R.string.pending_question_title)
     }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         SheetTopBar(title, close)
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
             Column(
@@ -284,7 +284,7 @@ fun QuestionAnswerSheet(
 private fun Prompt(question: PendingQuestion) {
     val accent = ShellXTheme.colors.accentText
     Column(
-        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp)).padding(16.dp),
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         question.header?.takeIf { it.isNotEmpty() }?.let { header ->
@@ -321,7 +321,7 @@ private fun Options(
     focused: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp))) {
+        Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))) {
             for (option in question.options) {
                 val selected = answers.isSelected(question.id, option.label)
                 ChoiceRow(

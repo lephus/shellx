@@ -154,7 +154,7 @@ fun PlanReviewSheet(
     // The sheet closed: the microphone never stays on behind it.
     DisposableEffect(model) { onDispose { model?.let { m -> voiceScope.launch { m.cancel() } } } }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         SheetTopBar(stringResource(R.string.pending_plan_title), close)
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
             Column(

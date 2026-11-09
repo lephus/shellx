@@ -49,7 +49,7 @@ fun PendingSheetHost(route: PendingRoute, hub: MachineHub, center: DecisionCente
     ModalBottomSheet(
         onDismissRequest = close,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         kept.SaveableStateProvider("${route.kind}/${route.id.machineId}/${route.id.requestId}") {
             Box {
