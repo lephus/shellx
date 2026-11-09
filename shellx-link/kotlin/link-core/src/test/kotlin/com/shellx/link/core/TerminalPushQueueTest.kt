@@ -196,6 +196,18 @@ class TerminalPushQueueTest {
         assertEquals(LinkCodecException.BadJson(null), decoded)
     }
 
+    /** Review A, m6: a frame weighs the UTF-8 bytes of its texts, as its JSON does, not their UTF-16 chars. */
+    @Test
+    fun weightCountsTheUtf8BytesOfTheText() {
+        fun weightOf(text: String) = TerminalPushQueue().apply {
+            offer(Frame("t-1", TerminalFramePart(1, lines = listOf(TerminalLine(0, listOf(TerminalRun(text = text)))))))
+        }.queuedWeight
+        val ascii = weightOf("e".repeat(1_000))
+        assertEquals(1_000, weightOf("é".repeat(1_000)) - ascii)
+        assertEquals(2_000, weightOf("中".repeat(1_000)) - ascii)
+        assertEquals(1_000, weightOf("😀".repeat(500)) - ascii)
+    }
+
     /** Review A, I-2: the next collector gets the frame, and its weight is never lost (Task 6 cancels at every STOP). */
     @Test
     fun aCancelledCollectorGivesItsFrameBack() {
