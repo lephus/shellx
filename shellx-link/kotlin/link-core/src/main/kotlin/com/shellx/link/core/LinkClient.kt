@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -99,7 +100,7 @@ class LinkClient private constructor(
         progress: (Int) -> Unit,
     ): String = withUploadTurn {
         endErrorOrNull()?.let { throw it }
-        upload(kind, name, data.copyOf(), progress)
+        upload(kind, name, copyOffCaller(data), progress)
     }
 
     override suspend fun chatSend(
@@ -113,7 +114,7 @@ class LinkClient private constructor(
         var sent = 0
         for (attachment in uploading) {
             val before = sent
-            val data = attachment.data.copyOf()
+            val data = copyOffCaller(attachment.data)
             ids += try {
                 upload(attachment.kind, attachment.name, data) { progress(before + it) }
             } catch (e: CancellationException) {
@@ -204,6 +205,12 @@ class LinkClient private constructor(
         }
     }
 
+    /**
+     * The caller's bytes, copied on [Dispatchers.Default]: attachment-sized work (up to 10 MiB, as is the digest in
+     * [upload]) never runs on the caller's dispatcher, which is often the main thread.
+     */
+    private suspend fun copyOffCaller(data: ByteArray): ByteArray = withContext(Dispatchers.Default) { data.copyOf() }
+
     /** One upload, `attach.begin` to `attach.end`. The caller holds the upload turn. */
     private suspend fun upload(kind: AttachmentKind, name: String, data: ByteArray, progress: (Int) -> Unit): String {
         val id = ask<LinkMessage.AttachReady> { LinkMessage.AttachBegin(it, kind, name, data.size) }.attachmentId
@@ -219,7 +226,7 @@ class LinkClient private constructor(
             offset = end
             progress(offset)
         }
-        val digest = sha256(data)
+        val digest = withContext(Dispatchers.Default) { sha256(data) }
         val finished = call { LinkMessage.AttachEnd(it, id, digest) }
         if (finished !is LinkMessage.AttachEndResult || finished.attachmentId != id) throw LinkClientException.UnexpectedAnswer()
         return id
