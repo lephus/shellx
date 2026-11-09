@@ -10,6 +10,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,19 +42,24 @@ fun PendingSheetHost(route: PendingRoute, hub: MachineHub, center: DecisionCente
         onDispose { sheets?.closed() }
     }
     val send: (LinkDecision) -> Unit = { decision -> hub.scope.launch { route.model.send(decision) } }
+    // The sheet's own state (page, picks, typed answers, feedback, the last decision) is kept with the page, not with
+    // the bottom sheet's window: the window keeps its state apart, which a rebuilt screen does not give back (RF 3).
+    val kept = rememberSaveableStateHolder()
     val item = route.model.opened ?: return
     ModalBottomSheet(
         onDismissRequest = close,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.background,
     ) {
-        Box {
-            when (route.kind) {
-                PendingRoute.Kind.QUESTION -> QuestionAnswerSheet(item, state, send, close)
-                PendingRoute.Kind.PLAN -> PlanReviewSheet(item, state, send, close)
-                PendingRoute.Kind.FULL_TEXT -> FullTextSheet(item.item, close)
+        kept.SaveableStateProvider("${route.kind}/${route.id.machineId}/${route.id.requestId}") {
+            Box {
+                when (route.kind) {
+                    PendingRoute.Kind.QUESTION -> QuestionAnswerSheet(item, state, send, close)
+                    PendingRoute.Kind.PLAN -> PlanReviewSheet(item, state, send, close)
+                    PendingRoute.Kind.FULL_TEXT -> FullTextSheet(item.item, close)
+                }
+                Announcement(if (state.handledElsewhere) stringResource(R.string.pending_status_handled_elsewhere) else "")
             }
-            Announcement(if (state.handledElsewhere) stringResource(R.string.pending_status_handled_elsewhere) else "")
         }
     }
 }
