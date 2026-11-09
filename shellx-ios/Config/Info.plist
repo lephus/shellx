@@ -61,7 +61,7 @@
 	<string>$(SHELLX_GOOGLE_IOS_CLIENT).apps.googleusercontent.com</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>GoogleSans.ttf</string>
+		<string>GoogleSans-Medium.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

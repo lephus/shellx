@@ -1,4 +1,3 @@
-import CoreText
 import ShellXAppCore
 import SwiftUI
 import XCTest
@@ -58,22 +57,14 @@ final class AccountRenderTests: XCTestCase {
     }
 
     func testGoogleSansIsUsedOnceBundled() throws {
-        let font = Bundle.main.url(forResource: "GoogleSans", withExtension: "ttf")
-            ?? Bundle.main.url(forResource: "GoogleSans", withExtension: "ttf", subdirectory: "Fonts")
-        try XCTSkipIf(font == nil, "Task 9 Step 7 bundles Google Sans")
-        // The bundled file is Google Fonts' variable Google Sans: its one PostScript name is `GoogleSans-Regular`, and
-        // its named instance "Medium" is wght 500 at opsz 18 (opsz 17 at wght 500 is another style, "Text Medium").
-        XCTAssertNotNil(UIFont(name: "GoogleSans-Regular", size: 14), "UIAppFonts registers the bundled font")
-        let label = GoogleSignInButton.labelFont()
-        XCTAssertEqual(label.familyName, "Google Sans", label.fontName)
-        XCTAssertEqual(label.pointSize, 14)
-        let raw = CTFontCopyVariation(label as CTFont) as? [NSNumber: NSNumber] ?? [:]
-        let axes = Dictionary(uniqueKeysWithValues: raw.map { ($0.key.uint32Value, $0.value.doubleValue) })
-        XCTAssertEqual(axes[0x7767_6874], 500, "wght is Medium: \(axes)")
-        // CoreText leaves an axis at its default out of the variation, and on its own sizes opsz to the point size
-        // (14 → 17); the Medium instance keeps 18.
-        XCTAssertEqual(axes[0x6F70_737A] ?? 18, 18, "opsz is the Medium instance's: \(axes)")
-        XCTAssertEqual(axes[0x4752_4144] ?? 0, 0, "GRAD is the Medium instance's: \(axes)")
+        let font = Bundle.main.url(forResource: "GoogleSans-Medium", withExtension: "ttf")
+            ?? Bundle.main.url(forResource: "GoogleSans-Medium", withExtension: "ttf", subdirectory: "Fonts")
+        try XCTSkipIf(font == nil, "Task 9 Step 7 bundles Google Sans Medium")
+        // The bundled file is Google Fonts' static Google Sans Medium (wght 500 at opsz 18), PostScript name
+        // `GoogleSans-Medium`.
+        XCTAssertNotNil(UIFont(name: "GoogleSans-Medium", size: 14), "UIAppFonts registers the bundled font")
+        XCTAssertEqual(GoogleSignInButton.labelFont().fontName, "GoogleSans-Medium")
+        XCTAssertEqual(GoogleSignInButton.labelFont().pointSize, 14)
     }
 
     func testSignInWithDemoRenders() throws {
