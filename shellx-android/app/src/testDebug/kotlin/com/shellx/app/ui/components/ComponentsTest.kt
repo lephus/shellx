@@ -19,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -40,6 +43,7 @@ import kotlin.time.TimeSource
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -167,6 +171,32 @@ class ComponentsTest {
         actions[1].action()
         assertEquals(1, close.count)
     }
+
+    /**
+     * TalkBack (review C I-1): a row is one stop that speaks its words and carries the menu's actions, whether or not it
+     * has a click. A row without a click (Your Macs) used to put the actions on a silent node TalkBack never visits.
+     */
+    private fun oneTalkBackStop(onClick: (() -> Unit)?) {
+        val close = Counter("Close")
+        row(swipe = null, menu = listOf(RowAction("Rename", Icons.Outlined.Edit, false) {}, close.action()), onClick = onClick)
+
+        val stops = rule.onAllNodes(hasText("row")).fetchSemanticsNodes()
+        assertEquals("one stop speaks the row", 1, stops.size)
+        val stop = stops.single()
+        assertEquals("the row itself speaks", "row", stop.config.getOrNull(SemanticsProperties.TestTag))
+        assertTrue(stop.config.isMergingSemanticsOfDescendants)
+        assertTrue(SemanticsActions.OnLongClick in stop.config)
+        val actions = stop.config.getOrNull(SemanticsActions.CustomActions).orEmpty()
+        assertEquals(listOf("Rename", "Close"), actions.map { it.label })
+        actions[1].action()
+        assertEquals(1, close.count)
+    }
+
+    @Test
+    fun talkBackReadsARowWithoutAClickAsOneStopWithItsActions() = oneTalkBackStop(onClick = null)
+
+    @Test
+    fun talkBackReadsARowWithAClickAsOneStopWithItsActions() = oneTalkBackStop(onClick = {})
 
     @Test
     fun aRowWithoutActionsNeitherSwipesNorHasAMenu() {

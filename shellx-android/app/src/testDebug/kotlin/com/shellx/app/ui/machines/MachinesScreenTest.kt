@@ -2,9 +2,12 @@ package com.shellx.app.ui.machines
 
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -21,6 +24,7 @@ import com.shellx.core.link.MachineLinkState
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -151,6 +155,34 @@ class MachinesScreenTest {
         rule.onNodeWithText("Make Default").performClick()
         rule.waitForIdle()
         assertEquals(listOf("m3"), madeDefault)
+    }
+
+    /** Review C I-1: TalkBack stops once on a Mac, hears its label there and finds the row's actions on that stop
+     *  (`MachineRow.swift`: one VoiceOver element with the swipe and menu actions). */
+    @Test
+    fun talkBackReadsAMacAsOneStopWithItsActions() {
+        show()
+
+        val stop = row("m3").fetchSemanticsNode()
+        assertTrue("the row merges its words into its stop", stop.config.isMergingSemanticsOfDescendants)
+        assertEquals(listOf("iMac, Connected"), stop.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(
+            "no other stop speaks the Mac",
+            1,
+            rule.onAllNodes(hasContentDescription("iMac", substring = true)).fetchSemanticsNodes().size,
+        )
+        assertEquals(listOf("Make Default", "Unpair"), menuLabels("m3"))
+
+        customAction("m3", "Make Default")
+        assertEquals(listOf("m3"), madeDefault)
+        customAction("m3", "Unpair")
+        rule.onNodeWithText("Unpair iMac?").assertIsDisplayed()
+        assertEquals("Unpair asks first, as the swipe does", emptyList<String>(), unpaired)
+    }
+
+    private fun customAction(id: String, label: String) {
+        row(id).fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == label }.action()
+        rule.waitForIdle()
     }
 
     @Test
