@@ -124,6 +124,38 @@ class RootSyncTest {
         assertEquals(Routes.HOME, current())
     }
 
+    /** Review D m-3: a root popped off the stack (a stray `nav.popBackStack()`) comes back; the window is never blank. */
+    @Test
+    fun aPoppedRootComesBack() {
+        start()
+        rootBecomes(Routes.HOME)
+
+        rule.runOnUiThread { nav.popBackStack() }
+        rule.waitForIdle()
+
+        rule.onNodeWithText("screen:home").assertIsDisplayed()
+        assertEquals(Routes.HOME, current())
+        assertNull(nav.previousBackStackEntry)
+    }
+
+    /** Review D m-3: a stack whose bottom is not the root (restored apart from RootSync) is put back on the root. */
+    @Test
+    fun aStackLeftOnAnotherRootIsPutBackOnTheRoot() {
+        start()
+        rootBecomes(Routes.HOME)
+
+        rule.runOnUiThread {
+            nav.navigate(Routes.LAUNCH) {
+                popUpTo(nav.graph.id) { inclusive = true }
+            }
+        }
+        rule.waitForIdle()
+
+        rule.onNodeWithText("screen:home").assertIsDisplayed()
+        assertEquals(Routes.HOME, current())
+        assertNull(nav.previousBackStackEntry)
+    }
+
     @Test
     fun sessionArgumentsRoundTrip() {
         start()
