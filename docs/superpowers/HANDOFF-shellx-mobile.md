@@ -37,11 +37,13 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 | 2C iPhone terminal | 34d42258b9 | Contracts §23. Two-reviewer final review (2 I + 11 M fixed test-first), one regression fixed, re-reviews clean. Device check skipped (user waived). Core 682 / app 246 tests. |
 | 1C follow-up: Google G + Google Sans Medium (static, OFL) on iOS; iPhone Debug bundle `com.shellx.prod` | cf1d4e2343 | Review approved (0 C / 0 I). Desktop branding by the user: 112079593c. |
 | 3B Kotlin Link (`link-core`, `link-account`) | 91bc8626be | Contracts §24. Three chunks, each reviewed + fixed test-first; final review clean. link-core 135, link-account 62 (4 live-relay tests skipped: no `cmux-relay` binary on this Mac). |
+| 3C Android core (`:core`) | 4596d4d4c4 | Contracts §25. Four chunks + final review, every Important fixed test-first and re-reviewed. `:core` 586 tests. |
 
-## In progress
+## In progress (overnight run, user: "từ giờ đến mai làm cho xong cho tôi", 2026-11-09 17:22)
 
-- 3C (Android core), worktree `.worktrees/android-3c-core`, branch `feat/shellx-android-3c-core`; ledger `.superpowers/sdd/2026-11-07-shellx-android-3c-core/progress.md` (git-ignored). Four chunks (Tasks 0–7, 8–13, 14–23, 24–30), a fresh review after each, then a final review; merge after review (non-UI). User: "chạy tiếp 3B rồi 3C luôn".
-- Before 3C's first dogfood: run 3B's `RelayIntegrationTest` with `CMUX_RELAY_BIN` on a machine that has the binary.
+- 3D → 3E → 3G, each on its own branch stacked on the previous one (`feat/shellx-android-3d-ui-shell` from develop; 3E from 3D's branch; 3G from 3E's), reviewed and fixed like 3C, plus our own emulator / Pixel 3 checks. **UI plans: not merged** until the user's phone check and "merge" / "auto-merge".
+- 3D notes: the user approved (2026-11-09) Google's G and Google Sans for Android (`~/Downloads/shellx-google-signin/`, incl. `GoogleSans-Medium.ttf`); live Google sign-in waits for the relay's `GOOGLE_CLIENT_IDS` (1D).
+- Before the first live dogfood: run 3B's `RelayIntegrationTest` with `CMUX_RELAY_BIN` on a machine that has the binary.
 
 ## Waiting on the user
 
@@ -53,14 +55,16 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 4. **1C Task 15** runs after plan 1D's cut-over.
 5. **Android dark mode on the Pixel 3:** the user turns on dark theme and opens "ShellX Dev" (light was checked 2026-11-09). The vsmart Live (serial in `~/.config/shellx/android-serial`) is not connected on this Mac.
 
+6. **HEIC on Android (3E):** default ruling is to convert HEIC/HEIF picks to JPEG like the iPhone; the user may say otherwise.
+7. **iPhone follow-up:** `SpeechRunSlot.swift:78-90` has the quick-tap gap Android fixed in 3C (contracts §25).
+
 ## Next after these
 
-- 3B (Kotlin Link), now that 3A has landed. Not started; offer it to the user.
-- Then 3C → 3D → 3E → 3G → {1D, 3H}. Not started; the user has not asked for them yet.
+- {1D, 3H} after 3G. Not started.
 
 ## Known noise
 
-- `verify-local.py` fails `feature-flags`: `ios-feed-performance-release` in `Packages/Shared/CmuxClientConfig/Sources/CmuxClientConfig/ClientConfigFlag.swift` has reviewBy 2026-11-06. Pre-existing.
+- `verify-local.py` fails `feature-flags`: `ios-feed-performance-release` in `Packages/Shared/CmuxClientConfig/Sources/CmuxClientConfig/ClientConfigFlag.swift` has reviewBy 2026-11-06. Pre-existing. In the main checkout it passes falsely, because the untracked lower-case `packages/` folders hide `Packages/` on the case-insensitive disk.
 - `AttachmentPreparerTests.testCancellingAHungFileReadStopsIt` fails on clean develop.
 - `WorkspaceViewTests` and `MachineHubWorkspaceTests.testRefusedCloseKeepsRow` are flaky under load.
 - A post-merge Mac build can fail with "cannot find type 'Terminal…'" when DerivedData holds a stale `ShellXLinkCore` module. Delete that module's products and intermediates, then rebuild.
