@@ -79,6 +79,9 @@ fun ActionRow(
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         menuOpen = true
     }
+    // The detector reads the latest openMenu; a key on `menu` (a fresh list at each recomposition) would restart it
+    // and drop a press in progress (review B I-1).
+    val currentOpenMenu by rememberUpdatedState(openMenu)
 
     val interaction = when {
         onClick != null -> Modifier.combinedClickable(
@@ -89,7 +92,7 @@ fun ActionRow(
             onClick = onClick,
         )
         hasMenu -> Modifier
-            .pointerInput(menu) { detectTapGestures(onLongPress = { openMenu() }) }
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { currentOpenMenu() }) }
             .semantics { onLongClick(actionsLabel) { openMenu(); true } }
         else -> Modifier
     }
