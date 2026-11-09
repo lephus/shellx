@@ -26,6 +26,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -290,6 +291,88 @@ class AppCoordinatorGoogleTest {
         assertTrue(eventually { rig.coordinator.phase.value == AppPhase.SignedOut(false) })
         assertNothingStored(rig)
         assertEquals(1, rig.wiper.wipes)
+    } }
+
+    // Review 3a m-2: the screen went while its action was on the relay, and the next screen's tap came before the
+    // relay answered. The tap joins the action that runs instead of starting another beside it.
+
+    @Test fun aSecondSignInWhileOneRunsJoinsIt() { runTest {
+        val rig = rig()
+        rig.coordinator.launch()
+        val gate = Gate()
+        rig.relay.setHook({ gate.wait() }, Function.SIGN_IN_WITH_GOOGLE)
+        val first = launch { rig.coordinator.signInWithGoogle() }
+        assertTrue(eventually { gate.waiting == 1 })
+        first.cancel()
+        runCurrent()
+
+        val second = async { rig.coordinator.signInWithGoogle() }
+        runCurrent()
+        gate.open()
+        second.await()
+
+        assertEquals(listOf("nonce-1"), rig.identity.googleNonces, "one Google prompt")
+        assertEquals(
+            listOf(Call.Nonce, Call.SignInWithGoogle("google-id-token", "nonce-1", "Phu's Pixel", rig.vault.phoneKey().publicKey.hex())),
+            rig.relay.calls.filter { it is Call.Nonce || it is Call.SignInWithGoogle },
+            "one relay sign-in, so no device token is left signed in",
+        )
+        assertEquals(AppPhase.SignedIn("g@example.com"), rig.coordinator.phase.value)
+    } }
+
+    @Test fun aSecondDeletionWhileOneRunsJoinsIt() { runTest {
+        val rig = signedInRig()
+        val gate = Gate()
+        rig.relay.setHook({ gate.wait() }, Function.DELETE_ACCOUNT)
+        val first = launch { rig.coordinator.deleteAccount() }
+        assertTrue(eventually { gate.waiting == 1 })
+        first.cancel()
+        runCurrent()
+
+        val second = async { rig.coordinator.deleteAccount() }
+        runCurrent()
+        gate.open()
+        second.await()
+
+        assertEquals(listOf("nonce-1"), rig.identity.googleNonces, "one Google prompt")
+        assertEquals(
+            listOf(Call.Nonce, Call.DeleteAccount("google-id-token", "nonce-1", "tok-old")),
+            rig.relay.calls.filter { it is Call.Nonce || it is Call.DeleteAccount },
+        )
+        assertEquals(AppPhase.SignedOut(false), rig.coordinator.phase.value)
+        assertEquals(1, rig.wiper.wipes)
+    } }
+
+    @Test fun aSecondSignOutWhileOneRunsJoinsIt() { runTest {
+        val rig = rig()
+        rig.coordinator.signInWithGoogle()
+        val gate = Gate()
+        rig.relay.setHook({ gate.wait() }, Function.LOGOUT)
+        val first = launch { rig.coordinator.signOut() }
+        assertTrue(eventually { gate.waiting == 1 })
+        first.cancel()
+        runCurrent()
+
+        val second = async { rig.coordinator.signOut() }
+        runCurrent()
+        gate.open()
+        second.await()
+
+        assertEquals(listOf(Call.Logout("tok-g")), rig.relay.calls.filter { it is Call.Logout })
+        assertEquals(1, rig.wiper.wipes)
+        assertEquals(AppPhase.SignedOut(false), rig.coordinator.phase.value)
+    } }
+
+    /** A tap after the action ended starts a new one. */
+    @Test fun anActionThatEndedIsNotJoined() { runTest {
+        val rig = rig()
+        rig.coordinator.launch()
+        rig.identity.googleResult = Result.failure(IdentityProviderException.Cancelled())
+        assertFails { rig.coordinator.signInWithGoogle() }
+        rig.identity.googleResult = Result.success("google-id-token")
+        rig.coordinator.signInWithGoogle()
+        assertEquals(listOf("nonce-1", "nonce-2"), rig.identity.googleNonces)
+        assertEquals(AppPhase.SignedIn("g@example.com"), rig.coordinator.phase.value)
     } }
 
     /**
