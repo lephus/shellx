@@ -1,13 +1,16 @@
 package com.shellx.app.ui.pending
 
 import android.content.Context
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -135,5 +138,31 @@ class PendingListViewTest {
         rig.hub.scope.launch { route.model.send(LinkDecision.Question(listOf("Postgres"))) }
         until { holder?.route == null }
         until { !shown("Which database should the sync service use?") && cards() == 0 }
+    }
+
+    /** RF 3 through the real host: the sheet lives in a bottom sheet's own window; its page and typed answer survive a
+     *  rebuilt screen. */
+    @Test
+    fun anOpenSheetKeepsItsPageAndTypedAnswerWhenTheScreenIsRebuilt() {
+        rig.mac.addPending(PendingFixtures.question(workspaceId = "ws-shellx"))
+        pending(1)
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            ShellXTheme {
+                holder = viewModel(key = PendingListView.HOLDER_KEY)
+                PendingListView(rig.hub, rig.scope.decisions, rig.scope.sheets, only = null, back = { backs++ })
+            }
+        }
+        until { cards() == 1 && enabled("pending.open") }
+        compose.onNodeWithTag("pending.open").performClick()
+        until { compose.onAllNodesWithTag("pending.option").fetchSemanticsNodes().size == 2 }
+        compose.onAllNodesWithTag("pending.option")[0].performClick()
+        compose.onNodeWithTag("pending.next").performClick()
+        compose.onNodeWithTag("pending.other").performClick()
+        compose.onNodeWithTag("pending.otherField").performTextInput("Chỉ lint")
+
+        restoration.emulateSavedInstanceStateRestore()
+        until { shown(context.getString(R.string.pending_question_page, 2, 2)) }
+        compose.onNodeWithTag("pending.otherField").assertTextEquals("Chỉ lint")
     }
 }

@@ -2,6 +2,7 @@ package com.shellx.app.ui.pending
 
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -150,5 +152,17 @@ class QuestionAnswerSheetTest {
         assertEquals(2, compose.onAllNodesWithText(context.getString(R.string.common_close)).fetchSemanticsNodes().size)
         assertTrue(compose.onAllNodesWithTag("pending.send").fetchSemanticsNodes().isEmpty())
         compose.onNodeWithText(context.getString(R.string.pending_status_handled_elsewhere)).assertExists()
+    }
+
+    /** A huge paste is too long to send; only its first 64 KB go into the saved screen state. */
+    @Test
+    fun aHugeTypedAnswerIsSavedCut() {
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent { ShellXTheme { QuestionAnswerSheet(item, PendingSheetState(), send = { sent += it }, close = {}) } }
+        compose.onNodeWithTag("pending.other").performClick()
+        compose.onNodeWithTag("pending.otherField").performTextReplacement("x".repeat(70_000))
+        restoration.emulateSavedInstanceStateRestore()
+        val kept = compose.onNodeWithTag("pending.otherField").fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+        assertEquals(65_536, kept.length)
     }
 }

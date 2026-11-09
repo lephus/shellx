@@ -2,6 +2,10 @@ package com.shellx.app.ui.pending
 
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -20,6 +24,8 @@ import com.shellx.app.testing.VoiceRig
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.app.voice.LocalVoice
 import com.shellx.core.pending.DecisionCenter
+import com.shellx.core.pending.DecisionFailure
+import com.shellx.core.pending.DecisionStatus
 import com.shellx.core.voice.VoiceInputModel
 import com.shellx.link.core.ExitPlanMode
 import com.shellx.link.core.LinkDecision
@@ -116,5 +122,32 @@ class PlanReviewSheetTest {
         show()
         compose.onNodeWithTag("pending.reject").performClick()
         assertEquals(listOf(LinkDecision.ExitPlan(ExitPlanMode.DENY, null)), sent)
+    }
+
+    /** "Try again" resends what was sent from here, also once the screen was rebuilt in between. */
+    @Test
+    fun tryAgainResendsTheLastDecisionAfterRecreation() {
+        var state by mutableStateOf(PendingSheetState())
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent { ShellXTheme { PlanReviewSheet(item, state, send = { sent += it }, close = {}) } }
+        compose.onNodeWithTag("pending.revise").performClick()
+        compose.onNodeWithTag("pending.feedback").performTextInput("Tách bước 2 ra.")
+        compose.onNodeWithTag("pending.sendFeedback").performClick()
+        state = PendingSheetState(status = DecisionStatus.Failed(DecisionFailure.NO_ANSWER))
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("pending.retry").performClick()
+        val feedback = LinkDecision.ExitPlan(ExitPlanMode.DENY, "Tách bước 2 ra.")
+        assertEquals(listOf(feedback, feedback), sent)
+    }
+
+    /** A huge paste is too long to send; only its first 64 KB go into the saved screen state. */
+    @Test
+    fun aHugeFeedbackIsSavedCut() {
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent { ShellXTheme { PlanReviewSheet(item, PendingSheetState(), send = { sent += it }, close = {}, revising = true) } }
+        compose.onNodeWithTag("pending.feedback").performTextReplacement("x".repeat(70_000))
+        restoration.emulateSavedInstanceStateRestore()
+        val kept = compose.onNodeWithTag("pending.feedback").fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+        assertEquals(65_536, kept.length)
     }
 }
