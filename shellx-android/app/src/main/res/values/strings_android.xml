@@ -24,7 +24,9 @@
     <string name="signin_error_local_wipe_pending">Couldn\'t clear the previous account\'s data on this phone. Try again.</string>
     <string name="signin_error_reauth_required">Sign in with the Google account this ShellX account uses, then try again.</string>
     <string name="signin_subtitle">Use the Google account you use with ShellX on your Mac.</string>
+    <string name="update_downloaded">The update is downloaded.</string>
     <string name="update_message">Update ShellX on Google Play to get the latest fixes and features.</string>
+    <string name="update_restart">Restart</string>
     <string name="voice_denied">ShellX needs microphone access to hear you.</string>
     <string name="voice_mic_hint">Hold to talk and release to finish. With TalkBack, double-tap to start and double-tap again to finish.</string>
 </resources>
