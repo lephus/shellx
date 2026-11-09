@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -23,6 +24,7 @@ import com.shellx.app.R
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.app.ui.workspaces.WorkspaceFixtures.NOW_MS
 import com.shellx.core.workspaces.WorkspacePane
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -195,5 +197,22 @@ class WorkspaceScreenTest {
         compose.waitForIdle()
         assertEquals("t-claude", selected)
         assertTrue(displayed("pane.s-claude"))
+    }
+
+    /** The iPhone's `scrollTo(id, anchor: .center)`: on first show and on each pick, the chip shown sits mid-row. */
+    @Test
+    fun theChipShownSitsInTheMiddleOfTheRow() {
+        val many = (1..24).map { WorkspacePane("t-$it", "terminal $it") }
+        selected = "t-8"
+        show(panes = many)
+        compose.waitForIdle()
+        val row = compose.onNodeWithTag("workspace.chips").getUnclippedBoundsInRoot()
+        fun offCentre(id: String): Float {
+            val chip = compose.onNodeWithTag("workspace.chip.$id").getUnclippedBoundsInRoot()
+            return abs(((chip.left + chip.right) - (row.left + row.right)).value / 2)
+        }
+        assertTrue("first shown (${offCentre("t-8")} dp off)", offCentre("t-8") < 2f)
+        selected = "t-14"
+        until { offCentre("t-14") < 2f }
     }
 }
