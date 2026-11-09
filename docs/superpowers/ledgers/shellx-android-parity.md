@@ -93,28 +93,28 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 
 ## Test devices
 
-| Device | Maker and model | Android (API) | Used for | S3 §7.4c test | 3A dogfood |
-| --- | --- | --- | --- | --- | --- |
-| `ShellX_Dev_API_26` (emulator) | Pixel 5 profile | 8.0 (26) | lowest supported version | no | emulator ok (2026-11-09) |
-| `ShellX_Dev_API_36` (emulator) | Pixel 5 profile | 16 (36) | newest version | no | emulator ok (2026-11-09) |
-| The user's phone | vsmart Live | 10 (29) | camera, voice, notifications, Vietnamese keyboard | no | pending (USER) |
-| The user's second phone | Google Pixel 3 (`blueline`) | 12 (31) | real-phone dogfood, Android 12 splash | no | light ok (2026-11-09, debug `com.shellx.prod` via `dev.sh device`); dark pending (USER) |
+| Device | Maker and model | Android (API) | Used for | S3 §7.4c test | 3A dogfood | 3D dogfood |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ShellX_Dev_API_26` (emulator) | Pixel 5 profile | 8.0 (26) | lowest supported version | no | emulator ok (2026-11-09) | debug ok (2026-11-10): sign-in with the G, placeholder client → "having a problem", demo home, Settings shows only the e-mail, Dark/Light at once with the status bar, Licenses opens the browser, camera denied → Open Settings → allowed → scanner, a link during the demo waits, Exit → sign-in; the real Keystore under the app's uid: write, read in a new process, lost key → absent + file deleted |
+| `ShellX_Dev_API_36` (emulator) | Pixel 5 profile | 16 (36) | newest version | no | emulator ok (2026-11-09) | debug ok (2026-11-10): the same, plus system bars dark/light, Ended and Agents Outside Workspaces, system Back; R8 release (debug-signed) ok: the G, demo, scanner, Exit |
+| The user's phone | vsmart Live | 10 (29) | camera, voice, notifications, Vietnamese keyboard | no | pending (USER) | pending (USER) |
+| The user's second phone | Google Pixel 3 (`blueline`) | 12 (31) | real-phone dogfood, Android 12 splash | no | light ok (2026-11-09, debug `com.shellx.prod` via `dev.sh device`); dark pending (USER) | pending (USER): not attached on 2026-11-10; Google sign-in pending (USER: needs 1D Task 1 and the relay with 1A) |
 
 ## iPhone changes since the reference
 
 | Commit | iPhone change | Android row | State |
 | --- | --- | --- | --- |
-| `e299e66f17`, `d3559df034` | Google OAuth with PKCE and the identity-provider seam | 6.1-3 | todo (3D) |
-| `96ddabdd0c`, `7b70255952` | Sessions remember how they signed in; relay calls and errors for Google and Apple | 6.1-3, A-3 | todo (3D) for Google; Apple differs (A-3) |
+| `e299e66f17`, `d3559df034` | Google OAuth with PKCE and the identity-provider seam | 6.1-3 | done (3D) |
+| `96ddabdd0c`, `7b70255952` | Sessions remember how they signed in; relay calls and errors for Google and Apple | 6.1-3, A-3 | done (3D) for Google; Apple differs (A-3) |
 | `b02771794b`, `cf149f5a8e` | Connect to Your Mac links an Apple ID through the Mac's pairing code | A-3 | differs (S3): no Apple sign-in; `appleLink.*` in `strings-ios-only.txt` |
-| `a324e35db1`, `4613359cd9` | The coordinator signs in with Google and Apple and links Apple IDs | 6.1-3, A-3 | todo (3D) for Google; Apple differs (A-3) |
-| `c327fd0112`, `6d24a4eaab` | Switch a password session to Google; delete the account | 6.1-13, A-3 | todo (3D) for Delete Account; the switch differs (A-3): its strings are in `strings-ios-only.txt` |
-| `74d2418b80`, `570fb670f6` | Google and Apple sign-in on the system sheets, a Google client per build | 6.1-3 | todo (3D) for Google; Apple differs (A-3) |
-| `8bfe3a7bb3`, `349118fbaf` | Sign-in screen: Continue with Google or Apple, no password field | 6.1-3, A-2 | todo (3D); `signin_subtitle` has Android wording: done (3A) |
+| `a324e35db1`, `4613359cd9` | The coordinator signs in with Google and Apple and links Apple IDs | 6.1-3, A-3 | done (3D) for Google; Apple differs (A-3) |
+| `c327fd0112`, `6d24a4eaab` | Switch a password session to Google; delete the account | 6.1-13, A-3 | done (3D) for Delete Account; the switch differs (A-3): its strings are in `strings-ios-only.txt` |
+| `74d2418b80`, `570fb670f6` | Google and Apple sign-in on the system sheets, a Google client per build | 6.1-3 | done (3D) for Google; Apple differs (A-3) |
+| `8bfe3a7bb3`, `349118fbaf` | Sign-in screen: Continue with Google or Apple, no password field | 6.1-3, A-2 | done (3D); `signin_subtitle` has Android wording: done (3A) |
 | `7459004aab`, `2d7975d29d` | Connect to Your Mac after Sign in with Apple; pairing names the Mac's Pair Phone… item | A-3, 6.1-4 | Apple flow differs (A-3); `pairing_instructions` already names Pair Phone…: done (3A) |
-| `fa4ef23f06`, `bebd292139` | Settings › Account: Switch to Google and Delete Account… | 6.1-13, A-2 | todo (3D); `settings_account_delete_message` and `signin_error_reauth_required` have Android wording: done (3A) |
+| `fa4ef23f06`, `bebd292139` | Settings › Account: Switch to Google and Delete Account… | 6.1-13, A-2 | done (3D) for Delete Account; Switch to Google differs (A-3, no password session); `settings_account_delete_message` and `signin_error_reauth_required` have Android wording: done (3A) |
 | `7d6c2d3679`, `c9013596fa` | The demo's Mac moves to a `ShellXDemo` package target | 6.1-17 | done (3C): the fake Mac is `core:demo/FakeMac*.kt` in `:core`'s main sources; row 6.1-17 names the new iPhone paths |
-| `90f371c2a4`, `a21f210078` | Try without an account opens the demo in every build | 6.1-17 | done (3C) for the data: `core:demo/` ships in every build; todo (3D) for the entry points |
+| `90f371c2a4`, `a21f210078` | Try without an account opens the demo in every build | 6.1-17 | done (3C) for the data: `core:demo/` ships in every build; done (3D) for the entry points |
 | `ec4aa9e64e`, `3829c7c69b` | The demo keeps its own wipe-pending defaults | 6.1-17 | done (3C): `DemoEnvironment.settings` is the demo's own `MemoryKeyValueStore`, used as its hub's settings and its coordinator's wipe-pending store |
 | `2a5382ab66` | Release check tests: a stray fence fixed | — | no Android change (iPhone tests only) |
 | `4fc0e27051` | `PendingPicksTests` compiles on Swift 6.3 | — | no Android change (iPhone tests only) |
