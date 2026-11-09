@@ -440,6 +440,23 @@ class VoiceInputModelTest {
         assertTrue(stopped)
     } }
 
+    /** Android's recognizer ends a run at a silence (3E review A M-6): with nothing heard, nothing listens and nothing
+     *  waits to be sent, so the mic is idle, not "Listening…", until the lift. */
+    @Test fun aSilentStreamEndingByItselfShowsIdle() { runTest {
+        val rig = makeRig()
+        rig.model.press()
+        val run = rig.transcriber.starts.lastOrNull()?.run
+        waitForPhase(rig.model, VoiceInputModel.Phase.Listening(""))
+        rig.transcriber.endStream()
+        val released = eventually { rig.transcriber.cancelledRuns == listOfNotNull(run) }
+        assertTrue(released, "the microphone is given back: ${rig.transcriber.cancelledRuns}")
+        assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase)
+        assertFalse(rig.model.isActive)
+        assertNull(rig.model.release())
+        assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase)
+        assertEquals(0, rig.transcriber.finishCalls)
+    } }
+
     @Test fun typeInsteadCancelsTheDictation() { runTest {
         val rig = makeRig()
         rig.model.press()

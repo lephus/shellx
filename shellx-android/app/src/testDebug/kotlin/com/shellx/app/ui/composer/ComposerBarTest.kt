@@ -192,4 +192,21 @@ class ComposerBarTest {
         assertEquals("x", draft.text)
         assertEquals(listOf("photo-1.jpg"), draft.attachments.map { it.name })
     }
+
+    /** Review A M-6: Android's recognizer ends a run at a silence; held with nothing heard, the bar then never says
+     *  "Listening…" while nothing listens, and the lift sends nothing. */
+    @Test
+    fun aSilentHoldTheRecognizerEndsNoLongerSaysListening() {
+        val rig = VoiceRig.make()
+        show(rig.env)
+        compose.onNodeWithTag("voice.mic").performTouchInput { down(center) }
+        until { rig.engine.starts.size == 1 }
+        compose.onNodeWithTag("voice.text", useUnmergedTree = true).assertTextEquals(context.getString(R.string.voice_listening))
+        rig.engine.end()
+        until { rig.engine.cancelCalls.isNotEmpty() }
+        compose.onNodeWithTag("voice.text", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("voice.mic").performTouchInput { up() }
+        compose.waitForIdle()
+        assertEquals(emptyList<Pair<String, Int>>(), sent)
+    }
 }
