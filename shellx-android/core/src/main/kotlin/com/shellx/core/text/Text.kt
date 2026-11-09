@@ -73,6 +73,30 @@ val String.utf8Size: Int get() = encodeToByteArray().size
 /** The composed form (java.text.Normalizer NFC). */
 fun String.nfc(): String = Normalizer.normalize(this, Normalizer.Form.NFC)
 
+/** Swift's `split(whereSeparator: \.isNewline)`: the lines between "\r\n", "\r", "\n", U+000B, U+000C, U+0085,
+ *  U+2028 and U+2029, without the empty ones. */
+internal fun String.nonEmptyLines(): List<String> = split(LINE_BREAK).filter { it.isNotEmpty() }
+
+/** Swift's `split(whereSeparator: \.isWhitespace)`: the runs of characters between whitespace. */
+internal fun String.words(): List<String> {
+    val out = ArrayList<String>()
+    val word = StringBuilder()
+    for (c in this) {
+        if (c.isWhitespace()) {
+            if (word.isNotEmpty()) {
+                out += word.toString()
+                word.setLength(0)
+            }
+        } else {
+            word.append(c)
+        }
+    }
+    if (word.isNotEmpty()) out += word.toString()
+    return out
+}
+
+private val LINE_BREAK = Regex("\r\n|[\n\r\u000B\u000C\u0085\u2028\u2029]")
+
 private const val CR = 0x0D
 private const val LF = 0x0A
 private const val ZWJ = 0x200D
