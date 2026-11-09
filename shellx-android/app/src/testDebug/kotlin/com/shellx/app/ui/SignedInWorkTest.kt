@@ -22,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.google.android.play.core.appupdate.testing.FakeAppUpdateManager
 import com.shellx.app.NoPushRegistrar
 import com.shellx.app.PlatformServices
 import com.shellx.app.testing.ScriptedRelay
@@ -67,7 +68,7 @@ class SignedInWorkTest {
     @get:Rule val folder = TemporaryFolder()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
-    private val platform = PlatformServices(app, debugBuild = true)
+    private val platform = PlatformServices(app, debugBuild = true, updateManager = { FakeAppUpdateManager(it) })
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val rigs = mutableListOf<WorkRig>()
 

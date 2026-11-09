@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.platform.DataStoreKeyValueStore
 import com.shellx.app.platform.PushNotifier
+import com.shellx.app.testing.TestShellXApplication
 import com.shellx.core.platform.CoreLog
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -20,7 +21,7 @@ import org.robolectric.shadows.ShadowLog
 
 /** The application builds the composition once the settings are read, off the main thread. */
 @RunWith(AndroidJUnit4::class)
-@Config(application = ShellXApplication::class)
+@Config(application = TestShellXApplication::class)
 class ShellXApplicationTest {
     private val app: ShellXApplication = ApplicationProvider.getApplicationContext()
 

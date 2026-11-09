@@ -15,8 +15,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
+import com.shellx.app.platform.NotificationPermission
 import com.shellx.app.testing.FakeResultRegistry
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.platform.MemoryKeyValueStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -66,6 +68,25 @@ class NotificationsSettingsSectionTest {
         val opened = shadowOf(activity).nextStartedActivity
         assertEquals(Settings.ACTION_APP_NOTIFICATION_SETTINGS, opened.action)
         assertEquals(activity.packageName, opened.getStringExtra(Settings.EXTRA_APP_PACKAGE))
+    }
+
+    /** Review C m-8: Turn On shows Android's dialog, which spends one of its two showings, so the automatic ask (when
+     *  the first Mac is paired) is spent too and does not use the last one. */
+    @Test
+    fun turnOnSpendsTheAutomaticAsk() {
+        shadowOf(activity.application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val registry = FakeResultRegistry().apply { answer = { false } }
+        val settings = MemoryKeyValueStore()
+        rule.setContent {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides registry.owner) {
+                ShellXTheme { NotificationsSettingsSection(settings) }
+            }
+        }
+        rule.onNodeWithTag("settings.notifications.turnOn").performClick()
+        rule.waitForIdle()
+
+        assertEquals(1, registry.launches.size)
+        assertTrue(settings.getBoolean(NotificationPermission.ASKED_KEY))
     }
 
     @Test
