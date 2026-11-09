@@ -21,7 +21,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 
 | # | Screen or flow | iPhone | Android | Plan | State |
 | --- | --- | --- | --- | --- | --- |
-| 6.1-1 | Launch: logo and name | `ShellX/UI/RootView.swift` (`LaunchView`) | `app:ui/LaunchView.kt` | 3A | todo |
+| 6.1-1 | Launch: logo and name | `ShellX/UI/RootView.swift` (`LaunchView`) | `app:ui/LaunchView.kt` | 3A | done (3A) |
 | 6.1-2 | Launch: the screen is chosen by the account phase | `ShellX/UI/RootView.swift` (`RootView`), `ShellXAppCore/Account/AppPhase.swift` | `app:ui/nav/ShellXNavHost.kt` (route `launch`) | 3D | todo |
 | 6.1-3 | Sign-in: one "Continue with Google" button; errors for network, server, rate limit and pending wipe; "Session expired" banner after a 401 | `ShellX/UI/SignIn/SignInView.swift` | `app:ui/signin/SignInView.kt` (route `sign_in`) | 3D | todo |
 | 6.1-4 | Pairing: scan the QR, paste `shellx-link://…`, or open the link from another app; confirm the Mac's name, wait for Allow, done; camera blocked; failure; the code stays in memory and nothing goes out before the user confirms | `ShellX/UI/Pairing/PairingSheet.swift`, `QRScannerView.swift`, `PairingPaste.swift`, `ShellX/Platform/CameraAccess.swift`, `ShellX/UI/Onboarding/FirstMacView.swift`, `Config/Info.plist` (`CFBundleURLTypes`), `ShellX/ShellXApp.swift` (`onOpenURL`) | `app:ui/pairing/…`, `app:platform/CameraAccess.kt`, `app:ui/onboarding/FirstMacView.kt`, intent filter `shellx-link` in `AndroidManifest.xml` (routes `first_mac`, `pairing`) | 3D | todo |
@@ -73,7 +73,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-2 | iPhone wording replaced in 14 strings: "iPhone" → "phone", "App Store" → "Google Play", "VoiceOver" → "TalkBack", Apple's servers → the phone's speech service. Names: `first_mac_step2`, `first_mac_subtitle`, `machine_state_revoked`, `machines_unpair_message`, `pairing_error_needs_update`, `pairing_instructions`, `pairing_waiting_detail`, `settings_account_sign_out_confirm`, `settings_appearance_system`, `settings_voice_on_device`, `settings_voice_server`, `signin_error_local_wipe_pending`, `update_message`, `voice_mic_hint` | The words match the iPhone's, except for platform names (S3 §7.2) | `shellx-android/app/src/main/res/values*/strings_android.xml` | 3A | done (3A) |
 | A-3 | No Apple sign-in and no password sign-in | S3 §3 | — | — | differs (S3): by design |
 | A-4 | Nothing is backed up or moved to a new phone (`allowBackup="false"`, and `data_extraction_rules.xml` excludes everything) | Secrets never go into a backup (S3 §7.3) | `AndroidManifest.xml`, `res/xml/data_extraction_rules.xml` | 3A | done (3A) |
-| A-5 | On Android 12 and later, a system splash (the app icon on the ShellX background) shows before the launch screen | Android always shows one | `res/values*/themes.xml` | 3A | todo |
+| A-5 | On Android 12 and later, a system splash (the app icon on the ShellX background) shows before the launch screen | Android always shows one | `res/values*/themes.xml` | 3A | done (3A) |
 
 ## Test devices
 

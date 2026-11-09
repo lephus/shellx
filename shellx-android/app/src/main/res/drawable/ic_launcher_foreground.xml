@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: the glyphs of design/shellx-logo.svg (elements 4-6) in a 768-unit, 108 dp box. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="768"
+    android:viewportHeight="768">
+    <!-- The logo's 512 units fill the 72 dp the launcher shows, so the glyphs stay inside the safe circle. -->
+    <group android:translateX="128" android:translateY="128">
+        <!-- 4. "<", the phone side -->
+        <path android:pathData="M384,122L290,234L384,346" android:strokeWidth="54"
+            android:strokeLineCap="round" android:strokeLineJoin="round">
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="384" android:startY="122" android:endX="290" android:endY="346"
+                    android:startColor="#FFFFFFFF" android:endColor="#FFCFC8EE" />
+            </aapt:attr>
+        </path>
+        <!-- 5. ">", the computer side and the prompt -->
+        <path android:pathData="M128,122L222,234L128,346" android:strokeWidth="54"
+            android:strokeLineCap="round" android:strokeLineJoin="round">
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="128" android:startY="122" android:endX="222" android:endY="346"
+                    android:startColor="#FF7DF7BE" android:endColor="#FF2FD98A" />
+            </aapt:attr>
+        </path>
+        <!-- 6. the cursor -->
+        <path android:pathData="M308,398H376A8,8 0,0 1,384 406V416A8,8 0,0 1,376 424H308A8,8 0,0 1,300 416V406A8,8 0,0 1,308 398Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="300" android:startY="398" android:endX="384" android:endY="424"
+                    android:startColor="#FF7DF7BE" android:endColor="#FF2FD98A" />
+            </aapt:attr>
+        </path>
+    </group>
+</vector>
