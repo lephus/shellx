@@ -54,6 +54,7 @@ private class InMemoryPipe {
         inboxes.forEach { it.close() }
         // The closing end drops its own unread frames.
         val own = inboxes[from]
-        while (own.tryReceive().isSuccess) Unit
+        var dropped = own.tryReceive()
+        while (dropped.isSuccess) dropped = own.tryReceive()
     }
 }
