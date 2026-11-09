@@ -12,12 +12,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
@@ -29,19 +33,22 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.platform.CoreLog
 
 /**
  * An agent's plan, drawn from its Markdown (`PlanMarkdownText.swift`): headings, bullet and numbered lists, code
  * blocks, rules and paragraphs, with inline styles (bold, italic, code, links). The lines are sorted into blocks
  * first ([PlanMarkdownText.blocks]); each block's inline marks become spans ([PlanMarkdownText.inline]). Selectable
- * for copying.
+ * for copying. A tapped link opens only when it is a web link ([PlanMarkdownText.open]).
  */
 @Composable
 fun PlanMarkdownText(markdown: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
     val typography = MaterialTheme.typography
     val code = SpanStyle(fontFamily = FontFamily.Monospace)
     val links = TextLinkStyles(SpanStyle(color = ShellXTheme.colors.accentText))
-    fun inline(text: String) = PlanMarkdownText.inline(text, code, links)
+    val uriHandler = LocalUriHandler.current
+    val open = remember(uriHandler) { { url: String -> PlanMarkdownText.open(url, uriHandler) } }
+    fun inline(text: String) = PlanMarkdownText.inline(text, code, links, open)
     SelectionContainer(modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (block in PlanMarkdownText.blocks(markdown)) {
@@ -179,12 +186,42 @@ object PlanMarkdownText {
      * opening mark that finds its closing mark becomes a span over the parsed inside; otherwise it stays text.
      * Backslash escapes, `code`, **bold** / __bold__, *italic* / _italic_ (not inside a word for `_`) and
      * [label](url).
+     *
+     * A tapped link goes to [open], and to nothing when it is null: never to Compose's own handler, which opens any
+     * scheme and lets most failures through (review A I-2).
      */
     fun inline(
         text: String,
         code: SpanStyle = SpanStyle(fontFamily = FontFamily.Monospace),
         link: TextLinkStyles? = null,
-    ): AnnotatedString = buildAnnotatedString { InlineParser(text, code, link, this).parse(0, text.length) }
+        open: ((String) -> Unit)? = null,
+    ): AnnotatedString = buildAnnotatedString {
+        val tapped = LinkInteractionListener { tapped -> (tapped as? LinkAnnotation.Url)?.let { open?.invoke(it.url) } }
+        InlineParser(text, code, link, tapped, this).parse(0, text.length)
+    }
+
+    /**
+     * Opens [url] through [handler] when it is a web link ([isWebLink]). A plan's links come from an agent, so any other
+     * scheme (`file:`, `intent:`, `javascript:`, `tel:`, `content:` …) does nothing, and a phone that cannot open the
+     * link (no browser, a refused URI) does nothing either. Never logs the link.
+     */
+    fun open(url: String, handler: UriHandler) {
+        if (!isWebLink(url)) {
+            CoreLog.log("plan_link_ignored")
+            return
+        }
+        try {
+            handler.openUri(url)
+        } catch (e: RuntimeException) {
+            CoreLog.log("plan_link_failed ${e.javaClass.simpleName}")
+        }
+    }
+
+    /** `http:` or `https:`, in any case. */
+    fun isWebLink(url: String): Boolean {
+        val scheme = url.substringBefore(':', missingDelimiterValue = "")
+        return scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)
+    }
 
     private val BULLET_MARKERS = listOf("- ", "* ", "+ ")
     private val RULES = setOf("---", "***", "___")
@@ -215,6 +252,7 @@ object PlanMarkdownText {
         private val s: String,
         private val code: SpanStyle,
         private val link: TextLinkStyles?,
+        private val tapped: LinkInteractionListener,
         private val out: AnnotatedString.Builder,
     ) {
         fun parse(start: Int, end: Int) {
@@ -285,7 +323,7 @@ object PlanMarkdownText {
             val paren = s.indexOf(')', close + 2)
             if (paren < 0 || paren >= end || paren == close + 2) return text(i)
             val url = s.substring(close + 2, paren)
-            out.withLink(LinkAnnotation.Url(url, link)) { parse(i + 1, close) }
+            out.withLink(LinkAnnotation.Url(url, link, tapped)) { parse(i + 1, close) }
             return paren + 1
         }
     }
