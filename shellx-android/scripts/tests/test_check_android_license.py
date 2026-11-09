@@ -45,6 +45,7 @@ CLEAN = {
         "junit:junit               test  EPL-1.0  # JUnit 4\n"),
 }
 LOCK = "shellx-android/app/gradle.lockfile"
+APP = "shellx-android/app/build.gradle.kts"
 ALLOW = "scripts/shellx/android-license-allowlist.txt"
 
 
@@ -148,10 +149,48 @@ class CheckAndroidLicenseTests(unittest.TestCase):
              "shellx-android/build.gradle.kts"),
             ("shellx-link/kotlin/link-core/build.gradle.kts", 'val v = layout.projectDirectory.dir("../../../ios")\n',
              "../../../ios"),
+            # Paths anchored at the build root, not at the module folder.
+            (APP, 'android { sourceSets { getByName("main") { java.srcDir(rootProject.file("../Sources")) } } }\n',
+             "../Sources"),
+            (APP, 'val core = File(rootDir, "../shellx-core/src")\n', "../shellx-core/src"),
+            (APP, 'val pkgs = rootDir.resolve("../../Packages")\n', "../../Packages"),
+            (APP, 'val tui = rootProject.layout.projectDirectory.dir("../cmux-tui")\n', "../cmux-tui"),
+            (APP, 'val tui = rootDir.toPath().resolveSibling("cmux-tui")\n', "resolveSibling"),
+            # A path kept in a variable, or reached through a parent folder.
+            (APP, 'val gpl = "../../cmux-tui/src"\nandroid { sourceSets { getByName("main") { java.srcDir(gpl) } } }\n',
+             "../../cmux-tui/src"),
+            (APP, 'val ios = File(rootDir.parentFile, "ios")\n', "parent"),
+            (APP, 'val ios = rootProject.projectDir.parent\n', "parent"),
+            # Relative to the working directory of the Gradle daemon, or to the user's home.
+            (APP, 'val src = File("Sources")\n', "working directory"),
+            (APP, 'val src = java.nio.file.Paths.get("Sources")\n', "working directory"),
+            (APP, 'val src = java.nio.file.Path.of("Sources", "x")\n', "working directory"),
+            (APP, 'val lib = File(System.getProperty("user.home"), "lib")\n', "environment"),
+            (APP, 'val lib = file(System.getenv("SHELLX_LIB"))\n', "environment"),
+            # Other calls that take a path.
+            (APP, 'apply(from = "../../Sources/shared.gradle.kts")\n', "../../Sources"),
+            (APP, 'val u = uri("../../ios")\n', "../../ios"),
+            (APP, 'val u = uri("file:///Users/me/ios")\n', "absolute"),
+            (APP, 'tasks.register<Copy>("x") { from("../../Packages/res") }\n', "../../Packages/res"),
         ]
         for path, text, needle in cases:
             with self.subTest(text=text):
                 self.assertFails(self.tree({path: text}), needle)
+
+    def test_paths_from_the_build_root_that_stay_inside_pass(self):
+        link = "shellx-link/kotlin/link-core/build.gradle.kts"
+        for path, text in [
+            (APP, 'val version = rootProject.file("version.properties")\n'),
+            (APP, 'val catalog = File(rootDir, "gradle/libs.versions.toml")\n'),
+            (APP, 'val shots = layout.buildDirectory.dir("shellx-snapshots").get().asFile.absolutePath\n'),
+            (APP, 'apply(plugin = "com.google.gms.google-services")\n'),
+            (APP, 'val site = uri("https://shellx.pro")\n'),
+            (link, 'val vectors = rootProject.file("../vectors")\n'),
+            (link, 'val spec = rootDir.resolve("../spec/vectors")\n'),
+            (link, 'val vectors = layout.projectDirectory.dir("../../vectors")\n'),
+        ]:
+            with self.subTest(text=text):
+                self.assertPasses(self.tree({path: text}))
 
     def test_only_maven_central_and_google_repositories(self):
         settings = CLEAN["shellx-android/settings.gradle.kts"]
