@@ -5,6 +5,7 @@ import com.shellx.link.core.TerminalViewPush.Frame
 import com.shellx.link.core.TerminalViewPush.Opened
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.first
@@ -110,6 +111,75 @@ class TerminalPushQueueTest {
                 queue.close()
                 queue.offer(Opened("t-2"))
                 assertEquals(listOf<TerminalViewPush>(Opened("t-1")), queue.pushes.toList())
+            }
+        }
+    }
+
+    /**
+     * Review A, I-1: during a flood the consumer reaches the gap and asks for a resync while output goes on; the
+     * snapshot that answers it must still reach the assembler, or the view would freeze on its last screen.
+     */
+    @Test
+    fun aSnapshotThatAnswersAResyncDuringAFloodStillArrives() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                val assembler = TerminalFrameAssembler()
+                val screen = TerminalScreen()
+                var resyncs = 0
+                fun feed(push: TerminalViewPush) {
+                    val result = assembler.receive((push as Frame).part)
+                    if (result.resync) resyncs++
+                    result.frame?.let(screen::apply)
+                }
+                queue.offer(Opened("t-1"))
+                queue.offer(Frame("t-1", snapshot(1, "$")))
+                var r = 2L
+                while (queue.droppedFrames == 0L) queue.offer(Frame("t-1", delta(r++)))
+                assertEquals(Opened("t-1"), queue.pushes.first())
+                while (true) {
+                    val push = queue.pushes.first()
+                    feed(push)
+                    if ((push as Frame).part == TerminalFramePart.LOST) break
+                }
+                assertEquals(1, resyncs)
+                repeat(2_000) { queue.offer(Frame("t-1", delta(r++))) }
+                val answer = r++
+                queue.offer(Frame("t-1", snapshot(answer, "fresh")))
+                repeat(10) { queue.offer(Frame("t-1", delta(r++))) }
+                queue.pushes.take(queue.queuedPushes).toList().forEach(::feed)
+                assertEquals(1, resyncs)
+                assertFalse(assembler.awaitingSnapshot)
+                assertEquals(answer + 10, assembler.revision)
+                assertEquals(0, queue.queuedWeight)
+            }
+        }
+    }
+
+    /**
+     * Review A, I-1: a snapshot of the terminal viewed is never dropped, even over the bound, and it replaces the frames
+     * of that terminal it makes stale, so snapshots stay bounded at one per terminal however many the host sends.
+     */
+    @Test
+    fun aSnapshotIsNeverDroppedAndReplacesWhatItMakesStale() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                var r = 1L
+                while (queue.queuedWeight + 10_000 < TerminalPushQueue.MAX_QUEUED_WEIGHT) queue.offer(Frame("t-1", delta(r++)))
+                val big = TerminalFramePart(
+                    r++,
+                    head = TerminalFrameHead(TerminalFrameKind.SNAPSHOT, 300, 120, cursor = TerminalCursor(0, 0), palette = palette),
+                    lines = (0 until 120).map { TerminalLine(it, listOf(TerminalRun(text = "x".repeat(300)))) },
+                )
+                queue.offer(Frame("t-1", big))
+                assertEquals(0L, queue.droppedFrames)
+                assertEquals(2, queue.queuedPushes)
+                repeat(1_000) { queue.offer(Frame("t-1", big.copy(revision = r++))) }
+                assertEquals(2, queue.queuedPushes)
+                assertTrue(queue.queuedWeight < TerminalPushQueue.MAX_QUEUED_WEIGHT, "${queue.queuedWeight}")
+                assertEquals(listOf(Opened("t-1"), Frame("t-1", big.copy(revision = r - 1))), queue.pushes.take(2).toList())
             }
         }
     }
