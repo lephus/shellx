@@ -496,8 +496,8 @@ object LinkCodec {
     private fun outcome(o: JsonObject) = WorkspaceControlOutcome(o.str("outcome"))
 
     /**
-     * A `terminal.view.input` unit. `lines` is any JSON integer a 64-bit host may send; one outside Int's range is held
-     * as Int.MIN_VALUE or Int.MAX_VALUE, which [TerminalInputCheck] refuses as it refuses the value itself.
+     * A `terminal.view.input` unit. `lines` is any JSON integer a 64-bit host may send ([wideInt]): one outside Int's
+     * range is refused by [TerminalInputCheck] as the value itself would be.
      */
     private fun unit(o: JsonObject): TerminalInputUnit = when (val k = o.str("k")) {
         "text" -> TerminalInputUnit.Text(o.str("text"))
@@ -506,48 +506,51 @@ object LinkCodec {
             o.optArray("mods")?.strings()?.map(::TerminalModifier) ?: emptyList(),
         )
         "paste" -> TerminalInputUnit.Paste(o.str("text"))
-        "scroll" -> TerminalInputUnit.Scroll(o.long("lines").coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
+        "scroll" -> TerminalInputUnit.Scroll(o.wideInt("lines"))
         else -> TerminalInputUnit.Other(k)
     }
 
     private fun head(o: JsonObject) = TerminalFrameHead(
         kind = TerminalFrameKind(o.str("kind")),
-        cols = o.int("cols"),
-        rows = o.int("rows"),
+        cols = o.wideInt("cols"),
+        rows = o.wideInt("rows"),
         alt = o.bool("alt"),
         cursor = o.optObj("cursor")?.let {
-            TerminalCursor(it.int("x"), it.int("y"), TerminalCursorShape(it.str("shape")), it.bool("visible"), it.bool("blink"))
+            TerminalCursor(it.wideInt("x"), it.wideInt("y"), TerminalCursorShape(it.str("shape")), it.bool("visible"), it.bool("blink"))
         },
         palette = o.optObj("palette")?.let {
             TerminalPalette(it.str("fg"), it.str("bg"), it.optStr("cursor"), it.array("colors").strings())
         },
-        history = o.optInt("history") ?: 0,
-        scroll = o.optInt("scroll") ?: 0,
+        history = o.optWideInt("history") ?: 0,
+        scroll = o.optWideInt("scroll") ?: 0,
     )
 
     private fun style(o: JsonObject) = TerminalStyle(
-        id = o.int("id"),
-        fg = o.optInt("fg"),
+        id = o.wideInt("id"),
+        fg = o.optWideInt("fg"),
         fgRgb = o.optStr("fg_rgb"),
-        bg = o.optInt("bg"),
+        bg = o.optWideInt("bg"),
         bgRgb = o.optStr("bg_rgb"),
         attrs = o.optArray("attrs")?.strings()?.map(::TerminalAttribute) ?: emptyList(),
     )
 
     private fun line(o: JsonObject) = TerminalLine(
-        y = o.int("y"),
+        y = o.wideInt("y"),
         runs = o.optArray("runs")?.map {
             val r = it.asObj()
-            TerminalRun(r.optInt("x"), r.str("t"), r.optInt("s"), r.optInt("w"))
+            TerminalRun(r.optWideInt("x"), r.str("t"), r.optWideInt("s"), r.optWideInt("w"))
         } ?: emptyList(),
     )
 
-    /** Every structural violation is BadJson(null), as on encode. */
+    /**
+     * Every structural violation is BadJson(null), as on encode. Its integers are read as Swift reads them, as 64-bit
+     * values ([wideInt]), then checked.
+     */
     private fun frameMessage(o: JsonObject): LinkMessage.TerminalViewFrame {
         val part = TerminalFramePart(
             revision = o.long("revision"),
-            part = o.int("part"),
-            parts = o.int("parts"),
+            part = o.wideInt("part"),
+            parts = o.wideInt("parts"),
             head = o.optObj("head")?.let(::head),
             styles = o.optArray("styles")?.map { style(it.asObj()) } ?: emptyList(),
             lines = o.optArray("lines")?.map { line(it.asObj()) } ?: emptyList(),
