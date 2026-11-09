@@ -52,6 +52,8 @@ public final class WorkspaceScreenModel {
     public private(set) var lastTabClosedHere = false
     /// The agent chips the user switched to their terminal ("View as Terminal"), until the screen closes.
     public private(set) var shownAsTerminal: Set<String> = []
+    /// ＋ was tapped and the Mac has not answered yet: ＋ is dimmed meanwhile (`startCreatingTerminal()`).
+    public private(set) var creatingTerminal = false
 
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
@@ -73,6 +75,8 @@ public final class WorkspaceScreenModel {
     @ObservationIgnored private var lastTerminalIds: [String] = []
     /// The terminal the Mac made for this screen (＋, `expect(_:)`), shown as soon as the Mac's list has it.
     @ObservationIgnored private var expected: String?
+    /// The user picked a chip while ＋ was on its way: the new tab is not shown when it arrives.
+    @ObservationIgnored private var pickedWhileCreating = false
 
     /// `sleep` waits out `patience`; tests pass one they release by hand.
     public init(
@@ -170,6 +174,7 @@ public final class WorkspaceScreenModel {
         selectedTerminalId = terminalId
         settled = true
         expected = nil
+        if creatingTerminal { pickedWhileCreating = true }
     }
 
     /// The user tapped or typed into the terminal of the chip shown: it is chosen for good, like a pick, so an agent
@@ -197,6 +202,22 @@ public final class WorkspaceScreenModel {
         guard let selectedTerminalId else { return nil }
         let isAgent = panes.first { $0.id == selectedTerminalId }?.isAgent ?? false
         return !isAgent || shownAsTerminal.contains(selectedTerminalId) ? selectedTerminalId : nil
+    }
+
+    /// The user tapped ＋: true when the create may go out, false while an earlier one is still on its way.
+    public func startCreatingTerminal() -> Bool {
+        guard !creatingTerminal else { return false }
+        creatingTerminal = true
+        pickedWhileCreating = false
+        return true
+    }
+
+    /// The Mac answered ＋: the tab it made (`terminalId`, on success) is expected (`expect(_:)`) unless the user
+    /// picked a chip while the answer was on its way.
+    public func finishCreatingTerminal(_ terminalId: String?) {
+        creatingTerminal = false
+        guard let terminalId, !pickedWhileCreating else { return }
+        expect(terminalId)
     }
 
     /// The Mac made `terminalId` for this screen (＋): it is shown as soon as the Mac's list has it (at once when

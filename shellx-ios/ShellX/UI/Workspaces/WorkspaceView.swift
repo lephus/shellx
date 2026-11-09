@@ -55,6 +55,7 @@ struct WorkspaceView: View {
                     canCloseTab: WorkspaceListActions.canCloseTab(machineID: ref.machineID, hub: hub),
                     canCreateTerminal: hub.supportsTerminalCreate(ref.machineID),
                     canViewTerminals: hub.supportsTerminalView(ref.machineID), shownAsTerminal: model.shownAsTerminal,
+                    creatingTerminal: model.creatingTerminal,
                     pagingLocked: voiceService?.isListening ?? false, notice: notice,
                     actions: WorkspaceScreenActions.make(
                         scope: scope, model: model,
@@ -184,10 +185,12 @@ extension WorkspaceScreenActions {
                     done: done)
             },
             createTerminal: {
+                // One at a time (＋ is dimmed meanwhile); a chip picked before the answer wins over the new tab.
+                guard model.startCreatingTerminal() else { return }
                 run(.createTerminal) {
                     let answer = await hub.createTerminal(ref)
                     // Shown as soon as the Mac's list has it; the Mac's own selected tab stays.
-                    if let id = answer.terminalId { model.expect(id) }
+                    model.finishCreatingTerminal(answer.terminalId)
                     return answer.result
                 }
             },

@@ -281,4 +281,20 @@ final class WorkspaceViewTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertEqual(rig.model.selectedTerminalId, "t-claude", "the user's pick wins over the new tab")
     }
+
+    /// ＋ is dimmed from the tap until the Mac answers (final review, app M6).
+    func testPlusIsDimmedWhileANewTerminalIsOnItsWay() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+
+        rig.actions.createTerminal()
+        XCTAssertTrue(rig.model.creatingTerminal)
+        _ = await rig.lastFeedback()
+
+        XCTAssertFalse(rig.model.creatingTerminal)
+        rig.actions.createTerminal()
+        _ = await rig.lastFeedback()
+        let creates = await rig.mac.terminalCreates
+        XCTAssertEqual(creates, ["ws-shellx", "ws-shellx"], "once answered, ＋ works again")
+    }
 }

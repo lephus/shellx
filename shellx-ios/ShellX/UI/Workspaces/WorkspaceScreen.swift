@@ -68,8 +68,9 @@ enum WorkspaceMenuItem: CaseIterable {
 ///   the chip shown while its Mac can close tabs (`canCloseTab`), and "Close Workspace…".
 /// - Under it, the chips (`PaneChips`): one per terminal, the one shown highlighted, then ＋ (a new
 ///   terminal tab) while the Mac takes `terminal.create` (`canCreateTerminal`), dimmed while it is not
-///   online. While the Mac is online and can close tabs, a long press on any chip offers "Close Tab…" for
-///   it too. Either way one confirmation names the tab and says what closing it stops (HIG: Action sheets).
+///   online or a new tab is on its way (`creatingTerminal`). While the Mac is online and can close tabs, a
+///   long press on any chip offers "Close Tab…" for it too. Either way one confirmation names the tab and
+///   says what closing it stops (HIG: Action sheets).
 /// - Below, one page per chip, swiped sideways like the chips are tapped: a chip that runs an agent
 ///   shows the agent's chat (`agent`: the existing agent screen as a pane) unless it is shown as its
 ///   terminal (`shownAsTerminal`); any other page is `shell` (the terminal, `TerminalPane`). While a mic
@@ -95,6 +96,8 @@ struct WorkspaceScreen<AgentPane: View, ShellPane: View>: View {
     var canViewTerminals = false
     /// The agent chips shown as their terminal (`WorkspaceScreenModel.shownAsTerminal`).
     var shownAsTerminal: Set<String> = []
+    /// ＋ was tapped and the Mac has not answered: ＋ is dimmed (`WorkspaceScreenModel.creatingTerminal`).
+    var creatingTerminal = false
     /// A mic is listening: the pages do not follow a sideways drag, so a drag to the left on the mic (its
     /// cancel) never turns the page instead.
     var pagingLocked = false
@@ -118,7 +121,7 @@ struct WorkspaceScreen<AgentPane: View, ShellPane: View>: View {
             PaneChips(
                 panes: panes, selected: selected, now: now, select: actions.select,
                 close: canCloseTab && canControl ? { closingTab = $0 } : nil,
-                add: canCreateTerminal ? actions.createTerminal : nil, addEnabled: canControl)
+                add: canCreateTerminal ? actions.createTerminal : nil, addEnabled: canControl && !creatingTerminal)
             pager
                 .overlay(alignment: .top) {
                     if let notice {
