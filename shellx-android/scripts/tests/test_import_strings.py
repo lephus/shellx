@@ -217,6 +217,12 @@ class ImportStringsTests(unittest.TestCase):
         self.assertWrites(root)
         self.assertNotIn("first_subtitle", self.generated(root, "values"))
         self.assertNotIn("first_subtitle", self.generated(root, "values-vi"))
+        for value in ("Works on Macs and iPhones.", "Your iPads too.", "This iPhone's name.", "Send it with AirDrop.",
+                      "Opens in Safari.", "Shows in Live Activities.", "Uses the Live Activity.",
+                      "Sits in the Dynamic Island."):
+            with self.subTest(value=value):
+                self.assertRefused(self.tree({"a.b": entry(value, "Chào")}), "a.b", "strings_android.xml")
+        self.assertWrites(self.tree({"a.b": entry("Mac and phone, Safety first.", "Mac và điện thoại")}))
 
     def test_an_override_keeps_the_ios_arguments(self):
         strings = {"settings.voice.server %@": entry("This iPhone can't do %@.", "iPhone này không làm được %@.")}
