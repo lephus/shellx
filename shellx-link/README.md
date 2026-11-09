@@ -4,6 +4,8 @@ ShellX Link is the phone-to-Mac protocol for ShellX: Noise sessions, a message c
 
 It is MIT licensed (see `LICENSE`), unlike the rest of this repository. For that reason it must not depend on, link to or copy code from GPL parts of the repo (`Sources/`, `ios/`, `Packages/`, `cmux-tui/`). Reading them to understand a protocol is fine. `scripts/shellx/check-link-license.sh` enforces the boundary.
 
+The Kotlin/JVM port for the Android app lives in [`kotlin/`](kotlin/README.md), under the same MIT licence.
+
 ## shellx-link-probe
 
 `shellx-link-probe` plays a paired phone from a Mac terminal, for end-to-end checks and latency

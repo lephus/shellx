@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android-only strings, and Android wording for iPhone strings: a name defined here replaces the one
+     import-strings.py would generate. Every translatable name also needs values-vi/strings_android.xml. -->
+<resources>
+    <string name="app_name" translatable="false">ShellX</string>
+    <string name="first_mac_step2">Scan the QR code it shows with this phone.</string>
+    <string name="first_mac_subtitle">See and answer Claude Code on your Mac from this phone.</string>
+    <string name="machine_state_revoked">This Mac removed this phone</string>
+    <string name="machines_unpair_message">This phone will stop getting requests from this Mac. To use it again, pair again.</string>
+    <string name="pairing_error_needs_update">This code is from a newer ShellX. Update ShellX on this phone.</string>
+    <string name="pairing_instructions">On your Mac, open ShellX, right-click “This Mac” and choose Pair Phone…</string>
+    <string name="pairing_waiting_detail">Keep ShellX open on this phone until the Mac answers.</string>
+    <string name="settings_account_delete_message">This deletes your ShellX account for good. Every Mac and phone signed in to it is signed out, its pairings and shared sessions end, and this phone\'s history is removed. To confirm, you sign in once more.</string>
+    <string name="settings_account_sign_out_confirm">This phone will be removed from every paired Mac, and its history will be deleted.</string>
+    <string name="settings_appearance_system">Match phone</string>
+    <string name="settings_voice_on_device">Recognized on this phone.</string>
+    <string name="settings_voice_server">This phone can\'t recognize %1$s on device, so your voice goes to the phone\'s speech recognition service, usually Google\'s servers. ShellX never receives your voice.</string>
+    <string name="signin_error_local_wipe_pending">Couldn\'t clear the previous account\'s data on this phone. Try again.</string>
+    <string name="signin_error_reauth_required">Sign in with the Google account this ShellX account uses, then try again.</string>
+    <string name="signin_subtitle">Use the Google account you use with ShellX on your Mac.</string>
+    <string name="update_message">Update ShellX on Google Play to get the latest fixes and features.</string>
+    <string name="voice_mic_hint">Hold to talk and release to finish. With TalkBack, double-tap to start and double-tap again to finish.</string>
+</resources>

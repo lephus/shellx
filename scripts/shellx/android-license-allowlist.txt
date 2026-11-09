@@ -1,0 +1,73 @@
+# Dependencies the ShellX Android app (shellx-android/) and ShellX Link for Kotlin (shellx-link/kotlin/) may
+# resolve. scripts/shellx/check-android-license.sh checks every gradle.lockfile against this list.
+#
+# Format: <group>:<artifact>  <scope>  <licence>  [# note]
+#   scope    ship: allowed in the app (release and debug runtime classpaths) and in tests
+#            test: allowed only on test runtime classpaths
+#   licence  ship: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, Bouncy-Castle, Google-SDK
+#            test: also EPL-1.0, EPL-2.0, ICU, CDDL-1.1
+# Never GPL, LGPL or AGPL. Only the three wildcard lines below use "*". Google SDKs (com.google.android.gms,
+# com.google.firebase, com.google.android.datatransport, com.google.android.play,
+# com.google.android.libraries.identity.googleid) are always listed by name.
+# Add a line only after reading the artifact's POM licence; keep the lines sorted.
+# Each group:artifact is listed once. A test entry whose artifact starts to ship moves to ship, never both.
+
+androidx.*:*                 ship  Apache-2.0
+org.jetbrains.kotlin:*       ship  Apache-2.0
+org.jetbrains.kotlinx:*      ship  Apache-2.0
+com.almworks.sqlite4java:sqlite4java                      test  Apache-2.0     # The Apache Software License, Version 2.0
+com.dropbox.differ:differ                                 test  Apache-2.0     # The Apache Software License, Version 2.0
+com.dropbox.differ:differ-jvm                             test  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.auto.value:auto-value-annotations              test  Apache-2.0     # Apache 2.0 (parent auto-value-parent)
+com.google.code.findbugs:jsr305                           test  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.errorprone:error_prone_annotations             test  Apache-2.0     # Apache 2.0
+com.google.guava:failureaccess                            test  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
+com.google.guava:guava                                    test  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
+com.google.guava:listenablefuture                         ship  Apache-2.0     # The Apache Software License, Version 2.0 (parent guava-parent)
+com.google.j2objc:j2objc-annotations                      test  Apache-2.0     # Apache License, Version 2.0
+com.google.testparameterinjector:test-parameter-injector  test  Apache-2.0     # The Apache Software License, Version 2.0
+com.ibm.icu:icu4j                                         test  ICU            # Unicode-3.0
+com.squareup:javawriter                                   test  Apache-2.0     # Apache 2.0
+io.github.takahirom.roborazzi:roborazzi                   test  Apache-2.0     # Apache-2.0
+io.github.takahirom.roborazzi:roborazzi-compose           test  Apache-2.0     # Apache-2.0
+io.github.takahirom.roborazzi:roborazzi-core              test  Apache-2.0     # Apache-2.0
+io.github.takahirom.roborazzi:roborazzi-core-android      test  Apache-2.0     # Apache-2.0
+io.github.takahirom.roborazzi:roborazzi-painter           test  Apache-2.0     # Apache-2.0
+io.github.takahirom.roborazzi:roborazzi-painter-jvm       test  Apache-2.0     # Apache-2.0
+javax.annotation:javax.annotation-api                     test  CDDL-1.1       # CDDL + GPLv2 with classpath exception (CDDL elected)
+javax.inject:javax.inject                                 test  Apache-2.0     # The Apache Software License, Version 2.0
+junit:junit                                               test  EPL-1.0        # Eclipse Public License 1.0
+org.bouncycastle:bc-jdk18on-bom                           test  Bouncy-Castle  # Bouncy Castle Licence
+org.bouncycastle:bcprov-jdk18on                           test  Bouncy-Castle  # Bouncy Castle Licence
+org.conscrypt:conscrypt-openjdk-uber                      test  Apache-2.0     # Apache 2
+org.hamcrest:hamcrest-core                                test  BSD-3-Clause   # New BSD License (parent hamcrest-parent)
+org.hamcrest:hamcrest-integration                         test  BSD-3-Clause   # New BSD License (parent hamcrest-parent)
+org.hamcrest:hamcrest-library                             test  BSD-3-Clause   # New BSD License (parent hamcrest-parent)
+org.jetbrains:annotations                                 ship  Apache-2.0     # The Apache Software License, Version 2.0
+org.jspecify:jspecify                                     ship  Apache-2.0     # The Apache License, Version 2.0
+org.junit.jupiter:junit-jupiter                           test  EPL-2.0        # Eclipse Public License v2.0
+org.junit.jupiter:junit-jupiter-api                       test  EPL-2.0        # Eclipse Public License v2.0
+org.junit.jupiter:junit-jupiter-engine                    test  EPL-2.0        # Eclipse Public License v2.0
+org.junit.jupiter:junit-jupiter-params                    test  EPL-2.0        # Eclipse Public License v2.0
+org.junit.platform:junit-platform-commons                 test  EPL-2.0        # Eclipse Public License v2.0
+org.junit.platform:junit-platform-engine                  test  EPL-2.0        # Eclipse Public License v2.0
+org.junit.platform:junit-platform-launcher                test  EPL-2.0        # Eclipse Public License v2.0
+org.junit:junit-bom                                       test  EPL-2.0        # Eclipse Public License v2.0
+org.opentest4j:opentest4j                                 test  Apache-2.0     # The Apache License, Version 2.0
+org.ow2.asm:asm                                           test  BSD-3-Clause   # BSD-3-Clause
+org.ow2.asm:asm-commons                                   test  BSD-3-Clause   # BSD-3-Clause
+org.ow2.asm:asm-tree                                      test  BSD-3-Clause   # BSD-3-Clause
+org.robolectric:annotations                               test  MIT            # The MIT License
+org.robolectric:junit                                     test  MIT            # The MIT License
+org.robolectric:nativeruntime                             test  MIT            # The MIT License
+org.robolectric:nativeruntime-dist-compat                 test  Apache-2.0     # Apache 2.0
+org.robolectric:pluginapi                                 test  MIT            # The MIT License
+org.robolectric:plugins-maven-dependency-resolver         test  MIT            # The MIT License
+org.robolectric:resources                                 test  MIT            # The MIT License
+org.robolectric:robolectric                               test  MIT            # The MIT License
+org.robolectric:sandbox                                   test  MIT            # The MIT License
+org.robolectric:shadowapi                                 test  MIT            # The MIT License
+org.robolectric:shadows-framework                         test  MIT            # The MIT License
+org.robolectric:utils                                     test  MIT            # The MIT License
+org.robolectric:utils-reflector                           test  MIT            # The MIT License
+org.yaml:snakeyaml                                        test  Apache-2.0     # Apache License, Version 2.0
