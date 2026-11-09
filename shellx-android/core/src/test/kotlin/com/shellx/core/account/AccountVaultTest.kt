@@ -103,11 +103,13 @@ class AccountVaultTest {
         try {
             runBlocking {
                 val threads = Collections.synchronizedSet(mutableSetOf<String>())
+                // Under -ea, kotlinx-coroutines' debug mode appends " @coroutine#N" to the name while a coroutine runs.
+                fun thread() = Thread.currentThread().name.substringBefore(" @coroutine#")
                 val inner = InMemorySecretStore()
                 val store = object : SecretStore {
-                    override fun read(item: SecretItem) = inner.read(item).also { threads += Thread.currentThread().name }
-                    override fun write(data: ByteArray, item: SecretItem) { threads += Thread.currentThread().name; inner.write(data, item) }
-                    override fun delete(item: SecretItem) { threads += Thread.currentThread().name; inner.delete(item) }
+                    override fun read(item: SecretItem) = inner.read(item).also { threads += thread() }
+                    override fun write(data: ByteArray, item: SecretItem) { threads += thread(); inner.write(data, item) }
+                    override fun delete(item: SecretItem) { threads += thread(); inner.delete(item) }
                 }
                 val vault = AccountVault(store, io)
                 vault.setSession(StoredSession("u", "d", "t", "e")); vault.session(); vault.phoneKey()
