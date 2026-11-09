@@ -262,4 +262,23 @@ final class WorkspaceViewTests: XCTestCase {
         XCTAssertEqual(WorkspaceFeedback.of(.offline, for: .createTerminal, machineID: m), .alert(.offline))
         XCTAssertEqual(WorkspaceFeedback.of(.unknown, for: .createTerminal, machineID: m), .alert(.unknown))
     }
+
+    /// ＋ again while a new terminal is on its way does nothing, and a chip the user picks before the Mac answers stays
+    /// shown when the new tab arrives (final review, app M6).
+    func testAPickWhileANewTerminalIsOnItsWayWins() async throws {
+        let rig = try await makeRig()
+        follow(rig)
+
+        rig.actions.createTerminal()
+        rig.actions.createTerminal()
+        rig.actions.select("t-claude")
+        for task in rig.screen.tasks { _ = await task.value }
+
+        let creates = await rig.mac.terminalCreates
+        XCTAssertEqual(creates, ["ws-shellx"], "one create while one is on its way")
+        let listed = await eventually { rig.model.panes.contains { $0.id.hasPrefix("ws-shellx-new-") } }
+        XCTAssertTrue(listed)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(rig.model.selectedTerminalId, "t-claude", "the user's pick wins over the new tab")
+    }
 }
