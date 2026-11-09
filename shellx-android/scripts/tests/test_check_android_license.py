@@ -22,6 +22,7 @@ CLEAN = {
         'includeBuild("../shellx-link/kotlin")\n'
         'include(":app")\n'),
     "shellx-android/build.gradle.kts": "plugins { }\n",
+    "shellx-android/gradle.properties": "kotlin.code.style=official\nandroid.builder.sdkDownload=false\n",
     "shellx-android/app/build.gradle.kts": (
         '// includeBuild("../../Sources") in a comment does not count\n'
         'description = "see ../../Sources"\n'
@@ -173,6 +174,14 @@ class CheckAndroidLicenseTests(unittest.TestCase):
         self.assertFails(self.tree({"shellx-link/kotlin/README.md": f"see {COMPANY.lower()}-ai\n"}),
                          "shellx-link/kotlin/README.md")
         self.assertPasses(self.tree({"shellx-android/Notes.kt": f"fun test{COMPANY}NameFails() {{}}\n"}))
+
+    def test_agp_never_downloads_sdk_packages(self):
+        props = "shellx-android/gradle.properties"
+        for text in ("kotlin.code.style=official\n", "android.builder.sdkDownload=true\n",
+                     "# android.builder.sdkDownload=false\n"):
+            with self.subTest(text=text):
+                self.assertFails(self.tree({props: text}), props, "android.builder.sdkDownload=false")
+        self.assertFails(self.tree(remove=(props,)), props, "android.builder.sdkDownload=false")
 
     def test_symlinks_fail(self):
         root = self.tree()
