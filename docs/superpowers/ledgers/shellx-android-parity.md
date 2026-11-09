@@ -75,6 +75,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-4 | Nothing is backed up or moved to a new phone (`allowBackup="false"`, and `data_extraction_rules.xml` excludes everything) | Secrets never go into a backup (S3 §7.3) | `AndroidManifest.xml`, `res/xml/data_extraction_rules.xml` | 3A | done (3A) |
 | A-5 | On Android 12 and later, a system splash (the app icon on the ShellX background) shows before the launch screen | Android always shows one | `res/values*/themes.xml` | 3A | done (3A) |
 | A-6 | A debug build reads its relay from the `shellxApiBase` Gradle property, not an environment variable. A relay on the Mac is reached through `adb reverse tcp:<port> tcp:<port>` at `http://127.0.0.1:<port>`, because `10.0.2.2` is refused like any other non-loopback http address | Android apps have no launch environment | `core:config/ShellXEndpoints.kt` | 3C | differs (3C): by design |
+| A-7 | Coming back after 25 s or more in the background reconnects every Mac, measured with a clock that counts deep sleep, even when the grace timer never ran. A return within the 25 s probes each online Mac's session and replaces one that does not answer | Android freezes cached apps and Doze stops their timers, so the iPhone's background-task expiry has no Android signal; the Link client's liveness timers do not count deep sleep either (3B M-3) | `core:link/MachineHub.kt` (`appDidBecomeActive`), `core:link/MachineConnection.kt` (`checkAlive`) | 3C | differs (3C): by design |
 
 ## Test devices
 

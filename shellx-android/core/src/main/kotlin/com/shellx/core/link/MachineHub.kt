@@ -20,14 +20,19 @@ import com.shellx.link.core.LinkDecision
 import com.shellx.link.core.LinkSession
 import com.shellx.link.core.ReplyOutcome
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -122,6 +127,16 @@ class MachineHub(
     private var stopped = false
     private var unauthorizedReported = false
 
+    /** The app is in the background (until [appDidBecomeActive]). */
+    private var inBackground = false
+
+    /** The sessions were closed because the app stayed in the background past the grace. */
+    private var suspended = false
+    private var grace: Deferred<Boolean>? = null
+
+    /** When the app went to the background, by [Clock.monotonic] (which counts deep sleep on Android). */
+    private var backgroundSince: ComparableTimeMark? = null
+
     /** Transcript resets per session since the hub started ([transcriptResets]). */
     private val resetCounts = HashMap<SessionRef, Int>()
 
@@ -154,6 +169,8 @@ class MachineHub(
     /** Stops every connection and completes the update flows. The hub is done afterwards: its [scope] is cancelled. */
     suspend fun stopAll() {
         stopped = true
+        grace?.cancel()
+        grace = null
         for (reader in readers.values) reader.cancel()
         readers.clear()
         val all = connections.values.toList()
@@ -267,6 +284,102 @@ class MachineHub(
                 revoke(id)
             }
         }
+    }
+
+    /**
+     * Android: ProcessLifecycleOwner ON_START (3D). Cancels the grace. When the sessions were closed, reconnects every
+     * Mac; otherwise asks each Mac that is not online to retry now.
+     *
+     * Android additions:
+     * - When the app went to the background [BACKGROUND_GRACE] or more ago by [Clock.monotonic] but the grace never ran
+     *   out (a frozen or dozing process), it first detaches every connection, as the grace would have, so every Mac
+     *   reconnects from scratch (ledger A-7).
+     * - On a return within the grace, each online Mac's session is probed (3B M-3): the Link client's liveness timers
+     *   do not count deep sleep, so a session that died while the phone slept could otherwise look alive for most of a
+     *   minute. One that does not answer is replaced at once.
+     */
+    fun appDidBecomeActive() {
+        val since = backgroundSince
+        backgroundSince = null
+        inBackground = false
+        grace?.cancel()
+        grace = null
+        if (stopped) return
+        if (!suspended && since != null && since.elapsedNow() >= BACKGROUND_GRACE) {
+            CoreLog.log("hub_frozen_return")
+            val closing = detachAll()
+            scope.launch { for (connection in closing) connection.stop() }
+        }
+        if (suspended) {
+            resume()
+            return
+        }
+        for (model in state.value.machines) {
+            val connection = connections[model.id] ?: continue
+            if (model.state != MachineLinkState.Online) {
+                // Coming back is a good moment to retry a Mac that was out of reach.
+                connection.reconnectNow()
+            } else if (since != null) {
+                scope.launch { connection.checkAlive() }
+            }
+        }
+    }
+
+    /**
+     * Android: ON_STOP (3D launches it in the app scope). Waits [BACKGROUND_GRACE] with `sleep`; when the app is still
+     * in the background then, closes every session. Returns early when the app comes back. Records
+     * `clock.monotonic.markNow()` for [appDidBecomeActive]'s frozen-return rule.
+     */
+    suspend fun appDidEnterBackground() {
+        if (stopped || suspended) return
+        inBackground = true
+        backgroundSince = clock.monotonic.markNow()
+        grace?.cancel()
+        val wait = scope.async {
+            try {
+                sleep(BACKGROUND_GRACE)
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                false
+            }
+        }
+        grace = wait
+        val elapsed = try {
+            wait.await()
+        } catch (e: CancellationException) {
+            // The grace was cancelled (the app came back, or the hub stopped); the caller's own cancellation propagates.
+            currentCoroutineContext().ensureActive()
+            false
+        }
+        if (!elapsed || !inBackground || grace !== wait || stopped) return
+        grace = null
+        suspend()
+    }
+
+    /**
+     * Closes every session at once (iOS: background time expired). Everything that matters happens before this returns
+     * (items not actionable, connections detached), so a return reconnects every Mac from scratch even if the process
+     * is frozen before the sessions finish closing. Android keeps it for a future signal; today only tests call it.
+     */
+    fun backgroundTimeExpired() {
+        if (stopped || suspended) return
+        inBackground = true
+        grace?.cancel()
+        grace = null
+        val closing = detachAll()
+        scope.launch { for (connection in closing) connection.stop() }
+    }
+
+    /**
+     * The default network changed (NetworkChangeFilter's onChange, 3D): a session, or an attempt still syncing, may ride
+     * a dead path without anyone knowing yet, so each connection replaces its client at once, and one without a client
+     * retries now. The connection decides from its own state; the model's copy may lag.
+     */
+    fun networkChanged() {
+        if (stopped || suspended) return
+        for (connection in connections.values.toList()) scope.launch { connection.forceReconnect() }
     }
 
     // Calls
@@ -446,6 +559,43 @@ class MachineHub(
             )
         }
         forgetFinishes(machineId)
+    }
+
+    private suspend fun suspend() {
+        for (connection in detachAll()) connection.stop()
+    }
+
+    /**
+     * Marks every Mac as not live and takes every connection out of the hub, without waiting, so nothing can interleave
+     * halfway. Returns the connections for the caller to stop.
+     */
+    private fun detachAll(): List<MachineConnection> {
+        suspended = true
+        _state.update { s ->
+            s.copy(
+                machines = s.machines.map { model ->
+                    when {
+                        model.state.isTerminal -> model
+                        model.state == MachineLinkState.Online ->
+                            model.copy(pendingActionable = false, state = MachineLinkState.Reconnecting)
+                        else -> model.copy(pendingActionable = false)
+                    }
+                },
+            )
+        }
+        for (reader in readers.values) reader.cancel()
+        readers.clear()
+        val detached = connections.values.toList()
+        connections.clear()
+        return detached
+    }
+
+    private fun resume() {
+        if (stopped) return
+        suspended = false
+        for (model in state.value.machines) {
+            if (!model.state.isTerminal && connections[model.id] == null) connect(model.id)
+        }
     }
 
     /**

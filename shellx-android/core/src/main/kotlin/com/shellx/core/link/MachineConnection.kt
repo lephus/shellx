@@ -9,6 +9,7 @@ import com.shellx.link.core.AgentSession
 import com.shellx.link.core.ChatPush
 import com.shellx.link.core.LinkClientException
 import com.shellx.link.core.LinkSession
+import com.shellx.link.core.LinkTimings
 import com.shellx.link.core.PendingChange
 import com.shellx.link.core.SessionChange
 import com.shellx.link.core.SessionList
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The Link to one paired Mac: one live session at a time, kept in sync, and brought back when it drops
@@ -119,6 +121,27 @@ class MachineConnection(
         forcedClose = true
         skipBackoff = true
         current.close()
+    }
+
+    /**
+     * Android (3B M-3): asks the live session for its snapshot, as a proof that it is alive. The Link client's liveness
+     * timers do not count deep sleep, so after the phone slept a dead session can look alive for most of a minute. A
+     * session that fails the call or does not answer within the request timeout is replaced as [forceReconnect] does:
+     * no backoff, and the items stay. The answer itself is not used. Does nothing unless Online.
+     */
+    internal suspend fun checkAlive() {
+        val current = client
+        if (ended || state != MachineLinkState.Online || current == null) return
+        val alive = try {
+            withTimeoutOrNull(LinkTimings.STANDARD.requestTimeout) { current.snapshot() } != null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+        if (alive || client !== current) return
+        CoreLog.log("link_probe_failed")
+        forceReconnect()
     }
 
     /** Runs [body] on the live session; LinkCallException.Offline(machine.name) unless Online. Errors of [body] pass. */
