@@ -2,7 +2,8 @@ package com.shellx.link.core
 
 /**
  * A ShellX Link v1 message (PROTOCOL.md section 4). Each property is sent under its snake_case name, in the
- * order declared. Every request that expects one answer carries a `callId` of 1 to 64 UTF-8 bytes.
+ * order declared. Every request that expects one answer carries a `callId` of 1 to 64 UTF-8 bytes. User content
+ * prints as `<redacted>` (Global Constraint "Secrets"); the models it nests redact themselves.
  */
 sealed interface LinkMessage {
     /** The one answer to a client call (PROTOCOL.md section 3). */
@@ -10,7 +11,9 @@ sealed interface LinkMessage {
         val callId: String
     }
 
-    data class Hello(val clientVersion: String, val deviceName: String) : LinkMessage
+    data class Hello(val clientVersion: String, val deviceName: String) : LinkMessage {
+        override fun toString(): String = "Hello(clientVersion=$clientVersion, deviceName=<redacted>)"
+    }
 
     /** `features` lists what the host offers beyond the base protocol; empty when none. */
     data class Welcome(
@@ -18,10 +21,15 @@ sealed interface LinkMessage {
         val hostVersion: String,
         val machineName: String,
         val features: List<String> = emptyList(),
-    ) : LinkMessage
+    ) : LinkMessage {
+        override fun toString(): String =
+            "Welcome(protocolVersion=$protocolVersion, hostVersion=$hostVersion, machineName=<redacted>, features=$features)"
+    }
 
     /** `callId` is set when the error answers one specific client call. */
-    data class Error(val code: String, val message: String, val callId: String? = null) : LinkMessage
+    data class Error(val code: String, val message: String, val callId: String? = null) : LinkMessage {
+        override fun toString(): String = "Error(code=$code, message=<redacted>, callId=$callId)"
+    }
 
     data class SnapshotGet(val callId: String) : LinkMessage
 
@@ -63,7 +71,10 @@ sealed interface LinkMessage {
         val sessionId: String,
         val text: String,
         val attachments: List<String> = emptyList(),
-    ) : LinkMessage
+    ) : LinkMessage {
+        override fun toString(): String =
+            "ChatSend(callId=$callId, sessionId=$sessionId, text=<redacted>, attachments=$attachments)"
+    }
 
     data class ChatSendResult(override val callId: String, val outcome: ChatSendOutcome) : Answer
 
@@ -72,7 +83,9 @@ sealed interface LinkMessage {
     data class ChatInterruptResult(override val callId: String, val outcome: ChatInterruptOutcome) : Answer
 
     /** Starts an upload of `size` bytes; the host answers [AttachReady]. */
-    data class AttachBegin(val callId: String, val kind: AttachmentKind, val name: String, val size: Int) : LinkMessage
+    data class AttachBegin(val callId: String, val kind: AttachmentKind, val name: String, val size: Int) : LinkMessage {
+        override fun toString(): String = "AttachBegin(callId=$callId, kind=$kind, name=<redacted>, size=$size)"
+    }
 
     data class AttachReady(override val callId: String, val attachmentId: String) : Answer
 
@@ -117,7 +130,9 @@ sealed interface LinkMessage {
         val workspaceId: String? = null,
     ) : Answer
 
-    data class WorkspaceRename(val callId: String, val workspaceId: String, val title: String) : LinkMessage
+    data class WorkspaceRename(val callId: String, val workspaceId: String, val title: String) : LinkMessage {
+        override fun toString(): String = "WorkspaceRename(callId=$callId, workspaceId=$workspaceId, title=<redacted>)"
+    }
 
     data class WorkspaceRenameResult(override val callId: String, val outcome: WorkspaceControlOutcome) : Answer
 

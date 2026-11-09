@@ -1,5 +1,15 @@
 package com.shellx.link.core
 
+// Global Constraint "Secrets": user content (chat text, previews, answers, plan feedback, titles, directories,
+// branches, attachment names, device and machine names, host error text) never appears in toString(). Ids, kinds,
+// counts and sizes stay visible.
+
+/** `<redacted>` for content that is present, `null` for content that is absent. */
+internal fun redact(value: Any?): String = if (value == null) "null" else "<redacted>"
+
+/** A list of content strings by its size only. */
+internal fun redactAll(values: List<*>): String = if (values.isEmpty()) "[]" else "[<redacted> × ${values.size}]"
+
 /** One agent request waiting for a human decision: a permission prompt, a question or a plan exit. */
 data class PendingItem(
     val requestId: String,
@@ -17,6 +27,11 @@ data class PendingItem(
     /** The plan text of an `exit_plan` request. */
     val planPreview: String? = null,
 ) {
+    override fun toString(): String = "PendingItem(requestId=$requestId, kind=$kind, agent=$agent, " +
+        "workspaceId=$workspaceId, workspaceTitle=<redacted>, toolName=$toolName, " +
+        "toolInputPreview=${redact(toolInputPreview)}, createdAtMs=$createdAtMs, modes=$modes, questions=$questions, " +
+        "planPreview=${redact(planPreview)})"
+
     companion object {
         /** Maximum UTF-8 bytes of `toolInputPreview` and of `planPreview` on the wire. */
         const val MAX_PREVIEW_BYTES = 8192
@@ -30,10 +45,15 @@ data class PendingQuestion(
     val prompt: String,
     val multiSelect: Boolean,
     val options: List<PendingQuestionOption>,
-)
+) {
+    override fun toString(): String =
+        "PendingQuestion(id=$id, header=${redact(header)}, prompt=<redacted>, multiSelect=$multiSelect, options=$options)"
+}
 
 /** One option of a [PendingQuestion]. A [LinkDecision.Question] selects options by `label`. */
-data class PendingQuestionOption(val id: String, val label: String, val description: String? = null)
+data class PendingQuestionOption(val id: String, val label: String, val description: String? = null) {
+    override fun toString(): String = "PendingQuestionOption(id=$id, label=<redacted>, description=${redact(description)})"
+}
 
 /** The user's decision in an `agent.reply` (PROTOCOL.md section 4, "Decision"). */
 sealed interface LinkDecision {
@@ -47,11 +67,15 @@ sealed interface LinkDecision {
     /** Positional answers: `selections[i]` answers `questions[i]`. */
     data class Question(val selections: List<String>) : LinkDecision {
         override val kind: String get() = "question"
+
+        override fun toString(): String = "Question(selections=${redactAll(selections)})"
     }
 
     /** A non-empty `feedback` rejects the plan and asks the agent to revise it, whatever the mode. */
     data class ExitPlan(val mode: ExitPlanMode, val feedback: String? = null) : LinkDecision {
         override val kind: String get() = "exit_plan"
+
+        override fun toString(): String = "ExitPlan(mode=$mode, feedback=${redact(feedback)})"
     }
 
     /** A `kind` this version does not know. */
@@ -69,7 +93,11 @@ data class AgentSession(
     /** Unix time in milliseconds at which `state` began. */
     val stateSinceMs: Long? = null,
     val lastActivityMs: Long? = null,
-)
+) {
+    override fun toString(): String = "AgentSession(sessionId=$sessionId, agent=$agent, workspaceId=$workspaceId, " +
+        "workspaceTitle=<redacted>, title=${redact(title)}, state=$state, stateSinceMs=$stateSinceMs, " +
+        "lastActivityMs=$lastActivityMs)"
+}
 
 /** One entry of a session's chat transcript. Entries are upserted by `id`; `seq` orders them. */
 data class ChatEntry(
@@ -85,6 +113,9 @@ data class ChatEntry(
     val toolName: String? = null,
     val tsMs: Long,
 ) {
+    override fun toString(): String = "ChatEntry(id=$id, rev=$rev, seq=$seq, role=$role, kind=$kind, text=<redacted>, " +
+        "truncated=$truncated, toolName=$toolName, tsMs=$tsMs)"
+
     companion object {
         /** Maximum UTF-8 bytes of `text` on the wire. */
         const val MAX_TEXT_BYTES = 4096
@@ -106,7 +137,10 @@ data class LinkWorkspace(
     /** Listening ports, when the workspace has any. */
     val ports: List<Int>? = null,
     val terminals: List<LinkTerminal>,
-)
+) {
+    override fun toString(): String = "LinkWorkspace(workspaceId=$workspaceId, title=<redacted>, order=$order, " +
+        "directory=${redact(directory)}, branch=${redact(branch)}, ports=$ports, terminals=$terminals)"
+}
 
 /** One terminal of a workspace, as listed in `workspace.list`. */
 data class LinkTerminal(
@@ -118,4 +152,7 @@ data class LinkTerminal(
     val selected: Boolean,
     /** The agent session running in this terminal, when there is one. */
     val sessionId: String? = null,
-)
+) {
+    override fun toString(): String =
+        "LinkTerminal(terminalId=$terminalId, title=<redacted>, order=$order, selected=$selected, sessionId=$sessionId)"
+}
