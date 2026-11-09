@@ -153,6 +153,23 @@ class ConversationStoreTest {
         assertEquals(Doc(listOf("y")), store.load(doc, DocCodec))
     } }
 
+    /**
+     * A process killed between a save's temp file and its move leaves `threads/write-*.tmp`, which eviction never counts.
+     * The next store's first file work deletes them (review 3b m-3), and nothing else.
+     */
+    @Test fun tempFilesLeftByAKilledWriteAreSweptOnOpen() { runTest {
+        makeStore().writer().save(Doc(listOf("kept")), DocCodec, doc)
+        val thread = onlyThreadFile()
+        val threads = File(directory, "threads")
+        val leftovers = listOf(File(threads, "write-1234.tmp"), File(threads, "write-5678.tmp"))
+        for (file in leftovers) file.writeText("{ half a copy")
+
+        val reopened = makeStore()
+        assertEquals(Doc(listOf("kept")), reopened.load(doc, DocCodec))
+
+        assertEquals(listOf(thread.name), threads.list().orEmpty().toList())
+    } }
+
     @Test fun threadsBeyondLimitEvictOldest() { runTest {
         val store = makeStore(maxThreads = 2)
         store.writer().save(Doc(listOf("1")), DocCodec, StoreDocument.Thread(ref("s1")))
