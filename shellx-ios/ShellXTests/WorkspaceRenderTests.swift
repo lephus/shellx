@@ -93,13 +93,14 @@ final class WorkspaceRenderTests: XCTestCase {
         selected: String?, panes: [WorkspacePane] = WorkspaceRenderTests.panes, title: String = "shellx-ios",
         branch: String? = "feat/workspaces", canControl: Bool = true, alert: WorkspaceAlert? = nil,
         notice: AgentScreen.Notice? = nil, requested: Requested = Requested(), canCreateTerminal: Bool = false,
-        canViewTerminals: Bool = false, shownAsTerminal: Set<String> = [],
+        canViewTerminals: Bool = false, shownAsTerminal: Set<String> = [], creatingTerminal: Bool = false,
         shell: @escaping (WorkspacePane) -> AnyView = { _ in AnyView(ShellPanePlaceholder()) }
     ) -> some View {
         NavigationStack {
             WorkspaceScreen(
                 title: title, branch: branch, panes: panes, selected: selected, now: Self.now, canControl: canControl,
                 canCreateTerminal: canCreateTerminal, canViewTerminals: canViewTerminals, shownAsTerminal: shownAsTerminal,
+                creatingTerminal: creatingTerminal,
                 notice: notice, alert: .constant(alert),
                 agent: { session in
                     let _ = requested.sessions.append(session.session.sessionId)
@@ -183,6 +184,16 @@ final class WorkspaceRenderTests: XCTestCase {
         let without = try SnapshotWriter().write(screen(selected: "t-zsh"), name: "workspace-shell")
         let with = try SnapshotWriter().write(screen(selected: "t-zsh", canCreateTerminal: true), name: "workspace-new-terminal")
         XCTAssertNotEqual(without.first?.pngData(), with.first?.pngData(), "the ＋ chip shows")
+    }
+
+    /// ＋ is dimmed while the new tab is on its way (final review, app M6).
+    func testRendersTheNewTerminalChipWhileOneIsOnItsWay() throws {
+        try assertRenders(
+            screen(selected: "t-zsh", canCreateTerminal: true, creatingTerminal: true), name: "workspace-new-terminal-creating")
+        let ready = try SnapshotWriter().write(screen(selected: "t-zsh", canCreateTerminal: true), name: "workspace-new-terminal")
+        let creating = try SnapshotWriter().write(
+            screen(selected: "t-zsh", canCreateTerminal: true, creatingTerminal: true), name: "workspace-new-terminal-creating")
+        XCTAssertNotEqual(ready.first?.pngData(), creating.first?.pngData(), "＋ is dimmed")
     }
 
     /// S2 §3.4: "View as Terminal" shows an agent chip's terminal instead of its chat.
