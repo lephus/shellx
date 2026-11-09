@@ -1,10 +1,18 @@
 package com.shellx.app.ui.workspaces
 
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
@@ -59,7 +67,9 @@ class WorkspaceViewTest {
         until { shown(notice) }
         compose.onNodeWithTag("workspace.chip.t-claude").assertIsSelected()
         compose.mainClock.autoAdvance = false
-        compose.mainClock.advanceTimeBy(4_100)
+        compose.mainClock.advanceTimeBy(3_900)
+        assertTrue("the notice stays 4 s", shown(notice))
+        compose.mainClock.advanceTimeBy(200)
         assertTrue("the notice goes after 4 s", !shown(notice))
         compose.mainClock.autoAdvance = true
     }
@@ -72,6 +82,48 @@ class WorkspaceViewTest {
         until { backs == 1 }
         compose.waitForIdle()
         assertEquals(1, backs)
+        assertEquals(context.getString(R.string.workspace_closed_on_mac), rig.scope.listNotice.current.value?.text)
+    }
+
+    /** The page's own lifecycle, as a navigation entry has it: the navigator's back works only while it is RESUMED. */
+    private class Entry : LifecycleOwner {
+        val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
+        override val lifecycle: Lifecycle get() = registry
+    }
+
+    @Test
+    fun aWorkspaceClosedWhileAnotherPageCoversItLeavesOnceTheUserIsBack() {
+        val entry = compose.runOnIdle { Entry() }
+        var covered by mutableStateOf(false)
+        var dropped = 0
+        compose.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(LocalLifecycleOwner provides entry) {
+                    if (!covered) {
+                        WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {
+                            if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) backs++ else dropped++
+                        })
+                    }
+                }
+            }
+        }
+        until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        // The "Needs you" page goes on top; the Mac closes the workspace meanwhile.
+        compose.runOnIdle {
+            entry.registry.currentState = Lifecycle.State.CREATED
+            covered = true
+        }
+        rig.mac.removeWorkspace("ws-shellx")
+        compose.waitForIdle()
+        // Back: the page shows again while it slides in (STARTED), then is in front (RESUMED).
+        compose.runOnIdle {
+            covered = false
+            entry.registry.currentState = Lifecycle.State.STARTED
+        }
+        compose.waitForIdle()
+        assertEquals("the navigator would drop a back from a page not in front", 0, dropped)
+        compose.runOnIdle { entry.registry.currentState = Lifecycle.State.RESUMED }
+        until { backs == 1 }
         assertEquals(context.getString(R.string.workspace_closed_on_mac), rig.scope.listNotice.current.value?.text)
     }
 }

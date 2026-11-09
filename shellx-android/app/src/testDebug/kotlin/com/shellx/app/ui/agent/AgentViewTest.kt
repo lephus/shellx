@@ -74,7 +74,9 @@ class AgentViewTest {
         until { exists("agent.notice") }
         compose.onNodeWithTag("agent.notice").assertTextEquals(context.getString(R.string.agent_sent))
         compose.mainClock.autoAdvance = false
-        compose.mainClock.advanceTimeBy(4_100)
+        compose.mainClock.advanceTimeBy(3_900)
+        assertTrue("the notice stays 4 s", exists("agent.notice"))
+        compose.mainClock.advanceTimeBy(200)
         assertTrue("the notice goes after 4 s", !exists("agent.notice"))
         compose.mainClock.autoAdvance = true
     }
