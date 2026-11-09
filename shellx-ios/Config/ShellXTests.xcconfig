@@ -1,7 +1,7 @@
 // The ShellXTests bundle, on top of the project's Debug/Release.xcconfig: hosted in the app, with a
 // generated Info.plist and no entitlements or asset catalog of its own.
 
-PRODUCT_BUNDLE_IDENTIFIER = com.shellx.dev.tests
+PRODUCT_BUNDLE_IDENTIFIER = com.shellx.prod.tests
 INFOPLIST_FILE =
 GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_PREPROCESS = NO

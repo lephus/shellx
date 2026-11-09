@@ -36,8 +36,10 @@ new module means adding it to the script, in review.
 | `Packages/ShellXAppCore` | The app's logic, tested with `swift test` on the Mac. |
 | `scripts/` | `dev.sh`, `check-strings.py`, `strings-identity.txt`. |
 
-Debug builds are "ShellX Dev" (`com.shellx.dev`) and install next to the App Store / TestFlight
-build "ShellX" (`com.shellx.prod`), each with its own Keychain.
+There is one app id, `com.shellx.prod`, in every configuration. Debug builds are "ShellX Dev": on
+a phone they replace the App Store / TestFlight build "ShellX" and share its Keychain items, and an
+App Store or TestFlight install replaces them in turn. Debug builds register sandbox APNs tokens,
+App Store builds production ones.
 
 ## Building and testing: `scripts/dev.sh`
 

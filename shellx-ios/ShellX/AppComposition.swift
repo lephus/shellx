@@ -60,7 +60,7 @@ enum AppComposition {
         #else
         let updatePrompt = makeUpdatePrompt(bundleID: bundle.bundleIdentifier, version: version)
         #endif
-        // Debug builds (com.shellx.dev) get sandbox APNs tokens, App Store builds production ones.
+        // One app id (com.shellx.prod): Debug builds get sandbox APNs tokens, App Store builds production ones.
         let push = PushRegistration(
             relay: relay, vault: vault, topic: bundle.bundleIdentifier ?? "com.shellx.prod",
             environment: debugBuild ? .sandbox : .production)
