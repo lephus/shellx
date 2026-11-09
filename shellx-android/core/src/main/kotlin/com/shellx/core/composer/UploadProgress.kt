@@ -12,9 +12,9 @@ import kotlinx.coroutines.launch
  * on Dispatchers.Default); each one hops to [scope] (scope.launch) before it is applied, only while its send is the
  * latest one, and only upward.
  *
- * Main-confined.
+ * Main-confined. [onChange] gets every new [fraction] (the agent screen copies it into its own state).
  */
-internal class UploadProgress(private val scope: CoroutineScope) {
+internal class UploadProgress(private val scope: CoroutineScope, private val onChange: (Double?) -> Unit = {}) {
     private val _fraction = MutableStateFlow<Double?>(null)
     val fraction: StateFlow<Double?> = _fraction.asStateFlow()
 
@@ -25,18 +25,23 @@ internal class UploadProgress(private val scope: CoroutineScope) {
     suspend fun <T> track(send: suspend (progress: (Double) -> Unit) -> T): T {
         run += 1
         val current = run
-        _fraction.value = 0.0
+        set(0.0)
         try {
             return send { value -> scope.launch { advance(value, current) } }
         } finally {
-            if (run == current) _fraction.value = null
+            if (run == current) set(null)
         }
+    }
+
+    private fun set(value: Double?) {
+        _fraction.value = value
+        onChange(value)
     }
 
     private fun advance(value: Double, send: Int) {
         // A late value of a send that is over (null) or replaced does nothing.
         val fraction = _fraction.value
         if (send != run || fraction == null || value <= fraction) return
-        _fraction.value = minOf(value, 1.0)
+        set(minOf(value, 1.0))
     }
 }

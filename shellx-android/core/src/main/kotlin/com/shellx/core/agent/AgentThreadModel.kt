@@ -1,5 +1,9 @@
 package com.shellx.core.agent
 
+import com.shellx.core.composer.OutgoingAttachment
+import com.shellx.core.composer.UploadProgress
+import com.shellx.core.home.ComposerValidation
+import com.shellx.core.link.AttachmentSendException
 import com.shellx.core.link.ChatUpdate
 import com.shellx.core.link.LinkCallException
 import com.shellx.core.link.MachineHub
@@ -13,6 +17,8 @@ import com.shellx.core.platform.rethrowIfCancelled
 import com.shellx.core.storage.ConversationStore
 import com.shellx.core.storage.StoreDocument
 import com.shellx.link.core.AgentState
+import com.shellx.link.core.ChatInterruptOutcome
+import com.shellx.link.core.ChatSendOutcome
 import com.shellx.link.core.LinkClientException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -41,7 +47,7 @@ data class AgentThreadState(
     val loading: Boolean = false,
     /** An older page is on its way. */
     val loadingOlder: Boolean = false,
-    /** How far the attachments of the message being sent got; null while none go up (Task 21). */
+    /** How far the attachments of the message being sent got (bytes sent over bytes to send); null while none go up. */
     val uploadProgress: Double? = null,
     /** The Mac answered that it does not have this session (history, send or stop). */
     val answeredNotFound: Boolean = false,
@@ -115,6 +121,7 @@ class AgentThreadModel(
     private val _state = MutableStateFlow(AgentThreadState())
     val state: StateFlow<AgentThreadState> = _state.asStateFlow()
 
+    private val upload = UploadProgress(scope) { fraction -> _state.update { it.copy(uploadProgress = fraction) } }
     private var writer: ConversationStore.Writer? = null
     private var opening: Deferred<Unit>? = null
     private var pendingSave: Job? = null
@@ -322,6 +329,55 @@ class AgentThreadModel(
         } finally {
             // A turn that finished while the user watched is not news when the screen goes away.
             hub.markSeen(ref)
+        }
+    }
+
+    // Send and stop
+
+    /**
+     * Sends [text] with [attachments] to this session: refused on the phone when there is nothing to send, the text is
+     * too long, or the attachments are too many or one is too big (ComposerValidation.message, checked first); Offline
+     * at once when the Mac is not online. The attachments go up first, then the message names them
+     * (MachineHub.chatSend with attachments), and [uploadProgress] follows them. LinkCallException.Offline /
+     * NeedsPairing → Offline; AttachmentSendException.Refused("unsupported") → AttachmentsUnsupported; any other
+     * AttachmentSendException → NotSent; anything else → NoAnswer. A CancellationException of the caller propagates. A
+     * NOT_FOUND outcome marks the session gone. [viaVoice] is how the user said it; the Mac gets the same text either
+     * way.
+     */
+    suspend fun send(text: String, attachments: List<OutgoingAttachment> = emptyList(), viaVoice: Boolean): AgentSendResult {
+        val validation = ComposerValidation.message(text, attachments)
+        if (validation !is ComposerValidation.Ok) return AgentSendResult.Refused(validation)
+        if (offline) return AgentSendResult.Offline
+        return try {
+            val outcome = if (attachments.isEmpty()) {
+                hub.chatSend(ref, validation.text)
+            } else {
+                upload.track { progress -> hub.chatSend(ref, validation.text, attachments, progress) }
+            }
+            if (outcome == ChatSendOutcome.NOT_FOUND) _state.update { it.copy(answeredNotFound = true) }
+            AgentSendResult.Sent(outcome)
+        } catch (e: Exception) {
+            rethrowIfCancelled(e)
+            when {
+                e is LinkCallException.Offline || e is LinkCallException.NeedsPairing -> AgentSendResult.Offline
+                e is AttachmentSendException.Refused && e.code == "unsupported" -> AgentSendResult.AttachmentsUnsupported
+                e is AttachmentSendException -> AgentSendResult.NotSent
+                else -> AgentSendResult.NoAnswer
+            }
+        }
+    }
+
+    /** Interrupts the session's current turn; [hard] is Force stop. Null when nothing was sent (the Mac is offline) or
+     *  no answer came. A NOT_FOUND outcome marks the session gone. */
+    suspend fun stop(hard: Boolean): ChatInterruptOutcome? {
+        if (offline) return null
+        return try {
+            val outcome = hub.chatInterrupt(ref, hard)
+            if (outcome == ChatInterruptOutcome.NOT_FOUND) _state.update { it.copy(answeredNotFound = true) }
+            outcome
+        } catch (e: Exception) {
+            rethrowIfCancelled(e)
+            null
         }
     }
 
