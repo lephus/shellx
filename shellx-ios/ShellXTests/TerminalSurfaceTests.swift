@@ -1,6 +1,7 @@
 import ShellXAppCore
 import ShellXAppTestSupport
 import ShellXLinkCore
+import SwiftUI
 import UIKit
 import XCTest
 @testable import ShellX
