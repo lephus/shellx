@@ -192,6 +192,87 @@ class TerminalPushQueueTest {
         }
     }
 
+    /** Fills [queue] with frames of t-2, a terminal not viewed, until the next would not fit the bound. */
+    private fun fillWithAnotherTerminal(queue: TerminalPushQueue) {
+        var r = 1L
+        val dropped = queue.droppedFrames
+        while (queue.droppedFrames == dropped) queue.offer(Frame("t-2", delta(r++)))
+    }
+
+    /**
+     * Re-review A, m6: a snapshot of the view in three parts, arriving while the queue is full of another terminal's
+     * frames, is kept whole, past the bound, and the assembler applies it.
+     */
+    @Test
+    fun aViewedSnapshotOfThreePartsOverTheBoundIsKeptWhole() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                fillWithAnotherTerminal(queue)
+                val dropped = queue.droppedFrames
+                val head = TerminalFrameHead(TerminalFrameKind.SNAPSHOT, 300, 120, cursor = TerminalCursor(0, 0), palette = palette)
+                val parts = (0 until 3).map { p ->
+                    TerminalFramePart(
+                        1, part = p, parts = 3, head = if (p == 0) head else null,
+                        lines = (p * 40 until p * 40 + 40).map { TerminalLine(it, listOf(TerminalRun(text = "x".repeat(300)))) },
+                    )
+                }
+                parts.forEach { queue.offer(Frame("t-1", it)) }
+                assertEquals(dropped, queue.droppedFrames)
+                assertTrue(queue.queuedWeight > TerminalPushQueue.MAX_QUEUED_WEIGHT, "${queue.queuedWeight}")
+                val view = List(queue.queuedPushes) { queue.pushes.first() }.filter { it.terminalId == "t-1" }
+                assertEquals(listOf<TerminalViewPush>(Opened("t-1")) + parts.map { Frame("t-1", it) }, view)
+                val assembler = TerminalFrameAssembler()
+                val screen = TerminalScreen()
+                for (push in view.drop(1)) assembler.receive((push as Frame).part).frame?.let(screen::apply)
+                assertEquals(List(120) { "x".repeat(300) }, screen.screenText())
+            }
+        }
+    }
+
+    /**
+     * Re-review A, m6: the I-1 freeze avoided by the exemption itself. The answer to the resync arrives while the queue
+     * is full of another terminal's frames (not the view's, which the rule after a LOST would have dropped), and it is
+     * still kept.
+     */
+    @Test
+    fun aResyncAnswerIsKeptOverAQueueFullOfAnotherTerminal() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                val assembler = TerminalFrameAssembler()
+                val screen = TerminalScreen()
+                var resyncs = 0
+                fun feed(push: TerminalViewPush) {
+                    if (push !is Frame || push.terminalId != "t-1") return
+                    val result = assembler.receive(push.part)
+                    if (result.resync) resyncs++
+                    result.frame?.let(screen::apply)
+                }
+                queue.offer(Opened("t-1"))
+                queue.offer(Frame("t-1", snapshot(1, "$")))
+                var r = 2L
+                while (queue.droppedFrames == 0L) queue.offer(Frame("t-1", delta(r++)))
+                assertEquals(Opened("t-1"), queue.pushes.first())
+                while (true) {
+                    val push = queue.pushes.first()
+                    feed(push)
+                    if ((push as Frame).part == TerminalFramePart.LOST) break
+                }
+                assertEquals(1, resyncs)
+                fillWithAnotherTerminal(queue)
+                val answer = r++
+                queue.offer(Frame("t-1", snapshot(answer, "fresh")))
+                List(queue.queuedPushes) { queue.pushes.first() }.forEach(::feed)
+                assertEquals(1, resyncs)
+                assertFalse(assembler.awaitingSnapshot)
+                assertEquals(answer, assembler.revision)
+                assertEquals(listOf("fresh"), screen.screenText())
+            }
+        }
+    }
+
     /** The weight [TerminalPushQueue] gives [part], read off an empty queue. */
     private fun weightOf(part: TerminalFramePart) = TerminalPushQueue().apply { offer(Frame("t-9", part)) }.queuedWeight
 
