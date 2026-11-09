@@ -3,6 +3,8 @@ package com.shellx.app.platform
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +19,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Runtime permissions for code that is not a screen (the mic's model, the push effect). One per process; the activity
- * [attach]es its result registry. Main thread.
+ * [attach]es its result registry. Main thread: [attach] and [request] are called there (every caller runs in a main
+ * scope); a caller cancelled from another thread is let go on the main thread, and never gets its prompt meanwhile.
  *
  * A prompt shows only while the attached activity is resumed: a request made in the background (or while the activity
  * is only started) waits for its next ON_RESUME, because Android may drop a prompt started from the background and
@@ -37,6 +40,7 @@ class PermissionRequester(context: Context) {
     }
 
     private val app = context.applicationContext
+    private val main = Handler(Looper.getMainLooper())
     private var launcher: ActivityResultLauncher<String>? = null
     private var lifecycle: Lifecycle? = null
 
@@ -74,8 +78,8 @@ class PermissionRequester(context: Context) {
 
     /**
      * The user's answer; false at once while nothing is attached. Requests run one at a time, in order; a request for a
-     * permission already being asked (or waiting to be) waits for that answer. [onLaunch] runs when the prompt is
-     * started (at once when it already is), never for a request that was dropped or answered without one.
+     * permission already being asked (or waiting to be) waits for that answer. [onLaunch] runs once the prompt has
+     * started (at once when it already has), never for a request that was dropped, or whose prompt failed to start.
      */
     suspend fun request(permission: String, onLaunch: (() -> Unit)? = null): Boolean {
         if (launcher == null) return false
@@ -83,8 +87,12 @@ class PermissionRequester(context: Context) {
         if (onLaunch != null) if (ask.launched) onLaunch() else ask.onLaunch += onLaunch
         return suspendCancellableCoroutine { caller ->
             ask.waiting += caller
-            // At once, not when the cancelled caller next runs: an ON_RESUME in between must not show its prompt.
-            caller.invokeOnCancellation { left(ask, caller) }
+            // At once, not when the cancelled caller next runs: an ON_RESUME in between must not show its prompt. A
+            // cancellation on another thread is handed to the main thread (review C m-3); launchWhenResumed skips the
+            // ask meanwhile.
+            caller.invokeOnCancellation {
+                if (Looper.getMainLooper().isCurrentThread) left(ask, caller) else main.post { left(ask, caller) }
+            }
             if (asks.first() === ask) launchWhenResumed(ask)
         }
     }
@@ -94,15 +102,25 @@ class PermissionRequester(context: Context) {
         if (ask.launched) return
         val current = launcher ?: return
         if (lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) != true) return
+        if (ask.waiting.all { it.isCancelled }) {
+            // Every caller was cancelled on another thread, and left() has not run here yet: drop it now.
+            asks.remove(ask)
+            asks.firstOrNull()?.let(::launchWhenResumed)
+            return
+        }
         ask.launched = true
-        ask.onLaunch.forEach { it() }
-        ask.onLaunch.clear()
         try {
             current.launch(ask.permission)
         } catch (e: RuntimeException) {
             CoreLog.log("permission_launch_failed ${e.javaClass.simpleName}")
+            ask.onLaunch.clear()
             finish(ask, isGranted(ask.permission))
+            return
         }
+        // Only once the prompt started: a launch that failed spends nothing (review C m-3).
+        val started = ask.onLaunch.toList()
+        ask.onLaunch.clear()
+        started.forEach { it() }
     }
 
     private fun answered(granted: Boolean) {

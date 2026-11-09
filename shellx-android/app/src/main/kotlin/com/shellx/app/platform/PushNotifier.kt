@@ -90,6 +90,9 @@ class PushNotifier(
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
         synchronized(lock) {
+            // Again, under the lock clearAll takes: the app may have come to the front (and cleared the alerts) while
+            // the paired Macs were read (review C m-2).
+            if (inForeground()) return
             post(payload.requestId, NOTIFICATION_ID, alert)
             post(payload.machineId, SUMMARY_ID, summary)
         }

@@ -20,8 +20,10 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * The update prompt (`UpdateAlert.swift`; ledger A-27). Each offer starts Play's flexible-update dialog once
  * ([UpdatePrompt.update]: Play's "Update / No thanks" is the prompt). Once the download finished, a Snackbar says so and
- * offers Restart ([restart]: Play installs and restarts the app). [prompt] null (debug builds, the demo) shows nothing.
- * [restart] comes last, so a call can pass it as a trailing lambda.
+ * offers Restart ([restart]: Play installs and restarts the app), or can be dismissed. [prompt] null (debug builds)
+ * offers nothing. MainActivity passes the real account's prompt during the demo too, as the iPhone puts
+ * `.updateAlert(graph.updatePrompt)` on its window, around the demo as well. [restart] comes last, so a call can pass it
+ * as a trailing lambda.
  */
 @Composable
 fun UpdateAlert(
@@ -42,7 +44,10 @@ fun UpdateAlert(
     val currentRestart by rememberUpdatedState(restart)
     LaunchedEffect(downloaded, message, action) {
         if (!downloaded) return@LaunchedEffect
-        val result = snackbar.showSnackbar(message, actionLabel = action, duration = SnackbarDuration.Indefinite)
+        // Dismissible: it sits over the bottom of every page, the composer's Send included (review C m-5).
+        val result = snackbar.showSnackbar(
+            message, actionLabel = action, withDismissAction = true, duration = SnackbarDuration.Indefinite,
+        )
         if (result == SnackbarResult.ActionPerformed) currentRestart()
     }
     SnackbarHost(snackbar, modifier)
