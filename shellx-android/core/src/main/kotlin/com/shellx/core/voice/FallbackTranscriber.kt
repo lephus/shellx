@@ -12,6 +12,8 @@ import kotlinx.coroutines.channels.ReceiveChannel
  *   app stops offering the primary for the language and Settings names the path really used.
  * - Any other error ([SpeechStartException.Audio]: a passing audio problem) fails the press and keeps the primary for
  *   the next one.
+ * - A primary's error for a run that was cancelled meanwhile (a quick tap while the primary waits to be ready) is the
+ *   cancel's: it is rethrown, the run never starts on the fallback, and the primary stays offered (final review I-3).
  * - [finish] and [cancel] go through the slot, which holds the handlers of whichever engine claimed the run, so a run
  *   can never be left holding the microphone.
  *
@@ -29,7 +31,8 @@ class FallbackTranscriber(
         if (usePrimary(language)) {
             try {
                 return primary.start(run, language, contextualStrings)
-            } catch (_: SpeechStartException.Recognizer) {
+            } catch (e: SpeechStartException.Recognizer) {
+                if (slot.wasCancelled(run)) throw e
                 primaryFailed(language)
             }
         }

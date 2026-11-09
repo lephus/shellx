@@ -9,7 +9,8 @@ package com.shellx.core.voice
  * - [claim] is asked right before the audio starts. A start that a newer one overtook, or whose run was cancelled
  *   while it started (or before), is refused: it cleans up after itself and leaves the active run alone. A granted
  *   claim hands back the run it replaced, which the caller tears down.
- * - [cancel], [takeForFinish] and [ended] act on the run they name only.
+ * - [cancel], [takeForFinish] and [ended] act on the run they name only. A cancelled run is never granted again, also
+ *   when it held the microphone ([wasCancelled]; final review I-3).
  *
  * Thread-safe (`synchronized`): every call is short and never suspends while holding the lock.
  */
@@ -57,20 +58,23 @@ class SpeechRunSlot {
         Claim.Granted(replaced)
     }
 
-    /** Cancels [run]: its handlers when it holds the microphone (the caller tears it down); otherwise null, and a start
-     *  of [run] still under way (or not yet begun) will be refused. */
+    /** Cancels [run]: its handlers when it holds the microphone (the caller tears it down); otherwise null. Either way
+     *  a later claim of [run] is refused: a start still under way (or not yet begun), or a retry of a start that failed
+     *  after it claimed (a fallback). */
     fun cancel(run: SpeechRunId): Handlers? = synchronized(lock) {
-        val holder = current
-        if (holder != null && holder.run == run) {
-            current = null
-            return holder.handlers
-        }
         if (run !in cancelled) {
             cancelled.addLast(run)
             while (cancelled.size > CANCEL_MEMORY) cancelled.removeFirst()
         }
-        null
+        val holder = current
+        if (holder == null || holder.run != run) return null
+        current = null
+        holder.handlers
     }
+
+    /** [run] was cancelled (among the last [CANCEL_MEMORY] cancels): a failure of its start is that cancel's, not the
+     *  recognizer's. */
+    fun wasCancelled(run: SpeechRunId): Boolean = synchronized(lock) { run in cancelled }
 
     /** [run] is released to finish: its handlers when it holds the microphone (it no longer does). */
     fun takeForFinish(run: SpeechRunId): Handlers? = synchronized(lock) {
@@ -89,7 +93,7 @@ class SpeechRunSlot {
     }
 
     private companion object {
-        /** Cancels remembered for runs that are not active (bounded, oldest dropped). */
+        /** Cancels remembered (bounded, oldest dropped). */
         const val CANCEL_MEMORY = 32
 
         /** Runs remembered as begun, so beginning one again changes nothing (bounded, oldest dropped). */

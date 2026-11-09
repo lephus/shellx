@@ -181,6 +181,8 @@ class VoiceInputModel(
                 engine.start(run, language, contextualStrings())
             } catch (e: Exception) {
                 rethrowIfCancelled(e)
+                // Released while it started: the failure is the release's cancel (final review I-3); nothing to show.
+                if (attempt != current || released) return
                 return refuse(current, Phase.Unavailable)
             }
             // Released while the recognizer started: the release already cancelled this run, so the engine refused
