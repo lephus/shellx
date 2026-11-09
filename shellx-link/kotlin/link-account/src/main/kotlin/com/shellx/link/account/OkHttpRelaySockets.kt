@@ -47,12 +47,18 @@ private class OkHttpRelaySocket(client: OkHttpClient, request: Request) : RelayS
     private val inbox = Channel<RelaySocketMessage>(Channel.UNLIMITED)
     private val webSocket: WebSocket = client.newWebSocket(request, Listener())
 
+    /**
+     * Set by a local close or cancel. OkHttp only refuses sends once its reader thread has seen a cancelled call, so a
+     * send right after a cancel would otherwise be accepted and lost.
+     */
+    @Volatile private var closedHere = false
+
     override suspend fun sendText(text: String) {
-        if (!webSocket.send(text)) throw RelayException.Closed()
+        if (closedHere || !webSocket.send(text)) throw RelayException.Closed()
     }
 
     override suspend fun sendBinary(bytes: ByteArray) {
-        if (!webSocket.send(bytes.toByteString())) throw RelayException.Closed()
+        if (closedHere || !webSocket.send(bytes.toByteString())) throw RelayException.Closed()
     }
 
     override suspend fun receive(): RelaySocketMessage = try {
@@ -60,11 +66,15 @@ private class OkHttpRelaySocket(client: OkHttpClient, request: Request) : RelayS
     } catch (_: ClosedReceiveChannelException) {
         throw RelayException.Closed()
     } catch (e: CancellationException) {
+        closedHere = true
+        // Closed before the failure arrives, so a later receive is Closed, not the cancelled call's IOException.
+        inbox.close()
         webSocket.cancel()
         throw e
     }
 
     override fun close() {
+        closedHere = true
         webSocket.close(NORMAL_CLOSURE, null)
         inbox.close()
     }
