@@ -28,8 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,13 +61,10 @@ fun NeedsYouBar(items: List<MachinePendingItem>, showsMachineName: Boolean, open
             .clip(shape)
             .background(colors.accent.copy(alpha = 0.12f), shape)
             .border(1.dp, colors.accent.copy(alpha = 0.35f), shape)
-            .clickable(onClick = open)
+            // One button for TalkBack: the click (with its hint) and the tag come before the cleared, spoken content.
+            .clickable(onClickLabel = hint, role = Role.Button, onClick = open)
             .testTag("home.needsYou")
-            .clearAndSetSemantics {
-                contentDescription = spoken
-                role = Role.Button
-                onClick(label = hint) { open(); true }
-            }
+            .clearAndSetSemantics { contentDescription = spoken }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
