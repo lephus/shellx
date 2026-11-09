@@ -36,9 +36,11 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 | One app id `com.shellx.prod` + Firebase (3A Task 10) | 61a339fb3e | `shellx-android/app/google-services.json` from the user's download (project `shellxpro`; also holds the Android OAuth client with this Mac's debug SHA-1 and the Web client). |
 | 2C iPhone terminal | 34d42258b9 | Contracts §23. Two-reviewer final review (2 I + 11 M fixed test-first), one regression fixed, re-reviews clean. Device check skipped (user waived). Core 682 / app 246 tests. |
 
+| 1C follow-up: Google G + Google Sans Medium (static, OFL) on iOS; iPhone Debug bundle `com.shellx.prod` | cf1d4e2343 | Review approved (0 C / 0 I). Desktop branding by the user: 112079593c. |
+
 ## In progress
 
-- 1C follow-up: Google G + Google Sans on iOS (1C Task 9 steps 7–8) together with the iPhone Debug bundle → `com.shellx.prod`. Assets are in `~/Downloads/shellx-google-signin/` (zip SHA-256 checked).
+- 3B (Kotlin Link), worktree `.worktrees/android-3b-link-kotlin`, branch `feat/shellx-android-3b-link-kotlin`; ledger `.superpowers/sdd/2026-11-07-shellx-android-3b-link-kotlin/progress.md` (git-ignored). Run in three chunks (Tasks 0–5, 6–9, 10–15), a fresh review after each, then a final review; merge after review (non-UI). Then 3C, same way (user: "chạy tiếp 3B rồi 3C luôn").
 
 ## Waiting on the user
 
@@ -105,6 +107,10 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
   - a lost session restores the open budgets, so a Mac whose session drops on every open cycles offline/connecting and never reaches Try Again;
   - `failedOpen()`'s doc comment still says "input only `.live`"; no test pins `acceptsInput` false in the busy gap or after `notSent`; `testAReopeningPageGivesUpTheKeyboardAndTheKeyBar` now covers only the failed-view wait;
   - latency criteria 3–5, Telex/VNI and hardware keys are untested on a device (user waived the check).
+- **1C follow-up / one app id:**
+  - `deploy/README.md` (lines ~233–272), `relay/README.md:52`, `scripts/shellx/share-e2e.mjs` and the relay's default `APPLE_CLIENT_IDS` still name `com.shellx.dev` (plan 1D, with the relay config);
+  - iPhone Debug and Release now share keychain, defaults and push topic on a device (by design; `shellx-ios/README.md`);
+  - the replaced 4.97 MB variable font stays in history (6dae2f42f3).
 - **3A:**
   - the Gradle path rule is a text check: a directory read from the environment into a variable (`File(System.getenv("HOME"), …)`) or built with `+` and no `..` literal still passes;
   - runtime-classpath locking is matched by configuration name (backed by STRICT mode);
