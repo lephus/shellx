@@ -162,4 +162,38 @@ class WorkspaceScreenTest {
         show(panes = emptyList())
         compose.onNodeWithTag("workspace.noTerminals").assertIsDisplayed()
     }
+
+    private fun displayed(tag: String): Boolean = try {
+        compose.onNodeWithTag(tag).assertIsDisplayed()
+        true
+    } catch (e: AssertionError) {
+        false
+    }
+
+    /** The pane shown (the last) is closed on the Mac, and the model picks the first chip, not the page the pager
+     *  falls back to: the model's pick shows. */
+    @Test
+    fun whenThePaneShownLeavesTheModelsPickWins() {
+        var panes by mutableStateOf(WorkspaceFixtures.panes)
+        selected = "t-dev"
+        compose.setContent {
+            ShellXTheme {
+                WorkspaceScreen(
+                    title = "shellx-ios", branch = "feat/workspaces", panes = panes, selected = selected, nowMs = NOW_MS,
+                    canControl = true, actions = WorkspaceScreenActions(select = { selected = it }),
+                ) { pane, shown ->
+                    PaneContent(pane, shown, agent = { s -> Text("agent ${s.session.sessionId}", Modifier.testTag("pane.${s.session.sessionId}")) })
+                }
+            }
+        }
+        until { displayed("pane.s-dev") }
+        compose.runOnIdle {
+            panes = WorkspaceFixtures.panes.take(2)
+            selected = "t-claude"
+        }
+        until { displayed("pane.s-claude") }
+        compose.waitForIdle()
+        assertEquals("t-claude", selected)
+        assertTrue(displayed("pane.s-claude"))
+    }
 }
