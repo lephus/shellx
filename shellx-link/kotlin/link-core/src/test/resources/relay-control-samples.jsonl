@@ -1,0 +1,10 @@
+{"type":"register","protocol":5,"slot":"slot-k1","ticket":"t-register"}
+{"type":"registered","lease_seconds":45}
+{"type":"connect","protocol":5,"slot":"slot-k1","ticket":"t-connect","lane":"lane-k1","generation":3}
+{"type":"allocated","circuit":"circuit-k1","lane":"lane-k1","generation":3,"join_ticket":"t-client-join"}
+{"type":"incoming","circuit":"circuit-k1","lane":"lane-k1","generation":3,"join_ticket":"t-daemon-join"}
+{"type":"join","protocol":5,"slot":"slot-k1","circuit":"circuit-k1","lane":"lane-k1","generation":3,"ticket":"t-client-join","role":"client"}
+{"type":"ready","circuit":"circuit-k1","lane":"lane-k1","generation":3}
+{"type":"ping","nonce":7}
+{"type":"pong","nonce":7}
+{"type":"error","code":"slot-offline","message":"the host is offline","retryable":true}
