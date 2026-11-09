@@ -46,7 +46,7 @@ class RootSyncTest {
         rule.waitForIdle()
     }
 
-    private fun setRoot(route: String) {
+    private fun rootBecomes(route: String) {
         root = route
         rule.waitForIdle()
     }
@@ -63,9 +63,9 @@ class RootSyncTest {
         start()
         rule.onNodeWithText("screen:launch").assertIsDisplayed()
 
-        setRoot(Routes.SIGN_IN)
+        rootBecomes(Routes.SIGN_IN)
         rule.onNodeWithText("screen:sign_in").assertIsDisplayed()
-        setRoot(Routes.HOME)
+        rootBecomes(Routes.HOME)
 
         rule.onNodeWithText("screen:home").assertIsDisplayed()
         assertNull("home is the only page", nav.previousBackStackEntry)
@@ -74,11 +74,11 @@ class RootSyncTest {
     @Test
     fun signingOutClearsEveryScreen() {
         start()
-        setRoot(Routes.HOME)
+        rootBecomes(Routes.HOME)
         navigate(Routes.SETTINGS)
         navigate(Routes.MACHINES)
 
-        setRoot(Routes.SIGN_IN)
+        rootBecomes(Routes.SIGN_IN)
 
         assertEquals(Routes.SIGN_IN, current())
         assertNull(nav.previousBackStackEntry)
@@ -87,10 +87,10 @@ class RootSyncTest {
     @Test
     fun aFirstMacWaitsUntilThePageOnTopCloses() {
         start()
-        setRoot(Routes.FIRST_MAC)
+        rootBecomes(Routes.FIRST_MAC)
         navigate(Routes.PAIRING)
 
-        setRoot(Routes.HOME)
+        rootBecomes(Routes.HOME)
         assertEquals("the Paired step stays on screen", Routes.PAIRING, current())
 
         rule.runOnUiThread { nav.popBackStack() }
@@ -102,9 +102,9 @@ class RootSyncTest {
     @Test
     fun losingTheLastMacAtTheRootSwitchesAtOnce() {
         start()
-        setRoot(Routes.HOME)
+        rootBecomes(Routes.HOME)
 
-        setRoot(Routes.FIRST_MAC)
+        rootBecomes(Routes.FIRST_MAC)
 
         assertEquals(Routes.FIRST_MAC, current())
         assertNull(nav.previousBackStackEntry)
@@ -113,7 +113,7 @@ class RootSyncTest {
     @Test
     fun systemBackReturnsToTheRoot() {
         start()
-        setRoot(Routes.HOME)
+        rootBecomes(Routes.HOME)
         navigate(Routes.SETTINGS)
         rule.onNodeWithText("screen:settings").assertIsDisplayed()
 
@@ -127,7 +127,7 @@ class RootSyncTest {
     @Test
     fun sessionArgumentsRoundTrip() {
         start()
-        setRoot(Routes.HOME)
+        rootBecomes(Routes.HOME)
 
         navigate(Routes.sessions(SessionListKind.OTHER, "m 1"))
         rule.onNodeWithText("other|m 1").assertIsDisplayed()

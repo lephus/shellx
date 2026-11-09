@@ -81,12 +81,12 @@ class NavControllerNavigatorTest {
         rule.activityRule.scenario.recreate()
         rule.setContent { Host() }
         rule.waitForIdle()
-        assertSame("the screens get the same navigator", before, navigator)
 
         rule.runOnUiThread { before.openSettings() }
         rule.waitForIdle()
 
         rule.onNodeWithText("screen:settings").assertIsDisplayed()
         assertEquals(Routes.SETTINGS, current())
+        assertSame("the screens get the same navigator", before, navigator)
     }
 }

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -16,6 +17,7 @@ import com.shellx.app.testing.mainComposition
 import com.shellx.app.ui.ShellXApp
 import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXAppTheme
+import com.shellx.core.demo.DemoEnvironment
 import com.shellx.core.demo.FakeMac
 import com.shellx.link.core.LinkTerminal
 import com.shellx.link.core.LinkWorkspace
@@ -105,7 +107,10 @@ class ShellXAppSmokeTest {
         tap("Try without an account")
         waitForText("Exit")
         assertTrue(shown("Demo"))
-        waitUntil { rule.onAllNodesWithText("MAC GIẢ", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        // The demo Mac's header ("MAC GIẢ" on screen) speaks its name in one label; its drawn words are not in the tree.
+        waitUntil {
+            rule.onAllNodes(hasContentDescription(DemoEnvironment.FIRST_NAME, substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
 
         tap("Exit")
 
