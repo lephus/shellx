@@ -79,6 +79,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-8 | Sign-out also deletes this phone's FCM token on the relay before logging out | Contracts §8; the iPhone relies on logout alone | `core:account/AppCoordinator.kt` | 3C | differs (3C): by design |
 | A-9 | A photo's file extension comes from the picked item's MIME type; the image bytes are not inspected | Android's Photo Picker reports a MIME type and has no ImageIO | `core:composer/AttachmentChecks.kt` | 3C | differs (3C): by design |
 | A-10 | Voice: the on-device recognizer comes first (API 31+), then the standard `SpeechRecognizer`. There is no separate speech permission. The microphone and level meter belong to the recognizer, so the iPhone's audio-route and level-throttle rules do not apply | S3 §7.3 replaces the iPhone's recognizers with `SpeechRecognizer` | `core:voice/VoiceCapabilities.kt`, `FallbackTranscriber.kt`, `VoiceService.kt` | 3C | differs (3C): by design |
+| A-11 | A push is an FCM data message that carries `agent` and `workspace_title`, and the phone builds the alert text itself | Contracts §8: data-only messages | `core:push/PushPayload.kt` | 3C | differs (3C): by design |
 
 ## Test devices
 
