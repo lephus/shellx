@@ -8,12 +8,16 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -216,12 +220,32 @@ class ConversationStoreTest {
         assertEquals(Doc(listOf("3")), store.load(StoreDocument.Thread(ref("s3")), DocCodec))
     } }
 
-    /** Review Focus 3: no file work on the caller's (main) thread. */
+    /**
+     * Review Focus 3: no file work on the caller's (main) thread. The codec notes the thread it runs on. A remove or a
+     * wipe deletes inside its hop to io (review 3b m-2): what it deletes is still there when the io task starts, and
+     * gone when the io task hands control back to the caller (both noted on the io thread, before the caller can run).
+     */
     @Test fun fileWorkRunsOnTheIoDispatcher() {
-        val executor = Executors.newSingleThreadExecutor { Thread(it, "store-io") }
-        val io = executor.asCoroutineDispatcher()
+        val ioThread = Executors.newSingleThreadExecutor { Thread(it, "store-io") }.asCoroutineDispatcher()
+        val callerThread = Executors.newSingleThreadExecutor { Thread(it, "caller") }.asCoroutineDispatcher()
+        val watched = AtomicReference<File?>(null)
+        val hops = Collections.synchronizedList(mutableListOf<String>())
+        fun note(hop: String) {
+            val file = watched.get() ?: return
+            hops += "$hop:${if (file.exists()) "there" else "gone"}"
+        }
+        val io = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) =
+                ioThread.dispatch(context, Runnable { note("io"); block.run() })
+        }
+        val caller = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                note("back")
+                callerThread.dispatch(context, block)
+            }
+        }
         try {
-            runBlocking {
+            runBlocking(caller) {
                 val threads = Collections.synchronizedSet(mutableSetOf<String>())
                 // Under -ea, kotlinx-coroutines' debug mode appends " @coroutine#N" to the name while a coroutine runs.
                 fun thread() = Thread.currentThread().name.substringBefore(" @coroutine#")
@@ -230,16 +254,26 @@ class ConversationStoreTest {
 
                     override fun decode(json: JsonElement): Doc = DocCodec.decode(json).also { threads += thread() }
                 }
+                suspend fun hopsWhileWatching(file: File, step: suspend () -> Unit): List<String> {
+                    hops.clear()
+                    watched.set(file)
+                    step()
+                    watched.set(null)
+                    return hops.toList()
+                }
                 val store = ConversationStore(directory, io, Ticks())
                 val writer = store.writer()
                 writer.save(Doc(listOf("a")), codec, doc)
                 assertEquals(Doc(listOf("a")), store.load(doc, codec))
-                writer.remove(doc)
-                store.wipe()
                 assertEquals(setOf("store-io"), threads.toSet())
+
+                assertEquals(listOf("io:there", "back:gone"), hopsWhileWatching(onlyThreadFile()) { writer.remove(doc) })
+                writer.save(Doc(listOf("b")), codec, doc)
+                assertEquals(listOf("io:there", "back:gone"), hopsWhileWatching(directory) { store.wipe() })
             }
         } finally {
-            io.close()
+            ioThread.close()
+            callerThread.close()
         }
     }
 }
