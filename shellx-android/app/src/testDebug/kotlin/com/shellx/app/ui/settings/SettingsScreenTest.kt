@@ -1,5 +1,6 @@
 package com.shellx.app.ui.settings
 
+import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -54,6 +55,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** A recognizer that hears nothing (not 3E's FakeSpeechEngine). */
@@ -298,5 +300,17 @@ class SettingsScreenTest {
         rule.onNodeWithTag("settings.about.license").performClick()
 
         assertEquals(listOf("https://shellx.pro"), opened)
+    }
+
+    /** Review D m-6: with no app to open a web page (no browser, some work profiles), Licenses does nothing, no crash. */
+    @Test
+    fun licensesWithNoBrowserDoesNotCrash() {
+        shadowOf(ApplicationProvider.getApplicationContext<Application>()).checkActivities(true)
+        rule.setContent { Screen() }
+
+        rule.onNodeWithTag("settings.about.license").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("settings.about.license").assertIsDisplayed()
     }
 }

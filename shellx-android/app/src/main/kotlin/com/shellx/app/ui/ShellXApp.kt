@@ -16,7 +16,6 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -24,6 +23,7 @@ import com.shellx.app.AppComposition
 import com.shellx.app.demo.DemoBanner
 import com.shellx.app.ui.nav.Routes
 import com.shellx.app.ui.nav.ShellXNavHost
+import com.shellx.app.ui.nav.bottomRoute
 import com.shellx.app.ui.nav.rememberShellXNavigator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -68,6 +68,6 @@ fun ShellXApp(composition: AppComposition, nav: NavHostController = rememberNavC
 
 /** Whether the stack stands on [root] (or on the other signed-in root, which RootSync swaps once the top page closes). */
 private fun rootApplied(nav: NavHostController, root: String): Boolean {
-    val bottom = nav.currentBackStack.value.firstOrNull { it.destination !is NavGraph }?.destination?.route
+    val bottom = bottomRoute(nav)
     return bottom == root || (bottom in Routes.SIGNED_IN_ROOTS && root in Routes.SIGNED_IN_ROOTS)
 }

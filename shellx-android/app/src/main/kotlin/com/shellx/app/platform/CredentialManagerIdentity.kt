@@ -16,6 +16,9 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingExcept
 import com.shellx.app.R
 import com.shellx.core.account.IdentityProviderException
 import com.shellx.core.account.IdentityProviding
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The OAuth client of type "Web application" (contracts §16), Credential Manager's serverClientId. */
 object GoogleWebClient {
@@ -51,17 +54,20 @@ object IdentityErrors {
 
 /**
  * IdentityProviding over Credential Manager (S1 §6.7): GetSignInWithGoogleOption with serverClientId = the Web client
- * (contracts §16) and setNonce(the relay's nonce). It holds no activity: [activity] is asked at each sign-in, because
- * sign-in and deletion run detached and outlive their screen (3C carry 3D-2).
+ * (contracts §16) and setNonce(the relay's nonce). It holds no activity beyond the call: [resumedActivity] is asked at
+ * each sign-in, because sign-in and deletion run detached and outlive their screen (3C carry 3D-2).
  */
 class CredentialManagerIdentity(
     private val serverClientId: String?,
-    private val activity: () -> Activity?,
+    private val resumedActivity: suspend () -> Activity,
     private val getter: CredentialGetter,
 ) : IdentityProviding {
     override suspend fun googleIdToken(nonce: String): String {
         val client = serverClientId ?: throw IdentityProviderException.NotConfigured()
-        val host = activity() ?: throw IdentityProviderException.Failed()
+        // Google's sheet is an activity started over ours. Started from the background, Android may block it and no
+        // answer would ever come (final review F-2), so the sheet waits until ShellX is in front again, as iOS shows
+        // its sheet once the app is active. Past RESUME_WAIT it ends as if the user had closed the sheet.
+        val host = withTimeoutOrNull(RESUME_WAIT) { resumedActivity() } ?: throw IdentityProviderException.Cancelled()
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(GetSignInWithGoogleOption.Builder(client).setNonce(nonce).build())
             .build()
@@ -81,9 +87,13 @@ class CredentialManagerIdentity(
     }
 
     companion object {
+        /** Half the life of the relay's nonce (600 s, relay README), so the sheet and the sign-in fit in what is left. */
+        val RESUME_WAIT: Duration = 5.minutes
+
         fun create(context: Context): CredentialManagerIdentity {
             val manager = CredentialManager.create(context.applicationContext)
-            return CredentialManagerIdentity(GoogleWebClient.id(context), ActivityTracker::current) { activity, request ->
+            val resumed = ActivityTracker.shared::awaitResumed
+            return CredentialManagerIdentity(GoogleWebClient.id(context), resumed) { activity, request ->
                 manager.getCredential(activity, request)
             }
         }

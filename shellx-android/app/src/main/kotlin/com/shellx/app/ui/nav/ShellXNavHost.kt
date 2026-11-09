@@ -1,8 +1,12 @@
 package com.shellx.app.ui.nav
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,24 +20,22 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.shellx.app.AppComposition
 import com.shellx.app.BuildConfig
@@ -182,24 +184,31 @@ private fun agentTitle(session: com.shellx.link.core.AgentSession?, ref: Session
 /**
  * Keeps `root` as the only root destination: a new root replaces the whole stack (signing in or out, the demo), except
  * that a switch between `first_mac` and `home` (pairing the first Mac, unpairing the last one) waits until the page on
- * top closes, so the user is never pulled off it.
+ * top closes, so the user is never pulled off it. It compares with the stack's real bottom entry, so a stack that lost
+ * its root (popped, or restored apart from this) is put back on it rather than left blank or on `launch`.
  */
 @Composable
 fun RootSync(nav: NavHostController, root: String) {
-    var applied by rememberSaveable { mutableStateOf(Routes.LAUNCH) }
-    val entry by nav.currentBackStackEntryAsState()
-    LaunchedEffect(root, entry) {
-        if (root == applied) return@LaunchedEffect
+    // The whole stack, not the current entry: popping the last entry empties the stack without a new current entry.
+    @SuppressLint("RestrictedApi") // No public API gives the whole stack or its emptying; RootSyncTest guards upgrades.
+    val stack by nav.currentBackStack.collectAsState()
+    LaunchedEffect(root, stack) {
+        val bottom = bottomRoute(nav)
+        if (root == bottom) return@LaunchedEffect
         val atRoot = nav.previousBackStackEntry == null
         // Pairing the first Mac, or unpairing the last one, never pulls the user off the page they are on.
-        if (applied in Routes.SIGNED_IN_ROOTS && root in Routes.SIGNED_IN_ROOTS && !atRoot) return@LaunchedEffect
+        if (bottom in Routes.SIGNED_IN_ROOTS && root in Routes.SIGNED_IN_ROOTS && !atRoot) return@LaunchedEffect
         nav.navigate(root) {
             popUpTo(nav.graph.id) { inclusive = true }
             launchSingleTop = true
         }
-        applied = root
     }
 }
+
+/** The route of the stack's bottom destination (the root), or null when the stack is empty. */
+@SuppressLint("RestrictedApi") // No public API gives the stack's bottom entry; RootSyncTest guards Navigation upgrades.
+internal fun bottomRoute(nav: NavHostController): String? =
+    nav.currentBackStack.value.firstOrNull { it.destination !is NavGraph }?.destination?.route
 
 /** A signed-in destination's body: the active account's scope (its state starts afresh with each scope), or
  *  [LaunchView] while there is none (a sign-out, a deletion or a 401 under way; never "signed out" on that alone). */
@@ -229,7 +238,7 @@ internal fun WorkPlaceholder(title: String, back: () -> Unit) {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
             )
         },
-    ) {}
+    ) { padding -> Box(Modifier.padding(padding).fillMaxSize()) }
 }
 
 /**

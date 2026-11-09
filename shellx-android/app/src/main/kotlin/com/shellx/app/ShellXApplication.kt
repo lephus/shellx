@@ -35,7 +35,7 @@ class ShellXApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         CoreLog.sink = { Log.i("ShellX", it) }
-        registerActivityLifecycleCallbacks(ActivityTracker)
+        registerActivityLifecycleCallbacks(ActivityTracker.shared)
         val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         // One channel keeps ON_START and ON_STOP in order, and holds the ones that come before the composition exists.
         val events = Channel<Lifecycle.Event>(Channel.UNLIMITED)
