@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -497,6 +498,43 @@ class LinkClientTest {
                 assertEquals(emptyList(), client.sessionChanges.toList())
                 assertEquals(emptyList(), client.workspaceChanges.toList())
                 assertEquals(emptyList(), client.chatEntries.toList())
+            }
+        }
+    }
+
+    /** The client half of Swift's `testPingsKeepIdleSessionAlive`: frames from a live host keep the watchdog away. */
+    @Test
+    fun hostPingsKeepALiveSessionPastIdleTimeout() {
+        runBlocking {
+            within {
+                val rig = HostRig(timings = LinkTimings(50.milliseconds, 300.milliseconds, requestTimeout = 5.seconds))
+                val host = async { rig.host() }
+                val client = rig.client()
+                val (channel, _) = host.await()
+                val hostPings = launch {
+                    var nonce = 0uL
+                    try {
+                        while (true) {
+                            delay(50.milliseconds)
+                            channel.send(LinkMessage.Ping(nonce++))
+                        }
+                    } catch (_: RelayException.Closed) {
+                        // The session ended; the assertions below report it.
+                    }
+                }
+                // More than three idle timeouts with nothing but pings.
+                delay(1.seconds)
+                val snapshot = async { client.snapshot() }
+                while (true) {
+                    val message = channel.receive()
+                    if (message is LinkMessage.SnapshotGet) {
+                        channel.send(LinkMessage.Snapshot(message.callId, 9, emptyList()))
+                        break
+                    }
+                }
+                assertEquals(9, snapshot.await().revision)
+                hostPings.cancelAndJoin()
+                client.close()
             }
         }
     }
