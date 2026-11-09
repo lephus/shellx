@@ -46,7 +46,7 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
    - Set its id, without `.apps.googleusercontent.com`, as `SHELLX_GOOGLE_IOS_CLIENT` in both `shellx-ios/Config/Debug.xcconfig` and `Release.xcconfig`. Add the full id to the relay's `GOOGLE_CLIENT_IDS` (plan 1D).
    - The client the user gave (852509094750-nl7t2msvjr77u636ofl7p3hpfu9jp9o3) is a **Desktop** client and does not work for iOS. It serves 1B: pass it at build time through `SHELLX_GOOGLE_DESKTOP_CLIENT_ID` and `SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET`. The secret is in the user's downloaded JSON and is never committed.
 2. **Sign in with Apple is enabled** on `com.shellx.prod`. Nothing left to do.
-3. **1B: Google G and Google Sans on Mac and Windows.** The user accepts Google's branding terms, then runs `bash scripts/shellx/fetch-google-branding.sh`; it must end with `google branding: OK`. Then commit `chore(shellx): Google's official G mark and Google Sans Medium (OFL 1.1), downloaded by the user`. Until then the button is text-only and the desktop release scripts refuse to build.
+3. ~~1B: Google G and Google Sans on Mac and Windows~~ — done 2026-11-09 (112079593c, the user ran `fetch-google-branding.sh`).
 4. **1C Task 15** runs after plan 1D's cut-over.
 5. **Android dark mode on the Pixel 3:** the user turns on dark theme and opens "ShellX Dev" (light was checked 2026-11-09). The vsmart Live (serial in `~/.config/shellx/android-serial`) is not connected on this Mac.
 
