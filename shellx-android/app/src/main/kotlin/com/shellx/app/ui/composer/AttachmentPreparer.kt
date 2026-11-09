@@ -66,7 +66,8 @@ class AttachmentPreparer(
         if (jpeg != null) {
             AttachmentChecks.checked(pick.kind, name, jpeg)
         } else {
-            AttachmentChecks.checked(pick.kind, AttachmentChecks.photoName(AttachmentChecks.photoExtension(mime), taken), bytes)
+            // As picked, under its own type: `photoExtension` knows no HEIF sequence and would say "jpg" (review A M-4).
+            AttachmentChecks.checked(pick.kind, AttachmentChecks.photoName(HEIF_EXTENSION, taken), bytes)
         }
     }
 
@@ -124,6 +125,9 @@ class AttachmentPreparer(
         const val CHUNK_BYTES = 65_536
 
         private val HEIF_TYPES = setOf("image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence")
+
+        /** What a HEIF photo sent as picked is named with, as `AttachmentChecks.photoExtension` names a HEIC. */
+        private const val HEIF_EXTENSION = "heic"
 
         /** The red line under the composer for [failure]. */
         fun message(failure: AttachmentReadException, res: Resources): String = when (failure) {
