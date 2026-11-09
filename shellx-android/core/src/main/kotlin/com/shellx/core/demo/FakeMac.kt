@@ -2,16 +2,21 @@ package com.shellx.core.demo
 
 import com.shellx.core.link.MachineLinkConnecting
 import com.shellx.link.account.PairedMachine
+import com.shellx.link.core.AgentSession
+import com.shellx.link.core.ChatAttachment
+import com.shellx.link.core.ChatEntry
+import com.shellx.link.core.ChatInterruptOutcome
+import com.shellx.link.core.ChatSendOutcome
 import com.shellx.link.core.LinkDecision
 import com.shellx.link.core.LinkSession
 import com.shellx.link.core.LinkWorkspace
-import com.shellx.link.core.AgentSession
 import com.shellx.link.core.NoiseException
 import com.shellx.link.core.NoiseStaticKey
 import com.shellx.link.core.PairingOffer
 import com.shellx.link.core.PendingItem
 import com.shellx.link.core.ReplyOutcome
 import com.shellx.link.core.ShellXLink
+import com.shellx.link.core.WorkspaceControlOutcome
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
@@ -70,7 +75,8 @@ class FakeMac(
 
     internal val feed = FakeMacFeed(live)
     internal val sessionSource = FakeMacSessions(live, pushes = servesSessionsAndChat)
-    internal val workspaceSource = FakeMacWorkspaces(live, pushes = servesWorkspaces)
+    internal val workspaceSource = FakeMacWorkspaces(live, pushes = servesWorkspaces, sessionSource, nowMs)
+    internal val chat = FakeMacChat(live, pushes = servesSessionsAndChat)
 
     /** The pairing record a phone keeps for this Mac: machineId "mac-<id>", linkSlot "slot-<id>", the first host key. */
     val machine: PairedMachine
@@ -210,6 +216,75 @@ class FakeMac(
 
     /** How many workspace lists the Mac was asked for (a `too_large` answer counts). */
     val workspaceListCount: Int get() = workspaceSource.listCount
+
+    // Workspace, agent and terminal control (FakeMacWorkspaces)
+
+    /** Every workspace control call the Mac received, in order: `create`, `rename:<id>:<title>`, `close:<id>`. */
+    val workspaceCalls: List<String> get() = workspaceSource.controlCalls
+
+    /**
+     * The next workspace control call answers [outcome] and, unless it is `OK`, changes nothing. Without it the Mac acts
+     * as the real one does: it makes the workspace, renames or closes one it has (`NOT_FOUND` otherwise) and keeps its
+     * last workspace (`REFUSED`).
+     */
+    fun setNextWorkspaceOutcome(outcome: WorkspaceControlOutcome) = workspaceSource.setNextOutcome(outcome)
+
+    /** From now on control calls (workspace, agent and terminal) are recorded but not answered until released. */
+    fun holdWorkspaceControl() = workspaceSource.hold.hold()
+
+    fun releaseWorkspaceControl() = workspaceSource.hold.release()
+
+    /** The session id of every agent close the Mac received, in order. */
+    val agentCloses: List<String> get() = workspaceSource.agentCloses
+
+    /**
+     * The next agent close answers [outcome] and, unless it is `OK`, changes nothing. Without it a session the Mac lists
+     * that has not ended turns `ENDED` (`OK`); any other id is `NOT_FOUND`.
+     */
+    fun setNextAgentCloseOutcome(outcome: WorkspaceControlOutcome) = workspaceSource.setNextAgentCloseOutcome(outcome)
+
+    /** Every terminal close the Mac received, in order. */
+    val terminalCloses: List<TerminalCloseCall> get() = workspaceSource.terminalCloses
+
+    /**
+     * The next terminal close answers [outcome] and, unless it is `OK`, changes nothing. Without it a terminal that the
+     * named workspace lists is closed (`OK`), and the workspace goes with its last terminal; any other pair is `NOT_FOUND`.
+     */
+    fun setNextTerminalCloseOutcome(outcome: WorkspaceControlOutcome) =
+        workspaceSource.setNextTerminalCloseOutcome(outcome)
+
+    // Chat (FakeMacChat)
+
+    fun setHistory(sessionId: String, entries: List<ChatEntry>) = chat.setHistory(sessionId, entries)
+
+    fun pushChat(sessionId: String, entries: List<ChatEntry>) = chat.push(sessionId, entries)
+
+    /**
+     * The Mac reloads the session's transcript (its `seq` values start over): the transcript becomes [entries] and phones
+     * get `ChatPush.Reset`, in order with the session's pushes.
+     */
+    fun resetChat(sessionId: String, entries: List<ChatEntry>) = chat.reset(sessionId, entries)
+
+    /** Null goes back to `SUBMITTED` for a known transcript and `NOT_FOUND` otherwise. */
+    fun setSendOutcome(outcome: ChatSendOutcome?) = chat.setSendOutcome(outcome)
+
+    val sentTexts: List<SentText> get() = chat.sentTexts
+
+    /** The attachments of every message the Mac took, in order (their messages are in [sentTexts]). */
+    val receivedAttachments: List<ChatAttachment> get() = chat.receivedAttachments
+
+    /** Null goes back to `SENT` for a known transcript and `NOT_FOUND` otherwise. */
+    fun setInterruptOutcome(outcome: ChatInterruptOutcome?) = chat.setInterruptOutcome(outcome)
+
+    val interrupts: List<Interrupt> get() = chat.interrupts
+
+    /** Every history request that reached the transcript, in order. */
+    val historyRequests: List<HistoryRequest> get() = chat.historyRequests
+
+    /** From now on chat calls (history, send, interrupt) are recorded but not answered until [releaseChat]. */
+    fun holdChat() = chat.hold.hold()
+
+    fun releaseChat() = chat.hold.release()
 }
 
 /** The live sessions of one [FakeMac], and the lock that guards every part of that Mac. */
