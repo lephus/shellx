@@ -17,6 +17,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -378,19 +379,27 @@ class LinkClientTest {
     fun cancelledCallerLeavesTheSessionUsable() {
         runBlocking {
             within {
-                val rig = HostRig()
+                val rig = HostRig(wrapClient = ::SuspendingSendCircuit)
                 val host = async { rig.host() }
                 val client = rig.client()
                 val (channel, _) = host.await()
+                // Cancelled while it waits for the answer.
                 val job = launch { client.snapshot() }
                 val cancelled = channel.request() as LinkMessage.SnapshotGet
                 job.cancelAndJoin()
                 assertEquals(0, client.pendingCalls)
                 channel.send(LinkMessage.Snapshot(cancelled.callId, 1, emptyList()))
+                // Cancelled while its encrypted frame is suspended in the circuit's send: the frame still goes out.
+                val midSend = launch(start = CoroutineStart.UNDISPATCHED) { client.snapshot() }
+                midSend.cancelAndJoin()
+                assertEquals(0, client.pendingCalls)
                 val next = async { client.snapshot() }
+                val sentAnyway = channel.request() as LinkMessage.SnapshotGet
+                channel.send(LinkMessage.Snapshot(sentAnyway.callId, 2, emptyList()))
                 val get = channel.request() as LinkMessage.SnapshotGet
-                assertNotEquals(cancelled.callId, get.callId)
+                assertEquals(3, setOf(cancelled.callId, sentAnyway.callId, get.callId).size)
                 channel.send(LinkMessage.Snapshot(get.callId, 5, emptyList()))
+                // Both late answers were dropped.
                 assertEquals(5, next.await().revision)
                 client.close()
             }
@@ -401,7 +410,9 @@ class LinkClientTest {
     fun cancellingManyCallersNeverBreaksTheCipherStream() {
         runBlocking {
             within(10.seconds) {
-                val rig = HostRig()
+                // The client's sends suspend before they reach the circuit, so a cancellation can land after a frame
+                // was encrypted (Review Focus 1); the in-memory pair alone never suspends in send.
+                val rig = HostRig(wrapClient = ::SuspendingSendCircuit)
                 val host = async { rig.host() }
                 val client = rig.client()
                 val (channel, _) = host.await()
@@ -415,6 +426,7 @@ class LinkClientTest {
                             throw e
                         } catch (e: Exception) {
                             hostErrors += e
+                            channel.close()
                             break
                         }
                         when (message) {
@@ -431,15 +443,39 @@ class LinkClientTest {
                     }
                     replies
                 }
-                val jobs = (0 until 100).map { i -> async(Dispatchers.Default) { client.reply("r$i", once) } }
+
+                /** The call's outcome, or the failure it threw; cancellation propagates. */
+                suspend fun attempt(block: suspend () -> ReplyOutcome): Any = try {
+                    block()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    e
+                }
+
+                // Deterministic: each caller takes the free send lock, encrypts its reply and suspends in the
+                // circuit's send; every odd one is cancelled right there.
+                val sequential = (0 until 20).map { i ->
+                    val caller = async(start = CoroutineStart.UNDISPATCHED) { attempt { client.reply("s$i", once) } }
+                    if (i % 2 == 1) caller.cancel()
+                    caller.join()
+                    caller
+                }
+                // Concurrent: 100 callers on Dispatchers.Default, every odd one cancelled at once.
+                val jobs = (0 until 100).map { i ->
+                    async(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) { attempt { client.reply("r$i", once) } }
+                }
                 jobs.forEachIndexed { i, job -> if (i % 2 == 1) job.cancel() }
-                val kept = jobs.filterIndexed { i, _ -> i % 2 == 0 }.awaitAll()
                 jobs.joinAll()
-                assertTrue(kept.all { it == ReplyOutcome.DELIVERED })
+                assertEquals(emptyList(), hostErrors.map { it::class.simpleName }, "the host could not decrypt a frame")
+                val kept = (sequential.filterIndexed { i, _ -> i % 2 == 0 } + jobs.filterIndexed { i, _ -> i % 2 == 0 }).awaitAll()
+                assertTrue(kept.all { it == ReplyOutcome.DELIVERED }, "$kept")
                 assertEquals(5, client.snapshot().revision)
                 val replies = served.await()
-                assertEquals(emptyList(), hostErrors.toList())
-                assertTrue(replies in 50..100, "replies: $replies")
+                assertEquals(emptyList(), hostErrors.map { it::class.simpleName })
+                // All 20 sequential replies were sent (a cancellation landed after encryption), and 50 to 100 others.
+                assertTrue(replies in 70..120, "replies: $replies")
+                assertEquals(0, client.pendingCalls)
                 client.close()
             }
         }

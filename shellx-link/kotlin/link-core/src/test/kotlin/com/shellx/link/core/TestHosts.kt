@@ -1,11 +1,20 @@
 package com.shellx.link.core
 
-/** One phone/host pair over an in-memory circuit. The host side is scripted inline by each test. */
-class HostRig(val features: List<String> = emptyList(), val timings: LinkTimings = LinkTimings.STANDARD) {
+import kotlinx.coroutines.yield
+
+/**
+ * One phone/host pair over an in-memory circuit. The host side is scripted inline by each test. [wrapClient] wraps the
+ * client's end, for example in a [SuspendingSendCircuit].
+ */
+class HostRig(
+    val features: List<String> = emptyList(),
+    val timings: LinkTimings = LinkTimings.STANDARD,
+    wrapClient: (RelayCircuit) -> RelayCircuit = { it },
+) {
     val hostKey = NoiseStaticKey.generate()
     val clientKey = NoiseStaticKey.generate()
     private val ends = inMemoryCircuitPair()
-    val clientEnd = ends.first
+    val clientEnd = wrapClient(ends.first)
     val hostEnd = ends.second
 
     /** Responder handshake only, trusting anyone: for tests that script what comes before Welcome. */
@@ -21,6 +30,17 @@ class HostRig(val features: List<String> = emptyList(), val timings: LinkTimings
 
     suspend fun client(): LinkClient =
         LinkClient.connect(clientEnd, clientKey, hostKey.publicKey, "test-client", "Test Phone", timings)
+}
+
+/**
+ * A circuit whose `send` suspends (yields) before it forwards, as a socket with back-pressure can. The in-memory pair
+ * never suspends in `send`, so without this a cancellation could never land between a frame's encryption and its send.
+ */
+class SuspendingSendCircuit(private val inner: RelayCircuit) : RelayCircuit by inner {
+    override suspend fun send(data: ByteArray) {
+        yield()
+        inner.send(data)
+    }
 }
 
 /** The next frame from the client that is not one of its pings. */

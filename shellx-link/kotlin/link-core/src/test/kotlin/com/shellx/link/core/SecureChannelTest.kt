@@ -4,9 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class SecureChannelTest {
@@ -151,12 +155,52 @@ class SecureChannelTest {
     fun concurrentSendsAllDecrypt() {
         runBlocking {
             within {
-                val (client, server) = pair(inMemoryCircuitPair())
+                // A send that suspends between encryption and delivery: frames still leave in nonce order.
+                val (a, b) = inMemoryCircuitPair()
+                val (client, server) = pair(SuspendingSendCircuit(a) to b)
                 val received = async { List(200) { server.receive() } }
                 (0 until 200).map { i -> async(Dispatchers.Default) { client.send(LinkMessage.Ping(i.toULong())) } }.awaitAll()
                 val nonces = received.await().map { (it as LinkMessage.Ping).nonce }
                 assertEquals((0uL until 200uL).toSet(), nonces.toSet())
                 assertEquals(200, nonces.size)
+                client.close()
+            }
+        }
+    }
+
+    /**
+     * Review Focus 1 at the channel: a sender cancelled while its encrypted frame is suspended in the circuit's send
+     * still sends it, so the nonce it spent is never skipped.
+     */
+    @Test
+    fun cancelledSendersNeverDesyncTheCipher() {
+        runBlocking {
+            within {
+                val (a, b) = inMemoryCircuitPair()
+                val (client, server) = pair(SuspendingSendCircuit(a) to b)
+                // Deterministic: each sender takes the free lock, encrypts, and suspends in the circuit's send;
+                // every odd one is cancelled right there.
+                for (i in 0 until 50) {
+                    val sender = launch(start = CoroutineStart.UNDISPATCHED) { client.send(LinkMessage.Ping(i.toULong())) }
+                    if (i % 2 == 1) sender.cancel()
+                    sender.join()
+                }
+                // Concurrent: 200 senders on Dispatchers.Default, every odd one cancelled at once.
+                val senders = (50 until 250).map { i ->
+                    launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) { client.send(LinkMessage.Ping(i.toULong())) }
+                }
+                senders.forEachIndexed { k, sender -> if (k % 2 == 1) sender.cancel() }
+                senders.joinAll()
+                client.send(LinkMessage.Ping(999u))
+                val nonces = mutableListOf<ULong>()
+                while (true) {
+                    val nonce = (server.receive() as LinkMessage.Ping).nonce
+                    if (nonce == 999uL) break
+                    nonces += nonce
+                }
+                // Every frame decrypted; each sequential sender sent its frame, cancelled or not.
+                assertEquals((0uL until 50uL).toList(), nonces.take(50))
+                assertTrue(nonces.drop(50).all { it in 50uL until 250uL } && nonces.drop(50).size >= 100, "$nonces")
                 client.close()
             }
         }
