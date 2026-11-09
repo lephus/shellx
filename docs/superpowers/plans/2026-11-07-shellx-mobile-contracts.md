@@ -152,7 +152,7 @@ public enum AppleLinkStatus: Equatable, Sendable { case pending, denied, expired
   each module directory.
 - `shellx-android/`: Gradle build with `includeBuild("../shellx-link/kotlin")`. Modules `:core` (Kotlin
   JVM, package `com.shellx.core`, JUnit 5) and `:app` (Android application, namespace `com.shellx.app`).
-  Application id `com.shellx.prod` (release, label "ShellX") and `com.shellx.dev` (debug, label "ShellX
+  Application id `com.shellx.prod` in both build types (release label "ShellX", debug label "ShellX
   Dev"). Versions in `shellx-android/version.properties` (`VERSION_NAME`, `VERSION_CODE`; first
   `VERSION_CODE` is 100).
 - Kotlin names mirror §4 in Kotlin style: `RelayApi.nonce()`, `signInWithGoogle(...)`, `deleteAccount(...)`,
@@ -320,9 +320,9 @@ From 3A:
   screenshot tests use Roborazzi; backup is off for the whole app.
 - Platform implementations: 3D owns `SecretStore`, `NetworkMonitor`, `Clock`; 3E owns `SpeechEngine`,
   `PushRegistrar`, `UpdateChecker`, `AttachmentReader`.
-- `google-services.json` for both app ids is committed (Google treats it as non-secret; the prod copy is
-  already in history at `flutter-final`). 1D/3H add a USER step to restrict the Firebase Android API key
-  to the two package names and their SHA-1s in Google Cloud Console.
+- `google-services.json` for `com.shellx.prod` is committed at `shellx-android/app/google-services.json`
+  (Google treats it as non-secret). 1D/3H add a USER step to restrict the Firebase Android API key
+  to `com.shellx.prod` and its SHA-1s in Google Cloud Console.
 - First `VERSION_CODE` 100 (the Flutter app's last local code was 2).
 
 ## 13. Additions from plan 2A (terminal protocol)
@@ -384,15 +384,14 @@ exceptions keep their Swift names (`PairingModel.step`, `UpdatePrompt.offered`, 
 
 ## 16. Additions from plan 1D (rollout)
 
-- All OAuth clients live in the Google Cloud project `shellxpro`: iOS × 2 (`com.shellx.prod`, `com.shellx.dev`),
-  Android × 3 (`com.shellx.dev` + debug SHA-1; `com.shellx.prod` + upload-key SHA-1; `com.shellx.prod` +
-  Play App Signing SHA-1), Web × 1 (Android's `serverClientId`), Desktop × 1.
+- All OAuth clients live in the Google Cloud project `shellxpro`: iOS × 1 (`com.shellx.prod`),
+  Android `com.shellx.prod` with the debug SHA-1 of the Mac that builds debug, the upload-key SHA-1 and the
+  Play App Signing SHA-1, Web × 1 (Android's `serverClientId`), Desktop × 1.
 - The client ids (not secrets) are recorded in `docs/superpowers/ledgers/shellx-signin-rollout.md`, the
   source for 1C's xcconfigs and 3D/3H's Android config. The Desktop client secret lives only in
   `~/.shellx-release/google-desktop-oauth.env`, read by `scripts/shellx/release/google-desktop-client.sh`
   (two guard functions); both desktop release builds refuse to build without it.
-- Apple: `com.shellx.dev` is grouped under `com.shellx.prod` for Sign in with Apple, with one SIWA key on the
-  relay.
+- Apple: Sign in with Apple uses the single app id `com.shellx.prod`, with one SIWA key on the relay.
 - Android Web client id: `shellx-android/app/src/main/res/values/google_oauth.xml` string
   `google_web_client_id` (a placeholder until 1D fills it from the ledger); `release/mobile/android.sh` (3H)
   refuses a release AAB that still holds the placeholder.
@@ -507,11 +506,13 @@ Behaviour Android (3G) mirrors:
   name both the debug and the release runtime classpaths. Repository blocks hold only `google()` and
   `mavenCentral()` (`gradlePluginPortal()` only in `pluginManagement`).
 - `dev.sh`: `test app` runs both variants with `--continue`; `emulator` prints only the serial on stdout;
-  `device` / `emulator` refuse an APK whose package is not `com.shellx.dev`; ShellX emulators are recognised by
+  `device` installs only a debuggable `com.shellx.prod` APK and refuses a release build on a phone, `emulator`
+  accepts any `com.shellx.prod` APK; ShellX emulators are recognised by
   AVD name, and `clean` waits for an emulator to exit before deleting its AVD.
 - Strings: the Apple-link keys, `appleLink.title`, `settings.account.delete.switchFirst` and the
   `settings.account.switchToGoogle*` keys are iPhone-only (`strings-ios-only.txt`). Plural forms Android ignores
   (en `zero`, vi `one`) are refused.
 - Versions pinned: AGP 9.5.1, Kotlin 2.4.21, Gradle 9.9.0, Compose BOM 2026.06.01, JUnit 5.14.4, JUnit 4.13.2,
   Robolectric 4.17, Roborazzi 1.78.0, activity-compose 1.13.0, google-services 4.5.0, API 36.
-- Still the user's: Task 10 (Firebase `google-services.json` for both app ids) and the phone dogfood.
+- Firebase: `google-services.json` for `com.shellx.prod` is committed (see §12); only the phone dogfood is still the user's.
+- User decision 2026-11-09: no `com.shellx.dev` anywhere; debug builds on Android and iPhone use `com.shellx.prod`.
