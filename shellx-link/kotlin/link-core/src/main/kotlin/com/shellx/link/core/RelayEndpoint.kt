@@ -8,15 +8,21 @@ import java.security.SecureRandom
  * Shared by the relay sockets and the ShellX account API.
  */
 object RelayTransportPolicy {
-    /** `localhost`, `127.0.0.0/8` and `::1`, in any case and with or without IPv6 brackets. */
+    /**
+     * `localhost`, `127.0.0.0/8` and `::1`, in any case and with or without IPv6 brackets. Each IPv4 octet must be
+     * canonical decimal (0–255, no sign and no leading zero): Android's resolver does not read `127.0.0.01` as an
+     * address, so such a name would go to DNS.
+     */
     fun isLoopback(host: String?): Boolean {
         var h = host?.lowercase() ?: return false
         if (h.length >= 2 && h.startsWith("[") && h.endsWith("]")) h = h.substring(1, h.length - 1)
         if (h == "localhost" || h == "::1") return true
         val octets = h.split('.')
-        if (octets.size != 4 || octets.any { it.toUByteOrNull() == null }) return false
+        if (octets.size != 4 || octets.any { !CANONICAL_OCTET.matches(it) || it.toInt() > 255 }) return false
         return octets[0] == "127"
     }
+
+    private val CANONICAL_OCTET = Regex("0|[1-9][0-9]{0,2}")
 
     /**
      * Accepts `https`, and `http` only to a loopback host. Plain `http` to any other host is
