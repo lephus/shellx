@@ -3,18 +3,24 @@ package com.shellx.app
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.TestComposition
 import com.shellx.app.testing.mainComposition
 import com.shellx.app.ui.ShellXApp
+import com.shellx.app.ui.nav.WorkRoutes
 import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXAppTheme
 import com.shellx.core.demo.DemoEnvironment
@@ -34,11 +40,12 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** The whole window over fakes on the main thread: sign in, pair the first Mac, see its workspaces; and the demo. */
+/** The whole window over fakes on the main thread: sign in, pair the first Mac, see its workspaces; the demo; and a
+ *  workspace made across a recreated window. */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "w400dp-h1600dp")
 class ShellXAppSmokeTest {
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     @get:Rule val folder = TemporaryFolder()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -117,5 +124,37 @@ class ShellXAppSmokeTest {
         waitForText("Continue with Google")
         waitUntil { !shown("Exit") }
         rule.onNodeWithText("Exit").assertDoesNotExist()
+    }
+
+    /**
+     * Review C m-3: a ＋ still waiting for the Mac when the window is recreated (a rotation) opens the new workspace in
+     * the new window. The create runs in the hub's scope and holds the navigator the old window gave the home.
+     */
+    @Test
+    fun aWorkspaceMadeAcrossARecreatedWindowOpensInTheNewWindow() {
+        val mac = macWithAWorkspace()
+        val t = mainComposition(folder.root, macs = listOf(mac), appScope = appScope)
+        lateinit var nav: NavHostController
+        val app: @Composable () -> Unit = {
+            ShellXAppTheme(AppAppearance.SYSTEM) { ShellXApp(t.composition, rememberNavController().also { nav = it }) }
+        }
+        rule.setContent(app)
+        rule.runOnUiThread { t.composition.lifecycle.onStart() }
+        waitForText("shellx-ios")
+        mac.holdWorkspaceControl()
+
+        rule.onNodeWithTag("workspaces.create").performClick()
+        waitUntil { mac.workspaceCalls == listOf("create") }
+        rule.activityRule.scenario.recreate()
+        rule.setContent(app)
+        waitForText("shellx-ios")
+        mac.releaseWorkspaceControl()
+
+        waitUntil {
+            val top = nav.currentBackStackEntry
+            top?.destination?.route == WorkRoutes.WORKSPACE && top.arguments?.getString("workspaceId") == "ws-new-1"
+        }
+        assertEquals(mac.machine.machineId, nav.currentBackStackEntry?.arguments?.getString("machineId"))
+        assertEquals("one workspace was made", listOf("create"), mac.workspaceCalls)
     }
 }
