@@ -534,3 +534,33 @@ Behaviour Android (3G) mirrors:
 - **Budgets.** A lost session restores the open budgets (busy ×5, one failed retry); a `not_open` reopen after
   `.opened` has its own budget. `terminalFirstScreen` restarts on the open that actually produces the screen (not
   counting time offline or in the background).
+
+## 24. Additions from plan 3B (landed 91bc8626be)
+
+- Built names beyond §9: result types `PendingChange`, `SessionChange`, `WorkspaceChange`, `ChatPush`,
+  `PendingSnapshot`, `SessionList`, `WorkspaceList`, `ChatHistoryPage`, `WorkspaceCreated`, `ChatAttachment`,
+  `LinkTimings`; exceptions `LinkClientException.{ProtocolMismatch, Rejected, SessionClosed, TimedOut, Remote,
+  UnexpectedAnswer}`, `NoiseException.UntrustedPeer`, `RelayException.*`, `PairingOfferException.*`,
+  `RelayApiException.{Http(status, code), BadResponse, SlotMismatch, NotConnectTicket}`,
+  `PhonePairingException.{Denied, Expired}`.
+- `com.shellx.link.account`: `RelayApi(baseUrl, okHttpClient, clientVersion)` throws on construction
+  (`RelayException.InsecureTransport` for plain http to a non-loopback host, `ProtocolViolation` for a bad URL);
+  `RelayApi.relaySockets`; `PhonePairing.pair(offerUri, clientKey, api, token, pollInterval = 2.seconds,
+  timeout = PairingOffer.LIFETIME, onRequested = {})` (cancelling it withdraws the pairing); `PairedMachine(machineId,
+  name, linkSlot, hostKey)`, `PairedMachineListing`, `PhonePairingStatus`, `AccountSession`, `AccountSignIn`,
+  `MintedTicket`; `LinkConnector.connect(machine, key, api, token, clientVersion, deviceName, sockets =
+  api.relaySockets)` (no `timings`: for custom timings call `mintConnectTicket` → `RelayClientConnector.connect` →
+  `LinkClient.connect(…, timings)`); `OkHttpRelaySockets(okHttpClient)`.
+- Consumer rules: `LinkLog.sink` is called from any thread (thread-safe); `RelayApi` inherits the caller's OkHttp
+  interceptors — never add a logging interceptor (bearer tokens); `clientKey` is the phone's Noise static **public**
+  key; `chatSend(id, text, emptyList())` is ambiguous — name `attachments =` or `uploading =`; every type holding user
+  content or secrets prints `<redacted>` in `toString()`; attachment copy + SHA-256 run on `Dispatchers.Default`,
+  the handshake and per-frame encryption on the caller's dispatcher.
+- Failure mapping for 3C's `LinkFailure`: `Http(401, …)` signed out; `Http(_, "not_granted" | "machine_not_found")`
+  grant revoked; `NoiseException.UntrustedPeer` / `RelayApiException.SlotMismatch` host key changed;
+  `LinkClientException.ProtocolMismatch` needs an update; `IOException`, `RelayException.*`, `SessionClosed`,
+  `TimedOut` offline. Tests run with `-ea`: assert exception type, never identity.
+- Pins and gaps: OkHttp 5.4.0 until compileSdk 37; `RelayTransportPolicy.isLoopback` takes only canonical decimal IPv4
+  octets (parity difference from Swift); the relay socket's incoming queue is unbounded — 3G bounds it before terminal
+  streams; the live-relay test `RelayIntegrationTest` needs `CMUX_RELAY_BIN` and has not run yet; R8 has not yet seen
+  link-account / BouncyCastle (3C reruns `dev.sh build-release` once `:app` uses them).
