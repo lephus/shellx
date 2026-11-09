@@ -10,21 +10,25 @@ import kotlinx.coroutines.flow.FlowCollector
  * (plan 3G Task 4b, contracts §24). [offer] never suspends, so the session's reader never waits on a slow consumer:
  * pings, call answers and the other pushes keep flowing behind a terminal flood.
  *
- * The rules, per terminal:
+ * The terminal viewed is the one of the last [TerminalViewPush.Opened], until its [TerminalViewPush.Ended]; a session
+ * views one terminal (PROTOCOL.md 11.1). Its frames follow these rules:
  * - A delta or history frame that would take the frames queued past [maxQueuedWeight] is dropped, unless none is
  *   queued. The first one dropped puts [TerminalFramePart.LOST] in its place: the consumer's assembler sees the gap
  *   there and asks for one resync. From then until the terminal's next snapshot, its other frames are dropped too:
  *   an assembler that awaits a snapshot would ignore them anyway.
- * - A snapshot of the terminal viewed (the one of the last [TerminalViewPush.Opened]) is never dropped, so the answer
- *   to every resync reaches the assembler. Kept, it removes every frame of its terminal still queued: a snapshot
- *   replaces the screen and the history (PROTOCOL.md 11.6). So at most one snapshot per terminal is ever queued.
- *   Another terminal's snapshot follows the bound like a delta.
- * - [TerminalViewPush.Opened] and [TerminalViewPush.Ended] are never dropped and weigh nothing.
+ * - A snapshot is never dropped, so the answer to every resync reaches the assembler: its part 0, and each later part
+ *   in turn (a part sent again, out of order or after the snapshot is complete follows the bound like a delta). Kept,
+ *   its part 0 removes every frame of the terminal still queued: a snapshot replaces the screen and the history
+ *   (PROTOCOL.md 11.6), so at most one snapshot of the view is ever queued.
+ *
+ * The frames of any other terminal, which the client ignores (11.1), are kept while they fit the bound and dropped
+ * when they do not, with no LOST part, and leave no state behind, so a host that names many terminals grows nothing.
+ * [TerminalViewPush.Opened] and [TerminalViewPush.Ended] are never dropped and weigh nothing.
  *
  * A frame's weight is about the size of its JSON: the UTF-8 bytes of its texts, counted exactly, and a fixed estimate
- * for the rest. So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of the terminal viewed, which
- * PROTOCOL.md 11.4 caps at 256 parts of one frame each (a snapshot of the largest grid a phone asks for, 300 × 120 with
- * 240 history rows, is far smaller). Decoded, a frame takes about 1 to 3 times its weight in memory (the most for many
+ * for the rest. So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of each view opened while the
+ * consumer lagged (the phone opens views, one at a time). PROTOCOL.md 11.4 caps a snapshot at 256 parts of one frame
+ * each; a snapshot of the largest grid a phone asks for, 300 × 120 with 240 history rows, is far smaller. Decoded, a frame takes about 1 to 3 times its weight in memory (the most for many
  * one-cell runs: an object and a string per run), so the bound holds a session's queued terminal output to about 2 to
  * 6 MiB, plus that one snapshot.
  *
@@ -52,8 +56,12 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     private var dropped = 0L
     private var closed = false
     private var viewing: String? = null
-    private val lost = HashSet<String>()
-    private val arriving = HashMap<String, Arriving>()
+
+    /** The view's LOST part is queued (or was taken), and no snapshot of it was kept since. */
+    private var viewLost = false
+
+    /** The view's frame whose parts are arriving. */
+    private var viewArriving: Arriving? = null
 
     /** A token after each offer; a collector waits on it only when nothing is queued. */
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -96,13 +104,11 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
             if (closed) return
             when (push) {
                 is TerminalViewPush.Opened -> {
-                    viewing = push.terminalId
-                    forget(push.terminalId)
+                    view(push.terminalId)
                     add(push, 0)
                 }
                 is TerminalViewPush.Ended -> {
-                    if (viewing == push.terminalId) viewing = null
-                    forget(push.terminalId)
+                    if (viewing == push.terminalId) view(null)
                     add(push, 0)
                 }
                 is TerminalViewPush.Frame -> lostNow = offerFrame(push)
@@ -113,7 +119,10 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
 
     /** Completes [pushes] once the queued pushes are taken. Idempotent. */
     fun close() {
-        synchronized(lock) { closed = true }
+        synchronized(lock) {
+            closed = true
+            view(null)
+        }
         wake.close()
     }
 
@@ -130,34 +139,44 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     private fun offerFrame(push: TerminalViewPush.Frame): Boolean {
         val id = push.terminalId
         val part = push.part
+        val w = part.weight()
+        if (id != viewing) {
+            if (weight > 0 && weight + w > maxQueuedWeight) {
+                dropped += 1
+            } else {
+                add(push, w)
+            }
+            return false
+        }
         // A part belongs to the frame arriving only as the part it lacks next: a part sent again, out of order or
         // after the frame is complete is no part of it, and follows the bound like a delta.
         val frame = if (part.part == 0) {
-            Arriving(part.revision, part.parts, part.head?.kind == TerminalFrameKind.SNAPSHOT).also { arriving[id] = it }
+            Arriving(part.revision, part.parts, part.head?.kind == TerminalFrameKind.SNAPSHOT).also { viewArriving = it }
         } else {
-            arriving[id]?.takeIf { it.revision == part.revision && it.parts == part.parts && it.next == part.part }
+            viewArriving?.takeIf { it.revision == part.revision && it.parts == part.parts && it.next == part.part }
                 ?.also { it.next += 1 }
         }
-        if (frame != null && frame.next == frame.parts) arriving.remove(id)
+        if (frame != null && frame.next == frame.parts) viewArriving = null
         val snapshot = frame?.snapshot == true
         // The rest of a frame whose first part went, and what waits for a snapshot, go without another marker.
-        if ((frame != null && !frame.kept) || (!snapshot && id in lost)) return drop(frame, null)
-        val w = part.weight()
-        if (!(snapshot && id == viewing) && weight > 0 && weight + w > maxQueuedWeight) return drop(frame, id)
+        if ((frame != null && !frame.kept) || (!snapshot && viewLost)) return drop(frame, markLost = false)
+        if (!snapshot && weight > 0 && weight + w > maxQueuedWeight) return drop(frame, markLost = true)
         if (snapshot && part.part == 0) {
             replaceFramesOf(id)
-            lost.remove(id)
+            viewLost = false
         }
         add(push, w)
         return false
     }
 
-    /** Caller holds [lock]. Drops a frame part; with [markLost], queues the terminal's LOST part unless it has one. */
-    private fun drop(frame: Arriving?, markLost: String?): Boolean {
+    /** Caller holds [lock]. Drops a part of the view's frame; with [markLost], queues its LOST part unless it has one. */
+    private fun drop(frame: Arriving?, markLost: Boolean): Boolean {
         dropped += 1
         frame?.kept = false
-        if (markLost == null || !lost.add(markLost)) return false
-        add(TerminalViewPush.Frame(markLost, TerminalFramePart.LOST), 0)
+        val id = viewing
+        if (!markLost || viewLost || id == null) return false
+        viewLost = true
+        add(TerminalViewPush.Frame(id, TerminalFramePart.LOST), 0)
         return true
     }
 
@@ -173,10 +192,11 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
         }
     }
 
-    /** Caller holds [lock]. A new view of [terminalId], or its end: what was known of its frames no longer holds. */
-    private fun forget(terminalId: String) {
-        lost.remove(terminalId)
-        arriving.remove(terminalId)
+    /** Caller holds [lock]. A new view, or none: what was known of the old view's frames no longer holds. */
+    private fun view(terminalId: String?) {
+        viewing = terminalId
+        viewLost = false
+        viewArriving = null
     }
 
     /** Caller holds [lock]. */
