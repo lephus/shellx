@@ -144,4 +144,26 @@ final class TerminalPaneTests: XCTestCase {
 
         XCTAssertEqual(surface.model.terminalId, "t-zsh", "the shell being typed into stays shown")
     }
+
+    /// A page that is reopening (its view ended `failed`; the last screen stays, uncovered) takes no input: the keyboard
+    /// and the key bar go, so nothing typed is lost while it looks ready (final review, app I1 and core M1).
+    func testAReopeningPageGivesUpTheKeyboardAndTheKeyBar() async throws {
+        let (rig, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        let unfocused = surface.bounds.height
+        XCTAssertTrue(surface.becomeFirstResponder())
+        let keyBar = await eventually { surface.bounds.height < unfocused }
+        XCTAssertTrue(keyBar, "the key bar takes room under the surface")
+
+        await rig.mac.endTerminalView("t-zsh", reason: .failed)
+
+        let reopening = await eventually { model.phase == .connecting }
+        XCTAssertTrue(reopening, "\(model.phase)")
+        let released = await eventually { !surface.isFirstResponder && surface.bounds.height == unfocused }
+        XCTAssertTrue(
+            released, "first responder: \(surface.isFirstResponder), height \(surface.bounds.height) of \(unfocused)")
+    }
 }
