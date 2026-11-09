@@ -39,6 +39,15 @@ class WorkspaceListViewTest {
         appScope.cancel()
     }
 
+    /** Waits in real time, running the main looper between checks: the account's work is posted to the main thread,
+     *  which a plain `waitUntil` (a sleep on that thread) never runs. */
+    private fun waitUntil(condition: () -> Boolean) = rule.waitUntil(10_000) {
+        rule.waitForIdle()
+        condition()
+    }
+
+    private fun shows(text: String): Boolean = rule.onAllNodes(hasText(text, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
+
     @Test
     fun theHomeRegroupsEveryThirtySeconds() {
         val clock = ManualClock()
@@ -58,17 +67,17 @@ class WorkspaceListViewTest {
         mac.upsertSession(working)
         val t = mainComposition(folder.root, listOf(mac), appScope, clock = clock)
         t.composition.lifecycle.onStart()
-        rule.waitUntil(10_000) { t.composition.real.scopes.current.value != null }
+        waitUntil { t.composition.real.scopes.current.value != null }
         val scope = t.composition.real.scopes.current.value!!
         val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         rule.setContent { ShellXTheme { WorkspaceListView(scope, RecordingNavigator(), ticks) } }
-        rule.waitUntil(10_000) { rule.onAllNodes(hasText("Running · 1", ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }
+        waitUntil { shows("Running · 1") }
 
         mac.upsertSession(working.copy(state = AgentState.IDLE, stateSinceMs = clock.nowMs()))
-        rule.waitUntil(10_000) { rule.onAllNodes(hasText("Just finished · 1", ignoreCase = true)).fetchSemanticsNodes().isNotEmpty() }
+        waitUntil { shows("Just finished · 1") }
 
         clock.advance(3_601.seconds)
         ticks.tryEmit(Unit)
-        rule.waitUntil(10_000) { rule.onAllNodes(hasText("Just finished · 1", ignoreCase = true)).fetchSemanticsNodes().isEmpty() }
+        waitUntil { !shows("Just finished · 1") }
     }
 }

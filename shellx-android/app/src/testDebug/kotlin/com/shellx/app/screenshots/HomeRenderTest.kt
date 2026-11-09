@@ -42,11 +42,20 @@ class HomeRenderTest {
         allowsControl = false, listsWorkspaces = false, otherSessionCount = 3,
     )
 
-    @Test fun homeFocus() = run { assertRenders("home-focus") { List(listOf(macbook), mockup) } }
+    @Test
+    fun homeFocus() {
+        assertRenders("home-focus") { List(listOf(macbook), mockup) }
+    }
 
-    @Test fun homeFocusLargeText() = run { assertRenders("home-focus-large-text") { LargeText { List(listOf(macbook), mockup) } } }
+    @Test
+    fun homeFocusLargeText() {
+        assertRenders("home-focus-large-text") { LargeText { List(listOf(macbook), mockup) } }
+    }
 
-    @Test fun homeQuiet() = run { assertRenders("home-quiet") { List(listOf(macbook)) } }
+    @Test
+    fun homeQuiet() {
+        assertRenders("home-quiet") { List(listOf(macbook)) }
+    }
 
     @Test
     fun homeOldMac() {
@@ -76,7 +85,10 @@ class HomeRenderTest {
         assertRenders("home-two-macs") { List(listOf(macbook, reconnecting), focus, showsMachineNames = true) }
     }
 
-    @Test fun workspaces() = run { assertRenders("workspaces") { List(listOf(macbook, mini), pending = HomeFixtures.pending) } }
+    @Test
+    fun workspaces() {
+        assertRenders("workspaces") { List(listOf(macbook, mini), pending = HomeFixtures.pending) }
+    }
 
     @Test
     fun workspacesError() {
@@ -106,9 +118,18 @@ class HomeRenderTest {
         }
     }
 
-    @Test fun workspacesEmpty() = run { assertRenders("workspaces-empty") { List(listOf(macbook.copy(rows = emptyList()))) } }
+    @Test
+    fun workspacesEmpty() {
+        assertRenders("workspaces-empty") { List(listOf(macbook.copy(rows = emptyList()))) }
+    }
 
-    @Test fun workspacesOffline() = run { assertRenders("workspaces-offline") { List(listOf(mini)) } }
+    @Test
+    fun workspacesOffline() {
+        assertRenders("workspaces-offline") { List(listOf(mini)) }
+    }
 
-    @Test fun workspacesRename() = run { assertRenders("workspaces-rename") { WorkspaceRenameContent("shellx-ios", save = {}, cancel = {}) } }
+    @Test
+    fun workspacesRename() {
+        assertRenders("workspaces-rename") { WorkspaceRenameContent("shellx-ios", save = {}, cancel = {}) }
+    }
 }
