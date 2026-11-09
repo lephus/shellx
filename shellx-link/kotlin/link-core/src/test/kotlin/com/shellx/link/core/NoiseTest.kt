@@ -84,6 +84,31 @@ class NoiseTest {
     }
 
     @Test
+    fun throwingTrustsPoisonsTheHandshake() {
+        // Whatever `trusts` throws, the decrypted but unproven key is dropped and the handshake is dead.
+        val cases: List<Pair<Throwable, (Throwable) -> Boolean>> = listOf(
+            AssertionError("boom") to { e -> e is AssertionError },
+            NotImplementedError() to { e -> e is NotImplementedError },
+            kotlin.coroutines.cancellation.CancellationException("gone") to
+                { e -> e is kotlin.coroutines.cancellation.CancellationException },
+            IllegalStateException("x") to { e -> e is NoiseException.BadMessage },
+        )
+        for ((thrown, expected) in cases) {
+            val name = thrown::class.simpleName
+            val initiator = NoiseHandshake(NoiseRole.INITIATOR, NoiseStaticKey.generate(), trusts = { throw thrown })
+            val responder = NoiseHandshake(NoiseRole.RESPONDER, NoiseStaticKey.generate())
+            responder.readMessage(initiator.writeMessage())
+            val message2 = responder.writeMessage()
+            val error = runCatching { initiator.readMessage(message2) }.exceptionOrNull()
+            assertTrue(error != null && expected(error), "$name became $error")
+            assertNull(initiator.remoteStatic, "$name: an unproven key is not kept")
+            assertFalse(initiator.isComplete, "$name")
+            assertFailsWith<NoiseException.BadMessage>("$name") { initiator.writeMessage() }
+            assertFailsWith<NoiseException.BadMessage>("$name") { initiator.readMessage(message2) }
+        }
+    }
+
+    @Test
     fun tamperedMessagesFail() {
         // Transport: one flipped bit anywhere fails authentication.
         val (iT, rT) = transports()
