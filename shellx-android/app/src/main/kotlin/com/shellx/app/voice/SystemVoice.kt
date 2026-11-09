@@ -37,8 +37,9 @@ class SystemVoice(
     private val known = VoiceCapabilityCache(timeSource = timeSource, ask = probe::capabilities)
     private val intents = RecognizerIntents(app.packageName)
 
-    /** The newest service made: it hears that the on-device recognizer failed, so Settings names the path used. */
-    @Volatile private var newest: WeakReference<VoiceService>? = null
+    /** Every live service made (held weakly): each hears that the on-device recognizer failed, so every account's
+     *  Settings names the path used, not only the newest's (the demo's, after a demo run; final review m-5). */
+    private val services = ArrayList<WeakReference<VoiceService>>()
 
     val engine: SpeechEngine = FallbackTranscriber(
         slot = slot,
@@ -58,12 +59,16 @@ class SystemVoice(
     internal suspend fun primaryFailed(language: VoiceLanguage) {
         probe.markFailed(language)
         known.forget(language)
-        newest?.get()?.primaryFellBack(language)
+        val live = synchronized(services) {
+            services.removeAll { it.get() == null }
+            services.mapNotNull { it.get() }
+        }
+        for (service in live) service.primaryFellBack(language)
     }
 
     /**
      * The account's voice input over [hub]: [engine], its capabilities through the process-level answers, the hub's
-     * scope, and the phone's preferred languages. The newest one made hears `primaryFellBack`.
+     * scope, and the phone's preferred languages. Every live one hears `primaryFellBack`.
      */
     fun makeService(
         hub: MachineHub,
@@ -83,7 +88,10 @@ class SystemVoice(
             preferredLanguages = preferredLanguages(),
             contextualStrings = VoiceService.contextualStrings(hub),
         )
-        newest = WeakReference(service)
+        synchronized(services) {
+            services.removeAll { it.get() == null }
+            services += WeakReference(service)
+        }
         return service
     }
 
