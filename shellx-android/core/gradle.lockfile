@@ -2,10 +2,10 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :core:dependencies --write-locks
-com.squareup.okhttp3:okhttp-jvm:5.5.1=runtimeClasspath,testRuntimeClasspath
-com.squareup.okhttp3:okhttp:5.5.1=runtimeClasspath,testRuntimeClasspath
-com.squareup.okio:okio-jvm:3.18.1=runtimeClasspath,testRuntimeClasspath
-com.squareup.okio:okio:3.18.1=runtimeClasspath,testRuntimeClasspath
+com.squareup.okhttp3:okhttp-jvm:5.4.0=runtimeClasspath,testRuntimeClasspath
+com.squareup.okhttp3:okhttp:5.4.0=runtimeClasspath,testRuntimeClasspath
+com.squareup.okio:okio-jvm:3.17.0=runtimeClasspath,testRuntimeClasspath
+com.squareup.okio:okio:3.17.0=runtimeClasspath,testRuntimeClasspath
 org.bouncycastle:bcprov-jdk18on:1.86=runtimeClasspath,testRuntimeClasspath
 org.jetbrains.kotlin:kotlin-stdlib:2.4.21=runtimeClasspath,testRuntimeClasspath
 org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.11.0=runtimeClasspath,testRuntimeClasspath
