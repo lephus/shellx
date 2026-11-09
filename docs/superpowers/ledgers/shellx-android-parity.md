@@ -82,6 +82,7 @@ Android file it goes to, the owning plan (contracts §1) and its state.
 | A-11 | A push is an FCM data message that carries `agent` and `workspace_title`, and the phone builds the alert text itself | Contracts §8: data-only messages | `core:push/PushPayload.kt` | 3C | differs (3C): by design |
 | A-12 | The update prompt compares Play `versionCode`s from Play In-App Updates; there is no store-page URL | S3 §7.3: flexible in-app update instead of the App Store lookup | `core:update/UpdatePrompt.kt` | 3C | differs (3C): by design |
 | A-13 | A debug build may reach a relay at `http://127.0.0.1` or `http://localhost` (cleartext to loopback only, `app/src/debug/res/xml/network_security_config.xml`); release builds allow no cleartext | The debug relay override of A-6 needs plain HTTP to a relay on the Mac through `adb reverse`; the iPhone's debug build has `NSAllowsLocalNetworking` | `shellx-android/app/src/debug/AndroidManifest.xml` | 3D | done (3D) |
+| A-14 | Android wording for three plan-1C strings (`signin_subtitle`, `signin_error_reauth_required`, `settings_account_delete_message`): Google only, phone for iPhone; 1C's Apple and password-switch keys (`signin.error.emailInUse` and `signin.error.identityInUse` among them) are in `strings-ios-only.txt`. Android-only TalkBack and navigation words: `nav_back`, `row_actions`, `action_open_agent`, `action_open_your_macs` | S3 §3: no Apple sign-in and no password session on Android | `shellx-android/app/src/main/res/values*/strings_android.xml` | 3D | done (3D) |
 
 ## Test devices
 

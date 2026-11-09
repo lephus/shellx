@@ -184,8 +184,6 @@
     <string name="settings_voice_unavailable">Lúc này không nhận dạng giọng nói được. Bạn vẫn gõ được.</string>
     <string name="signin_demo">Xem thử không cần tài khoản</string>
     <string name="signin_email">Email</string>
-    <string name="signin_error_email_in_use">Một tài khoản ShellX khác đã dùng email của tài khoản Google đó.</string>
-    <string name="signin_error_identity_in_use">Tài khoản Google đó đã đăng nhập vào một tài khoản ShellX khác, hoặc tài khoản này đã dùng một tài khoản Google khác.</string>
     <string name="signin_error_invalid_credentials">ShellX không xác nhận được lần đăng nhập này. Thử lại.</string>
     <string name="signin_error_network">Không kết nối được tới ShellX.</string>
     <string name="signin_error_provider_failed">Đăng nhập chưa xong. Thử lại.</string>

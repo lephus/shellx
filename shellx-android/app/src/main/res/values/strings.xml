@@ -185,8 +185,6 @@
     <string name="settings_voice_unavailable">Speech recognition isn\'t available right now. You can still type.</string>
     <string name="signin_demo">Try without an account</string>
     <string name="signin_email">Email</string>
-    <string name="signin_error_email_in_use">Another ShellX account already uses that Google account\'s email.</string>
-    <string name="signin_error_identity_in_use">That Google account already signs in to another ShellX account, or this account already uses another Google account.</string>
     <string name="signin_error_invalid_credentials">ShellX couldn\'t confirm this sign-in. Try again.</string>
     <string name="signin_error_network">Can\'t reach ShellX.</string>
     <string name="signin_error_provider_failed">The sign-in didn\'t finish. Try again.</string>
