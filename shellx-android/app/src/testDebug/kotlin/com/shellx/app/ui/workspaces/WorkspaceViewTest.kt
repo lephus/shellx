@@ -57,6 +57,8 @@ class WorkspaceViewTest {
     fun thePaneClosedOnTheMacShowsTheNoticeThenItGoes() {
         show()
         until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        // Frame by frame from here, so the 4 s count from the frame the notice shows (the chips slide meanwhile).
+        compose.mainClock.autoAdvance = false
         rig.mac.upsertWorkspace(
             LinkWorkspace(
                 "ws-shellx", "shellx-ios", 0, directory = "~/shellx/shellx-ios", branch = "feat/workspaces",
@@ -64,9 +66,11 @@ class WorkspaceViewTest {
             ),
         )
         val notice = context.getString(R.string.workspace_pane_closed_on_mac)
-        until { shown(notice) }
+        compose.waitUntil(10_000) {
+            compose.mainClock.advanceTimeByFrame()
+            shown(notice)
+        }
         compose.onNodeWithTag("workspace.chip.t-claude").assertIsSelected()
-        compose.mainClock.autoAdvance = false
         compose.mainClock.advanceTimeBy(3_900)
         assertTrue("the notice stays 4 s", shown(notice))
         compose.mainClock.advanceTimeBy(200)
