@@ -1,3 +1,4 @@
+import org.gradle.api.artifacts.dsl.LockMode
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -37,4 +38,9 @@ tasks.withType<Test>().configureEach {
 
 configurations.configureEach {
     if (name == "runtimeClasspath" || name.endsWith("RuntimeClasspath")) resolutionStrategy.activateDependencyLocking()
+}
+
+dependencyLocking {
+    // An unlocked runtime classpath fails instead of resolving freely (scripts/shellx/check-android-license.sh).
+    lockMode.set(LockMode.STRICT)
 }

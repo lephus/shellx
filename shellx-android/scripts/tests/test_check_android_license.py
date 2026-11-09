@@ -225,7 +225,7 @@ class CheckAndroidLicenseTests(unittest.TestCase):
             (link, 'val vectors = layout.projectDirectory.dir("../../vectors")\n'),
         ]:
             with self.subTest(text=text):
-                self.assertPasses(self.tree({path: text}))
+                self.assertPasses(self.tree({path: CLEAN[path] + text}))
 
     def test_only_maven_central_and_google_repositories(self):
         settings = CLEAN["shellx-android/settings.gradle.kts"]

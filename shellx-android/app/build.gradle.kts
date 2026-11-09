@@ -1,5 +1,6 @@
 import com.android.build.api.variant.HostTestBuilder
 import java.util.Properties
+import org.gradle.api.artifacts.dsl.LockMode
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -111,6 +112,11 @@ tasks.withType<Test>().configureEach {
 
 configurations.configureEach {
     if (name == "runtimeClasspath" || name.endsWith("RuntimeClasspath")) resolutionStrategy.activateDependencyLocking()
+}
+
+dependencyLocking {
+    // An unlocked runtime classpath fails instead of resolving freely (scripts/shellx/check-android-license.sh).
+    lockMode.set(LockMode.STRICT)
 }
 
 // Firebase (push) needs both config files; Task 10 of plan 3A adds them. Until then push stays off.

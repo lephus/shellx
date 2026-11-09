@@ -3,7 +3,8 @@
 # (shellx-link/kotlin/). Prints `violation: <path>[:<line>]: <message>` per problem and exits 1 when:
 #   1. a gradle.lockfile entry is not on scripts/shellx/android-license-allowlist.txt, or is a test-only
 #      entry used on a shipped classpath
-#   2. a Gradle module has no gradle.lockfile with its runtime classpath
+#   2. a Gradle module has no gradle.lockfile with its runtime classpaths (debug and release for Android), does
+#      not activate locking, or does not lock in STRICT mode; or a build script uses core library desugaring
 #   3. the allowlist is malformed: duplicate keys, GPL/LGPL/AGPL, unknown scope or licence, stray wildcards,
 #      Google SDKs not listed by name
 #   4. a *.gradle (Groovy) script exists
@@ -33,7 +34,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     -h|--help)
-      sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)

@@ -32,6 +32,10 @@ MODULE_RECEIVER = re.compile(r"^(?:project\.)?(?:(?:layout\.)?(?:projectDirector
 ENV_TOKENS = re.compile(r"\bSystem\s*\.\s*(?:getenv|getProperty)\b|\bgradleUserHomeDir\b|\buserHome\b")
 PARENT = re.compile(r"\.\s*(?:parentFile|parent)\b|\b(?:getParentFile|getParent)\s*\(")
 URL_SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]+):")
+TEST_CONFIG = re.compile(r"^test(?:[A-Z]|$)|UnitTest|AndroidTest|ScreenshotTest|HostTest|DeviceTest|TestFixtures")
+ANDROID_CONFIG = re.compile(r"^(?:debug|release)(?:[A-Z]\w*)?RuntimeClasspath$")
+STRICT_LOCKING = re.compile(r"\blockMode\s*(?:\.\s*set\s*\(|=)\s*LockMode\s*\.\s*STRICT\b")
+DESUGARING = re.compile(r"\b(?:coreLibraryDesugaring|isCoreLibraryDesugaringEnabled)\b")
 ROOTS_TEXT = "shellx-android/, shellx-link/kotlin/, shellx-link/vectors/ and shellx-link/spec/"
 REPO_CALL = re.compile(r"\b(maven|mavenLocal|jcenter|ivy|flatDir)\s*[({]")
 COMPANY = re.compile(r"(?<![A-Za-z0-9_])manaflow(?![A-Za-z0-9_])", re.IGNORECASE)
@@ -310,15 +314,14 @@ def lookup(entries, group: str, artifact: str):
 
 
 def check_lockfile(rel: str, text: str, entries, report: Report) -> None:
-    has_runtime = False
+    named = set()
     for number, raw in enumerate(text.splitlines(), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         coords, _, confs = line.partition("=")
         configs = [c for c in confs.split(",") if c]
-        if "releaseRuntimeClasspath" in configs or "runtimeClasspath" in configs:
-            has_runtime = True
+        named.update(configs)
         if coords == "empty":
             continue
         parts = coords.split(":")
@@ -326,7 +329,7 @@ def check_lockfile(rel: str, text: str, entries, report: Report) -> None:
             report.add(rel, "unreadable lockfile line %r" % line, number)
             continue
         group, artifact, version = parts[0], parts[1], parts[2]
-        ships = any(("test" not in c and "Test" not in c) for c in configs)
+        ships = any(not TEST_CONFIG.search(c) for c in configs)
         scope = "ship" if ships else "test"
         allowed = lookup(entries, group, artifact)
         label = "%s:%s:%s" % (group, artifact, version)
@@ -335,8 +338,13 @@ def check_lockfile(rel: str, text: str, entries, report: Report) -> None:
         elif scope == "ship" and allowed == "test":
             report.add(rel, "%s (ship) is allowed on test classpaths only; move its allowlist line to ship" % label,
                        number)
-    if not has_runtime:
-        report.add(rel, "gradle.lockfile has no releaseRuntimeClasspath or runtimeClasspath line")
+    # An Android module locks both build types (a missing debug line would leave the debug app unchecked);
+    # a JVM module locks runtimeClasspath.
+    needed = ["debugRuntimeClasspath", "releaseRuntimeClasspath"] if any(ANDROID_CONFIG.match(c) for c in named) \
+        else ["runtimeClasspath"]
+    for config in needed:
+        if config not in named:
+            report.add(rel, "gradle.lockfile has no %s line; run shellx-android/scripts/dev.sh lock" % config)
 
 
 def inside_roots(path: str) -> bool:
@@ -378,6 +386,9 @@ def check_kts(rel: str, text: str, report: Report) -> None:
     for m in REPO_CALL.finditer(bare):
         report.add(rel, "repository %s is not allowed; only google() and mavenCentral()" % m.group(1),
                    line_of(code, m.start()))
+    for m in DESUGARING.finditer(bare):
+        report.add(rel, "core library desugaring is not allowed: it ships desugar_jdk_libs (GPLv2 with the "
+                        "Classpath Exception) outside every lockfile", line_of(code, m.start()))
     if posixpath.basename(rel) != "settings.gradle.kts":
         for m in re.finditer(r"\bgradlePluginPortal\s*\(", bare):
             report.add(rel, "gradlePluginPortal() is allowed only in settings.gradle.kts", line_of(code, m.start()))
@@ -477,6 +488,13 @@ def run(root: Path) -> int:
             lock = full.parent / "gradle.lockfile"
             if not lock.is_file():
                 report.add(posixpath.dirname(rel), "module has no gradle.lockfile; run its dependency locking")
+            bare = blank_strings(blank_comments(data.decode("utf-8", errors="replace")))
+            if "activateDependencyLocking" not in bare:
+                report.add(rel, "module does not lock its runtime classpaths "
+                                "(resolutionStrategy.activateDependencyLocking())")
+            if not STRICT_LOCKING.search(bare):
+                report.add(rel, "module must lock in strict mode, so an unlocked configuration fails: "
+                                "dependencyLocking { lockMode.set(LockMode.STRICT) }")
     for path, line, message in sorted(report.items, key=lambda item: (item[0], item[1], item[2])):
         print(message)
     return 1 if report.items else 0
