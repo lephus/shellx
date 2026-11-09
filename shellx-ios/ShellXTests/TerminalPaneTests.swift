@@ -175,4 +175,59 @@ final class TerminalPaneTests: XCTestCase {
         ]
         for phase in others { XCTAssertFalse(TerminalSurfaceView.takesInput(phase), "\(phase)") }
     }
+
+    /// Review Focus 1 through the screen: after A → B → A there is exactly one surface, on the page shown, and keys typed
+    /// into it reach A only (final review, app M8).
+    func testSwipingBackAndForthLeavesOneSurfaceOnThePageShown() async throws {
+        let rig = try await WorkspaceRig.make(in: self)
+        let terminal = TerminalViewModel(machineID: rig.model.ref.machineID, link: rig.hub)
+        let run = Task { await terminal.run() }
+        addTeardownBlock { run.cancel() }
+        let selection = Selection("t-zsh")
+        terminal.show("t-zsh")
+        let host = WindowHost(SwipeHarness(panes: rig.model.panes, selection: selection, terminal: terminal), in: self)
+        func shows(_ id: String) async -> Bool {
+            await eventually { terminal.phase == .live && host.surfaces.map(\.terminalId) == [id] }
+        }
+        let first = await shows("t-zsh")
+        XCTAssertTrue(first, "\(host.surfaces.map(\.terminalId))")
+
+        selection.id = "t-claude"; terminal.show("t-claude")
+        let second = await shows("t-claude")
+        XCTAssertTrue(second, "\(host.surfaces.map(\.terminalId))")
+        selection.id = "t-zsh"; terminal.show("t-zsh")
+        let back = await shows("t-zsh")
+        XCTAssertTrue(back, "\(host.surfaces.map(\.terminalId)) \(terminal.phase)")
+
+        let surface = try XCTUnwrap(host.surfaces.first)
+        surface.insertText("ls")
+        let typed = await eventually { await rig.mac.terminalViewInputs("t-zsh") == [[.text("ls")]] }
+        XCTAssertTrue(typed)
+        let elsewhere = await rig.mac.terminalViewInputs("t-claude")
+        XCTAssertEqual(elsewhere, [])
+    }
+}
+
+/// The chip shown, set by the test as a swipe would.
+@MainActor @Observable
+private final class Selection {
+    var id: String
+    init(_ id: String) { self.id = id }
+}
+
+/// `WorkspaceScreen` composed as `WorkspaceView` composes it: one terminal model for every page, a `TerminalPane` per
+/// terminal page, `claude` shown as its terminal so both chips are terminals.
+private struct SwipeHarness: View {
+    let panes: [WorkspacePane]
+    let selection: Selection
+    let terminal: TerminalViewModel
+
+    var body: some View {
+        NavigationStack {
+            WorkspaceScreen(
+                title: "shellx-ios", panes: panes, selected: selection.id, shownAsTerminal: ["t-claude"],
+                alert: .constant(nil), agent: { _ in Color.clear },
+                shell: { pane in TerminalPane(model: terminal, terminalId: pane.id, title: pane.title) })
+        }
+    }
 }
