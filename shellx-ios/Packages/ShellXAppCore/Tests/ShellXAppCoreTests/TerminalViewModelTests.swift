@@ -331,4 +331,19 @@ final class TerminalViewModelTests: XCTestCase {
         }
         XCTAssertTrue(reopened, "\(link.calls)")
     }
+
+    /// A view that ends `failed` is reopened after 1 s. Meanwhile the page is reopening, not live, so nothing typed
+    /// can go nowhere while it still looks live (final review, core M1).
+    func testAFailedViewWaitsForItsReopenAsConnecting() async {
+        let link = ScriptedTerminalLink(); let sleeper = ManualSleeper(); let model = makeModel(link, sleeper: sleeper)
+        await live(model, link, text: ["$ ls"])
+        emit(link, .ended(terminalId: "t1", reason: .failed))
+        let waiting = await eventually { sleeper.waiting.contains(TerminalViewModel.failedRetryDelay) }
+        XCTAssertTrue(waiting)
+        XCTAssertEqual(model.phase, .connecting, "the reopen's wait is not live")
+        XCTAssertEqual(model.screen.screenText().first, "$ ls", "the last screen stays")
+        sleeper.release { $0 == TerminalViewModel.failedRetryDelay }
+        let reopened = await eventually { link.opens == ["t1", "t1"] }
+        XCTAssertTrue(reopened, "\(link.calls)")
+    }
 }
