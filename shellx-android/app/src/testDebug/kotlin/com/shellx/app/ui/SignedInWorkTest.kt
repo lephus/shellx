@@ -41,11 +41,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -191,6 +193,77 @@ class SignedInWorkTest {
         rule.runOnUiThread { platform.pushTaps.receive() }
 
         waitUntil { nav.currentBackStackEntry?.destination?.route == WorkRoutes.PENDING }
+        assertEquals(Routes.HOME, nav.previousBackStackEntry?.destination?.route)
+        assertFalse(platform.pushTaps.hasTap.value)
+    }
+
+    private fun macWithAWorkspace() = FakeMac("MacBook Pro", appScope).apply {
+        setWorkspaces(listOf(LinkWorkspace("ws-1", "shellx-ios", 0, terminals = listOf(LinkTerminal("t1", "zsh", 0, selected = true)))))
+    }
+
+    private fun route(nav: NavHostController) = nav.currentBackStackEntry?.destination?.route
+
+    /** Review C I-1: a tap that started the app (cold start: a new window and a new account) opens the waiting requests
+     *  above the home. It waits for RootSync to put the home at the bottom, whose swap would otherwise wipe it. */
+    @Test
+    fun aTapThatStartedTheAppOpensTheRequestsAboveTheHome() {
+        val t = mainComposition(folder.root, listOf(macWithAWorkspace()), appScope)
+        platform.pushTaps.receive()
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            ShellXAppTheme(AppAppearance.SYSTEM) { ShellXApp(t.composition, nav, platform) }
+        }
+        rule.runOnUiThread { t.composition.lifecycle.onStart() }
+
+        waitUntil { route(nav) == WorkRoutes.PENDING }
+        assertEquals(Routes.HOME, nav.previousBackStackEntry?.destination?.route)
+        assertFalse(platform.pushTaps.hasTap.value)
+    }
+
+    /** Review C I-1: the same when only the window is new (relaunched after a Back exit, the account still at home). */
+    @Test
+    fun aTapThatRecreatesTheWindowOverALiveAccountOpensTheRequests() {
+        val t = mainComposition(folder.root, listOf(macWithAWorkspace()), appScope)
+        rule.runOnUiThread { t.composition.lifecycle.onStart() }
+        waitUntil { t.composition.root.value == Routes.HOME }
+        platform.pushTaps.receive()
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            ShellXAppTheme(AppAppearance.SYSTEM) { ShellXApp(t.composition, nav, platform) }
+        }
+
+        waitUntil { route(nav) == WorkRoutes.PENDING }
+        assertEquals(Routes.HOME, nav.previousBackStackEntry?.destination?.route)
+        assertFalse(platform.pushTaps.hasTap.value)
+    }
+
+    /** Review C m-4: as the iPhone's DemoRootView has its own empty inbox, the demo never takes an alert's tap; it waits
+     *  for the real account, which opens it once the demo is left. */
+    @Test
+    fun theDemoLeavesAnAlertsTapToTheRealAccount() {
+        val t = mainComposition(folder.root, listOf(macWithAWorkspace()), appScope)
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            ShellXAppTheme(AppAppearance.SYSTEM) { ShellXApp(t.composition, nav, platform) }
+        }
+        rule.runOnUiThread { t.composition.lifecycle.onStart() }
+        waitUntil { route(nav) == Routes.HOME }
+        rule.runOnUiThread { t.composition.appScope.launch { t.composition.demo.start() } }
+        waitUntil {
+            route(nav) == Routes.DEMO &&
+                t.composition.active.value.scopes.current.value?.hub?.state?.value?.machines?.isNotEmpty() == true
+        }
+
+        rule.runOnUiThread { platform.pushTaps.receive() }
+        rule.waitForIdle()
+        assertEquals("the demo's screens stay", Routes.DEMO, route(nav))
+        assertTrue("the tap waits for the real account", platform.pushTaps.hasTap.value)
+
+        rule.runOnUiThread { t.composition.appScope.launch { t.composition.demo.exit() } }
+        waitUntil { route(nav) == WorkRoutes.PENDING }
         assertEquals(Routes.HOME, nav.previousBackStackEntry?.destination?.route)
         assertFalse(platform.pushTaps.hasTap.value)
     }
