@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -237,6 +238,33 @@ class SettingsScreenTest {
         rule.onNodeWithTag("delete.error").assertIsDisplayed()
             .assertTextEquals(string(R.string.signin_error_reauth_required))
         assertEquals(2, deletes)
+    }
+
+    @Test
+    fun aSignOutAndADeletionUnderWaySurviveRecreation() {
+        val signOutGate = CompletableDeferred<Unit>()
+        val deleteGate = CompletableDeferred<Unit>()
+        val restoration = StateRestorationTester(rule)
+        restoration.setContent { Screen(account = account(signOut = { signOutGate.await() }, delete = { deleteGate.await() })) }
+        rule.onNodeWithTag("settings.signOut").performClick()
+        dialogButton(string(R.string.settings_account_sign_out)).performClick()
+        rule.onNodeWithTag("settings.delete").performClick()
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+
+        // A rotation, a theme or a language change while both wait.
+        restoration.emulateSavedInstanceStateRestore()
+
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+        rule.onNodeWithTag("delete.confirm").assertIsNotEnabled()
+        rule.onNodeWithTag("settings.signOut").assertIsNotEnabled()
+        assertEquals(1, signOuts)
+        assertEquals(1, deletes)
+        signOutGate.complete(Unit)
+        deleteGate.complete(Unit)
+        rule.waitForIdle()
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+        assertEquals(1, deletes)
     }
 
     @Test
