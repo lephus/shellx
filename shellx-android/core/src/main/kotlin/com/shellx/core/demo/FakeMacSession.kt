@@ -21,7 +21,6 @@ import com.shellx.link.core.WorkspaceChange
 import com.shellx.link.core.WorkspaceControlOutcome
 import com.shellx.link.core.WorkspaceCreated
 import com.shellx.link.core.WorkspaceList
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -39,8 +38,11 @@ import kotlinx.coroutines.yield
  * One phone's session with a [FakeMac], with the host rules of LinkHost.swift. Every call counts in
  * [FakeMac.phoneCallCount]; a call on an ended session throws `SessionClosed`. Otherwise the Mac's side runs in the
  * Mac's scope, and the phone waits for its answer or for the session's end, whichever comes first (the end throws
- * `SessionClosed`). A message with attachments throws `MessageUploadException(SessionClosed)` instead while its
- * attachments go up, as 3B's client does.
+ * `SessionClosed`). No call times out.
+ *
+ * Uploads are the exception, as in 3B's client: the phone drives them chunk by chunk in the caller's coroutine, so a
+ * cancelled caller or an ended session stops them, nothing is kept, and a message whose attachments did not all go up
+ * is never sent (`MessageUploadException`).
  */
 internal class FakeMacSession(private val mac: FakeMac, override val hostFeatures: Set<String>) : LinkSession {
     val pendingQueue = Channel<PendingChange>(Channel.UNLIMITED)
@@ -81,27 +83,33 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         mac.chat.history(sessionId, beforeSeq, limit) ?: throw LinkClientException.Remote("not_found", "no such session")
     }
 
-    override suspend fun chatSend(sessionId: String, text: String, attachments: List<String>): ChatSendOutcome = ask {
-        if (!mac.servesSessionsAndChat) throw noChat()
-        if (attachments.isNotEmpty() && !takesAttachments) throw noAttachments()
-        checkText(text, withAttachments = attachments.isNotEmpty())
-        mac.chat.send(sessionId, text, take(attachments))
-    }
+    override suspend fun chatSend(sessionId: String, text: String, attachments: List<String>): ChatSendOutcome =
+        send(sessionId, text, attachments, counted = true)
 
+    /**
+     * The phone drives the upload, as 3B's client does: each chunk is one round trip in the caller's coroutine, so a
+     * cancelled caller stops it and an ended session fails the next chunk. Only a whole upload is kept.
+     */
     override suspend fun uploadAttachment(
         kind: AttachmentKind,
         name: String,
         data: ByteArray,
         progress: (Int) -> Unit,
-    ): String = ask {
-        uploadTurn.withLock {
-            if (!takesAttachments) throw noAttachments()
-            refusal(kind, data.size)?.let { throw it }
-            goUp(data.size, progress)
-            keep(ChatAttachment(kind, name, data.copyOf()))
+    ): String {
+        currentCoroutineContext().ensureActive()
+        mac.notePhoneCall()
+        return withUploadTurn {
+            if (ended.isCompleted) throw LinkClientException.SessionClosed()
+            upload(kind, name, data, progress)
         }
     }
 
+    /**
+     * Uploads [uploading] in order on the phone's side, then sends `chat.send` with their ids, holding the upload turn
+     * until that send is answered. An upload that fails, or a session that ends while the attachments go up, throws
+     * MessageUploadException: the send never left, so nothing is typed. Once the attachments are up, the send goes to the
+     * Mac like any call: an end while waiting throws SessionClosed, and a held send still acts once released.
+     */
     override suspend fun chatSend(
         sessionId: String,
         text: String,
@@ -109,31 +117,24 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         progress: (Int) -> Unit,
     ): ChatSendOutcome {
         if (uploading.isEmpty()) return chatSend(sessionId, text, attachments = emptyList())
-        val uploaded = AtomicBoolean(false)
-        val endError = {
-            if (uploaded.get()) LinkClientException.SessionClosed() else MessageUploadException(LinkClientException.SessionClosed())
-        }
-        return ask(endError) {
-            uploadTurn.withLock {
-                if (!takesAttachments) throw MessageUploadException(noAttachments())
-                val carried = ArrayList<ChatAttachment>(uploading.size)
-                var sent = 0
-                for (attachment in uploading) {
-                    refusal(attachment.kind, attachment.data.size)?.let { throw MessageUploadException(it) }
-                    val before = sent
-                    goUp(attachment.data.size) { progress(before + it) }
-                    sent += attachment.data.size
-                    carried += attachment.copy(data = attachment.data.copyOf())
+        currentCoroutineContext().ensureActive()
+        mac.notePhoneCall()
+        return withUploadTurn {
+            if (ended.isCompleted) throw MessageUploadException(LinkClientException.SessionClosed())
+            val ids = ArrayList<String>(uploading.size)
+            var sent = 0
+            for (attachment in uploading) {
+                val before = sent
+                ids += try {
+                    upload(attachment.kind, attachment.name, attachment.data) { progress(before + it) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw MessageUploadException(e)
                 }
-                uploaded.set(true)
-                checkText(text, withAttachments = true)
-                if (carried.size > ShellXLink.MAX_ATTACHMENTS_PER_MESSAGE) {
-                    throw LinkClientException.Remote(
-                        "bad_request", "at most ${ShellXLink.MAX_ATTACHMENTS_PER_MESSAGE} attachments per message",
-                    )
-                }
-                mac.chat.send(sessionId, text, carried)
+                sent += attachment.data.size
             }
+            send(sessionId, text, ids, counted = false)
         }
     }
 
@@ -190,6 +191,8 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
     fun end() {
         mac.ended(this)
         if (!ended.complete(Unit)) return
+        // The Mac drops a session's unsent uploads with it.
+        synchronized(uploads) { uploads.clear() }
         pendingQueue.close()
         sessionQueue.close()
         workspaceQueue.close()
@@ -224,14 +227,42 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         else -> null
     }
 
-    /** One upload's chunks: each is one round trip, so other work may run between them; [report] gets the bytes so far. */
-    private suspend fun goUp(size: Int, report: (Int) -> Unit) {
+    /** `chat.send` with attachment ids, as the Mac checks and takes it. [counted] is false inside a message upload. */
+    private suspend fun send(sessionId: String, text: String, ids: List<String>, counted: Boolean): ChatSendOutcome =
+        ask(counted = counted) {
+            if (!mac.servesSessionsAndChat) throw noChat()
+            if (ids.isNotEmpty() && !takesAttachments) throw noAttachments()
+            checkText(text, withAttachments = ids.isNotEmpty())
+            mac.chat.send(sessionId, text, take(ids))
+        }
+
+    /** Runs [block] holding the upload turn; a caller cancelled while waiting for it, or holding it, gives it up. */
+    private suspend fun <T> withUploadTurn(block: suspend () -> T): T = uploadTurn.withLock {
+        // Mutex.lock() takes a free lock without checking for cancellation.
+        currentCoroutineContext().ensureActive()
+        block()
+    }
+
+    /**
+     * One upload, on the phone's side: the Mac's refusal of its kind or size, then one round trip per chunk of at most
+     * `ShellXLink.MAX_ATTACHMENT_CHUNK_BYTES`, then the Mac keeps it. [report] gets the bytes the Mac took after each
+     * chunk. A session that ends before a chunk's answer fails the upload with SessionClosed; nothing is kept.
+     */
+    private suspend fun upload(kind: AttachmentKind, name: String, data: ByteArray, report: (Int) -> Unit): String {
+        if (!takesAttachments) throw noAttachments()
+        refusal(kind, data.size)?.let { throw it }
+        val copy = data.copyOf()
         var offset = 0
-        while (offset < size) {
-            offset = minOf(offset + ShellXLink.MAX_ATTACHMENT_CHUNK_BYTES, size)
+        while (offset < copy.size) {
+            if (ended.isCompleted) throw LinkClientException.SessionClosed()
+            offset = minOf(offset + ShellXLink.MAX_ATTACHMENT_CHUNK_BYTES, copy.size)
+            // The chunk's round trip: other work may run meanwhile, and a cancelled caller stops here.
             yield()
+            if (ended.isCompleted) throw LinkClientException.SessionClosed()
             report(offset)
         }
+        if (ended.isCompleted) throw LinkClientException.SessionClosed()
+        return keep(ChatAttachment(kind, name, copy))
     }
 
     /** Holds a finished upload until a message names it; the oldest goes when [ShellXLink.MAX_PENDING_UPLOADS] are held. */
@@ -257,17 +288,15 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
     }
 
     /**
-     * Counts the call, then runs [macSide] in the Mac's scope and waits for its answer or the session's end ([endError]).
+     * Counts the call (unless [counted] is false), then runs [macSide] in the Mac's scope and waits for its answer or the
+     * session's end (SessionClosed).
      * The Mac's side never fails its coroutine (its failure travels in a `Result`), so a reporting parent scope such as
      * runTest's backgroundScope never sees a refused call.
      */
-    private suspend fun <T> ask(
-        endError: () -> Exception = { LinkClientException.SessionClosed() },
-        macSide: suspend () -> T,
-    ): T {
+    private suspend fun <T> ask(counted: Boolean = true, macSide: suspend () -> T): T {
         currentCoroutineContext().ensureActive()
-        mac.notePhoneCall()
-        if (ended.isCompleted) throw endError()
+        if (counted) mac.notePhoneCall()
+        if (ended.isCompleted) throw LinkClientException.SessionClosed()
         val answer = mac.scope.async {
             try {
                 Result.success(macSide())
@@ -287,7 +316,7 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
             currentCoroutineContext().ensureActive()
             null
         }
-        return (result ?: throw endError()).getOrThrow()
+        return (result ?: throw LinkClientException.SessionClosed()).getOrThrow()
     }
 
     private companion object {

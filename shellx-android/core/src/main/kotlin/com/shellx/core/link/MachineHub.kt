@@ -220,7 +220,7 @@ class MachineHub(
 
     /** The vault's Mac list as last read or written. */
     private var records: List<PairedMachine> = emptyList()
-    private val connections = HashMap<String, MachineConnection>()
+    private val connections = LinkedHashMap<String, MachineConnection>()
     private val readers = HashMap<String, Job>()
     private val chatSubscribers = Subscribers<ChatUpdate>()
     private val sessionSubscribers = Subscribers<MachineSessions>()
@@ -268,7 +268,11 @@ class MachineHub(
         for (model in added) connect(model.id)
     }
 
-    /** Stops every connection and completes the update flows. The hub is done afterwards: its [scope] is cancelled. */
+    /**
+     * Stops every connection and completes the update flows. The hub is done afterwards: its [scope] is cancelled. A
+     * cancelled caller still finishes the teardown: the flows complete and the scope is cancelled, which ends every
+     * connection loop that was not stopped yet.
+     */
     suspend fun stopAll() {
         stopped = true
         grace?.cancel()
@@ -277,12 +281,15 @@ class MachineHub(
         readers.clear()
         val all = connections.values.toList()
         connections.clear()
-        for (connection in all) connection.stop()
-        chatSubscribers.closeAll()
-        sessionSubscribers.closeAll()
-        stateSubscribers.closeAll()
-        _state.update { it.copy(machines = it.machines.map { model -> model.copy(pendingActionable = false) }) }
-        scope.cancel()
+        try {
+            for (connection in all) connection.stop()
+        } finally {
+            chatSubscribers.closeAll()
+            sessionSubscribers.closeAll()
+            stateSubscribers.closeAll()
+            _state.update { it.copy(machines = it.machines.map { model -> model.copy(pendingActionable = false) }) }
+            scope.cancel()
+        }
     }
 
     /**
@@ -663,8 +670,10 @@ class MachineHub(
         forgetFinishes(machineId)
     }
 
+    /** Closes every session. The stops run in [scope], so a cancelled caller never leaves a connection running. */
     private suspend fun suspend() {
-        for (connection in detachAll()) connection.stop()
+        val closing = detachAll()
+        scope.launch { for (connection in closing) connection.stop() }.join()
     }
 
     /**

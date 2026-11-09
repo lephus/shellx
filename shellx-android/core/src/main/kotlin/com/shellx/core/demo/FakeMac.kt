@@ -31,7 +31,13 @@ import kotlinx.coroutines.CoroutineScope
  *
  * Every connect opens a new session with the Mac's current key and features, so [rotateHostKey] and
  * [failNextConnects] take effect on the next attempt. The Mac's side of each call runs in [scope], so a held call
- * still acts once released, even when the phone's session ended meanwhile.
+ * still acts once released, even when the phone's session ended meanwhile. Attachment uploads are driven by the phone,
+ * as 3B's client does: an upload whose call ended (session closed, caller cancelled) stops, and its message is never
+ * typed.
+ *
+ * Calls never time out, unlike 3B's client (`LinkTimings.requestTimeout`): a held call waits until it is released or
+ * the session ends, whatever virtual time passes. To test a `TimedOut` path, wrap the connector (or the session it
+ * returns) and throw `LinkClientException.TimedOut()` from the wrapper.
  *
  * Thread-safe: one lock guards every part of the Mac, and it is never held across a suspension.
  */
