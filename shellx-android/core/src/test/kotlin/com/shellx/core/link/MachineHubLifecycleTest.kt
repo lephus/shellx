@@ -2,6 +2,7 @@ package com.shellx.core.link
 
 import com.shellx.core.demo.FakeMac
 import com.shellx.core.testing.Gate
+import com.shellx.core.testing.HubRig
 import com.shellx.core.testing.ManualSleeper
 import com.shellx.core.testing.allOnline
 import com.shellx.core.testing.assertSameCase
@@ -14,10 +15,14 @@ import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 class MachineHubLifecycleTest {
@@ -183,6 +188,60 @@ class MachineHubLifecycleTest {
         assertTrue(eventually { allOnline(rig.hub) })
         assertEquals(3, a.connectCount)
         assertEquals(listOf(MachineHub.BACKGROUND_GRACE), sleeper.requested)
+    } }
+
+    // Teardown that outlives its caller (review 2 m-1)
+
+    /**
+     * Two Macs whose connects hang on a gate that ignores cancellation, so stopping either of them hangs too, and a third
+     * Mac that is online. Whatever order the hub stops them in, some connection comes after a hanging one.
+     */
+    private suspend fun TestScope.teardownRig(): Triple<HubRig, FakeMac, Gate> {
+        val first = FakeMac("MacBook Pro", backgroundScope)
+        val second = FakeMac("Mac Studio", backgroundScope)
+        val online = FakeMac("Mac mini", backgroundScope)
+        val gate = Gate()
+        val gated = setOf(first.machine.machineId, second.machine.machineId)
+        val rig = hubRig(listOf(first, second, online), connector = { GatedConnector(it, gated, gate) })
+        rig.hub.start()
+        assertTrue(eventually { model(rig.hub, online)?.state == MachineLinkState.Online && gate.waiting == 2 })
+        return Triple(rig, online, gate)
+    }
+
+    @Test fun aCancelledBackgroundCallerStillStopsEveryConnection() { runTest {
+        val (rig, online, gate) = teardownRig()
+        val background = backgroundScope.launch { rig.hub.appDidEnterBackground() }
+        assertTrue(eventually { rig.backoff.waiting == listOf(MachineHub.BACKGROUND_GRACE) })
+        rig.backoff.release()
+        assertTrue(eventually { rig.hub.connectionCount == 0 })
+        runCurrent()
+
+        // 3D's ON_STOP job is cancelled while a close hangs.
+        background.cancel()
+        gate.open()
+
+        assertTrue(eventually { online.liveSessionCount == 0 }, "Mac mini's session was closed all the same")
+        assertFalse(eventually(timeout = 1.seconds) { rig.backoff.waiting.isNotEmpty() }, "no detached connection keeps trying")
+        rig.hub.appDidBecomeActive()
+        assertTrue(eventually { online.connectCount == 2 && model(rig.hub, online)?.state == MachineLinkState.Online })
+        assertEquals(1, online.liveSessionCount, "one session per Mac after the return")
+    } }
+
+    @Test fun aCancelledStopAllStillStopsEveryConnection() { runTest {
+        val (rig, online, gate) = teardownRig()
+        val updates = rig.hub.chatUpdates()
+        val reader = backgroundScope.launch { updates.collect {} }
+        val stopping = backgroundScope.launch { rig.hub.stopAll() }
+        assertTrue(eventually { rig.hub.connectionCount == 0 })
+        runCurrent()
+
+        stopping.cancel()
+        gate.open()
+
+        assertTrue(eventually { online.liveSessionCount == 0 }, "Mac mini's session was closed all the same")
+        assertFalse(eventually(timeout = 1.seconds) { rig.backoff.waiting.isNotEmpty() }, "no detached connection keeps trying")
+        assertTrue(eventually { reader.isCompleted }, "the update flows completed")
+        assertFalse(rig.hub.scope.isActive, "the hub's scope ended")
     } }
 
     // Android: frozen and dozing returns (Review Focus 2, ledger A-7)

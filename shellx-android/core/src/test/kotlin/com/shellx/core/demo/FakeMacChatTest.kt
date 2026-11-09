@@ -26,10 +26,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -190,6 +193,88 @@ class FakeMacChatTest {
         val ones = List(10) { "one" }
         val twos = List(10) { "two" }
         assertTrue(chunks == ones + twos || chunks == twos + ones, "interleaved: $chunks")
+    } }
+
+    // An upload is driven by the phone, chunk by chunk, as 3B's client does: once the call has ended (the session
+    // closed, or the caller was cancelled) nothing more goes up, and the message is never typed.
+
+    @Test fun aMessageWhoseSessionEndsWhileUploadingIsNeverTyped() { runTest {
+        val mac = FakeMac("MacBook Pro", backgroundScope)
+        mac.setHistory("s1", listOf(chatEntry(1)))
+        val session = connect(mac)
+        val big = ChatAttachment(AttachmentKind.FILE, "big", ByteArray(100_000))
+        val progress = mutableListOf<Int>()
+        val error = assertFails {
+            session.chatSend("s1", "x", uploading = listOf(big)) {
+                progress += it
+                if (it == 45_000) session.close()
+            }
+        }
+        assertSameCase(MessageUploadException(LinkClientException.SessionClosed()), error)
+        assertFalse(eventually(timeout = 1.seconds) { mac.sentTexts.isNotEmpty() || mac.receivedAttachments.isNotEmpty() })
+        assertEquals(listOf(45_000), progress, "no progress after the end")
+    } }
+
+    @Test fun aMessageWhoseCallerIsCancelledWhileUploadingIsNeverTyped() { runTest {
+        val mac = FakeMac("MacBook Pro", backgroundScope)
+        mac.setHistory("s1", listOf(chatEntry(1)))
+        val session = connect(mac)
+        val big = ChatAttachment(AttachmentKind.FILE, "big", ByteArray(100_000))
+        val progress = mutableListOf<Int>()
+        lateinit var call: Job
+        call = backgroundScope.launch {
+            session.chatSend("s1", "x", uploading = listOf(big)) {
+                progress += it
+                if (it == 45_000) call.cancel()
+            }
+        }
+        call.join()
+        assertTrue(call.isCancelled)
+        assertFalse(eventually(timeout = 1.seconds) { mac.sentTexts.isNotEmpty() || mac.receivedAttachments.isNotEmpty() })
+        assertEquals(listOf(45_000), progress, "no progress after the end")
+        // The session lives on, and the cancelled message gave up its upload turn.
+        val small = ChatAttachment(AttachmentKind.IMAGE, "small.jpg", ByteArray(3))
+        assertEquals(ChatSendOutcome.SUBMITTED, session.chatSend("s1", "after", uploading = listOf(small)))
+        assertEquals(listOf(FakeMac.SentText("s1", "after")), mac.sentTexts)
+        assertEquals(listOf(small), mac.receivedAttachments)
+    } }
+
+    @Test fun anUploadThatEndsEarlyIsNotKept() { runTest {
+        val mac = FakeMac("MacBook Pro", backgroundScope)
+        mac.setHistory("s1", listOf(chatEntry(1)))
+        val session = connect(mac)
+        val data = ByteArray(100_000)
+        // The caller is cancelled after the first chunk: nothing more goes up, and no upload is kept.
+        val progress = mutableListOf<Int>()
+        lateinit var call: Job
+        call = backgroundScope.launch {
+            session.uploadAttachment(AttachmentKind.FILE, "big", data) {
+                progress += it
+                if (it == 45_000) call.cancel()
+            }
+        }
+        call.join()
+        assertFalse(eventually(timeout = 1.seconds) { progress.size > 1 }, "no progress after the end: $progress")
+        assertSameCase(
+            LinkClientException.Remote("bad_request", "an attachment is not held, or not finished"),
+            assertFails { session.chatSend("s1", "x", attachments = listOf("U1")) },
+        )
+        // A whole upload is kept and arrives with the message that names it.
+        val id = session.uploadAttachment(AttachmentKind.FILE, "whole", ByteArray(3))
+        assertEquals(ChatSendOutcome.SUBMITTED, session.chatSend("s1", "y", attachments = listOf(id)))
+        assertEquals(listOf("whole"), mac.receivedAttachments.map { it.name })
+        // The session ends after the first chunk: the upload throws SessionClosed and reports nothing more.
+        val ended = mutableListOf<Int>()
+        assertSameCase(
+            LinkClientException.SessionClosed(),
+            assertFails {
+                session.uploadAttachment(AttachmentKind.FILE, "late", data) {
+                    ended += it
+                    if (it == 45_000) session.close()
+                }
+            },
+        )
+        assertFalse(eventually(timeout = 1.seconds) { ended.size > 1 }, "no progress after the end: $ended")
     } }
 
     @Test fun workspaceControlActsLikeTheMac() { runTest {
