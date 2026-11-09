@@ -50,8 +50,9 @@ public enum TerminalViewPhase: Equatable, Sendable {
 ///   on. Frames of that terminal before it are ignored. Every push for another terminal or another Mac is ignored.
 /// - **R5 Frames.** `assembler.receive(part)`; `resync` → queue `resync(id)`; a complete frame → R7.
 /// - **R6 `.ended(id, reason)`** of the view (after its `.opened`): `gone` → `.unavailable(.gone)`; `refused` →
-///   `.unavailable(.refused)`; `not_open` → forget the view and reconcile at once (a new open); `failed` or unknown → as
-///   a failed open (R3). Before `.opened` it is ignored.
+///   `.unavailable(.refused)`; `not_open` → forget the view and reconcile at once (a new open), on the failed-open budget:
+///   a second `not_open` (or failure) before a snapshot restores it gives `.unavailable(.failed)`; `failed` or unknown →
+///   as a failed open (R3). Before `.opened` it is ignored.
 /// - **R7 Apply.** `screen.apply(frame)`, `screenRevision += 1`. A snapshot: `snapshots += 1`, `topShift = 0`, phase
 ///   `.live`, the first-screen latency recorded (once per start of the clock; a reopen after R6, R8 or `resume` starts it
 ///   again when it is not running), both retry budgets restored. A history frame: `topShift += after − before`. A delta
@@ -518,8 +519,15 @@ public final class TerminalViewModel {
         case .refused:
             becomeUnavailable(.refused)
         case .notOpen:
+            // Reopened at once, but on the failed-open budget (a snapshot restores it): a Mac that keeps ending its
+            // views before any screen cannot make the phone open them forever.
             forgetView()
-            reconcile()
+            if failedRetriesUsed >= 1 {
+                becomeUnavailable(.failed)
+            } else {
+                failedRetriesUsed += 1
+                reconcile()
+            }
         case .failed, .other:
             failedOpen()
         }
