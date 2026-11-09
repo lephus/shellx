@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The debug build's name: "ShellX Dev" installs next to the Google Play build "ShellX". -->
+<resources>
+    <string name="app_name" translatable="false">ShellX Dev</string>
+</resources>

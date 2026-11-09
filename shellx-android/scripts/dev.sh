@@ -117,8 +117,37 @@ cmd_test() {
   return "$status"
 }
 
+contains() { case "$1" in *"$2"*) return 0 ;; esac; return 1; }
+prop_value() { sed -n -E "s/^$2=(.*)$/\1/p" "$1" | head -1; }
+
+# Each step checks its own status: cmd_test runs this in a subshell after `||`, where set -e does not apply.
 cmd_build_release() {
-  die "build-release comes with a later task" 2
+  check_java
+  gradle_android :app:assembleRelease || die "release build failed"
+  local apk="$ANDROID_DIR/app/build/outputs/apk/release/app-release-unsigned.apk"
+  local mapping="$ANDROID_DIR/app/build/outputs/mapping/release/mapping.txt"
+  [ -f "$apk" ] || die "release APK missing: $apk"
+  local tools AAPT2 VC VN T badging manifest want
+  tools="$(ls "$ANDROID_HOME/build-tools" 2>/dev/null | sort -V | tail -1)" || tools=""
+  AAPT2="$ANDROID_HOME/build-tools/$tools/aapt2"
+  [ -n "$tools" ] && [ -x "$AAPT2" ] || die "aapt2 not found under $ANDROID_HOME/build-tools"
+  VC="$(prop_value "$ANDROID_DIR/version.properties" VERSION_CODE)"
+  VN="$(prop_value "$ANDROID_DIR/version.properties" VERSION_NAME)"
+  T="$(catalog_value "$ANDROID_DIR/gradle/libs.versions.toml" androidTargetSdk)"
+  [ -n "$VC" ] && [ -n "$VN" ] && [ -n "$T" ] || die "could not read VERSION_CODE, VERSION_NAME or androidTargetSdk"
+  badging="$("$AAPT2" dump badging "$apk")" || die "aapt2 dump badging failed on $apk"
+  for want in "package: name='$RELEASE_APP_ID' versionCode='$VC' versionName='$VN'" "minSdkVersion:'26'" \
+    "targetSdkVersion:'$T'" "application-label:'ShellX'"; do
+    contains "$badging" "$want" || die "release APK: expected $want"
+  done
+  if contains "$badging" "application-debuggable"; then die "release APK is debuggable"; fi
+  manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk")" || die "aapt2 dump xmltree failed on $apk"
+  contains "$manifest" "localeConfig" || die "release APK: the manifest has no localeConfig"
+  [ -f "$mapping" ] || die "release APK: $mapping is missing (R8 did not run)"
+  if [ ! -f "$ANDROID_DIR/app/src/debug/google-services.json" ] || [ ! -f "$ANDROID_DIR/app/src/release/google-services.json" ]; then
+    note "Firebase: not configured (no google-services.json); push stays off in this build"
+  fi
+  note "release checks passed ($RELEASE_APP_ID $VN ($VC), target SDK $T)"
 }
 
 cmd_lock() {
@@ -134,6 +163,7 @@ case "$command" in
   -h|--help|help) usage 0 ;;
   test) cmd_test "$@" ;;
   lock) cmd_lock ;;
-  screenshots|emulator|device|build-release|clean) die "$command comes with a later task" 2 ;;
+  build-release) cmd_build_release ;;
+  screenshots|emulator|device|clean) die "$command comes with a later task" 2 ;;
   *) echo "dev.sh: unknown command: $command" >&2; usage 2 ;;
 esac
