@@ -18,16 +18,17 @@ struct GoogleSignInButton: View {
     /// Google's official "G" (asset `GoogleG`, 20 × 20 pt); nil until the asset is bundled.
     static var mark: UIImage? { UIImage(named: "GoogleG") }
 
-    /// Google Sans Medium 14 pt: the static `GoogleSans-Medium` face when bundled, else the bundled variable font
-    /// `GoogleSans-Regular` with its `wght` axis (tag 0x77676874) at 500, else the system's medium weight.
+    /// Google Sans Medium 14 pt. `Fonts/GoogleSans.ttf` is Google Fonts' variable Google Sans, whose one PostScript name
+    /// is `GoogleSans-Regular`; its named instance "Medium" is `wght` (tag 0x77676874) 500 at `opsz` (tag 0x6F70737A) 18.
+    /// Both are set: CoreText would otherwise size `opsz` to the point size (17 at 14 pt, the "Text Medium" style).
+    /// The system's medium weight while the font is not bundled.
     static func labelFont() -> UIFont {
-        if let font = UIFont(name: "GoogleSans-Medium", size: 14) { return font }
-        if let base = UIFont(name: "GoogleSans-Regular", size: 14) {
-            let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
-            let descriptor = base.fontDescriptor.addingAttributes([variation: [0x7767_6874: 500]])
-            return UIFont(descriptor: descriptor, size: 14)
+        guard let base = UIFont(name: "GoogleSans-Regular", size: 14) else {
+            return UIFont.systemFont(ofSize: 14, weight: .medium)
         }
-        return UIFont.systemFont(ofSize: 14, weight: .medium)
+        let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        let descriptor = base.fontDescriptor.addingAttributes([variation: [0x7767_6874: 500, 0x6F70_737A: 18]])
+        return UIFont(descriptor: descriptor, size: 14)
     }
 
     var body: some View {
