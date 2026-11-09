@@ -346,4 +346,39 @@ final class TerminalViewModelTests: XCTestCase {
         let reopened = await eventually { link.opens == ["t1", "t1"] }
         XCTAssertTrue(reopened, "\(link.calls)")
     }
+
+    /// The first-screen clock does not run while the Mac is offline (final review, core M3): it starts at the open that
+    /// brings the first screen.
+    func testFirstScreenIsNotMeasuredAcrossAnOfflinePeriod() async {
+        let link = ScriptedTerminalLink(); link.online = false
+        let clock = SteppedNow(); let model = makeModel(link, now: clock.now)
+        model.setPhoneGrid(cols: 50, rows: 20); model.show("t1")
+        _ = await eventually { model.phase == .offline }
+        clock.advance(by: .seconds(600))
+        link.online = true; link.emit(.state(machineID: "m1", .online))
+        _ = await eventually { link.opens == ["t1"] }
+        clock.advance(by: .milliseconds(300))
+        emit(link, .opened(terminalId: "t1"))
+        emit(link, .frame(terminalId: "t1", part: snapshotPart(revision: 1, cols: 50, rows: 20, text: ["$"])))
+        _ = await eventually { model.phase == .live }
+        XCTAssertEqual(link.samples.filter { $0.metric == .terminalFirstScreen }.map(\.duration), [.milliseconds(300)])
+    }
+
+    /// Nor while the app is in the background before the first screen came (final review, core M3).
+    func testFirstScreenIsNotMeasuredAcrossTheBackground() async {
+        let link = ScriptedTerminalLink()
+        let clock = SteppedNow(); let model = makeModel(link, now: clock.now)
+        model.setPhoneGrid(cols: 50, rows: 20); model.show("t1")
+        _ = await eventually { link.opens == ["t1"] }
+        model.suspend()
+        _ = await eventually { link.calls.contains(.close("t1")) }
+        clock.advance(by: .seconds(600))
+        model.resume()
+        _ = await eventually { link.opens == ["t1", "t1"] }
+        clock.advance(by: .milliseconds(200))
+        emit(link, .opened(terminalId: "t1"))
+        emit(link, .frame(terminalId: "t1", part: snapshotPart(revision: 1, cols: 50, rows: 20, text: ["$"])))
+        _ = await eventually { model.phase == .live }
+        XCTAssertEqual(link.samples.filter { $0.metric == .terminalFirstScreen }.map(\.duration), [.milliseconds(200)])
+    }
 }
