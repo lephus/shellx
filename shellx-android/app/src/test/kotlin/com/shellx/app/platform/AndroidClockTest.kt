@@ -1,5 +1,6 @@
 package com.shellx.app.platform
 
+import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
@@ -16,6 +17,15 @@ class AndroidClockTest {
         val mark = AndroidClock.monotonic.markNow()
         ShadowSystemClock.advanceBy(java.time.Duration.ofSeconds(26))
         assertEquals(26.seconds, mark.elapsedNow())
+    }
+
+    @Test
+    fun monotonicCountsDeepSleep() { // ledger A-7; review A M-4: uptime stops in deep sleep, elapsed realtime does not
+        val mark = AndroidClock.monotonic.markNow()
+        val uptime = SystemClock.uptimeMillis()
+        ShadowSystemClock.simulateDeepSleep(java.time.Duration.ofSeconds(40))
+        assertEquals(uptime, SystemClock.uptimeMillis())
+        assertEquals(40.seconds, mark.elapsedNow())
     }
 
     @Test
