@@ -24,7 +24,9 @@ import com.shellx.app.ui.nav.bottomRoute
  * the pages between (3D note 6). It is taken only once that bottom is the signed-in root itself (`home` or `first_mac`,
  * equal to [root]): a window starts on `launch`, and RootSync's swap to the root replaces the whole stack, which would
  * wipe a page opened before it (review C I-1: a tap that starts the app or recreates its window). While a
- * `first_mac`↔`home` swap waits for the page on top to close, the tap waits for it too.
+ * `first_mac`↔`home` swap waits for the page on top to close, the tap waits for it too. When the stack is already the root
+ * and the whole list (no Mac or workspace filter), the tap is taken and nothing moves, so an open sheet and its typed
+ * answer stay (the iPhone sets an equal path; final review I-1).
  * [platform] null (3D's host tests) leaves the wrapper out.
  */
 @Composable
@@ -56,12 +58,25 @@ fun SignedInFrame(
                 null
             } else {
                 {
-                    nav.navigate(WorkRoutes.pending()) {
-                        popUpTo(bottomRoute(nav) ?: currentRoot)
-                        launchSingleTop = true
+                    // Already on the whole list: keep it, with its open sheet (Navigation pops for popUpTo before it
+                    // checks launchSingleTop, so navigating would rebuild the page).
+                    if (!showsEveryRequest(nav, currentRoot)) {
+                        nav.navigate(WorkRoutes.pending()) {
+                            popUpTo(bottomRoute(nav) ?: currentRoot)
+                            launchSingleTop = true
+                        }
                     }
                 }
             },
         ) { content() }
     }
+}
+
+/** The stack is exactly [root] and, above it, the waiting requests with no Mac or workspace filter. */
+@SuppressLint("RestrictedApi") // No public API gives the whole stack; RootSyncTest guards Navigation upgrades.
+private fun showsEveryRequest(nav: NavHostController, root: String): Boolean {
+    val pages = nav.currentBackStack.value.filter { it.destination !is NavGraph }
+    val top = pages.getOrNull(1) ?: return false
+    return pages.size == 2 && pages[0].destination.route == root && top.destination.route == WorkRoutes.PENDING &&
+        top.arguments?.getString("machineId") == null && top.arguments?.getString("workspaceId") == null
 }
