@@ -380,8 +380,8 @@ class MachineHubWorkspaceTest {
         hub.reachableSessions.firstOrNull { it.session.sessionId == sessionId }?.session?.state
 
     /**
-     * The Swift test reads HomeFocus (`running`, `ended`), which is Task 22. Until then it checks the same facts on the
-     * hub: a running session is a live one that works, an ended one is reachable and ENDED but no longer live.
+     * As the Swift test does, it reads HomeFocus (`running`, `ended`) for the hub's sessions: the session is Running
+     * before the close, and Ended once the Mac reports it ended.
      */
     @Test fun closeAgentCallsTheMacAndTheSessionEnds() { runTest {
         val mac = FakeMac("MacBook Pro", backgroundScope)
