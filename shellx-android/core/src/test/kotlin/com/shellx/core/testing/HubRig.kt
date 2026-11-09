@@ -10,8 +10,10 @@ import com.shellx.core.link.MachineHub
 import com.shellx.core.link.MachineLinkConnecting
 import com.shellx.core.link.MachineLinkState
 import com.shellx.core.platform.MemoryKeyValueStore
+import com.shellx.core.storage.ConversationStore
 import com.shellx.link.account.PairedMachine
 import com.shellx.link.account.PairedMachineListing
+import kotlin.io.path.createTempDirectory
 import kotlin.time.Duration
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -31,6 +33,8 @@ class HubRig(
     val backoff: ManualSleeper,
     /** One entry per call of the hub's onUnauthorized. */
     val unauthorized: MutableList<Unit>,
+    /** A store in a fresh temporary directory, on the test's scheduler and the rig's clock (HubRig.swift). */
+    val store: ConversationStore,
     private val test: TestScope,
 ) {
     /** HubRig.swift's online(sessions:): eventually every Mac is online and liveSessions.size == sessions. */
@@ -48,7 +52,8 @@ fun listing(machine: PairedMachine, name: String? = null): PairedMachineListing 
 /**
  * The hub's sleep is [sleep] when given (MachineHubWorkspaceTests and FakeMacDemoScriptTests pass instantSleep), else
  * [sleeper]'s (the Swift rigs' ManualSleeper). onUnauthorized appends to [HubRig.unauthorized]. [saved] are the Macs in
- * the vault ([macs] by default); [connector] and [relay] wrap the fakes. [start] starts the hub before returning.
+ * the vault ([macs] by default); [connector] and [relay] wrap the fakes. [seed] runs on the store before the hub starts;
+ * [start] starts the hub before returning.
  */
 suspend fun TestScope.hubRig(
     macs: List<FakeMac>,
@@ -59,8 +64,11 @@ suspend fun TestScope.hubRig(
     clock: ManualClock = ManualClock(),
     connector: (MachineLinkConnecting) -> MachineLinkConnecting = { it },
     relay: (FakeRelayAccount) -> RelayAccountCalling = { it },
+    seed: suspend (ConversationStore) -> Unit = {},
     start: Boolean = false,
 ): HubRig {
+    val store = ConversationStore(createTempDirectory("hub-rig").toFile(), StandardTestDispatcher(testScheduler), clock)
+    seed(store)
     val vault = AccountVault(InMemorySecretStore(), StandardTestDispatcher(testScheduler))
     vault.setSession(StoredSession("u1", "d1", "tok-1", "a@b.c"))
     vault.setMachines((saved ?: macs).map { it.machine }, "u1")
@@ -73,7 +81,7 @@ suspend fun TestScope.hubRig(
         sleep ?: sleeper.sleep,
     ) { unauthorized += Unit }
     if (start) hub.start()
-    return HubRig(hub, vault, fake, settings, latency, clock, sleeper, unauthorized, this)
+    return HubRig(hub, vault, fake, settings, latency, clock, sleeper, unauthorized, store, this)
 }
 
 /** Every Mac of the hub is online (and there is at least one). */
