@@ -150,8 +150,21 @@ cmd_build_release() {
     contains "$badging" "$want" || die "release APK: expected $want"
   done
   if contains "$badging" "application-debuggable"; then die "release APK is debuggable"; fi
+  # The shell's permissions (3D): network, network state and the camera for the pairing QR code, no storage access.
+  for want in INTERNET ACCESS_NETWORK_STATE CAMERA; do
+    contains "$badging" "uses-permission: name='android.permission.$want'" \
+      || die "release APK: expected uses-permission: name='android.permission.$want'"
+  done
+  if grep -qE "uses-permission: name='android\.permission\.(READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE|READ_MEDIA_[A-Z_]*)'" <<<"$badging"; then
+    die "release APK: expected no storage or media permission (READ_/WRITE_/MANAGE_EXTERNAL_STORAGE, READ_MEDIA_*)"
+  fi
+  contains "$badging" "uses-feature-not-required: name='android.hardware.camera'" \
+    || die "release APK: expected uses-feature-not-required: name='android.hardware.camera' (the camera is optional)"
   manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk")" || die "aapt2 dump xmltree failed on $apk"
   contains "$manifest" "localeConfig" || die "release APK: the manifest has no localeConfig"
+  if contains "$manifest" "networkSecurityConfig" || contains "$manifest" "usesCleartextTraffic"; then
+    die "release APK: expected no networkSecurityConfig and no usesCleartextTraffic (cleartext is debug only)"
+  fi
   [ -f "$mapping" ] || die "release APK: $mapping is missing (R8 did not run)"
   if [ ! -f "$ANDROID_DIR/app/google-services.json" ]; then
     note "Firebase: not configured (no google-services.json); push stays off in this build"
