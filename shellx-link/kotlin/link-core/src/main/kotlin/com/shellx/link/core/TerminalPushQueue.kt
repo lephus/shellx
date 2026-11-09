@@ -1,8 +1,9 @@
 package com.shellx.link.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.FlowCollector
 
 /**
  * The terminal pushes of one session, between the reader that takes them off the circuit and their consumer, bounded
@@ -60,13 +61,31 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     /**
      * The pushes in the order offered, less the frames dropped or replaced. One collector at a time; a later collector
      * goes on where the one before stopped. Completes after [close], once the queued pushes are taken.
+     *
+     * A push taken for a collector is handed straight to its code, with no cancellation check in between (a `flow {}`
+     * builder would check), so a collector cancelled from another thread loses no push, a LOST part included. Collect
+     * it directly: a `buffer`, `flowOn` or `shareIn` between this and the assembler can lose what it holds at a cancel.
      */
-    val pushes: Flow<TerminalViewPush> = flow {
+    val pushes: Flow<TerminalViewPush> = object : Flow<TerminalViewPush> {
+        override suspend fun collect(collector: FlowCollector<TerminalViewPush>) = deliver(collector)
+    }
+
+    private suspend fun deliver(collector: FlowCollector<TerminalViewPush>) {
         while (true) {
             val entry = synchronized(lock) {
-                entries.removeFirstOrNull()?.also { weight -= it.weight } ?: if (closed) return@flow else null
+                entries.removeFirstOrNull()?.also { weight -= it.weight } ?: if (closed) return else null
             }
-            if (entry != null) emit(entry.push) else wake.receiveCatching()
+            if (entry != null) {
+                collector.emit(entry.push)
+                continue
+            }
+            try {
+                wake.receiveCatching()
+            } catch (e: CancellationException) {
+                // The wake-up may have been this collector's: pass it on to one that waits beside it.
+                if (synchronized(lock) { entries.isNotEmpty() }) wake.trySend(Unit)
+                throw e
+            }
         }
     }
 
