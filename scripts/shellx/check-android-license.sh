@@ -9,8 +9,12 @@
 #   4. a *.gradle (Groovy) script exists
 #   5. a build script adds a repository other than google() and mavenCentral() (gradlePluginPortal() only in
 #      settings.gradle.kts)
-#   6. a path in includeBuild/file/files/fileTree/File/srcDir/srcDirs/dir is not a plain string literal, is
-#      absolute, or leaves shellx-android/, shellx-link/kotlin/, shellx-link/vectors/ and shellx-link/spec/
+#   6. a path in includeBuild/file/files/fileTree/File/srcDir/srcDirs/dir/resolve/resolveSibling/uri/from/
+#      apply/Paths.get/Path.of is not a plain string literal, is absolute, is built from the environment, is
+#      relative to the daemon's working directory (File("…")), or leaves shellx-android/, shellx-link/kotlin/,
+#      shellx-link/vectors/ and shellx-link/spec/ from its anchor: the module folder, the build root
+#      (rootProject, rootDir, settingsDir) or, when the receiver is unknown, both; a ".." literal outside these
+#      calls is checked from both, and parent/parentFile navigation is refused
 #   7. a .jar, .aar or .so file is vendored (gradle-wrapper.jar excepted)
 #   8. a text file names the upstream company
 #   9. a symlink exists in either tree
@@ -29,7 +33,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     -h|--help)
-      sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)

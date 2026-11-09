@@ -19,7 +19,20 @@ TEST_LICENCES = SHIP_LICENCES | {"EPL-1.0", "EPL-2.0", "ICU", "CDDL-1.1"}
 WILDCARDS = {"androidx.*:*", "org.jetbrains.kotlin:*", "org.jetbrains.kotlinx:*"}
 GOOGLE_GROUPS = {"com.google.android.gms", "com.google.firebase", "com.google.android.datatransport",
                  "com.google.android.play", "com.google.android.libraries.identity.googleid"}
-PATH_CALLS = re.compile(r"\b(includeBuild|file|files|fileTree|File|srcDir|srcDirs|dir)\s*\(")
+PATH_CALLS = re.compile(r"\b(Paths\.get|Path\.of|includeBuild|fileTree|files|file|File|srcDirs|srcDir|dir|"
+                        r"resolveSibling|resolve|uri|from|apply)\s*\(")
+# Calls that always resolve against the project folder (Project.file and friends), whatever their receiver.
+PROJECT_CALLS = {"srcDir", "srcDirs", "includeBuild", "apply", "from", "uri"}
+# Calls resolved against the working directory of the Gradle daemon when their first argument is a string.
+CWD_CALLS = {"File", "Paths.get", "Path.of"}
+ROOT_TOKENS = re.compile(r"\b(?:rootProject|rootDir|rootDirectory|settingsDir|settingsDirectory)\b")
+MODULE_TOKENS = re.compile(r"\b(?:projectDir|projectDirectory|buildDir|buildDirectory)\b")
+MODULE_RECEIVER = re.compile(r"^(?:project\.)?(?:(?:layout\.)?(?:projectDirectory|projectDir|buildDirectory|buildDir)"
+                             r"(?:\.get\(\))?(?:\.asFile)?\.)?$")
+ENV_TOKENS = re.compile(r"\bSystem\s*\.\s*(?:getenv|getProperty)\b|\bgradleUserHomeDir\b|\buserHome\b")
+PARENT = re.compile(r"\.\s*(?:parentFile|parent)\b|\b(?:getParentFile|getParent)\s*\(")
+URL_SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]+):")
+ROOTS_TEXT = "shellx-android/, shellx-link/kotlin/, shellx-link/vectors/ and shellx-link/spec/"
 REPO_CALL = re.compile(r"\b(maven|mavenLocal|jcenter|ivy|flatDir)\s*[({]")
 COMPANY = re.compile(r"(?<![A-Za-z0-9_])manaflow(?![A-Za-z0-9_])", re.IGNORECASE)
 GRADLE_PROPERTIES = "shellx-android/gradle.properties"
@@ -125,6 +138,72 @@ def blank_strings(code: str) -> str:
             out.append(code[i])
             i += 1
     return "".join(out)
+
+
+def string_literals(code: str):
+    """Yield (start, end, body, is_plain) for every string literal of code (comments already blanked)."""
+    i = 0
+    while i < len(code):
+        if code[i] == '"':
+            j = string_end(code, i)
+            raw = code[i:j]
+            if raw.startswith('"""'):
+                yield i, j, raw, False
+            else:
+                body = raw[1:-1] if raw.endswith('"') and len(raw) >= 2 else raw[1:]
+                yield i, j, body, "$" not in body and "\\" not in body
+            i = j
+        else:
+            i += 1
+
+
+def call_end(bare: str, start: int) -> int:
+    """bare[start - 1] is an opening parenthesis (strings blanked); return the index after its partner."""
+    depth = 1
+    i = start
+    while i < len(bare) and depth:
+        if bare[i] == "(":
+            depth += 1
+        elif bare[i] == ")":
+            depth -= 1
+        i += 1
+    return i
+
+
+def receiver_before(bare: str, idx: int) -> str:
+    """The receiver chain written before the call that starts at idx, without spaces ("" when there is none)."""
+    j = idx
+    while True:
+        k = j
+        while k > 0 and bare[k - 1] in " \t\r\n":
+            k -= 1
+        if k == 0 or bare[k - 1] != ".":
+            break
+        k -= 1
+        while k > 0 and bare[k - 1] in "?!":
+            k -= 1
+        while k > 0 and bare[k - 1] in " \t\r\n":
+            k -= 1
+        while k > 0 and bare[k - 1] in ")]":
+            close = bare[k - 1]
+            opener = "(" if close == ")" else "["
+            depth = 0
+            m = k - 1
+            while m >= 0:
+                if bare[m] == close:
+                    depth += 1
+                elif bare[m] == opener:
+                    depth -= 1
+                    if depth == 0:
+                        break
+                m -= 1
+            k = max(m, 0)
+        while k > 0 and (bare[k - 1].isalnum() or bare[k - 1] in "_$"):
+            k -= 1
+        if k >= j:
+            break
+        j = k
+    return re.sub(r"\s+", "", bare[j:idx])
 
 
 def literals_in(code: str, start: int):
@@ -264,6 +343,35 @@ def inside_roots(path: str) -> bool:
     return any(path == r or path.startswith(r + "/") for r in ALLOWED_ROOTS)
 
 
+def build_root(rel: str) -> str:
+    return "shellx-android" if rel.startswith("shellx-android/") else "shellx-link/kotlin"
+
+
+def anchors(call: str, receiver: str, context: str):
+    """The folders a literal path in this call may be resolved from: the module folder, the build root, or both
+    when the receiver is not one the check knows."""
+    if ROOT_TOKENS.search(context):
+        return ["root"]
+    if call in PROJECT_CALLS:
+        return ["module"]
+    if call in ("file", "files", "fileTree", "dir", "resolve", "resolveSibling") and MODULE_RECEIVER.match(receiver):
+        return ["module"]
+    if call in CWD_CALLS and MODULE_TOKENS.search(context):
+        return ["module"]
+    return ["module", "root"]
+
+
+def resolved_paths(rel: str, literal: str, call: str, where):
+    if call == "resolveSibling":
+        literal = posixpath.join("..", literal)
+    folders = {"module": posixpath.dirname(rel), "root": build_root(rel)}
+    return [posixpath.normpath(posixpath.join(folders[w], literal)) for w in where]
+
+
+def has_parent_segment(text: str) -> bool:
+    return ".." in text.split("/")
+
+
 def check_kts(rel: str, text: str, report: Report) -> None:
     code = blank_comments(text)
     bare = blank_strings(code)
@@ -273,20 +381,52 @@ def check_kts(rel: str, text: str, report: Report) -> None:
     if posixpath.basename(rel) != "settings.gradle.kts":
         for m in re.finditer(r"\bgradlePluginPortal\s*\(", bare):
             report.add(rel, "gradlePluginPortal() is allowed only in settings.gradle.kts", line_of(code, m.start()))
-    folder = posixpath.dirname(rel)
+    seen = set()
+
+    def add(message: str, line: int) -> None:
+        if (line, message) not in seen:
+            seen.add((line, message))
+            report.add(rel, message, line)
+
+    for m in PARENT.finditer(bare):
+        add("navigates to a parent folder (parent, parentFile); write a relative path instead",
+            line_of(code, m.start()))
+    covered = []
     for m in PATH_CALLS.finditer(bare):
         call = m.group(1)
+        line = line_of(code, m.start())
+        end = call_end(bare, m.end())
+        covered.append((m.end(), end))
+        receiver = receiver_before(bare, m.start())
+        context = receiver + bare[m.end():end]
+        if ENV_TOKENS.search(context):
+            add("%s(…) path is built from the environment (System.getenv, user.home)" % call, line)
+        if call in CWD_CALLS and bare[m.end():end].lstrip().startswith('"'):
+            add("%s(\"…\") is relative to the working directory of the Gradle daemon; use file(…) or "
+                "rootProject.file(…)" % call, line)
+        where = anchors(call, receiver, context)
         for literal, plain in literals_in(code, m.end()):
-            line = line_of(code, m.start())
+            scheme = URL_SCHEME.match(literal) if plain else None
             if not plain:
-                report.add(rel, "%s(…) path is not a plain string literal" % call, line)
-            elif literal.startswith("/") or literal.startswith("~"):
-                report.add(rel, '%s("%s") is absolute' % (call, literal), line)
-            else:
-                resolved = posixpath.normpath(posixpath.join(folder, literal))
-                if not inside_roots(resolved):
-                    report.add(rel, '%s("%s") points outside shellx-android/, shellx-link/kotlin/, '
-                                    "shellx-link/vectors/ and shellx-link/spec/" % (call, literal), line)
+                add("%s(…) path is not a plain string literal" % call, line)
+            elif scheme and scheme.group(1).lower() != "file":
+                continue
+            elif scheme or literal.startswith("/") or literal.startswith("~"):
+                add('%s("%s") is absolute' % (call, literal), line)
+            elif not all(inside_roots(path) for path in resolved_paths(rel, literal, call, where)):
+                origin = {"module": "", "root": " (from the build root)"}.get(where[0], "") if len(where) == 1 \
+                    else " (from the module folder or the build root)"
+                add('%s("%s") points outside %s%s' % (call, literal, ROOTS_TEXT, origin), line)
+    # A path kept in a variable is checked from both folders, since the call that uses it is not known.
+    for start, _, body, plain in string_literals(code):
+        if any(a <= start < b for a, b in covered) or not has_parent_segment(body):
+            continue
+        line = line_of(code, start)
+        if not plain:
+            add('"%s" builds a path with ".." from a template; write a plain relative path' % body, line)
+        elif not all(inside_roots(path) for path in resolved_paths(rel, body, "", ["module", "root"])):
+            add('"%s" points outside %s when used as a path from the module folder or the build root; '
+                'write it inside file(…) or rootProject.file(…)' % (body, ROOTS_TEXT), line)
 
 
 def check_sdk_download(root: Path, report: Report) -> None:
