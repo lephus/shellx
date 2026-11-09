@@ -400,8 +400,8 @@ private fun Viewfinder(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color.Black)
-                .clearAndSetSemantics { contentDescription = label }
-                .testTag("pairing.scanner"),
+                .testTag("pairing.scanner")
+                .clearAndSetSemantics { contentDescription = label },
             contentAlignment = Alignment.Center,
         ) {
             if (authorized) {
