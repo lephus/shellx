@@ -87,6 +87,23 @@ class RelayEndpointTest {
     }
 
     @Test
+    fun isLoopbackTakesOnlyCanonicalOctets() {
+        // Android's inet_pton refuses these forms, so the name would go to DNS and plain text could leave the phone.
+        for (host in listOf("127.0.0.01", "127.000.000.001", "0127.0.0.1", "127.+0.0.1", "127.0.0.+1", "127.0.0.1 ", "127.0x0.0.1")) {
+            assertFalse(RelayTransportPolicy.isLoopback(host), host)
+        }
+        for (host in listOf("127.0.0.0", "127.0.0.1", "127.255.255.255", "127.10.200.9")) assertTrue(RelayTransportPolicy.isLoopback(host), host)
+        assertEquals(
+            RelayException.InsecureTransport("http"),
+            assertFailsWith<RelayException.InsecureTransport> { RelayTransportPolicy.requireHttps(URI("http://127.0.0.01:9/")) },
+        )
+        assertEquals(
+            RelayException.InsecureTransport("ws"),
+            assertFailsWith<RelayException.InsecureTransport> { RelayEndpoint.control(URI("ws://127.000.000.001:9/")) },
+        )
+    }
+
+    @Test
     fun lanesAre32Base64UrlCharacters() {
         val lane = RelayLane.random()
         assertTrue(Regex("[A-Za-z0-9_-]{32}").matches(lane), lane)
