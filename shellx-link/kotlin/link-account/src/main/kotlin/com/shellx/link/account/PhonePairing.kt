@@ -34,6 +34,7 @@ sealed class PhonePairingException(message: String) : Exception(message) {
 object PhonePairing {
     /**
      * Sends a pairing request for the scanned offer and waits, up to [timeout], for the user to approve it on the Mac.
+     * [clientKey] is the phone's Noise static **public** key (`NoiseStaticKey.publicKey`), never its private key.
      *
      * Trust comes from the offer: the host key and name are the offer's, and the machine id and link slot the relay
      * reports on approval must equal the offer's, otherwise [RelayApiException.BadResponse]. A bad offer throws its

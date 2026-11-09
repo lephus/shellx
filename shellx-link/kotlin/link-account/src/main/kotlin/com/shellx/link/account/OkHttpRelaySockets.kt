@@ -42,7 +42,12 @@ class OkHttpRelaySockets(client: OkHttpClient) : RelaySocketFactory {
     }
 }
 
-/** One OkHttp WebSocket. Incoming messages queue without bound; the relay's own flow control limits them. */
+/**
+ * One OkHttp WebSocket. Incoming messages queue without bound (plan 3B): OkHttp's reader thread always drains the
+ * socket into the queue, so the relay's own queue limit never engages and only the phone's memory bounds it. That is
+ * fine for today's answers and small pushes. Terminal output streams (plan 3G) need a bound: block the reader on a
+ * bounded queue (which restores TCP back-pressure), or cap the queued bytes and close the socket.
+ */
 private class OkHttpRelaySocket(client: OkHttpClient, request: Request) : RelaySocket {
     private val inbox = Channel<RelaySocketMessage>(Channel.UNLIMITED)
     private val webSocket: WebSocket = client.newWebSocket(request, Listener())

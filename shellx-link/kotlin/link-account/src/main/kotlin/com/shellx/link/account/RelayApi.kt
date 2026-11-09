@@ -57,7 +57,10 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
         relaySockets = OkHttpRelaySockets(http)
     }
 
-    /** Asks the machine in [offer] to approve this phone; returns the pairing id to poll. */
+    /**
+     * Asks the machine in [offer] to approve this phone; returns the pairing id to poll. [clientKey] is the phone's
+     * Noise static **public** key (`NoiseStaticKey.publicKey`), never its private key.
+     */
     suspend fun requestPairing(offer: PairingOffer, clientKey: ByteArray, token: String): String {
         val body = buildJsonObject {
             put("machine_id", offer.machineId)
@@ -146,7 +149,10 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
         return nonce
     }
 
-    /** Signs this phone in with a Google ID token minted for [nonce]; [clientKey] is the phone's Noise public key. */
+    /**
+     * Signs this phone in with a Google ID token minted for [nonce]. [clientKey] is the phone's Noise static **public**
+     * key (`NoiseStaticKey.publicKey`), never its private key.
+     */
     suspend fun signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: ByteArray): AccountSignIn {
         val body = buildJsonObject {
             put("id_token", idToken)
