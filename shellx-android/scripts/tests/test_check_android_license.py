@@ -26,7 +26,9 @@ CLEAN = {
     "shellx-android/app/build.gradle.kts": (
         '// includeBuild("../../Sources") in a comment does not count\n'
         'description = "see ../../Sources"\n'
-        'val firebase = file("src/debug/google-services.json")\n'),
+        'val firebase = file("src/debug/google-services.json")\n'
+        "dependencyLocking { lockMode.set(LockMode.STRICT) }\n"
+        "configurations.configureEach { resolutionStrategy.activateDependencyLocking() }\n"),
     "shellx-android/app/gradle.lockfile": (
         "# This is a Gradle generated file for dependency locking.\n"
         "androidx.core:core:1.0.0=debugRuntimeClasspath,releaseRuntimeClasspath\n"
@@ -35,7 +37,10 @@ CLEAN = {
     "shellx-android/gradle/wrapper/gradle-wrapper.jar": "PK not really a jar\n",
     "shellx-link/kotlin/settings.gradle.kts": 'include(":link-core")\n',
     "shellx-link/kotlin/build.gradle.kts": "\n",
-    "shellx-link/kotlin/link-core/build.gradle.kts": 'val vectors = layout.projectDirectory.dir("../../vectors")\n',
+    "shellx-link/kotlin/link-core/build.gradle.kts": (
+        'val vectors = layout.projectDirectory.dir("../../vectors")\n'
+        "dependencyLocking { lockMode.set(LockMode.STRICT) }\n"
+        "configurations.configureEach { resolutionStrategy.activateDependencyLocking() }\n"),
     "shellx-link/kotlin/link-core/gradle.lockfile": (
         "org.jetbrains.kotlin:kotlin-stdlib:2.0.0=runtimeClasspath,testRuntimeClasspath\nempty=\n"),
     "scripts/shellx/android-license-allowlist.txt": (
@@ -136,6 +141,36 @@ class CheckAndroidLicenseTests(unittest.TestCase):
         self.assertFails(self.tree(remove=(LOCK,)), "shellx-android/app", "gradle.lockfile")
         self.assertFails(self.tree({LOCK: "junit:junit:4.13.2=debugUnitTestRuntimeClasspath\nempty=\n"}),
                          "releaseRuntimeClasspath")
+
+    def test_android_lockfiles_name_both_build_types(self):
+        only_release = ("androidx.core:core:1.0.0=releaseRuntimeClasspath\n"
+                        "junit:junit:4.13.2=releaseUnitTestRuntimeClasspath\nempty=\n")
+        self.assertFails(self.tree({LOCK: only_release}), LOCK, "debugRuntimeClasspath")
+        only_debug = ("androidx.core:core:1.0.0=debugRuntimeClasspath\n"
+                      "junit:junit:4.13.2=debugUnitTestRuntimeClasspath\nempty=\n")
+        self.assertFails(self.tree({LOCK: only_debug}), LOCK, "releaseRuntimeClasspath")
+        self.assertPasses(self.tree({LOCK: "junit:junit:4.13.2=debugUnitTestRuntimeClasspath\n"
+                                           "empty=debugRuntimeClasspath,releaseRuntimeClasspath\n"}))
+
+    def test_a_build_type_named_like_a_test_still_ships(self):
+        self.assertFails(self.tree({LOCK: CLEAN[LOCK] + "junit:junit:4.13.2=latestRuntimeClasspath\n"}),
+                         "junit:junit:4.13.2 (ship)")
+
+    def test_modules_lock_in_strict_mode(self):
+        app = CLEAN[APP].replace("dependencyLocking { lockMode.set(LockMode.STRICT) }\n", "")
+        self.assertFails(self.tree({APP: app}), APP, "LockMode.STRICT")
+        lenient = CLEAN[APP].replace("LockMode.STRICT", "LockMode.LENIENT")
+        self.assertFails(self.tree({APP: lenient}), APP, "LockMode.STRICT")
+        commented = CLEAN[APP].replace("dependencyLocking", "// dependencyLocking")
+        self.assertFails(self.tree({APP: commented}), APP, "LockMode.STRICT")
+        unlocked = CLEAN[APP].replace("resolutionStrategy.activateDependencyLocking()", "")
+        self.assertFails(self.tree({APP: unlocked}), APP, "activateDependencyLocking")
+
+    def test_core_library_desugaring_is_refused(self):
+        for text in ('dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") }\n',
+                     "android { compileOptions { isCoreLibraryDesugaringEnabled = true } }\n"):
+            with self.subTest(text=text):
+                self.assertFails(self.tree({APP: CLEAN[APP] + text}), APP, "desugaring")
 
     def test_paths_stay_inside_the_android_and_link_trees(self):
         cases = [
