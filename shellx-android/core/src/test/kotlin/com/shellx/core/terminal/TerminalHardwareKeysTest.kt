@@ -11,7 +11,11 @@ class TerminalHardwareKeysTest {
     private val shift = TerminalHardwareModifiers(shift = true); private val meta = TerminalHardwareModifiers(meta = true)
     private fun a(keyCode: Int, plain: Char? = null, altChar: Char? = plain, mods: TerminalHardwareModifiers = TerminalHardwareModifiers()) =
         TerminalHardwareKeys.action(keyCode, plain?.code ?: 0, altChar?.code ?: 0, mods)
-    private fun send(key: TerminalKey, vararg mods: TerminalModifier) = TerminalHardwareAction.Send(key, mods.toList())
+    // Kotlin allows no value class as a vararg type (TerminalModifier is one): one overload per count.
+    private fun send(key: TerminalKey) = TerminalHardwareAction.Send(key, emptyList())
+    private fun send(key: TerminalKey, mod: TerminalModifier) = TerminalHardwareAction.Send(key, listOf(mod))
+    private fun send(key: TerminalKey, first: TerminalModifier, second: TerminalModifier) =
+        TerminalHardwareAction.Send(key, listOf(first, second))
     private val System = TerminalHardwareAction.System
 
     @Test fun namedKeysAreSentWithTheirModifiers() {
