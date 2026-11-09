@@ -53,6 +53,9 @@ import kotlinx.coroutines.Dispatchers
  * picker, several at once). What is picked is read in the order picked through [picks] (the composer holds Send until
  * none is left, and each one's ✕ cancels it) and added with [onAdd], up to `ShellXLink.MAX_ATTACHMENTS_PER_MESSAGE`.
  * What cannot be added says why through [note], which a new pick clears.
+ *
+ * [attached] is what the composer holds right now, the attachment [onAdd] took a moment before included: names and the
+ * count come from it, not from [attachments], which is the list as last drawn (review A I-1).
  */
 @Composable
 fun AttachMenu(
@@ -62,12 +65,13 @@ fun AttachMenu(
     side: Dp,
     enabled: Boolean,
     note: (String?) -> Unit,
+    attached: () -> List<OutgoingAttachment>,
 ) {
     val context = LocalContext.current
     val res = context.resources
     val reader = LocalAttachmentReader.current ?: remember(context) { AttachmentPreparer(context.contentResolver, Dispatchers.IO) }
     val loading by picks.ids.collectAsState()
-    val current by rememberUpdatedState(attachments)
+    val held by rememberUpdatedState(attached)
     val add by rememberUpdatedState(onAdd)
     val say by rememberUpdatedState(note)
     var expanded by remember { mutableStateOf(false) }
@@ -79,7 +83,7 @@ fun AttachMenu(
     fun received(result: Result<OutgoingAttachment>) {
         result.fold(
             onSuccess = { attachment ->
-                if (current.size >= ShellXLink.MAX_ATTACHMENTS_PER_MESSAGE) {
+                if (held().size >= ShellXLink.MAX_ATTACHMENTS_PER_MESSAGE) {
                     say(res.getString(R.string.composer_attach_too_many))
                 } else {
                     add(attachment)
@@ -94,7 +98,7 @@ fun AttachMenu(
     fun read(uris: List<Uri>, kind: AttachmentKind) {
         if (uris.isEmpty()) return
         // Named when its read starts, after what the composer holds then, so photos read in a row get distinct names.
-        picks.read(uris.map { uri -> suspend { reader.read(AttachmentPick(uri.toString(), kind), current.map { it.name }) } }, ::received)
+        picks.read(uris.map { uri -> suspend { reader.read(AttachmentPick(uri.toString(), kind), held().map { it.name }) } }, ::received)
     }
 
     val photos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(PHOTO_PICKER_MAX)) { read(it, AttachmentKind.IMAGE) }

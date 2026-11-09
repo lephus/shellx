@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -117,8 +118,10 @@ fun ComposerBar(
     val res = LocalContext.current.resources
     val locale = AppLanguage.current()
     val colors = ShellXTheme.colors
-    val current by rememberUpdatedState(draft)
-    val change by rememberUpdatedState(onDraftChange)
+    // Every edit starts from the newest draft, the one an edit made a moment before included (review A I-1).
+    val live = remember { LiveDraft(draft) }
+    SideEffect { live.hosted(draft) }
+    val hostChange by rememberUpdatedState(onDraftChange)
     val sendNow by rememberUpdatedState(send)
     val sendSpoken by rememberUpdatedState(sendVoice)
     val side: Dp = 48.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
@@ -127,6 +130,13 @@ fun ComposerBar(
     val mic = model?.takeIf {
         draft.text.isEmpty() && draft.attachments.isEmpty() && loading.isEmpty() && sending == null &&
             voiceState?.phase != VoiceInputModel.Phase.Unavailable
+    }
+
+    /** Hands [next] to the host, after making it the draft the next edit starts from: a pick read or a keystroke before
+     *  the bar recomposes builds on it instead of on the draft the bar last drew. */
+    fun change(next: ComposerDraft) {
+        live.edit(next)
+        hostChange(next)
     }
 
     /** The keyboard comes up at once; a dictation in progress is cancelled, so nothing heard while typing is sent. */
@@ -144,7 +154,7 @@ fun ComposerBar(
         when (outcome) {
             is DictationOutcome.Complete -> sendSpoken?.invoke(outcome.words) ?: sendNow(outcome.words, emptyList())
             is DictationOutcome.CutAtLimit -> {
-                change(current.copy(text = outcome.words))
+                change(live.value.copy(text = outcome.words))
                 cutText = outcome.words
                 openKeyboard()
             }
@@ -152,6 +162,7 @@ fun ComposerBar(
     }
 
     fun sendTyped() {
+        val current = live.value
         val checked = ComposerValidation.message(current.text, current.attachments)
         // A pick still being read would arrive after its message left.
         if (checked !is ComposerValidation.Ok || picks.count > 0) return
@@ -160,7 +171,7 @@ fun ComposerBar(
         attachNote = null
         // With attachments the bar keeps the message while it goes up; the owner clears it.
         if (carried.isNotEmpty()) return
-        change(current.copy(text = ""))
+        change(live.value.copy(text = ""))
         cutText = null
     }
 
@@ -197,7 +208,7 @@ fun ComposerBar(
             AttachmentStrip(
                 draft.attachments,
                 onRemove = { id ->
-                    change(current.copy(attachments = current.attachments.filterNot { it.id == id }))
+                    change(live.value.let { d -> d.copy(attachments = d.attachments.filterNot { it.id == id }) })
                     attachNote = null
                 },
                 locked = sending != null,
@@ -209,11 +220,12 @@ fun ComposerBar(
             if (attachmentsEnabled) {
                 AttachMenu(
                     draft.attachments,
-                    onAdd = { change(current.copy(attachments = current.attachments + it)) },
+                    onAdd = { a -> change(live.value.let { d -> d.copy(attachments = d.attachments + a) }) },
                     picks, side, enabled = sending == null, note = { attachNote = it },
+                    attached = { live.value.attachments },
                 )
             }
-            Field(draft.text, { change(current.copy(text = it)) }, enabled = sending == null, side, focus, Modifier.weight(1f))
+            Field(draft.text, { change(live.value.copy(text = it)) }, enabled = sending == null, side, focus, Modifier.weight(1f))
             when {
                 mic != null -> MicButton(mic, R.string.voice_mic, diameter = side, onOutcome = ::said, onKeyboard = ::openKeyboard)
                 sending != null -> SendProgress(sending, side)
@@ -261,6 +273,28 @@ fun ComposerValidation.Companion.byteCount(count: Int, locale: Locale): String {
         format.decimalFormatSymbols = format.decimalFormatSymbols.apply { groupingSeparator = ' ' }
     }
     return format.format(count)
+}
+
+/**
+ * The draft the composer's edits start from (review A I-1). The host's draft reaches the bar only when it recomposes,
+ * up to a frame after an edit, while picks are read and keys typed in between. So an edit is taken at once ([edit]),
+ * and the host's draft only when it changes ([hosted]): an outside change (the owner cleared the bar) wins, and a host
+ * whose state comes a frame late never rolls an edit back.
+ */
+private class LiveDraft(initial: ComposerDraft) {
+    var value: ComposerDraft = initial
+        private set
+    private var fromHost: ComposerDraft = initial
+
+    fun edit(next: ComposerDraft) {
+        value = next
+    }
+
+    fun hosted(draft: ComposerDraft) {
+        if (draft === fromHost) return
+        fromHost = draft
+        value = draft
+    }
 }
 
 @Composable
