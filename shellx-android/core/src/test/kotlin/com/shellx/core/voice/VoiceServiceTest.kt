@@ -5,6 +5,7 @@ import com.shellx.core.pending.QuestionDraft
 import com.shellx.core.platform.MemoryKeyValueStore
 import com.shellx.core.testing.FakeTranscriber
 import com.shellx.core.testing.FakeVoicePermissions
+import com.shellx.core.testing.HoppingCancel
 import com.shellx.core.testing.eventually
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,7 +13,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.TestTimeSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 /** The voice service the screens share: it stops every mic at once (an audio interruption, a lost input, the app
@@ -33,13 +41,17 @@ class VoiceServiceTest {
         val SERVER = VoiceCapabilities(onDeviceRecognizer = false, standardOnDevice = false, standardAvailable = true)
     }
 
-    private fun TestScope.makeService(transcriber: FakeTranscriber, asker: Asker): VoiceService {
+    private fun TestScope.makeService(
+        transcriber: SpeechEngine,
+        asker: Asker,
+        scope: CoroutineScope = backgroundScope,
+    ): VoiceService {
         val settings = MemoryKeyValueStore()
         VoiceLanguage.VIETNAMESE.save(settings)
         val clock = TestTimeSource()
         return VoiceService(
             transcriber, FakeVoicePermissions(), VoiceCapabilityCache(timeSource = clock) { asker.ask() }, LatencyLog(),
-            settings, backgroundScope, clock, preferredLanguages = emptyList(), contextualStrings = { emptyList() },
+            settings, scope, clock, preferredLanguages = emptyList(), contextualStrings = { emptyList() },
         )
     }
 
@@ -69,6 +81,41 @@ class VoiceServiceTest {
         assertEquals(runs.toSet(), transcriber.cancelledRuns.toSet(), "both runs stopped")
         val words = composer.release()
         assertNull(words, "nothing heard before the interruption is sent afterwards")
+    } }
+
+    /** Final review I-1: `cancelAll()` reaches every mic, also when the voice scope (hub.scope) already ended, and
+     *  also when its own caller is cancelled (ON_STOP's scope going) while an engine's cancel suspends. Each mic shows
+     *  idle and no run keeps the microphone. */
+    @Test fun cancelAllReachesEveryMic() { runTest {
+        for (path in listOf("scope ended", "caller cancelled")) {
+            val transcriber = FakeTranscriber()
+            val hub = CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext.job))
+            val service = makeService(HoppingCancel(transcriber), Asker(SERVER), scope = hub)
+            val composer = service.makeModel()
+            val sheet = service.makeModel()
+            transcriber.holdStarts()
+            val presses = listOf(composer, sheet).map { model -> backgroundScope.launch { model.press() } }
+            assertTrue(eventually { transcriber.startsWaiting == 2 }, path)
+
+            if (path == "scope ended") {
+                hub.cancel()
+                runCurrent()
+                assertNull(runCatching { service.cancelAll() }.exceptionOrNull(), "$path: nothing throws")
+            } else {
+                val call = backgroundScope.launch {
+                    coroutineContext.job.cancel()
+                    service.cancelAll()
+                }
+                call.join()
+            }
+            assertEquals(VoiceInputModel.Phase.Idle, composer.phase, path)
+            assertEquals(VoiceInputModel.Phase.Idle, sheet.phase, "$path: the second mic is reached too")
+            transcriber.releaseStarts()
+            presses.joinAll()
+            runCurrent()
+            assertNull(transcriber.activeRun, "$path: nothing holds the microphone")
+            assertEquals(transcriber.starts.map { it.run }.toSet(), transcriber.cancelledRuns.toSet(), path)
+        }
     } }
 
     /** The workspace pager stops paging while any mic listens, so the mic's drag to cancel stays the mic's. */

@@ -7,6 +7,7 @@ import com.shellx.core.platform.CoreLog
 import com.shellx.core.testing.FakeTranscriber
 import com.shellx.core.testing.FakeVoicePermissions
 import com.shellx.core.testing.Gate
+import com.shellx.core.testing.HoppingCancel
 import com.shellx.core.testing.eventually
 import com.shellx.core.text.utf8Size
 import java.io.IOException
@@ -20,9 +21,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.TestScope
@@ -52,6 +57,7 @@ class VoiceInputModelTest {
         language: VoiceLanguage = VoiceLanguage.VIETNAMESE,
         maxBytes: Int = ComposerValidation.MAX_BYTES,
         engine: (FakeTranscriber) -> SpeechEngine = { it },
+        scope: CoroutineScope = backgroundScope,
     ): Rig {
         val transcriber = FakeTranscriber()
         val permissions = FakeVoicePermissions(microphone = microphone, speech = speech)
@@ -59,11 +65,16 @@ class VoiceInputModelTest {
         val latency = LatencyLog()
         val model = VoiceInputModel(
             engine(transcriber), permissions, capabilities = { capabilities }, language = language,
-            contextualStrings = { listOf("shellx", "PR") }, latency = latency, timeSource = clock, scope = backgroundScope,
+            contextualStrings = { listOf("shellx", "PR") }, latency = latency, timeSource = clock, scope = scope,
             maxBytes = maxBytes,
         )
         return Rig(model, transcriber, permissions, clock, latency)
     }
+
+    /** A supervised child of backgroundScope, as hub.scope is of the app scope: `MachineHub.stopAll()` cancels it on a
+     *  sign-out, a deletion, a refused token (401) and the demo's Exit. */
+    private fun TestScope.hubScope(): CoroutineScope =
+        CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext.job))
 
     private suspend fun TestScope.waitForPhase(model: VoiceInputModel, phase: VoiceInputModel.Phase) {
         val reached = eventually { model.phase == phase }
@@ -725,5 +736,57 @@ class VoiceInputModelTest {
         rig.model.press()
         assertEquals(VoiceInputModel.Phase.Listening(""), rig.model.phase, "the next press listens")
         assertEquals(2, rig.transcriber.starts.size)
+    } }
+
+    /** Final review I-1: the model's scope is hub.scope, which a refused token (401), a sign-out, a deletion or the
+     *  demo's Exit cancels while the user may hold the mic. The mic is given back once, even by an engine whose cancel
+     *  suspends, the mic shows idle, and the screen's later calls never throw into a caller that was not cancelled. */
+    @Test fun aScopeThatEndsWhileListeningGivesTheMicBack() { runTest {
+        val hub = hubScope()
+        val rig = makeRig(scope = hub, engine = { HoppingCancel(it) })
+        rig.model.press()
+        val run = rig.transcriber.starts.last().run
+        rig.transcriber.say("đang nói")
+        waitForPhase(rig.model, VoiceInputModel.Phase.Listening("đang nói"))
+
+        hub.cancel()
+        runCurrent()
+        assertEquals(listOf(run), rig.transcriber.cancelledRuns, "the mic is given back when the scope ends")
+        assertNull(rig.transcriber.activeRun)
+        assertFalse(rig.transcriber.isRunning)
+        assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase, "the mic shows idle")
+
+        // The hub is null now, so the screen goes; its calls end normally.
+        assertNull(runCatching { rig.model.cancel() }.exceptionOrNull(), "cancel() never throws into a live caller")
+        assertNull(runCatching { rig.model.release() }.getOrThrow(), "nothing is sent")
+        assertEquals(listOf(run), rig.transcriber.cancelledRuns, "given back once")
+    } }
+
+    /** Final review I-1: the scope ends while a press still starts. The start then ends by itself, or the screen
+     *  cancels first: either way the run never keeps the mic, the mic shows idle, and nothing throws. */
+    @Test fun aScopeThatEndsWhileStartingGivesTheMicBack() { runTest {
+        for (path in listOf("start ends", "screen cancels")) {
+            val hub = hubScope()
+            val rig = makeRig(scope = hub, engine = { HoppingCancel(it) })
+            rig.transcriber.holdStarts()
+            val press = backgroundScope.launch { rig.model.press() }
+            assertTrue(eventually { rig.transcriber.startsWaiting == 1 }, path)
+            val run = rig.transcriber.starts.last().run
+
+            hub.cancel()
+            runCurrent()
+            if (path == "screen cancels") {
+                assertNull(runCatching { rig.model.cancel() }.exceptionOrNull(), "$path: cancel() never throws")
+                assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase, path)
+            }
+            rig.transcriber.releaseStarts()
+            press.join()
+            runCurrent()
+            assertEquals(VoiceInputModel.Phase.Idle, rig.model.phase, path)
+            assertFalse(rig.model.isActive, path)
+            assertNull(rig.transcriber.activeRun, "$path: the mic is given back")
+            assertFalse(rig.transcriber.isRunning, path)
+            assertEquals(listOf(run), rig.transcriber.cancelledRuns, path)
+        }
     } }
 }

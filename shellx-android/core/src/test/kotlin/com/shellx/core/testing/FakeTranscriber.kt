@@ -7,6 +7,7 @@ import com.shellx.core.voice.VoiceLanguage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.yield
 
 /**
  * A [SpeechEngine] the test drives (port of FakeTranscriber), following the real recognizers' rule through a
@@ -172,5 +173,16 @@ class FakeTranscriber(private val slot: SpeechRunSlot = SpeechRunSlot()) : Speec
     override suspend fun cancel(run: SpeechRunId) {
         synchronized(lock) { cancelList += run }
         slot.cancel(run)?.teardown?.invoke()
+    }
+}
+
+/**
+ * An engine whose `cancel` suspends once (a real recognizer's teardown hops to the main thread, or waits for its
+ * callback) before it tears the run down: a give-back that is cancelled at that suspension never releases the mic.
+ */
+class HoppingCancel(private val base: FakeTranscriber) : SpeechEngine by base {
+    override suspend fun cancel(run: SpeechRunId) {
+        yield()
+        base.cancel(run)
     }
 }
