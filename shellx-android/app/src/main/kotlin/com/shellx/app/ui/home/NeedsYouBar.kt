@@ -64,12 +64,12 @@ fun NeedsYouBar(items: List<MachinePendingItem>, showsMachineName: Boolean, open
             .background(colors.accent.copy(alpha = 0.12f), shape)
             .border(1.dp, colors.accent.copy(alpha = 0.35f), shape)
             .clickable(onClick = open)
+            .testTag("home.needsYou")
             .clearAndSetSemantics {
                 contentDescription = spoken
                 role = Role.Button
                 onClick(label = hint) { open(); true }
             }
-            .testTag("home.needsYou")
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
