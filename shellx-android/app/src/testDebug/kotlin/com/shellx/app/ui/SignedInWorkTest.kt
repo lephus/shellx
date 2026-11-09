@@ -1,5 +1,6 @@
 package com.shellx.app.ui
 
+import android.annotation.SuppressLint
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
@@ -12,10 +13,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.navigation.NavGraph
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,6 +39,7 @@ import com.shellx.app.testing.mainComposition
 import com.shellx.app.ui.composer.LocalAttachmentReader
 import com.shellx.app.ui.nav.Routes
 import com.shellx.app.ui.nav.WorkRoutes
+import com.shellx.app.ui.pending.PendingFixtures
 import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXAppTheme
 import com.shellx.app.voice.LocalVoice
@@ -241,6 +249,39 @@ class SignedInWorkTest {
         waitUntil { nav.currentBackStackEntry?.destination?.route == WorkRoutes.PENDING }
         assertEquals(Routes.HOME, nav.previousBackStackEntry?.destination?.route)
         assertFalse(platform.pushTaps.hasTap.value)
+    }
+
+    /** Final review I-1: a tap while the whole list of waiting requests is already open keeps that page, its open sheet
+     *  and the typed answer (the iPhone sets an equal path, so SwiftUI keeps the page and its sheet). */
+    @Test
+    fun aTapWhileTheRequestsAreOpenKeepsTheOpenSheetAndItsText() {
+        val mac = macWithAWorkspace().apply { addPending(PendingFixtures.question(workspaceId = "ws-1")) }
+        val t = mainComposition(folder.root, listOf(mac), appScope)
+        platform.pushTaps.receive()
+        lateinit var nav: NavHostController
+        rule.setContent {
+            nav = rememberNavController()
+            ShellXAppTheme(AppAppearance.SYSTEM) { ShellXApp(t.composition, nav, platform) }
+        }
+        rule.runOnUiThread { t.composition.lifecycle.onStart() }
+        waitUntil {
+            route(nav) == WorkRoutes.PENDING &&
+                rule.onAllNodes(hasTestTag("pending.open") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithTag("pending.open").performClick()
+        waitUntil { rule.onAllNodesWithTag("pending.other").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("pending.other").performClick()
+        rule.onNodeWithTag("pending.otherField").performTextInput("abc")
+        val page = nav.currentBackStackEntry
+
+        rule.runOnUiThread { platform.pushTaps.receive() }
+        waitUntil { !platform.pushTaps.hasTap.value }
+
+        rule.onNodeWithTag("pending.otherField").assertTextEquals("abc")
+        assertSame("the same page", page, nav.currentBackStackEntry)
+        @SuppressLint("RestrictedApi")
+        val stack = nav.currentBackStack.value.filter { it.destination !is NavGraph }.map { it.destination.route }
+        assertEquals(listOf(Routes.HOME, WorkRoutes.PENDING), stack)
     }
 
     private fun macWithAWorkspace() = FakeMac("MacBook Pro", appScope).apply {
