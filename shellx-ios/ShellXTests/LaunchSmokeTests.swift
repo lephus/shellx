@@ -12,7 +12,7 @@ final class LaunchSmokeTests: XCTestCase {
 
     func testDisplayNameIsShellXDev() {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "ShellX Dev")
-        XCTAssertEqual(Bundle.main.bundleIdentifier, "com.shellx.dev")
+        XCTAssertEqual(Bundle.main.bundleIdentifier, "com.shellx.prod", "one app id everywhere (contracts §22)")
     }
 
     /// Debug keeps plain HTTP to the local network for the loopback relay (`SHELLX_API_BASE`); the
