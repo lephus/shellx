@@ -35,12 +35,13 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 | 3A Android scaffold | 7b2c58fdd6 | Contracts §22. Review: 0 C, 3 I + 5 M fixed, re-review approved. |
 | One app id `com.shellx.prod` + Firebase (3A Task 10) | 61a339fb3e | `shellx-android/app/google-services.json` from the user's download (project `shellxpro`; also holds the Android OAuth client with this Mac's debug SHA-1 and the Web client). |
 | 2C iPhone terminal | 34d42258b9 | Contracts §23. Two-reviewer final review (2 I + 11 M fixed test-first), one regression fixed, re-reviews clean. Device check skipped (user waived). Core 682 / app 246 tests. |
-
 | 1C follow-up: Google G + Google Sans Medium (static, OFL) on iOS; iPhone Debug bundle `com.shellx.prod` | cf1d4e2343 | Review approved (0 C / 0 I). Desktop branding by the user: 112079593c. |
+| 3B Kotlin Link (`link-core`, `link-account`) | 91bc8626be | Contracts §24. Three chunks, each reviewed + fixed test-first; final review clean. link-core 135, link-account 62 (4 live-relay tests skipped: no `cmux-relay` binary on this Mac). |
 
 ## In progress
 
-- 3B (Kotlin Link), worktree `.worktrees/android-3b-link-kotlin`, branch `feat/shellx-android-3b-link-kotlin`; ledger `.superpowers/sdd/2026-11-07-shellx-android-3b-link-kotlin/progress.md` (git-ignored). Run in three chunks (Tasks 0–5, 6–9, 10–15), a fresh review after each, then a final review; merge after review (non-UI). Then 3C, same way (user: "chạy tiếp 3B rồi 3C luôn").
+- 3C (Android core), worktree `.worktrees/android-3c-core`, branch `feat/shellx-android-3c-core`; ledger `.superpowers/sdd/2026-11-07-shellx-android-3c-core/progress.md` (git-ignored). Four chunks (Tasks 0–7, 8–13, 14–23, 24–30), a fresh review after each, then a final review; merge after review (non-UI). User: "chạy tiếp 3B rồi 3C luôn".
+- Before 3C's first dogfood: run 3B's `RelayIntegrationTest` with `CMUX_RELAY_BIN` on a machine that has the binary.
 
 ## Waiting on the user
 
