@@ -4,6 +4,7 @@ import kotlin.coroutines.resume
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -28,6 +29,23 @@ suspend fun TestScope.eventually(timeout: Duration = 10.seconds, condition: susp
         runCurrent()
         if (condition()) return true
         delay(5.milliseconds)
+    }
+    runCurrent()
+    return condition()
+}
+
+/**
+ * Like [eventually], but for an effect that a real thread produces (OkHttp, `Dispatchers.IO`/`Default`, a plain
+ * `Thread`): repeats until the condition holds or [timeout] of real time passed (Swift's `eventually` waits 10 s
+ * of real time). Each round runs runCurrent(), so work a real thread handed back to the test dispatcher runs, then
+ * checks the condition, then blocks the test thread for 5 ms of real time. Virtual time never moves here.
+ */
+suspend fun TestScope.eventuallyReal(timeout: Duration = 10.seconds, condition: suspend () -> Boolean): Boolean {
+    val deadline = TimeSource.Monotonic.markNow() + timeout
+    while (deadline.hasNotPassedNow()) {
+        runCurrent()
+        if (condition()) return true
+        Thread.sleep(5)
     }
     runCurrent()
     return condition()

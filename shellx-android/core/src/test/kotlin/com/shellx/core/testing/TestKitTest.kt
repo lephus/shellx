@@ -1,6 +1,8 @@
 package com.shellx.core.testing
 
 import com.shellx.link.account.RelayApiException
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -8,11 +10,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 
 class TestKitTest {
     @Test fun manualSleeperRecordsReleasesAndCountsCancellations() { runTest {
@@ -34,6 +39,19 @@ class TestKitTest {
     @Test fun eventuallyLetsVirtualTimePass() { runTest {
         var ready = false; backgroundScope.launch { delay(3.seconds); ready = true }
         assertTrue(eventually { ready }); assertFalse(eventually(timeout = 100.milliseconds) { false })
+    } }
+
+    @Test fun eventuallyRealWaitsForRealThreadsWithoutMovingVirtualTime() { runTest {
+        val flag = AtomicBoolean(false)
+        thread { Thread.sleep(200); flag.set(true) }
+        assertTrue(eventuallyReal { flag.get() })
+        var handedBack = false
+        backgroundScope.launch { withContext(Dispatchers.IO) { Thread.sleep(100) }; handedBack = true }
+        assertTrue(eventuallyReal { handedBack })
+        val started = TimeSource.Monotonic.markNow()
+        assertFalse(eventuallyReal(timeout = 50.milliseconds) { false })
+        assertTrue(started.elapsedNow() >= 50.milliseconds)
+        assertEquals(0L, testScheduler.currentTime)
     } }
 
     @Test fun manualClockMovesOnlyWhenTold() {

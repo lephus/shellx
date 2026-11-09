@@ -8,6 +8,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
@@ -38,6 +39,14 @@ class PlatformTest {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         assertEquals("boom", assertFailsWith<IllegalStateException> { scope.runDetached { error("boom") } }.message)
         assertTrue(scope.isActive); scope.cancel()
+        // A parent that a failed child cancels: the failure must not reach it.
+        val parent = Job()
+        val plain = CoroutineScope(parent + StandardTestDispatcher(testScheduler))
+        assertEquals("boom", assertFailsWith<IllegalStateException> { plain.runDetached { error("boom") } }.message)
+        assertTrue(parent.isActive); parent.cancel()
+        // runTest's backgroundScope reports a failed child as the test's failure.
+        assertEquals("boom", assertFailsWith<IllegalStateException> { backgroundScope.runDetached { error("boom") } }.message)
+        assertTrue(backgroundScope.isActive)
     } }
 
     @Test fun coreLogGoesToTheSink() {
