@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "852509094750",
+    "project_id": "shellxpro",
+    "storage_bucket": "shellxpro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:852509094750:android:b9b29deef22f840fb9d5cf",
+        "android_client_info": {
+          "package_name": "com.shellx.prod"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "852509094750-5d35kubnlrcns79j77p8c2ruqjsclf57.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shellx.prod",
+            "certificate_hash": "2f4f71949b7f014dd4384df0c3e484a68e508ff7"
+          }
+        },
+        {
+          "client_id": "852509094750-t48ejrvratb8picdha2s9geuafdimth4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6RDBWhbBTkiUr0FELYGIlQZP1zAMX4qg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "852509094750-t48ejrvratb8picdha2s9geuafdimth4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "852509094750-2u1non5qq4qgpg0i1ko9u2hkdicqkbfj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shellx.prod"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

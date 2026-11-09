@@ -15,11 +15,10 @@ class AppIdentityTest {
 
     @Test
     fun identityMatchesTheBuildType() {
+        assertEquals("com.shellx.prod", context.packageName)
         if (BuildConfig.DEBUG) {
-            assertEquals("com.shellx.dev", context.packageName)
             assertEquals("ShellX Dev", context.getString(R.string.app_name))
         } else {
-            assertEquals("com.shellx.prod", context.packageName)
             assertEquals("ShellX", context.getString(R.string.app_name))
         }
     }

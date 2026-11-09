@@ -90,8 +90,9 @@ Every `test` command first runs the licence check, `import-strings.py --check` a
   `build/dev/emulator-<api>.log`.
 - **Phone.** `dev.sh device` takes the serial from `--serial`, then `$SHELLX_ANDROID_SERIAL`, then the first
   line of `~/.config/shellx/android-serial`, then the only phone `adb devices` lists. It refuses an emulator
-  serial and a phone that is not ready. It installs only the debug app, `com.shellx.dev`, and checks the
-  APK's package first: `com.shellx.prod` never goes onto a phone from this script.
+  serial and a phone that is not ready. It installs only a debuggable APK of `com.shellx.prod` and checks
+  the APK first (`aapt2 dump badging`): a release (non-debuggable) APK is refused on a phone. A debug
+  install replaces a Play-installed "ShellX" (same id).
 - **Release check.** `build-release` builds the unsigned release APK with R8, then checks with `aapt2`: app
   id `com.shellx.prod`, label "ShellX", the version in `version.properties`, min SDK 26, the target SDK from
   the catalog, a locale config, not debuggable, and that R8 wrote `mapping.txt`. No signing key is involved.
@@ -100,11 +101,10 @@ Every `test` command first runs the licence check, `import-strings.py --check` a
 
 ## App ids
 
-Debug builds are "ShellX Dev" (`com.shellx.dev`) and install next to the Google Play build "ShellX"
-(`com.shellx.prod`). `app/build.gradle.kts` sets the debug id with `androidComponents.onVariants`
-(`applicationIdSuffix` cannot produce `com.shellx.dev`, and product flavors would add variants), and the
-debug resource overlay `app/src/debug/res/values/strings_android.xml` renames the app. The namespace is
-`com.shellx.app` in both. `AppIdentityTest` runs on both variants.
+Both builds use `com.shellx.prod`; the debug build is labelled "ShellX Dev" and the release build "ShellX".
+The debug resource overlay `app/src/debug/res/values/strings_android.xml` renames the app. The namespace is
+`com.shellx.app` in both. `AppIdentityTest` runs on both variants. Firebase config is
+`app/google-services.json`, shared by both.
 
 ## Strings
 
