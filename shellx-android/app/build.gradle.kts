@@ -68,10 +68,6 @@ androidComponents {
     beforeVariants(selector().withBuildType("release")) { variant ->
         variant.hostTests.getValue(HostTestBuilder.UNIT_TEST_TYPE).enable = true
     }
-    // Debug is "ShellX Dev" (com.shellx.dev), so it installs next to the Google Play build "ShellX"
-    // (com.shellx.prod). applicationIdSuffix cannot produce com.shellx.dev, and product flavors would add variants.
-    // The name comes from src/debug/res/values/strings_android.xml.
-    onVariants(selector().withBuildType("debug")) { variant -> variant.applicationId.set("com.shellx.dev") }
 }
 
 kotlin {
@@ -119,7 +115,7 @@ dependencyLocking {
     lockMode.set(LockMode.STRICT)
 }
 
-// Firebase (push) needs both config files; Task 10 of plan 3A adds them. Until then push stays off.
-if (file("src/debug/google-services.json").isFile && file("src/release/google-services.json").isFile) {
+// Firebase (push): both build types share com.shellx.prod, so one app/google-services.json serves both.
+if (file("google-services.json").isFile) {
     apply(plugin = "com.google.gms.google-services")
 }
