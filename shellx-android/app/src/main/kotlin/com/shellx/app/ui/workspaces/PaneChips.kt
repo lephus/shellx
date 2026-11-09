@@ -62,6 +62,9 @@ import kotlin.math.abs
 
 private const val CHIP_RADIUS = 10
 
+/** Frames [centre] waits for the row's first layout. */
+private const val FIRST_LAYOUT_FRAMES = 10
+
 /**
  * The row of chips under the workspace screen's top bar (`PaneChips.swift`): one per terminal of the workspace, in the
  * Mac's order, the one shown highlighted. An agent's chip has a dot in its state's tone, and while that agent waits for
@@ -104,8 +107,13 @@ fun PaneChips(
 
 /** Scrolls item [index] to the middle of the row, as far as the row's ends allow. */
 private suspend fun LazyListState.centre(index: Int, animated: Boolean) {
-    // Before the first layout there is nothing to measure against; frames resume outside a layout pass.
-    while (layoutInfo.visibleItemsInfo.isEmpty()) withFrameNanos { }
+    // Before the first layout there is nothing to measure against; frames resume outside a layout pass. A row that
+    // never lays out (no room) is left alone rather than asked for frames for ever.
+    var frames = 0
+    while (layoutInfo.visibleItemsInfo.isEmpty()) {
+        if (frames++ == FIRST_LAYOUT_FRAMES) return
+        withFrameNanos { }
+    }
     fun shown() = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
     val item = shown() ?: run {
         if (animated) animateScrollToItem(index) else scrollToItem(index)
