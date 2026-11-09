@@ -28,6 +28,8 @@ struct TerminalPane: View {
             content
             if (focused || showsKeyBar) && model.terminalId == terminalId {
                 TerminalKeyBar(ctrlLatched: model.typing.ctrlLatched) { item in
+                    // A tap as the page stops being the one shown never reaches the terminal shown next.
+                    guard model.terminalId == terminalId else { return }
                     Self.perform(item, on: model) { focused = false }
                 }
             }
@@ -113,7 +115,7 @@ struct TerminalPane: View {
     private func surfacePage(_ phase: TerminalViewPhase) -> some View {
         card {
             TerminalSurface(
-                model: model, revision: model.screenRevision, snapshots: model.snapshots, topShift: model.topShift,
+                model: model, terminalId: terminalId, revision: model.screenRevision, snapshots: model.snapshots, topShift: model.topShift,
                 typing: model.typing, phase: phase, sentInputs: model.sentInputs, title: title, focused: $focused)
                 .opacity(phase == .offline ? 0.5 : 1)
         }

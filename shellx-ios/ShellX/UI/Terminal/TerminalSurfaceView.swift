@@ -7,6 +7,9 @@ import UIKit
 /// zoom; alternate-screen pans become `model.scroll(lines:)`; reports `TerminalGeometry.phoneGrid` to the model.
 final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
     let model: TerminalViewModel
+    /// The terminal of the page this surface belongs to. The model is shared by every page of the screen, so a surface
+    /// left behind by a selection change must not type into the terminal shown now (`acceptsInput()`).
+    let terminalId: String
     let font: TerminalFont
     let canvas: TerminalCanvasView
 
@@ -51,8 +54,9 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
     private lazy var longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPressed(_:)))
     private lazy var editMenu = UIEditMenuInteraction(delegate: nil)
 
-    init(model: TerminalViewModel, font: TerminalFont = .standard) {
+    init(model: TerminalViewModel, terminalId: String, font: TerminalFont = .standard) {
         self.model = model
+        self.terminalId = terminalId
         self.font = font
         canvas = TerminalCanvasView(model: model, font: font)
         super.init(frame: .zero)
@@ -147,7 +151,25 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
     // MARK: - Focus
 
     override var canBecomeFirstResponder: Bool {
-        model.phase == .live || model.phase == .connecting
+        isShown && (model.phase == .live || model.phase == .connecting)
+    }
+
+    /// The page this surface belongs to is the one the model shows.
+    var isShown: Bool { model.terminalId == terminalId }
+
+    /// Whether input from the keyboard, the edit menu or a pan may reach the model: only on the page shown. A surface
+    /// whose page is no longer shown drops it and gives the keyboard up (base spec §4: typed text never lands in a
+    /// terminal other than the one shown).
+    func acceptsInput() -> Bool {
+        guard isShown else {
+            if isFirstResponder {
+                Task { @MainActor [weak self] in
+                    if self?.isShown == false { self?.resignFirstResponder() }
+                }
+            }
+            return false
+        }
+        return true
     }
 
     @discardableResult
@@ -188,7 +210,7 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
     }
 
     override func paste(_ sender: Any?) {
-        guard let text = pasteboard.string else { return }
+        guard acceptsInput(), let text = pasteboard.string else { return }
         model.paste(text)
         canvas.setNeedsDisplay()
     }
@@ -198,6 +220,11 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
     /// Esc, tab, arrows, home, end, page up and down, forward delete and ctrl+letter go out as named keys; the rest
     /// (letters, Return, Backspace, ⌘ shortcuts, anything while composing) go on to UIKit's text system.
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        // Off the page shown, every press goes on to UIKit, whose text calls `acceptsInput()` then drops.
+        guard acceptsInput() else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
         var rest = Set<UIPress>()
         for press in presses {
             guard let key = press.key,
@@ -346,7 +373,7 @@ final class TerminalSurfaceView: UIScrollView, UIScrollViewDelegate, UIGestureRe
                 translation: translation - panTranslation, carry: panCarry, lineHeight: font.cell.height, scale: scale)
             panTranslation = translation
             panCarry = step.carry
-            if step.lines != 0 { model.scroll(lines: step.lines) }
+            if step.lines != 0, acceptsInput() { model.scroll(lines: step.lines) }
         default:
             panCarry = 0
             panTranslation = 0

@@ -12,12 +12,14 @@ extension TerminalSurfaceView: UITextInput {
     var hasText: Bool { true }
 
     func insertText(_ text: String) {
+        guard acceptsInput() else { return }
         model.insertText(text)
         markedSelection = 0
         inputHappened(keyboardMarked: "")
     }
 
     func deleteBackward() {
+        guard acceptsInput() else { return }
         let composing = !model.typing.markedText.isEmpty
         model.deleteBackward()
         if composing { markedSelection = min(markedSelection, markedLength) }
@@ -28,12 +30,14 @@ extension TerminalSurfaceView: UITextInput {
 
     func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
         let text = markedText ?? ""
+        guard acceptsInput() else { return }
         model.setMarkedText(text)
         markedSelection = min(max(selectedRange.location + selectedRange.length, 0), markedLength)
         inputHappened(keyboardMarked: text)
     }
 
     func unmarkText() {
+        guard acceptsInput() else { return }
         model.unmarkText()
         markedSelection = 0
         inputHappened(keyboardMarked: "")

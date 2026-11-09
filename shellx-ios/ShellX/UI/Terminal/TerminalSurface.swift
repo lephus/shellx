@@ -5,6 +5,8 @@ import SwiftUI
 /// `updateUIView` after each change and the view redraws from the model. `focused` is whether it holds the keyboard.
 struct TerminalSurface: UIViewRepresentable {
     let model: TerminalViewModel
+    /// The terminal of the page this surface belongs to.
+    let terminalId: String
     let revision: Int
     let snapshots: Int
     let topShift: Int
@@ -15,7 +17,7 @@ struct TerminalSurface: UIViewRepresentable {
     @Binding var focused: Bool
 
     func makeUIView(context: Context) -> TerminalSurfaceView {
-        TerminalSurfaceView(model: model)
+        TerminalSurfaceView(model: model, terminalId: terminalId)
     }
 
     func updateUIView(_ view: TerminalSurfaceView, context: Context) {

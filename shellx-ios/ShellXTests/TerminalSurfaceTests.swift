@@ -21,7 +21,7 @@ final class TerminalSurfaceTests: XCTestCase {
         model.show("t-zsh")
         let live = await WorkspaceRig.eventually { model.phase == .live }
         XCTAssertTrue(live)
-        return (rig, model, TerminalSurfaceView(model: model))
+        return (rig, model, TerminalSurfaceView(model: model, terminalId: "t-zsh"))
     }
 
     func testMarkedTextStaysOnThePhoneUntilCommitted() async throws {
