@@ -111,14 +111,14 @@ class PendingSheetModel(val key: PendingKey, private val hub: MachineHub, privat
             return machine.state == MachineLinkState.Online && machine.pendingActionable
         }
 
-    /** Sends [decision] through the center, unless [canSend] is false. */
+    /**
+     * Sends [decision] through the center, unless [canSend] is false. The sheet's own result is set when the center's
+     * work ends, also when the caller was cancelled meanwhile (review 3a m-1): until then [PendingSheetState.sending]
+     * stays true.
+     */
     suspend fun send(decision: LinkDecision) {
         if (!canSend) return
         _state.update { it.copy(sending = true) }
-        try {
-            center.send(decision, key)
-        } finally {
-            _state.value = PendingSheetState(ownResult = center.status[key], sending = false)
-        }
+        center.send(decision, key) { final -> _state.value = PendingSheetState(ownResult = final, sending = false) }
     }
 }

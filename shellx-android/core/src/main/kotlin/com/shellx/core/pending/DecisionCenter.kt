@@ -94,7 +94,21 @@ class DecisionCenter(
     /** Sends [decision] for the item and updates its status as the rules say. Returns when the status is final for
      *  this tap. */
     suspend fun send(decision: LinkDecision, key: PendingKey) {
-        scope.runDetached { sendNow(decision, key) }
+        send(decision, key) {}
+    }
+
+    /**
+     * [send], then [ended] with the item's status once the work ends, from inside the detached work: it runs even after
+     * the caller was cancelled (the pending sheet's own result, review 3a m-1).
+     */
+    internal suspend fun send(decision: LinkDecision, key: PendingKey, ended: (DecisionStatus?) -> Unit) {
+        scope.runDetached {
+            try {
+                sendNow(decision, key)
+            } finally {
+                ended(status[key])
+            }
+        }
     }
 
     /**
