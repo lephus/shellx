@@ -285,10 +285,12 @@ class AppCoordinator(
     /**
      * The local part of signing out: the marker first, then the vault and every wiper. A failed wipe keeps the marker
      * and is retried before anyone signs in. If the app dies in between, the vault no longer names an owner, so only
-     * the marker makes the next launch or sign-in wipe the history.
+     * the marker makes the next launch or sign-in wipe the history, so it is flushed to disk before the vault is wiped
+     * (final review I-2).
      */
     private suspend fun forgetLocalData() {
         pendingWipeSettings.putBoolean(PENDING_WIPE_KEY, true)
+        pendingWipeSettings.flush()
         try {
             vault.wipe()
         } catch (e: Exception) {

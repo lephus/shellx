@@ -16,6 +16,12 @@ interface KeyValueStore {
     fun putBoolean(key: String, value: Boolean)
 
     fun remove(key: String)
+
+    /**
+     * Waits until every earlier write is on disk. The sign-out calls it after the wipe marker, before it wipes the vault
+     * (final review I-2). 3D's DataStore-backed store overrides it; in memory there is nothing to wait for.
+     */
+    suspend fun flush() {}
 }
 
 /** In memory only: the demo's own settings, and tests. Thread-safe. */
