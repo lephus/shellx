@@ -2,19 +2,28 @@ package com.shellx.link.core
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.flow
 
 /**
- * The terminal pushes of one session, between the reader that takes them off the circuit and their one consumer,
- * bounded (plan 3G Task 4b, contracts §24). [offer] never suspends, so the session's reader never waits on a slow
- * consumer and pings, call answers and the other pushes keep flowing behind a terminal flood.
+ * The terminal pushes of one session, between the reader that takes them off the circuit and their consumer, bounded
+ * (plan 3G Task 4b, contracts §24). [offer] never suspends, so the session's reader never waits on a slow consumer:
+ * pings, call answers and the other pushes keep flowing behind a terminal flood.
  *
- * Frames are counted by their weight, about the UTF-8 bytes of their JSON. A frame that would take the frames queued
- * past [maxQueuedWeight] is dropped, unless none is queued (one frame always fits). The first frame dropped of a
- * terminal since one of its frames was last kept queues [TerminalFramePart.LOST] in its place, so the consumer's
- * assembler sees exactly where the frames went missing and asks for one resync; the host answers with a snapshot.
- * [TerminalViewPush.Opened] and [TerminalViewPush.Ended] are never dropped and weigh nothing.
+ * The rules, per terminal:
+ * - A delta or history frame that would take the frames queued past [maxQueuedWeight] is dropped, unless none is
+ *   queued. The first one dropped puts [TerminalFramePart.LOST] in its place: the consumer's assembler sees the gap
+ *   there and asks for one resync. From then until the terminal's next snapshot, its other frames are dropped too:
+ *   an assembler that awaits a snapshot would ignore them anyway.
+ * - A snapshot of the terminal viewed (the one of the last [TerminalViewPush.Opened]) is never dropped, so the answer
+ *   to every resync reaches the assembler. Kept, it removes every frame of its terminal still queued: a snapshot
+ *   replaces the screen and the history (PROTOCOL.md 11.6). So at most one snapshot per terminal is ever queued.
+ *   Another terminal's snapshot follows the bound like a delta.
+ * - [TerminalViewPush.Opened] and [TerminalViewPush.Ended] are never dropped and weigh nothing.
+ *
+ * So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of the terminal viewed, which PROTOCOL.md
+ * 11.4 caps at 256 parts of one frame each (a snapshot of the largest grid a phone asks for, 300 × 120 with 240
+ * history rows, is far smaller). A collector cancelled while it waits takes nothing: what was queued stays for the
+ * next one.
  */
 class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     companion object {
@@ -24,65 +33,129 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
 
     private class Entry(val push: TerminalViewPush, val weight: Int)
 
-    private val lock = Any()
-    private val entries = Channel<Entry>(Channel.UNLIMITED)
-
-    // Guarded by lock.
-    private var weight = 0
-    private var count = 0
-    private var dropped = 0L
-    private val lost = HashSet<String>()
-
-    /** The pushes in the order offered, less the frames dropped. Single consumer; completes after [close]. */
-    val pushes: Flow<TerminalViewPush> = entries.receiveAsFlow().map { entry ->
-        synchronized(lock) {
-            weight -= entry.weight
-            count -= 1
-        }
-        entry.push
+    /** The frame of a terminal whose parts are arriving. */
+    private class Arriving(val revision: Long, val parts: Int, val snapshot: Boolean) {
+        var kept = true
     }
 
-    /** Queues [push], or drops it when it is a frame over the bound. Never suspends; ignored after [close]. */
-    fun offer(push: TerminalViewPush) {
-        synchronized(lock) {
-            val w = (push as? TerminalViewPush.Frame)?.part?.weight() ?: 0
-            if (push is TerminalViewPush.Frame) {
-                if (weight > 0 && weight + w > maxQueuedWeight) {
-                    dropped += 1
-                    if (lost.add(push.terminalId)) {
-                        LinkLog.event("client dropped terminal frames over the bound")
-                        enqueue(TerminalViewPush.Frame(push.terminalId, TerminalFramePart.LOST), 0)
-                    }
-                    return
-                }
-                lost.remove(push.terminalId)
-            } else if (push is TerminalViewPush.Opened) {
-                lost.remove(push.terminalId)
+    private val lock = Any()
+
+    // Guarded by lock.
+    private val entries = ArrayDeque<Entry>()
+    private var weight = 0
+    private var dropped = 0L
+    private var closed = false
+    private var viewing: String? = null
+    private val lost = HashSet<String>()
+    private val arriving = HashMap<String, Arriving>()
+
+    /** A token after each offer; a collector waits on it only when nothing is queued. */
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * The pushes in the order offered, less the frames dropped or replaced. One collector at a time; a later collector
+     * goes on where the one before stopped. Completes after [close], once the queued pushes are taken.
+     */
+    val pushes: Flow<TerminalViewPush> = flow {
+        while (true) {
+            val entry = synchronized(lock) {
+                entries.removeFirstOrNull()?.also { weight -= it.weight } ?: if (closed) return@flow else null
             }
-            enqueue(push, w)
+            if (entry != null) emit(entry.push) else wake.receiveCatching()
         }
+    }
+
+    /** Queues [push], or drops it by the rules above. Never suspends; ignored after [close]. */
+    fun offer(push: TerminalViewPush) {
+        var lostNow = false
+        synchronized(lock) {
+            if (closed) return
+            when (push) {
+                is TerminalViewPush.Opened -> {
+                    viewing = push.terminalId
+                    forget(push.terminalId)
+                    add(push, 0)
+                }
+                is TerminalViewPush.Ended -> {
+                    if (viewing == push.terminalId) viewing = null
+                    forget(push.terminalId)
+                    add(push, 0)
+                }
+                is TerminalViewPush.Frame -> lostNow = offerFrame(push)
+            }
+        }
+        if (lostNow) LinkLog.event("client dropped terminal frames over the bound")
     }
 
     /** Completes [pushes] once the queued pushes are taken. Idempotent. */
     fun close() {
-        entries.close()
+        synchronized(lock) { closed = true }
+        wake.close()
     }
 
     /** The weight of the frames queued. For tests. */
     internal val queuedWeight: Int get() = synchronized(lock) { weight }
 
     /** How many pushes are queued, markers included. For tests. */
-    internal val queuedPushes: Int get() = synchronized(lock) { count }
+    internal val queuedPushes: Int get() = synchronized(lock) { entries.size }
 
-    /** How many frames were dropped so far. For tests. */
+    /** How many frames were dropped so far (replaced ones not counted). For tests. */
     internal val droppedFrames: Long get() = synchronized(lock) { dropped }
 
-    /** Caller holds [lock]. */
-    private fun enqueue(push: TerminalViewPush, w: Int) {
-        if (entries.trySend(Entry(push, w)).isSuccess) {
-            weight += w
-            count += 1
+    /** Caller holds [lock]. True when this drop queued a LOST part. */
+    private fun offerFrame(push: TerminalViewPush.Frame): Boolean {
+        val id = push.terminalId
+        val part = push.part
+        val frame = if (part.part == 0) {
+            Arriving(part.revision, part.parts, part.head?.kind == TerminalFrameKind.SNAPSHOT).also { arriving[id] = it }
+        } else {
+            arriving[id]?.takeIf { it.revision == part.revision && it.parts == part.parts }
         }
+        val snapshot = frame?.snapshot == true
+        // The rest of a frame whose first part went, and what waits for a snapshot, go without another marker.
+        if ((frame != null && !frame.kept) || (!snapshot && id in lost)) return drop(frame, null)
+        val w = part.weight()
+        if (!(snapshot && id == viewing) && weight > 0 && weight + w > maxQueuedWeight) return drop(frame, id)
+        if (snapshot && part.part == 0) {
+            replaceFramesOf(id)
+            lost.remove(id)
+        }
+        add(push, w)
+        return false
+    }
+
+    /** Caller holds [lock]. Drops a frame part; with [markLost], queues the terminal's LOST part unless it has one. */
+    private fun drop(frame: Arriving?, markLost: String?): Boolean {
+        dropped += 1
+        frame?.kept = false
+        if (markLost == null || !lost.add(markLost)) return false
+        add(TerminalViewPush.Frame(markLost, TerminalFramePart.LOST), 0)
+        return true
+    }
+
+    /** Caller holds [lock]. Removes every queued frame of [terminalId]: a snapshot of it replaces them all. */
+    private fun replaceFramesOf(terminalId: String) {
+        val iterator = entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.push is TerminalViewPush.Frame && entry.push.terminalId == terminalId) {
+                weight -= entry.weight
+                iterator.remove()
+            }
+        }
+    }
+
+    /** Caller holds [lock]. A new view of [terminalId], or its end: what was known of its frames no longer holds. */
+    private fun forget(terminalId: String) {
+        lost.remove(terminalId)
+        arriving.remove(terminalId)
+    }
+
+    /** Caller holds [lock]. */
+    private fun add(push: TerminalViewPush, w: Int) {
+        entries.addLast(Entry(push, w))
+        weight += w
+        wake.trySend(Unit)
     }
 }
 
