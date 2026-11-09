@@ -15,6 +15,8 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
+    // runTest's scheduler controls (runCurrent, advanceTimeBy, StandardTestDispatcher) are marked experimental.
+    sourceSets.named("test") { languageSettings.optIn("kotlinx.coroutines.ExperimentalCoroutinesApi") }
 }
 
 dependencies {
