@@ -19,6 +19,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.yield
 
 enum class TerminalUnavailableReason { GONE, REFUSED, FAILED }
@@ -315,8 +317,16 @@ class TerminalViewModel(
     private val outbox = Channel<Message>(Channel.UNLIMITED)
     private var drainer: Job? = null
 
-    /** The open the outbox is waiting on, while it waits: A2 and A4 cancel it. */
-    private var openCall: Job? = null
+    /** An open the outbox waits on: [abandon] ends the wait at once and cancels the call (A2, A4). */
+    private class OpenCall(private val call: Job, private val abandoned: CompletableDeferred<Unit>) {
+        fun abandon() {
+            abandoned.complete(Unit)
+            call.cancel()
+        }
+    }
+
+    /** The open the outbox is waiting on, while it waits: A2 and A4 abandon it. */
+    private var openCall: OpenCall? = null
 
     /** The resize waiting out RESIZE_DELAY after the last grid change (R11). */
     private var resizeWait: Job? = null
@@ -432,7 +442,7 @@ class TerminalViewModel(
                 forgetView()
                 send(Message.Close(it.terminalId))
             }
-            openCall?.cancel()
+            openCall?.abandon()
             restoreBudgets()
             dropEcho()
             collecting?.stop()
@@ -529,7 +539,7 @@ class TerminalViewModel(
             reconcile()
             // An open still waiting would be announced to the next run as its own `Opened` (re-review B N-1). After
             // reconcile(), which forgot its view and queued its close: the cancel may be handled inside this call.
-            openCall?.cancel()
+            openCall?.abandon()
             publish()
         }
     }
@@ -554,21 +564,25 @@ class TerminalViewModel(
                 // Sent now, its `Opened` would wait in the queue for the next run, which would take it as its own.
                 if (!running && view?.attempt != message.attempt) return
                 openSending(message.attempt)
-                val result = coroutineScope {
-                    val call = async(start = CoroutineStart.UNDISPATCHED) {
-                        link.openTerminalView(machineId, message.terminalId, message.cols, message.rows)
+                val call = scope.async(start = CoroutineStart.UNDISPATCHED) {
+                    link.openTerminalView(machineId, message.terminalId, message.cols, message.rows)
+                }
+                val abandoned = CompletableDeferred<Unit>()
+                val open = OpenCall(call, abandoned)
+                openCall = open
+                val result = try {
+                    // An abandoned open is not waited for (a link may be slow to honour the cancel, review C m4):
+                    // whoever abandoned it forgot its view and queued its close, and there is no answer to handle.
+                    select<TerminalOpenResult?> {
+                        abandoned.onAwait { null }
+                        call.onAwait { it }
                     }
-                    openCall = call
-                    try {
-                        call.await()
-                    } catch (e: CancellationException) {
-                        // Only the open was cancelled (A2, A4): the drainer's own cancellation goes on. Whoever
-                        // cancelled it forgot its view and queued its close; there is no answer to handle.
-                        ensureActive()
-                        null
-                    } finally {
-                        if (openCall === call) openCall = null
-                    }
+                } catch (e: CancellationException) {
+                    // The drainer's own cancellation goes on; a call cancelled by anyone else is an open with no answer.
+                    currentCoroutineContext().ensureActive()
+                    if (abandoned.isCompleted) null else TerminalOpenResult.NoAnswer
+                } finally {
+                    if (openCall === open) openCall = null
                 }
                 if (result != null) openAnswered(result, message.attempt)
             }
