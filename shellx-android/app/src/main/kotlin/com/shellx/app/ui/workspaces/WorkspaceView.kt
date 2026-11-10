@@ -63,6 +63,15 @@ class WorkspaceScreenHolder(val model: WorkspaceScreenModel, val terminal: Termi
 }
 
 /**
+ * The workspace screen a page shows now. 3D's single-top navigation replaces a page's workspace and keeps its
+ * ViewModels, so the screen before stays in the page's store until the page goes: [WorkspaceView] lets that one's
+ * terminal screen go (final review m7).
+ */
+class WorkspaceScreenSlot : ViewModel() {
+    var holder: WorkspaceScreenHolder? = null
+}
+
+/**
  * One workspace of a Mac (`WorkspaceView.swift`): [WorkspaceScreen] fed by 3C's [WorkspaceScreenModel] and the hub.
  * An agent's chip shows the agent screen as its pane ([AgentView], embedded); a shell's chip, or an agent's chip shown
  * as its terminal, shows the Mac's terminal ([TerminalPane]). One [TerminalViewModel] serves every page and shows the
@@ -98,6 +107,13 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
     }
     val terminalShown = model.terminalShown
     LaunchedEffect(terminalShown) { terminal.show(terminalShown) }
+    // Another workspace replaced this page's: the one before lets its screen go and its view close (show(null)); its
+    // terminal opens again if that workspace comes back here.
+    val slot: WorkspaceScreenSlot = viewModel(key = "workspace/slot")
+    LaunchedEffect(holder) {
+        slot.holder?.takeIf { it !== holder }?.terminal?.show(null)
+        slot.holder = holder
+    }
     // Whatever finished while the user was here, the user saw.
     DisposableEffect(hub, ref) { onDispose { hub.markSeen(ref) } }
 
