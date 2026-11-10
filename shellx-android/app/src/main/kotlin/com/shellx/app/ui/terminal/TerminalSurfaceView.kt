@@ -462,8 +462,10 @@ class TerminalSurfaceView(
             }
             is TerminalHardwareAction.Type -> type(action.text)
             TerminalHardwareAction.DeleteBackward -> {
+                // With the key bar's ctrl latched the model sends ctrl+Backspace, a chord: the word ends instead.
+                val chord = model.state.value.ctrlLatched
                 model.deleteBackward()
-                connection?.deletedByKey()
+                if (chord) connection?.wordEnded() else connection?.deletedByKey()
             }
             TerminalHardwareAction.Paste -> TerminalClipboard.text(context)?.let(::paste) ?: connection?.wordEnded()
             TerminalHardwareAction.System -> return false
@@ -472,10 +474,14 @@ class TerminalSurfaceView(
         return true
     }
 
-    /** Types [text] as a key (the word being composed goes first); the keyboard's word grows with it. */
+    /**
+     * Types [text] as a key (the word being composed goes first); the keyboard's word grows with it. With the key bar's
+     * ctrl latched the model sends the first character as a chord: the Mac gets no letter, so the word ends instead.
+     */
     private fun type(text: String) {
+        val chord = model.state.value.ctrlLatched
         model.typeKey(text)
-        connection?.typedByKey(text)
+        if (chord) connection?.wordEnded() else connection?.typedByKey(text)
     }
 
     /** Pastes [text] (the word being composed goes first); the keyboard's word ends. */

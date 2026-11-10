@@ -11,7 +11,9 @@ import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputContentInfo
+import android.view.inputmethod.SurroundingText
 import android.view.inputmethod.TextAttribute
+import android.view.inputmethod.TextSnapshot
 import androidx.annotation.RequiresApi
 import com.shellx.core.terminal.TerminalTextInput
 import com.shellx.core.text.dropLastGrapheme
@@ -305,7 +307,7 @@ class TerminalInputConnection(
      * With nothing composed, the keyboard deletes committed text: one backspace (the Backspace key's unit) per character
      * taken back, counted as the keyboard counts them (UTF-16 units, or code points), whole clusters; one per character
      * asked for beyond the word shown, as a real editor would delete it; and a forward delete (the hardware Delete key's
-     * unit) per character after the cursor. At most [SHADOW_CAP] of each. While composing, the word on the phone is
+     * unit) per character after the cursor; at most [SHADOW_CAP] keys in all. While composing, the word on the phone is
      * edited, one character per call.
      */
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean = delete(beforeLength, afterLength) { it.length }
@@ -318,14 +320,19 @@ class TerminalInputConnection(
             if (before > 0) backspace()
             document = input.markedText
         } else {
-            takeBack(before, measure)
-            repeat(after.coerceIn(0, SHADOW_CAP)) { press(TerminalKey.DELETE) }
+            val sent = takeBack(before, measure)
+            // The editor shows nothing after the cursor, so a conforming keyboard never asks; one that forward-deletes
+            // blindly gets the hardware Delete key's unit, within the same budget of keys per call (re-review M-1, kept).
+            repeat(after.coerceIn(0, SHADOW_CAP - sent)) { press(TerminalKey.DELETE) }
         }
     }
 
-    /** Backspaces for the last [count] characters of the shadow as [measure] counts them (whole clusters), and one per character beyond it. */
-    private fun takeBack(count: Int, measure: (String) -> Int) {
-        if (count <= 0) return
+    /**
+     * Backspaces for the last [count] characters of the shadow as [measure] counts them (whole clusters), and one per
+     * character beyond it; at most [SHADOW_CAP] in all. Returns how many went out.
+     */
+    private fun takeBack(count: Int, measure: (String) -> Int): Int {
+        if (count <= 0) return 0
         val clusters = shadow.graphemes()
         var dropped = 0
         var measured = 0
@@ -335,7 +342,9 @@ class TerminalInputConnection(
         }
         shadow = clusters.subList(0, clusters.size - dropped).joinToString("")
         val beyond = (count - measured).coerceAtLeast(0)
-        repeat((dropped + beyond).coerceAtMost(SHADOW_CAP)) { backspace() }
+        val sent = (dropped + beyond).coerceAtMost(SHADOW_CAP)
+        repeat(sent) { backspace() }
+        return sent
     }
 
     // Keys and actions
@@ -398,6 +407,26 @@ class TerminalInputConnection(
         partialEndOffset = -1
         selectionStart = all.length
         selectionEnd = all.length
+    }
+
+    /**
+     * API 31: the text around the cursor, from the same state as the other reads (Gboard 15.1 asks this first, right
+     * after its start of input; the base class would answer from its own empty editable): the last [beforeLength] units
+     * with the cursor at their end, nothing after it, at their offset in the text.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    override fun getSurroundingText(beforeLength: Int, afterLength: Int, flags: Int): SurroundingText {
+        val all = shown
+        val text = all.takeLast(maxOf(beforeLength, 0))
+        return SurroundingText(text, text.length, text.length, all.length - text.length)
+    }
+
+    /** API 33: the whole text, the cursor, the composing region and no caps mode, as one snapshot. */
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    override fun takeSnapshot(): TextSnapshot {
+        val all = shown
+        val composing = document.isNotEmpty()
+        return TextSnapshot(SurroundingText(all, all.length, all.length, 0), if (composing) shadow.length else -1, if (composing) all.length else -1, 0)
     }
 
     /** The cursor stays at the end of the word. */
@@ -466,8 +495,12 @@ class TerminalInputConnection(
     }
 
     companion object {
-        /** The most of a word the keyboard is shown, in UTF-16 units: a Vietnamese word is under ten, a shell word rarely over this. */
-        const val SHADOW_CAP = 64
+        /**
+         * The most of a word the keyboard is shown, in UTF-16 units: a Vietnamese word is under ten, a shell word rarely
+         * over this; and a rewrite of all of it is one message per backspace, so 32 keeps a whole rewrite (32 backspaces
+         * and the text) inside the host's 64-message input queue (`ShellXLink.TERMINAL_MAX_QUEUED_INPUTS`).
+         */
+        const val SHADOW_CAP = 32
 
         /**
          * Whether keyboard text goes out as a paste (A-32): it holds a line break once one trailing break (the keyboard's
