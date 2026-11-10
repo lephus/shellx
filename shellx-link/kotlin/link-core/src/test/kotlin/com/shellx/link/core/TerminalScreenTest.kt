@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /** The ports of 2A's `TerminalScreenTests`, then two Kotlin tests. */
 class TerminalScreenTest {
@@ -77,4 +78,28 @@ class TerminalScreenTest {
         assertSame(top, s.historyRows.last())
         assertSame(bottom, s.screenRows[0])
     }
+
+    /**
+     * Android only (final review m6): history is capped by its estimated size too, so output with a colour per character
+     * cannot fill a budget phone's heap within the 10 000 rows. The oldest rows go first; the row cap still holds.
+     */
+    @Test
+    fun historyIsCappedBySizeToo() {
+        val screen = TerminalScreen(maxHistoryRows = 10_000, maxHistoryBytes = 200_000)
+        screen.apply(snapshot(100, 2, listOf("", "")))
+        val rainbow = (0 until 100).map { TerminalRun(x = it, text = "a") }
+        repeat(1_000) {
+            val head = TerminalFrameHead(TerminalFrameKind.DELTA, 100, 2, cursor = TerminalCursor(0, 0), scroll = 1)
+            screen.apply(TerminalGridFrame(head, lines = listOf(TerminalLine(1, rainbow))))
+        }
+        assertTrue(screen.historyBytes <= 200_000, "${screen.historyBytes}")
+        assertTrue(screen.historyRows.size in 10 until 999, "${screen.historyRows.size}")
+        assertEquals("a".repeat(100), screen.historyText().last())
+        assertEquals(TerminalScreen.DEFAULT_MAX_HISTORY_BYTES, TerminalScreen().maxHistoryBytes)
+        val rowsCapped = TerminalScreen(maxHistoryRows = 5)
+        rowsCapped.apply(snapshot(10, 2, listOf("", "")))
+        repeat(20) { rowsCapped.apply(delta(10, 2, mapOf(1 to "r$it"), scroll = 1)) }
+        assertEquals(5, rowsCapped.historyRows.size)
+    }
 }
+
