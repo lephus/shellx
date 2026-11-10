@@ -83,9 +83,11 @@ object TerminalHardwareKeys {
      * 4. DEL → with ctrl or alt, Send(BACKSPACE, mods); else DeleteBackward.
      * 5. SPACE with ctrl → Send(SPACE, mods).
      * 6. ctrl, and plainChar an ASCII letter → Paste when shift is held and the letter is v; else Send(the lowercase
-     *    letter, mods). When plainChar is a letter of another script (a Russian or Greek layout) and keyCode is one of
-     *    KEYCODE_A … KEYCODE_Z, the physical key's Latin letter instead, as the iPhone maps ctrl by the key (review B2
-     *    I-1; AZERTY keeps its layout letter, from the first case). Ctrl with any other character → System.
+     *    letter, mods). When plainChar is any non-ASCII letter or mark (a Russian, Greek or Turkish letter, a Hindi
+     *    virama, a Thai vowel sign) and keyCode is one of KEYCODE_A … KEYCODE_Z, the physical key's Latin letter
+     *    instead, as the iPhone maps ctrl by the key (review B2 I-1, re-review B N-2; AZERTY keeps its layout letter,
+     *    from the first case). Ctrl with any other character → System: punctuation on a letter key cannot be told
+     *    from AZERTY's ',' on KEYCODE_M (ruled).
      * 7. alt without ctrl → altChar ≠ 0: Type(altChar); else System.
      * 8. plainChar ≠ 0 → Type(plainChar).
      * 9. Otherwise → System.
@@ -118,12 +120,19 @@ object TerminalHardwareKeys {
         return typed(plainChar) ?: TerminalHardwareAction.System
     }
 
-    /** Rule 6's letter: the layout's ASCII letter, else a key A … Z of a layout whose letters are of another script. */
+    /** Rule 6's letter: the layout's ASCII letter, else a key A … Z whose layout types any non-ASCII letter or mark. */
     private fun ctrlLetter(keyCode: Int, plainChar: Int): Char? {
         if (plainChar in 'a'.code..'z'.code || plainChar in 'A'.code..'Z'.code) return plainChar.toChar().lowercaseChar()
         if (keyCode !in TerminalKeyCodes.A..TerminalKeyCodes.Z) return null
-        if (!Character.isValidCodePoint(plainChar) || !Character.isLetter(plainChar)) return null
+        if (!Character.isValidCodePoint(plainChar) || !(Character.isLetter(plainChar) || isMark(plainChar))) return null
         return 'a' + (keyCode - TerminalKeyCodes.A)
+    }
+
+    /** A Unicode combining mark (Mn, Mc, Me). No Latin layout puts one on a letter key: its dead keys carry the
+     *  COMBINING_ACCENT bit, which is no valid code point. */
+    private fun isMark(codePoint: Int): Boolean = when (Character.getType(codePoint).toByte()) {
+        Character.NON_SPACING_MARK, Character.COMBINING_SPACING_MARK, Character.ENCLOSING_MARK -> true
+        else -> false
     }
 
     /** Type(the character of [codePoint]), or null for 0 or a value that is no character. */
