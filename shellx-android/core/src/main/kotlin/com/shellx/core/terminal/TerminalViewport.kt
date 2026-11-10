@@ -10,9 +10,11 @@ import kotlin.math.floor
  *
  * Rules (plan 3G Task 8):
  * - Every result has [scrollX] in `0..maxScrollX` and [scrollY] in `0..maxScrollY`.
- * - [resized] keeps the scroll, and a viewport that follows the bottom stays at [maxScrollY].
+ * - [resized] keeps the scroll, and a viewport that follows the bottom stays at [maxScrollY]; one that the clamp puts
+ *   at the bottom follows it from then on (review B2 m2).
  * - [contentChanged] first applies `zoom.gridChanged(cols)`. With `toBottom` or [followsBottom] the result is at
- *   [maxScrollY] with [followsBottom] true. Otherwise [scrollY] moves by `topShiftDelta × cellHeight × scale`.
+ *   [maxScrollY] with [followsBottom] true. Otherwise [scrollY] moves by `topShiftDelta × cellHeight × scale`, and
+ *   [followsBottom] is set again after the clamp, as in [scrolledBy].
  * - [scrolledBy] adds `dx` and `dy`, then sets [followsBottom] when [scrollY] is within half a row of [maxScrollY]
  *   (`scrollY >= maxScrollY − cellHeight × scale / 2`, as the iPhone's pane does; review B2 m1).
  * - [pinched]: with `s0` the scale before and `s1` the scale of `zoom.pinch(s0 × factor, fit)`, the content point under
@@ -53,14 +55,14 @@ data class TerminalViewport(
 
     fun resized(width: Float, height: Float): TerminalViewport {
         val sized = copy(width = width, height = height)
-        return if (followsBottom) sized.atBottom() else sized.clamped()
+        return if (followsBottom) sized.atBottom() else sized.clamped().following()
     }
 
     /** The model changed: topShiftDelta rows were added above (negative: dropped from the top); toBottom: a new snapshot or typing. */
     fun contentChanged(cols: Int, shownRows: Int, topShiftDelta: Int, toBottom: Boolean): TerminalViewport {
         val changed = copy(cols = cols, shownRows = shownRows, zoom = zoom.gridChanged(cols))
         if (toBottom || followsBottom) return changed.atBottom()
-        return changed.copy(scrollY = scrollY + topShiftDelta * changed.cellHeight * changed.scale).clamped()
+        return changed.copy(scrollY = scrollY + topShiftDelta * changed.cellHeight * changed.scale).clamped().following()
     }
 
     fun scrolledBy(dx: Float, dy: Float): TerminalViewport =
