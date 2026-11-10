@@ -44,6 +44,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
 
 /**
@@ -52,6 +53,7 @@ import org.robolectric.shadows.ShadowLooper
  * locks paging, a zoomed-in grid pans instead of paging, and a page still loading reports its size.
  */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics: the grid's cell is the font's.
 @Config(qualifiers = "w400dp-h900dp")
 class TerminalPaneGestureTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -146,7 +148,8 @@ class TerminalPaneGestureTest {
         assertTrue("${zoomed.scale} after zooming in from $fit", zoomed.scale > fit && zoomed.scale <= 2f)
         assertTrue("a zoomed grid locks the pages", locked)
         swipe {
-            pinch(center - Offset(300f, 0f), center - Offset(20f, 0f), center + Offset(300f, 0f), center + Offset(20f, 0f))
+            // Both fingers start on the surface, 340 px apart, and end 20 px apart: past fit.
+            pinch(center - Offset(170f, 0f), center - Offset(10f, 0f), center + Offset(170f, 0f), center + Offset(10f, 0f))
         }
         assertEquals(fit, surface().viewport.scale, 0.0001f)
         assertFalse("back at fit the pages swipe again", locked)
