@@ -12,10 +12,13 @@ import com.shellx.core.storage.StoreDocument
 import com.shellx.core.testing.ManualClock
 import com.shellx.core.testing.assertSameCase
 import com.shellx.core.testing.chatEntry
+import com.shellx.core.terminal.TerminalViewModel
+import com.shellx.core.terminal.TerminalViewPhase
 import com.shellx.core.testing.eventually
 import com.shellx.link.core.ChatEntryRole
 import com.shellx.link.core.ChatInterruptOutcome
 import com.shellx.link.core.ChatSendOutcome
+import com.shellx.link.core.TerminalScreen
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -108,6 +111,31 @@ class DemoEnvironmentTest {
         val stopped = model.stop(hard = false)
         assertEquals(ChatInterruptOutcome.SENT, stopped)
         model.close().join()
+    } }
+
+    /** The demo Mac's terminals show their fixtures (DemoCompositionTests.swift, `testDemoMacShowsItsTerminals`). */
+    @Test fun demoMacShowsItsTerminals(@TempDir root: File) { runTest {
+        val env = environment(File(root, "ShellXDemo"), runsScript = true)
+        env.prepare()
+        env.coordinator.launch()
+        val hub = assertNotNull(env.coordinator.hub.value)
+        val id = env.first.machine.machineId
+        val ready = eventually {
+            hub.supportsTerminalView(id) && hub.supportsTerminalCreate(id) && hub.workspaceRows(id).size == 4
+        }
+        assertTrue(ready)
+
+        val model = TerminalViewModel(id, hub, hub.scope)
+        backgroundScope.launch { model.run() }
+        model.setPhoneGrid(50, 40)
+        model.show("demo-shellx-t2")
+        val expected = TerminalScreen().apply { apply(DemoTerminalScreens.SHELL.snapshot) }
+        val shell = eventually { model.phase == TerminalViewPhase.Live && model.screen.screenText() == expected.screenText() }
+        assertTrue(shell, "${model.phase} ${model.screen.screenText().take(3)}")
+
+        model.show("demo-notes-t1")
+        val wide = eventually { model.phase == TerminalViewPhase.Live && "中文：终端测试" in model.screen.screenText() }
+        assertTrue(wide, "${model.phase}")
     } }
 
     @Test fun demoSignOutWipesOnlyTheDemoStores(@TempDir root: File) { runTest {

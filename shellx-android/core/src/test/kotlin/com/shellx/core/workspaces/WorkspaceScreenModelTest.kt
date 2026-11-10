@@ -26,14 +26,15 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 
 /**
  * The workspace screen's model: which chip shows first, what happens when the workspace or the chip being viewed
- * leaves the Mac's list, and the wait for a workspace the Mac has not listed yet (WorkspaceScreenModelTests.swift,
- * without the plan 2C terminal tests).
+ * leaves the Mac's list, the wait for a workspace the Mac has not listed yet, and the terminal shown
+ * (WorkspaceScreenModelTests.swift).
  */
 class WorkspaceScreenModelTest {
     private fun ref(mac: FakeMac, workspace: String = "shellx") = WorkspaceRef(mac.machine.machineId, "ws-$workspace")
@@ -646,5 +647,103 @@ class WorkspaceScreenModelTest {
         run.cancelAndJoin()
 
         assertEquals(1, sleeper.cancelled, "the wait for the workspace ended with the screen")
+    } }
+
+    // The terminal shown (plan 2C, plan 3G Task 11)
+
+    @Test fun theTerminalShownIsTheShellOrAnAgentShownAsTerminal() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace(terminals = terminals("claude", "zsh", agent = mapOf("claude" to "s1"), selected = "zsh"))))
+        mac.upsertSession(agentSession("s1"))
+        val model = makeModel(mac, sessions = 1).model
+        assertEquals("zsh", model.terminalShown)
+        model.select("claude")
+        assertNull(model.terminalShown, "an agent's chip shows its chat")
+        model.showAsTerminal("claude", true)
+        assertEquals(setOf("claude"), model.shownAsTerminal)
+        assertEquals("claude", model.terminalShown)
+        model.showAsTerminal("claude", false)
+        assertNull(model.terminalShown)
+        model.showAsTerminal("nope", true)
+        assertEquals(emptySet(), model.shownAsTerminal)
+    } }
+
+    @Test fun anExpectedTerminalShowsOnceTheListHasIt() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace(terminals = terminals("zsh", selected = "zsh"))))
+        val model = makeModel(mac).model
+        model.expect("t-new")
+        assertEquals("zsh", model.selectedTerminalId)
+        mac.upsertWorkspace(linkWorkspace(terminals = terminals("zsh", "t-new", selected = "zsh")))
+        assertTrue(eventually { model.selectedTerminalId == "t-new" })
+        assertEquals(0, model.shownPaneClosed)
+    } }
+
+    @Test fun anExpectedTerminalAlreadyListedShowsAtOnce() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace(terminals = terminals("zsh", "t-new", selected = "zsh"))))
+        val model = makeModel(mac).model
+        assertEquals("zsh", model.selectedTerminalId)
+        model.expect("t-new")
+        assertEquals("t-new", model.selectedTerminalId)
+    } }
+
+    @Test fun pickingAChipDropsTheExpectedOne() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace(terminals = terminals("zsh", "other", selected = "zsh"))))
+        val model = makeModel(mac).model
+        model.expect("t-new")
+        model.select("other")
+        mac.upsertWorkspace(linkWorkspace(terminals = terminals("zsh", "other", "t-new", selected = "zsh")))
+        assertTrue(eventually { model.panes.any { it.id == "t-new" } })
+        delay(50.milliseconds)
+        assertEquals("other", model.selectedTerminalId)
+    } }
+
+    /** The user typing into the shell shown settles the screen on it, like a pick: an agent that starts asking later does
+     *  not move it (the iPhone's final review, app I2). */
+    @Test fun typingIntoTheChipShownKeepsItWhenAnAgentAsks() { runTest {
+        val mac = FakeMac("MacBook Pro", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace(terminals = terminals("zsh", "claude", agent = mapOf("claude" to "s1"), selected = "zsh"))))
+        val screen = makeModel(mac)
+        val model = screen.model
+        assertEquals("zsh", model.selectedTerminalId)
+
+        model.settle()
+        mac.upsertSession(agentSession("s1", state = AgentState.NEEDS_INPUT))
+        mac.addPending(pendingItem("r1"))
+        assertTrue(eventually { screen.hub.pendingItems.size == 1 })
+        delay(50.milliseconds)
+        assertEquals("zsh", model.selectedTerminalId)
+    } }
+
+    /**
+     * ＋ while a new terminal is on its way is refused, and a chip the user picks before the Mac answers stays shown when
+     * the new tab arrives; once answered, ＋ works again, and its tab shows (the model's half of the iPhone's
+     * `testAPickWhileANewTerminalIsOnItsWayWins` and `testPlusIsDimmedWhileANewTerminalIsOnItsWay`).
+     */
+    @Test fun aPickWhileANewTerminalIsOnItsWayWins() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(linkWorkspace(terminals = terminals("zsh", "other", selected = "zsh"))))
+        val model = makeModel(mac).model
+        assertTrue(model.startCreatingTerminal())
+        assertFalse(model.startCreatingTerminal(), "one create at a time")
+        assertTrue(model.creatingTerminal); assertTrue(model.state.value.creatingTerminal)
+        model.select("other")
+        model.finishCreatingTerminal("t-new")
+        assertFalse(model.creatingTerminal)
+        mac.upsertWorkspace(linkWorkspace(terminals = terminals("zsh", "other", "t-new", selected = "zsh")))
+        assertTrue(eventually { model.panes.any { it.id == "t-new" } })
+        delay(50.milliseconds)
+        assertEquals("other", model.selectedTerminalId, "the user's pick wins over the new tab")
+
+        assertTrue(model.startCreatingTerminal(), "once answered, ＋ works again")
+        model.finishCreatingTerminal(null)
+        assertFalse(model.creatingTerminal)
+        assertTrue(model.startCreatingTerminal())
+        mac.upsertWorkspace(linkWorkspace(terminals = terminals("zsh", "other", "t-new", "t-2", selected = "zsh")))
+        assertTrue(eventually { model.panes.any { it.id == "t-2" } })
+        model.finishCreatingTerminal("t-2")
+        assertEquals("t-2", model.selectedTerminalId, "answered with its tab listed already: it shows at once")
     } }
 }
