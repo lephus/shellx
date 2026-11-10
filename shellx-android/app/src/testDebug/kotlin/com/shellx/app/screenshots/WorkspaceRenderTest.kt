@@ -3,11 +3,16 @@ package com.shellx.app.screenshots
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import android.view.View
+import android.view.ViewGroup
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.WorkRig
 import com.shellx.app.ui.components.LocalSpinner
 import com.shellx.app.ui.terminal.TerminalPane
+import com.shellx.app.ui.terminal.TerminalSurfaceView
+import com.shellx.core.terminal.TerminalViewPhase
 import com.shellx.core.demo.DemoTerminalScreens
 import com.shellx.core.terminal.TerminalViewModel
 import com.shellx.link.core.TerminalScreen
@@ -210,16 +215,35 @@ class WorkspaceRenderTest {
         }
     }
 
-    /** `WorkspaceView` over a fake Mac whose shell is the demo's: the shell chip shows the Mac's terminal. */
+    /**
+     * `WorkspaceView` over a fake Mac whose shell is the demo's: the shell chip shows the Mac's terminal, drawn once its
+     * first screen came (`WorkspaceLiveRenderTests.swift` settles a second), and the open asked for the phone's grid.
+     */
     @Test
     fun workspaceLiveTerminal() {
         val rig = WorkRig.make()
         try {
             rig.mac.setTerminalFixtures(mapOf("t-zsh" to DemoTerminalScreens.SHELL))
-            assertRenders("workspace-live-terminal") { WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {}) }
+            var window: View? = null
+            assertRenders("workspace-live-terminal", ready = { window?.let(::liveTerminalIn) == true }) {
+                window = LocalView.current
+                WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
+            }
+            assertTrue("${rig.mac.terminalViewOpens}", rig.mac.terminalViewOpens.any { it.terminalId == "t-zsh" && it.cols >= 20 })
         } finally {
             rig.close()
         }
+    }
+
+    /** The window shows `t-zsh`'s surface, its model live with a screen. */
+    private fun liveTerminalIn(window: View): Boolean {
+        fun find(view: View): TerminalSurfaceView? = when (view) {
+            is TerminalSurfaceView -> view
+            is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { find(view.getChildAt(it)) }
+            else -> null
+        }
+        val surface = find(window.rootView) ?: return false
+        return surface.terminalId == "t-zsh" && surface.model.phase == TerminalViewPhase.Live && surface.model.screen.cols > 0
     }
 
     @Test
