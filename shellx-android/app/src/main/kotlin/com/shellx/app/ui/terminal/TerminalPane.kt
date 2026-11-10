@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupProperties
 import com.shellx.app.ui.agent.AgentNotice
@@ -118,7 +119,8 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  * no card covers it, [locksPaging] is told true, and false again when that ends, a card comes, or the page stops being
  * shown or leaves.
  *
- * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste. The key bar shows under the surface while
+ * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste; a page made again by a rotation takes the
+ * keyboard back once its terminal takes input, if it held it. The key bar shows under the surface while
  * it has the keyboard ([showsKeyBar] in tests), only on the page shown and only while it takes input; when the soft
  * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
  * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`. [engaged] is called when the user takes the
@@ -203,8 +205,21 @@ private fun ColumnScope.ShownPage(
 
     // The user took the keyboard here, or sent this page input: the screen settles on its chip.
     val currentEngaged by rememberUpdatedState(engaged)
+    // Whether the page holds the keyboard, kept across a rotation (the iPhone keeps it): the page made again takes the
+    // keyboard back once its terminal takes input. Any other loss of the focus (the user hid the keyboard, a card) ends it.
+    var keepsKeyboard by rememberSaveable { mutableStateOf(false) }
+    var restoring by remember { mutableStateOf(keepsKeyboard) }
     LaunchedEffect(focused) {
         if (focused) currentEngaged()
+        if (focused) {
+            keepsKeyboard = true
+            restoring = false
+        } else if (!restoring) {
+            keepsKeyboard = false
+        }
+    }
+    LaunchedEffect(restoring, state.acceptsInput, surface) {
+        if (restoring && state.acceptsInput) surface?.focusAndShowKeyboard()
     }
     var inputsSeen by remember { mutableIntStateOf(state.sentInputs) }
     LaunchedEffect(state.sentInputs) {
