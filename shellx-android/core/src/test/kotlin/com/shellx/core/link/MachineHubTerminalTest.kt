@@ -28,14 +28,17 @@ import com.shellx.link.core.WorkspaceControlOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -238,10 +241,10 @@ class MachineHubTerminalTest {
     /**
      * A page whose collection stops right after it handled a push, while the next ones have arrived, and starts again
      * in the same main-loop turn (a restarted effect) loses none of them: no resync (the queue's own tests show why: a
-     * cancelled collector takes nothing more). One that starts later finds the pushes made meanwhile dropped: at most
-     * one resync mends its screen.
+     * cancelled collector takes nothing more). One that starts later loses none either: what came meanwhile waited in
+     * the session's bounded queue.
      */
-    @Test fun aRestartedCollectionLosesNoPushAndALateOneCostsOneResync() { runTest {
+    @Test fun aRestartedCollectionLosesNoPushEarlyOrLate() { runTest {
         val mac = makeMac()
         val rig = hubRig(listOf(mac), start = true)
         assertTrue(rig.online(sessions = 0))
@@ -263,16 +266,56 @@ class MachineHubTerminalTest {
 
         view.stop()
         runCurrent()
-        mac.emitTerminalFrame("t1", row0("dropped"))
+        mac.emitTerminalFrame("t1", row0("waited"))
         runCurrent()
         view.start()
         runCurrent()
         mac.emitTerminalFrame("t1", row0("b"))
 
-        assertTrue(eventually { view.resyncs == 1 && !view.assembler.awaitingSnapshot }, "${view.resyncs}")
-        assertEquals(1, mac.terminalViewSnapshotRequests("t1"))
-        assertEquals("$", view.screen.screenText().first())
+        assertTrue(eventually { view.screen.screenText().firstOrNull() == "b" }, "${view.screen.screenText()}")
+        assertEquals(before + 5, view.frames)
+        assertEquals(0, view.resyncs)
+        assertEquals(0, mac.terminalViewSnapshotRequests("t1"))
     } }
+
+    /**
+     * Review B1 I-1: the iPhone's order. The page asks for its events, sends the open, and collects a little later. The
+     * open's `Opened` and first snapshot wait for it in the session's queue: nothing takes them away meanwhile.
+     */
+    @Test fun anOpenSentBeforeThePageCollectsKeepsItsFirstScreen() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        openThenCollect(rig.hub, mac.machine.machineId)
+    } }
+
+    /**
+     * Review B1 I-1, as the app runs it: the hub and the fake Mac on an immediate dispatcher (the app's
+     * `Dispatchers.Main.immediate`, which the demo shares with its fake Mac), where the Mac's answer, its `Opened` and
+     * its snapshot all come inside the open call.
+     */
+    @Test fun onAnImmediateDispatcherAnOpenSentBeforeThePageCollectsKeepsItsFirstScreen() { runTest {
+        val immediate = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+        val mac = FakeMac("Mac", immediate)
+        mac.setWorkspaces(listOf(linkWorkspace("a", terminals = listOf(linkTerminal("t1", selected = true)))))
+        val rig = hubRig(listOf(mac), start = true, scope = immediate)
+        assertTrue(rig.online(sessions = 0))
+        openThenCollect(rig.hub, mac.machine.machineId)
+    } }
+
+    private suspend fun TestScope.openThenCollect(hub: MachineHub, id: String) {
+        val events = hub.terminalEvents(id)
+        assertEquals(ok, hub.openTerminalView(id, "t1", 50, 20))
+        runCurrent()
+        val view = HubView(hub, id, "t1", backgroundScope)
+        view.collect(events)
+        runCurrent()
+
+        assertTrue(eventually { view.screen.screenText().firstOrNull() == "$" }, "${view.pushes}")
+        assertEquals(Opened("t1"), view.pushes.first())
+        val snapshot = assertIs<Frame>(view.pushes[1])
+        assertEquals(TerminalFrameKind.SNAPSHOT, snapshot.part.head?.kind)
+    }
 
     /** The newest collection of a Mac takes its pushes; an older one takes them again when the newer one ends. */
     @Test fun theNewestCollectionTakesThePushes() { runTest {
@@ -340,7 +383,12 @@ class MachineHubTerminalTest {
         private var job: Job? = null
 
         fun start() {
-            job = scope.launch { hub.terminalEvents(machineId).collect { take(it) } }
+            collect(hub.terminalEvents(machineId))
+        }
+
+        /** Collects [events], which the page asked for earlier. */
+        fun collect(events: Flow<TerminalHubEvent>) {
+            job = scope.launch { events.collect { take(it) } }
         }
 
         fun stop() {
