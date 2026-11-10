@@ -9,7 +9,13 @@ import com.shellx.core.testing.linkTerminal
 import com.shellx.core.testing.linkWorkspace
 import com.shellx.link.core.TerminalInputUnit.Key
 import com.shellx.link.core.TerminalInputUnit.Text
+import com.shellx.link.core.TerminalCursor
+import com.shellx.link.core.TerminalFrameHead
+import com.shellx.link.core.TerminalFrameKind
+import com.shellx.link.core.TerminalGridFrame
 import com.shellx.link.core.TerminalKey
+import com.shellx.link.core.TerminalLine
+import com.shellx.link.core.TerminalRun
 import com.shellx.link.core.TerminalViewOpenOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -198,5 +204,36 @@ class TerminalViewLiveTest {
         )
         assertEquals(1, model.snapshots, "no screen of the open the stopped page had queued")
         assertEquals(listOf("t1" to 30, "t2" to 40), mac.terminalViewOpens.map { it.terminalId to it.cols })
+    } }
+
+    private fun row0(text: String) = TerminalGridFrame(
+        TerminalFrameHead(TerminalFrameKind.DELTA, 30, 6, cursor = TerminalCursor(0, 0)),
+        lines = listOf(TerminalLine(0, listOf(TerminalRun(text = text)))),
+    )
+
+    /**
+     * Final review m8 (b): a run stopped and started in one turn (a rotation, the background and back) keeps the screen
+     * meanwhile, takes every push after it, and asks for one resync at most: nothing buffers pushes before the model's
+     * assembler, where a cancel would lose them.
+     */
+    @Test fun aRestartedRunKeepsTheScreenAndResyncsAtMostOnce() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val model = TerminalViewModel(mac.machine.machineId, rig.hub, rig.hub.scope)
+        var run = backgroundScope.launch { model.run() }
+        model.setPhoneGrid(30, 6); model.show("t1")
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live && model.screen.screenText().firstOrNull() == "$" })
+        repeat(5) { mac.emitTerminalFrame("t1", row0("a$it")) }
+        assertTrue(eventually { model.screen.screenText().firstOrNull() == "a4" }, "${model.screen.screenText()}")
+        run.cancel()
+        run = backgroundScope.launch { model.run() }
+        assertEquals("a4", model.screen.screenText().first(), "the screen stays")
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live })
+        mac.emitTerminalFrame("t1", row0("after"))
+        assertTrue(eventually { model.screen.screenText().firstOrNull() == "after" }, "${model.screen.screenText()}")
+        delay(50.milliseconds)
+        assertTrue(mac.terminalViewSnapshotRequests("t1") <= 1, "${mac.terminalViewSnapshotRequests("t1")} resyncs")
+        run.cancel()
     } }
 }

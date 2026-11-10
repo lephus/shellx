@@ -19,6 +19,7 @@ import com.shellx.link.core.TerminalViewPush
 import com.shellx.link.core.TerminalViewPush.Ended
 import com.shellx.link.core.TerminalViewPush.Frame
 import com.shellx.link.core.TerminalViewPush.Opened
+import com.shellx.link.core.TerminalFramePart
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.coroutines.cancellation.CancellationException
@@ -210,6 +211,21 @@ class TerminalViewModelTest {
         assertTrue(asked); assertEquals(1, link.calls.count { it == Call.Resync("t1") })
         emit(link, Frame("t1", snapshotPart(5, cols = 50, rows = 20, text = listOf("fresh"))))
         assertTrue(eventually { model.screen.screenText().first() == "fresh" })
+    } }
+
+    /**
+     * Final review m8 (a): a LOST part (the queue dropped frames in a flood) reaches the assembler with no filter first,
+     * so the model asks for exactly one resync and takes the snapshot that answers it.
+     */
+    @Test fun aLostPartAsksForOneResync() { runTest {
+        val link = ScriptedTerminalLink(); val (model, _) = makeModel(link)
+        live(model, link)
+        emit(link, Frame("t1", TerminalFramePart.LOST))
+        val asked = eventually { link.calls.count { it == Call.Resync("t1") } == 1 }
+        delay(50.milliseconds)
+        assertTrue(asked, "${link.calls}"); assertEquals(1, link.calls.count { it == Call.Resync("t1") })
+        emit(link, Frame("t1", snapshotPart(3, cols = 50, rows = 20, text = listOf("after the flood"))))
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live && model.screen.screenText().first() == "after the flood" })
     } }
 
     @Test fun macOfflineKeepsTheScreenAndReopensOnceOnline() { runTest {   // Review Focus 4
