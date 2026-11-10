@@ -1,5 +1,12 @@
 package com.shellx.app.ui.workspaces
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import com.shellx.core.terminal.TerminalViewPhase
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.LocalActivityResultRegistryOwner
@@ -231,5 +238,33 @@ class WorkspaceViewTest {
         compose.runOnUiThread { gate.complete(Unit) }
 
         until { compose.onAllNodesWithContentDescription("photo-1.jpg").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /**
+     * A workspace screen replaced by another in the same page (3D's single-top navigation keeps the page's ViewModels)
+     * lets the first one's terminal screen go and closes its view (final review m7); it opens again if that workspace
+     * comes back.
+     */
+    @Test
+    fun aReplacedWorkspaceScreenLetsItsTerminalGo() {
+        var ref by mutableStateOf(WorkspaceRef(rig.machineId, "ws-shellx"))
+        var owner: ViewModelStoreOwner? = null
+        compose.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(LocalSpinner provides StillSpinner) {
+                    owner = LocalViewModelStoreOwner.current
+                    WorkspaceView(rig.scope, ref, open = {}, back = {})
+                }
+            }
+        }
+        until { tagged("terminal.surface") }
+        val first = ViewModelProvider(checkNotNull(owner))["workspace/${rig.machineId}/ws-shellx", WorkspaceScreenHolder::class.java]
+        until { first.terminal.phase == TerminalViewPhase.Live && first.terminal.screen.cols > 0 }
+        ref = WorkspaceRef(rig.machineId, "ws-web")
+        until { tagged("workspace.chip.t-web") }
+        until { first.terminal.terminalId == null }
+        assertEquals(0, first.terminal.screen.cols)
+        ref = WorkspaceRef(rig.machineId, "ws-shellx")
+        until { first.terminal.terminalId == "t-zsh" && first.terminal.phase == TerminalViewPhase.Live }
     }
 }
