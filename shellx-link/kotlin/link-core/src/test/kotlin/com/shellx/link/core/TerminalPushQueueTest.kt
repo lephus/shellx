@@ -433,5 +433,36 @@ class TerminalPushQueueTest {
         }
     }
 
+    /**
+     * Re-review B, out of scope 1: Opened and Ended weigh nothing, so while nobody collects, a host that streams
+     * `terminal.view.ended` for terminals the session does not view must not grow the queue without bound. The viewed
+     * terminal's Ended is never dropped, and an Ended of a terminal not viewed still passes once taken ones make room
+     * (the page ignores it, PROTOCOL.md 11.1).
+     */
+    @Test
+    fun endedOfTerminalsNotViewedStayBoundedWithNoCollector() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                repeat(100_000) { queue.offer(Ended("x-$it", TerminalViewEndReason.GONE)) }
+                repeat(100_000) { queue.offer(Ended("t-2", TerminalViewEndReason.NOT_OPEN)) }
+                assertTrue(queue.queuedPushes < 100, "${queue.queuedPushes}")
+
+                queue.offer(Ended("t-1", TerminalViewEndReason.GONE))
+                val all = List(queue.queuedPushes) { queue.pushes.first() }
+                assertEquals(Opened("t-1"), all.first())
+                assertEquals(Ended("t-1", TerminalViewEndReason.GONE), all.last())
+
+                queue.offer(Ended("t-2", TerminalViewEndReason.NOT_OPEN))
+                queue.offer(Ended("t-2", TerminalViewEndReason.NOT_OPEN))
+                assertEquals(
+                    listOf<TerminalViewPush>(Ended("t-2", TerminalViewEndReason.NOT_OPEN)),
+                    List(queue.queuedPushes) { queue.pushes.first() },
+                )
+            }
+        }
+    }
+
     private fun snapshotFrame() = snapshot(1, "$").let { TerminalGridFrame(it.head!!, it.styles, it.lines) }
 }
