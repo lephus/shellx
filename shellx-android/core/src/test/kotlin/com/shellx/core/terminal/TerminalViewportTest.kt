@@ -64,6 +64,13 @@ class TerminalViewportTest {
         assertEquals(0f, alt.scrollY); assertTrue(alt.followsBottom)
         assertEquals(908f, alt.contentChanged(10, 50, 0, toBottom = false).scrollY)
     }
+    /** Review B2 m3: a pinch factor that is not a number, or infinite, changes nothing (it would poison the zoom). */
+    @Test fun aPinchWithABadFactorChangesNothing() {
+        val p = v(40, 30)
+        for (factor in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            assertEquals(p, p.pinched(factor, 0f, 0f), "$factor")
+        }
+    }
     @Test fun aKeyboardThatShrinksThePaneKeepsTheBottom() {
         val p = v(10, 100, h = 300f).resized(200f, 150f)
         assertEquals(p.maxScrollY, p.scrollY); assertTrue(p.followsBottom)
