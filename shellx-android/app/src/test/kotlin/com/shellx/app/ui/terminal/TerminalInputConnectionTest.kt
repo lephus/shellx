@@ -59,6 +59,26 @@ class TerminalInputConnectionTest {
         report = { document, composing -> reports += document to composing }, restart = { restarts += 1 },
     )
 
+    /**
+     * The emulator check (Gboard 15.1, API 36, English): with nothing composed Gboard commits letter by letter and keeps
+     * its own copy of the text ("ls "), which our document never shows; a second quick space then arrives as
+     * `finishComposingText` + `commitText(". ")`, and the Mac got "ls . ". A commit that ends with a space restarts the
+     * keyboard, so it reads the text before the cursor again (""), and a second space is a space (controller ruling).
+     */
+    @Test
+    fun aCommitEndingWithASpaceRestartsTheKeyboard() {
+        val c = connection()
+        c.commitText("l", 1)
+        c.commitText("s", 1)
+        assertEquals(0, restarts)
+        c.commitText(" ", 1)
+        assertEquals(1, restarts)
+        c.setComposingText("vi", 1)
+        c.commitText("việt ", 1)
+        assertEquals(2, restarts)
+        assertEquals(listOf(Text("l"), Text("s"), Text(" "), Text("việt ")), recorder.units)
+    }
+
     @Test
     fun composingStaysLocalAndACommitSendsTheWord() {
         val c = connection()
