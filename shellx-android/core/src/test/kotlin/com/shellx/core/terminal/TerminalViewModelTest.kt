@@ -559,5 +559,30 @@ class TerminalViewModelTest {
         assertIs<CancellationException>(ended, "a cancellation no newer run or close() made is the caller's to see")
     } }
 
+    /**
+     * Review C m3 (iPhone parity): a stopped page hears no State (A1), so it cannot tell whether its Mac reconnected
+     * meanwhile, which on the iPhone restores both budgets (R8). A run that starts with no view starts with both retries.
+     */
+    @Test fun aRunAfterAStopStartsWithBothRetries() { runTest {
+        val link = ScriptedTerminalLink()
+        link.openAnswers += listOf(
+            outcome(TerminalViewOpenOutcome.FAILED), outcome(TerminalViewOpenOutcome.OK), outcome(TerminalViewOpenOutcome.FAILED),
+        )
+        val sleeper = ManualSleeper(); val (model, run) = makeModel(link, sleeper)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting }
+        sleeper.release { it == TerminalViewModel.FAILED_RETRY_DELAY }
+        assertTrue(eventually { link.opens.size == 2 }, "answered ok, but no screen came: the retry stays spent")
+        run.cancel()
+        assertTrue(eventually { Call.Close("t1") in link.calls })
+        backgroundScope.launch { model.run() }
+        assertTrue(eventually { link.opens.size == 3 })
+        assertTrue(
+            eventually { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting },
+            "the first failure after the stop is retried: ${model.phase}",
+        )
+        assertEquals(TerminalViewPhase.Connecting, model.phase)
+    } }
+
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)
 }
