@@ -27,6 +27,10 @@ export const keywords: Record<Lang, string[]> = {
     'remote terminal app', 'SSH from phone', 'terminal on phone', 'control Mac terminal from iPhone',
     'remote terminal without VPN', 'no port forwarding', 'Claude Code on phone', 'tmux on phone',
     'terminal app for Mac and Windows', 'end-to-end encrypted terminal', 'mobile SSH alternative',
+    'terminal for AI coding agents', 'run multiple AI coding agents', 'Claude Code terminal',
+    'Codex, OpenCode, Gemini CLI and Pi', 'AI agent notifications', 'terminal with built-in browser',
+    'browser automation for AI agents', 'vertical tabs and split panes', 'terminal workspaces',
+    'terminal session restore', 'Ghostty-based terminal', 'GPU-accelerated terminal', 'terminal CLI and socket API',
   ],
 };
 
@@ -39,6 +43,71 @@ export const featureList: Record<Lang, string[]> = {
     'Workspaces, split panes, session restore, command palette and custom shortcuts',
     'SSH workspaces and tmux attach, with automatic reconnect',
     'Phone pairing with a QR code',
+    'Run Claude Code, Codex, OpenCode, Gemini CLI and Pi side by side and see which agent is working, waiting or done',
+    'Built-in browser pane that AI agents can drive: navigate, click, fill forms, run JavaScript, read the DOM, console and network',
+    'Command-line tool and Unix socket API to create workspaces and panes, send input, read output and take screenshots',
+    'Vertical tabs with Git branch, working directory and listening ports in the sidebar',
+    'Ghostty terminal engine with GPU-accelerated rendering; custom themes, fonts, colors and shortcuts',
+  ],
+};
+
+/**
+ * The desktop app by area: the "Inside the desktop app" section of the home page and llms.txt.
+ * Every line describes ShellX for macOS; the Windows app does not have all of it yet.
+ */
+export const capabilities: Record<Lang, Array<{ id: string; title: string; items: string[] }>> = {
+  en: [
+    { id: 'terminal', title: 'Terminal management', items: [
+      'Vertical tabs in a sidebar',
+      'Split panes, side by side or stacked; create, close, move and resize them',
+      'Many terminals and workspaces at once, with quick switching and renaming',
+      'Git branch, working directory and listening ports shown for each workspace',
+    ] },
+    { id: 'agents', title: 'AI coding agents', items: [
+      'Run Claude Code, Codex, OpenCode, Gemini CLI and Pi side by side',
+      'See at a glance which agent is working, which is waiting for you and which has finished',
+      'A badge on the workspace, a ring around the pane and a notification list collect what needs you',
+      'macOS desktop notifications when an agent needs input or completes its task',
+      'Works with Claude Code agent teams',
+    ] },
+    { id: 'browser', title: 'Built-in browser', items: [
+      'Open a browser pane next to your terminal and preview localhost',
+      'Agents can navigate to a URL, click elements and fill in forms',
+      'Read and snapshot the DOM, run JavaScript, read console logs and network requests',
+      'A browser automation API, so an agent can test the page it just built',
+    ] },
+    { id: 'remote', title: 'SSH and remote development', items: [
+      'SSH workspaces: terminals that run on a remote server',
+      'Attach to the tmux sessions already running there',
+      'Several SSH sessions at once, with automatic reconnect',
+    ] },
+    { id: 'automation', title: 'CLI and automation', items: [
+      'The shellx command-line tool and a Unix socket API control the app',
+      'Create and arrange workspaces and panes from a script',
+      'Send input to a terminal, read its output and take a screenshot of it',
+      'Automate workflows and connect outside tools',
+    ] },
+    { id: 'sessions', title: 'Sessions and state', items: [
+      'Workspaces, layout and panes come back after a restart',
+      'Working directories and terminal scrollback are restored',
+      'Supported AI agent sessions can be resumed',
+    ] },
+    { id: 'customization', title: 'Customization', items: [
+      'Themes, fonts and colors',
+      'Keyboard shortcuts you can rebind',
+      'Sidebar, workspace and terminal settings',
+    ] },
+    { id: 'mobile', title: 'Phone companion', items: [
+      'iOS and Android apps open the sessions running on your computer',
+      'Push notifications on your phone when a command finishes or an agent needs you',
+      'Watch and answer from anywhere, end-to-end encrypted',
+    ] },
+    { id: 'dx', title: 'Developer experience', items: [
+      'Ghostty terminal engine with GPU-accelerated rendering',
+      'Git and port information without leaving the terminal',
+      'Many projects open at the same time',
+      'Keyboard-driven navigation and a command palette',
+    ] },
   ],
 };
 
