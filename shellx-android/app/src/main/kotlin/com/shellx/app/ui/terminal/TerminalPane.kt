@@ -119,8 +119,9 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
  * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`. [engaged] is called when the user takes the
  * keyboard on the page shown or sends it input (a tap, the focus, typing): the workspace screen settles on its chip.
- * [holdsKeyboard] is told whether the page shown holds the keyboard (false again when it leaves): a window short in
- * height (a phone in landscape) gives it the workspace's top bar meanwhile.
+ * [holdsKeyboard] is told whether the page shown holds the soft keyboard, that is has the focus while the keyboard
+ * takes room (false again when either ends or the page leaves; never with a hardware keyboard): a window short in
+ * height (a phone in landscape) gives it the bars above meanwhile (ledger A-36).
  */
 @Composable
 fun TerminalPane(
@@ -197,16 +198,9 @@ private fun ColumnScope.ShownPage(
 
     // The user took the keyboard here, or sent this page input: the screen settles on its chip.
     val currentEngaged by rememberUpdatedState(engaged)
-    val currentHolds by rememberUpdatedState(holdsKeyboard)
-    var toldHolds by remember { mutableStateOf(false) }
     LaunchedEffect(focused) {
         if (focused) currentEngaged()
-        if (focused != toldHolds) {
-            toldHolds = focused
-            currentHolds(focused)
-        }
     }
-    DisposableEffect(Unit) { onDispose { if (toldHolds) currentHolds(false) } }
     var inputsSeen by remember { mutableIntStateOf(state.sentInputs) }
     LaunchedEffect(state.sentInputs) {
         if (state.sentInputs != inputsSeen) currentEngaged()
@@ -243,6 +237,19 @@ private fun ColumnScope.ShownPage(
         if (imeWasUp && !imeUp && focused) surface?.clearTerminalFocus()
         imeWasUp = imeUp
     }
+
+    // The page holds the soft keyboard: it has the focus and the keyboard takes room. A hardware keyboard (or a floating
+    // one, which reports no room) holds nothing, so the bars above stay where nothing would take their place.
+    val holds = focused && imeUp
+    val currentHolds by rememberUpdatedState(holdsKeyboard)
+    var toldHolds by remember { mutableStateOf(false) }
+    LaunchedEffect(holds) {
+        if (holds != toldHolds) {
+            toldHolds = holds
+            currentHolds(holds)
+        }
+    }
+    DisposableEffect(Unit) { onDispose { if (toldHolds) currentHolds(false) } }
 
     val phase = state.phase
     val covered = covers(phase, state.snapshots)
