@@ -36,6 +36,7 @@
     <string name="signin_error_local_wipe_pending">Không xoá được dữ liệu của tài khoản trước trên điện thoại này. Thử lại.</string>
     <string name="signin_error_reauth_required">Hãy đăng nhập bằng tài khoản Google mà tài khoản ShellX này dùng, rồi thử lại.</string>
     <string name="signin_subtitle">Dùng tài khoản Google bạn dùng với ShellX trên Mac.</string>
+    <string name="terminal_paste">Dán</string>
     <string name="update_downloaded">Đã tải xong bản cập nhật.</string>
     <string name="update_message">Cập nhật ShellX trên Google Play để có các bản sửa lỗi và tính năng mới nhất.</string>
     <string name="update_restart">Khởi động lại</string>

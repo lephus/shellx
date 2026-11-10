@@ -1,6 +1,19 @@
 package com.shellx.app.ui.terminal
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.unit.round
+import androidx.compose.ui.window.PopupProperties
+import com.shellx.app.ui.agent.AgentNotice
+import com.shellx.app.ui.agent.AgentView
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.gestures.FlingBehavior
@@ -99,6 +112,11 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  * alternate screen while the grid fits the height (no fling there); a horizontal drag pans while the grid is wider
  * than the pane; two fingers pinch between fit and 2. While a pinch is under way or the grid is wider than the pane,
  * [locksPaging] is told true, and false again when that ends or the page stops being shown or leaves.
+ *
+ * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste. The key bar shows under the surface while
+ * it has the keyboard ([showsKeyBar] in tests), only on the page shown and only while it takes input; when the soft
+ * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
+ * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`.
  */
 @Composable
 fun TerminalPane(
@@ -108,16 +126,27 @@ fun TerminalPane(
     shown: Boolean,
     modifier: Modifier = Modifier,
     locksPaging: (Boolean) -> Unit = {},
+    showsKeyBar: Boolean = false,
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val pageShown = shown && state.terminalId == terminalId
     Column(modifier.fillMaxSize().imePadding()) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (!pageShown) {
+        if (!pageShown) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (state.phase == TerminalViewPhase.Unsupported) ShellPanePlaceholder() else EmptyCard()
-            } else {
-                ShownPage(model, terminalId, title, state, locksPaging)
             }
+        } else {
+            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging)
+        }
+    }
+}
+
+object TerminalPane {
+    /** What a key bar button does: a key → `model.press(key)`; ctrl → `model.toggleCtrl()`; hide keyboard → [hideKeyboard]. */
+    fun perform(item: TerminalKeyBarItem, model: TerminalViewModel, hideKeyboard: () -> Unit) {
+        when (item) {
+            is TerminalKeyBarItem.Key -> item.key.key?.let { model.press(it) } ?: model.toggleCtrl()
+            TerminalKeyBarItem.HideKeyboard -> hideKeyboard()
         }
     }
 }
@@ -129,9 +158,17 @@ internal fun covers(phase: TerminalViewPhase, snapshots: Int): Boolean = when (p
     TerminalViewPhase.Unsupported, is TerminalViewPhase.Unavailable -> true
 }
 
+/** The page shown: composed only while it is, so whatever it holds (focus, a notice, a paging lock) goes with it. */
 @Composable
-private fun ShownPage(model: TerminalViewModel, terminalId: String, title: String, state: TerminalViewState, locksPaging: (Boolean) -> Unit) {
-    // Composed only while the page is the one shown: leaving it (a swipe, a chip, the pane gone) unlocks the pager.
+private fun ColumnScope.ShownPage(
+    model: TerminalViewModel,
+    terminalId: String,
+    title: String,
+    state: TerminalViewState,
+    showsKeyBar: Boolean,
+    locksPaging: (Boolean) -> Unit,
+) {
+    // Leaving the page (a swipe, a chip, the pane gone) unlocks the pager.
     val currentLocks by rememberUpdatedState(locksPaging)
     var told by remember { mutableStateOf(false) }
     val onLocks = { now: Boolean ->
@@ -141,9 +178,15 @@ private fun ShownPage(model: TerminalViewModel, terminalId: String, title: Strin
         }
     }
     DisposableEffect(Unit) { onDispose { if (told) currentLocks(false) } }
+
     val context = LocalContext.current
     val density = LocalDensity.current
     val font = remember(context, density.density) { TerminalFont(context) }
+    val ime = LocalTerminalIme.current ?: remember(context) { SystemTerminalIme(context) }
+    var surface by remember { mutableStateOf<TerminalSurfaceView?>(null) }
+    var focused by remember { mutableStateOf(false) }
+    val keyBar = (focused || showsKeyBar) && state.acceptsInput
+
     val padding = TerminalGeometry.PADDING_DP * density.density
     var box by remember { mutableStateOf(IntSize.Zero) }
     LaunchedEffect(box) {
@@ -151,52 +194,95 @@ private fun ShownPage(model: TerminalViewModel, terminalId: String, title: Strin
         val grid = TerminalGeometry.phoneGrid(box.width.toFloat(), box.height.toFloat(), font.cellWidth, font.cellHeight, padding)
         model.setPhoneGrid(grid.cols, grid.rows)
     }
+
+    // A rise of the refused-paste count, on this page only (the model is every page's).
+    var notice by remember { mutableStateOf<AgentNotice?>(null) }
+    var pastesSeen by remember { mutableIntStateOf(state.pasteTooLarge) }
+    val tooLarge = stringResource(R.string.terminal_paste_too_large)
+    LaunchedEffect(state.pasteTooLarge) {
+        if (state.pasteTooLarge > pastesSeen) notice = AgentNotice(tooLarge)
+        pastesSeen = state.pasteTooLarge
+    }
+    LaunchedEffect(notice?.id) {
+        val said = notice ?: return@LaunchedEffect
+        delay(AgentView.NOTICE_DURATION)
+        if (notice?.id == said.id) notice = null
+    }
+
+    // The soft keyboard went down while the surface had it: the focus goes too, so the key bar hides as on the iPhone.
+    // A hardware keyboard never shows the soft one, so its focus and bar stay.
+    val imeUp = WindowInsets.ime.getBottom(density) > 0
+    var imeWasUp by remember { mutableStateOf(false) }
+    LaunchedEffect(imeUp) {
+        if (imeWasUp && !imeUp && focused) surface?.clearTerminalFocus()
+        imeWasUp = imeUp
+    }
+
     val phase = state.phase
     val covered = covers(phase, state.snapshots)
-    Box(
-        Modifier
-            .fillMaxSize()
-            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-            .onSizeChanged { box = it },
-    ) {
-        Surface(model, terminalId, title, font, state, covered, onLocks)
-        if (!covered) {
-            if (phase == TerminalViewPhase.Offline) {
-                Box(Modifier.align(Alignment.TopCenter).padding(start = 24.dp, end = 24.dp, top = 6.dp).testTag("terminal.offline")) {
-                    NoticeCapsule(stringResource(R.string.terminal_offline))
+    Box(Modifier.weight(1f).fillMaxWidth()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 12.dp, bottom = if (keyBar) 6.dp else 12.dp)
+                .onSizeChanged { box = it },
+        ) {
+            Surface(
+                model, terminalId, title, font, ime, state, covered, onLocks,
+                attached = { surface = it }, onFocus = { focused = it },
+            )
+            if (!covered) {
+                val said = notice
+                if (said != null) {
+                    NoticeCapsule(said.text, Modifier.align(Alignment.TopCenter).padding(start = 24.dp, end = 24.dp, top = 6.dp))
+                } else if (phase == TerminalViewPhase.Offline) {
+                    Box(Modifier.align(Alignment.TopCenter).padding(start = 24.dp, end = 24.dp, top = 6.dp).testTag("terminal.offline")) {
+                        NoticeCapsule(stringResource(R.string.terminal_offline))
+                    }
+                }
+                if (phase == TerminalViewPhase.Connecting) {
+                    val connecting = stringResource(R.string.terminal_connecting)
+                    Spinner(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(18.dp)
+                            .size(16.dp)
+                            .semantics { contentDescription = connecting },
+                    )
                 }
             }
-            if (phase == TerminalViewPhase.Connecting) {
-                val connecting = stringResource(R.string.terminal_connecting)
-                Spinner(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(18.dp)
-                        .size(16.dp)
-                        .semantics { contentDescription = connecting },
-                )
-            }
         }
+        if (covered) Cover(phase, retry = model::retry)
     }
-    if (covered) Cover(phase, retry = model::retry)
+    if (keyBar) {
+        TerminalKeyBar(state.ctrlLatched, press = { item ->
+            // A tap as the page stops being the one shown never reaches the terminal shown next.
+            if (model.terminalId == terminalId) TerminalPane.perform(item, model) { surface?.clearTerminalFocus() }
+        })
+    }
 }
 
 /** The surface host, in the card's place and shape; hidden, untouchable and silent while a card covers it. */
 @Composable
-private fun Surface(
+private fun BoxScope.Surface(
     model: TerminalViewModel,
     terminalId: String,
     title: String,
     font: TerminalFont,
+    ime: TerminalIme,
     state: TerminalViewState,
     covered: Boolean,
     onLocks: (Boolean) -> Unit,
+    attached: (TerminalSurfaceView) -> Unit,
+    onFocus: (Boolean) -> Unit,
 ) {
+    val context = LocalContext.current
     var surface by remember { mutableStateOf<TerminalSurfaceView?>(null) }
     var viewport by remember { mutableStateOf<TerminalViewport?>(null) }
     var pinching by remember { mutableStateOf(false) }
     val wide = (viewport?.maxScrollX ?: 0f) > 0.5f
     LaunchedEffect(pinching || wide) { onLocks(pinching || wide) }
+    val currentOnFocus by rememberUpdatedState(onFocus)
 
     val emptyColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val label = stringResource(R.string.terminal_surface_label, title)
@@ -210,29 +296,45 @@ private fun Surface(
     }
     val fling = if (alt) NoFling else ScrollableDefaults.flingBehavior()
 
-    val semantics = if (covered) {
-        Modifier.clearAndSetSemantics {}
-    } else {
-        Modifier.semantics {
+    // The long press's Paste, at the touch.
+    var menuAt by remember { mutableStateOf<Offset?>(null) }
+    var canPaste by remember { mutableStateOf(false) }
+
+    // One modifier chain in every state, its parts switched off while covered: taking a gesture's node out of the chain
+    // would take its focus target out too, and Compose then moves the focus off the surface (the keyboard with it)
+    // before the surface can hide the keyboard itself.
+    val semantics = Modifier.clearAndSetSemantics {
+        if (!covered) {
             contentDescription = label
             // Built only when an accessibility service or a test asks; `revision` makes a new block when the screen changes.
             if (revision >= 0) text = AnnotatedString(model.screen.screenText().joinToString("\n"))
         }
     }
-    val gestures = if (covered) {
-        Modifier
-    } else {
-        Modifier
-            .pointerInput(Unit) { detectPinch({ pinching = it }) { zoom, centroid -> surface?.pinch(zoom, centroid.x, centroid.y) } }
-            .scrollable(horizontal, Orientation.Horizontal, enabled = wide)
-            .scrollable(vertical, Orientation.Vertical, flingBehavior = fling, interactionSource = drags)
-    }
+    val gestures = Modifier
+        .pointerInput(covered) {
+            if (!covered) detectPinch({ pinching = it }) { zoom, centroid -> surface?.pinch(zoom, centroid.x, centroid.y) }
+        }
+        .pointerInput(covered) {
+            if (covered) return@pointerInput
+            detectTapGestures(
+                onTap = { surface?.focusAndShowKeyboard() },
+                onLongPress = { at ->
+                    surface?.focusAndShowKeyboard()
+                    canPaste = TerminalClipboard.hasText(context)
+                    menuAt = at
+                },
+            )
+        }
+        .scrollable(horizontal, Orientation.Horizontal, enabled = wide && !covered)
+        .scrollable(vertical, Orientation.Vertical, enabled = !covered, flingBehavior = fling, interactionSource = drags)
     key(model, terminalId) {
         AndroidView(
-            factory = { context ->
-                TerminalSurfaceView(context, model, terminalId, font).also { view ->
+            factory = { viewContext ->
+                TerminalSurfaceView(viewContext, model, terminalId, font, ime).also { view ->
                     view.onViewportChange = { viewport = it }
+                    view.onFocusChange = { currentOnFocus(it) }
                     surface = view
+                    attached(view)
                 }
             },
             modifier = Modifier
@@ -253,7 +355,31 @@ private fun Surface(
                 view.emptyColor = emptyColor
                 view.render(state)
             },
+            onRelease = { view ->
+                view.onFocusChange = {}
+                if (view.hasFocus()) view.clearTerminalFocus()
+            },
         )
+    }
+    menuAt?.let { at ->
+        Box(Modifier.offset { at.round() }) {
+            DropdownMenu(
+                expanded = true,
+                onDismissRequest = { menuAt = null },
+                // Not focusable: the terminal keeps the keyboard, as the iPhone's edit menu leaves it.
+                properties = PopupProperties(focusable = false),
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.terminal_paste)) },
+                    enabled = canPaste,
+                    onClick = {
+                        menuAt = null
+                        if (surface?.accepts() == true) TerminalClipboard.text(context)?.let(model::paste)
+                    },
+                    modifier = Modifier.testTag("terminal.paste"),
+                )
+            }
+        }
     }
 }
 

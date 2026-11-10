@@ -4,10 +4,19 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
+import android.text.InputType
+import android.view.KeyCharacterMap
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import com.shellx.core.terminal.TerminalColors
 import com.shellx.core.terminal.TerminalGeometry
+import com.shellx.core.terminal.TerminalHardwareAction
+import com.shellx.core.terminal.TerminalHardwareKeys
+import com.shellx.core.terminal.TerminalHardwareModifiers
 import com.shellx.core.terminal.TerminalViewModel
 import com.shellx.core.terminal.TerminalViewPhase
 import com.shellx.core.terminal.TerminalViewState
@@ -25,7 +34,12 @@ import com.shellx.link.core.TerminalScreen
  *
  * A frame draws only the visible rows, from layouts kept by row object ([TerminalRowCache]): every row's backgrounds,
  * then every row's text and lines, then the cursor, then the text being composed, so a diacritic that rises into the
- * row above is never painted over. Main thread only.
+ * row above is never painted over.
+ *
+ * It is the keyboard's editor ([TerminalInputConnection]; plan 3G Design, "Soft keyboard") and takes hardware keys
+ * ([handleKey]; "Hardware keys"). Input reaches the model only from the page shown and only while the model takes it
+ * ([accepts]); a surface that stops accepting gives the keyboard up, and it never takes the keyboard back by itself:
+ * only a tap or a long press focuses it ([focusAndShowKeyboard]). Main thread only.
  */
 @SuppressLint("ViewConstructor") // Made in code by TerminalPane only.
 class TerminalSurfaceView(
@@ -34,6 +48,7 @@ class TerminalSurfaceView(
     /** The terminal of the page this surface belongs to: the model is every page's, and shows one terminal at a time. */
     val terminalId: String,
     val font: TerminalFont,
+    private val ime: TerminalIme = SystemTerminalIme(context),
 ) : View(context) {
     private val density = context.resources.displayMetrics.density
     private val padding = TerminalGeometry.PADDING_DP * density
@@ -58,8 +73,26 @@ class TerminalSurfaceView(
     /** What is left of a vertical drag on the alternate screen below one line (TerminalGeometry.scrollLines). */
     private var scrollCarry = 0f
 
+    /** Called with true / false when the surface takes / gives up the focus (and with it the keyboard). */
+    var onFocusChange: (Boolean) -> Unit = {}
+
+    /** The keyboard's current connection, kept in step with the model's marked text ([render]). */
+    private var connection: TerminalInputConnection? = null
+    private var restartPending = false
+
+    /** Only a tap or a long press lets the surface take the focus: nothing gives it back on its own. */
+    private var mayFocus = false
+
+    /** Key codes whose down [handleKey] took: their up is taken too. */
+    private val keysDown = HashSet<Int>()
+
+    /** A dead key's accent, waiting for the next character. */
+    private var deadAccent = 0
+
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        isFocusable = true
+        isFocusableInTouchMode = true
     }
 
     // Updates
@@ -78,6 +111,10 @@ class TerminalSurfaceView(
         lastSentInputs = state.sentInputs
         lastTopShift = state.topShift
         setViewport(viewport.contentChanged(screen.cols, shownRows(screen), if (newSnapshot) 0 else shift, toBottom = newSnapshot || typed))
+        // The keyboard follows the model: a key that committed the word, a paste, another terminal shown.
+        connection?.let { if (it.document != state.markedText) it.resync(state.markedText) }
+        // A page that stops taking input (covered, reopening, another terminal shown) gives the keyboard up.
+        if (hasFocus() && !accepts()) clearTerminalFocus()
         invalidate()
     }
 
@@ -140,6 +177,130 @@ class TerminalSurfaceView(
 
     /** Input from this surface may reach the model: its page is the terminal shown, and it takes input. */
     internal fun accepts(): Boolean = model.terminalId == terminalId && model.acceptsInput
+
+    // The keyboard
+
+    override fun onCheckIsTextEditor(): Boolean = true
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
+        // A text class keeps each language's composing (Telex, VNI, CJK); no suggestions, so letters go out one by one;
+        // no CAP_* or AUTO_* flag, so nothing is capitalised or rewritten; multi-line, so Enter is a key, never an action.
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or
+            EditorInfo.IME_FLAG_NO_ENTER_ACTION or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        val marked = if (accepts()) model.markedText.length else 0
+        outAttrs.initialSelStart = marked
+        outAttrs.initialSelEnd = marked
+        outAttrs.initialCapsMode = 0
+        return TerminalInputConnection(
+            this, model, ::accepts, ::handleKey, { TerminalClipboard.text(context) },
+            report = { document, composing ->
+                val end = document.length
+                ime.updateSelection(this, end, end, if (composing) 0 else -1, if (composing) end else -1)
+            },
+            restart = ::restartKeyboard,
+        ).also { connection = it }
+    }
+
+    /** The keyboard drops its composition on the next main-loop turn (once, however many asked meanwhile). */
+    private fun restartKeyboard() {
+        if (restartPending) return
+        restartPending = true
+        post {
+            restartPending = false
+            ime.restart(this)
+        }
+    }
+
+    /** A tap or a long press: the surface takes the focus and the keyboard shows, while the page takes input. */
+    fun focusAndShowKeyboard() {
+        if (!accepts()) return
+        mayFocus = true
+        requestFocus()
+        post { ime.show(this) }
+    }
+
+    /** Hides the soft keyboard and gives up the focus. */
+    fun clearTerminalFocus() {
+        ime.hide(this)
+        mayFocus = false
+        clearFocus()
+    }
+
+    override fun requestFocus(direction: Int, previouslyFocusedRect: Rect?): Boolean {
+        if (!mayFocus) return false
+        return super.requestFocus(direction, previouslyFocusedRect)
+    }
+
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        if (!gainFocus) {
+            mayFocus = false
+            keysDown.clear()
+            deadAccent = 0
+        }
+        onFocusChange(gainFocus)
+    }
+
+    // Hardware keys
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = handleKey(event) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean = handleKey(event) || super.onKeyUp(keyCode, event)
+
+    override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent): Boolean =
+        handleKey(event) || super.onKeyMultiple(keyCode, repeatCount, event)
+
+    /**
+     * A hardware key, or a key event the keyboard sent ("Hardware keys"): downs (repeats included) go through
+     * `TerminalHardwareKeys`; the up of a down it took is taken too; text of a KEYCODE_UNKNOWN multiple is committed text.
+     * A dead key waits for the next character and joins it (`KeyEvent.getDeadChar`), or is typed first when they do not
+     * join. False for the system's keys (Back, volume, Meta shortcuts, function keys), and for every key while the page
+     * does not take input.
+     */
+    fun handleKey(event: KeyEvent): Boolean {
+        if (!accepts()) return false
+        when (event.action) {
+            KeyEvent.ACTION_UP -> return keysDown.remove(event.keyCode)
+            KeyEvent.ACTION_MULTIPLE -> {
+                if (event.keyCode != KeyEvent.KEYCODE_UNKNOWN) return false
+                event.characters?.takeIf { it.isNotEmpty() }?.let(model::insertText)
+                return true
+            }
+            KeyEvent.ACTION_DOWN -> Unit
+            else -> return false
+        }
+        val meta = event.metaState
+        var plain = event.getUnicodeChar(meta and (KeyEvent.META_CTRL_MASK or KeyEvent.META_ALT_MASK or KeyEvent.META_META_MASK).inv())
+        val chorded = event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
+        if (!chorded && plain and KeyCharacterMap.COMBINING_ACCENT != 0) {
+            deadAccent.takeIf { it != 0 }?.let { typeCodePoint(it) }
+            deadAccent = plain and KeyCharacterMap.COMBINING_ACCENT_MASK
+            keysDown += event.keyCode
+            return true
+        }
+        val accent = deadAccent
+        if (accent != 0) {
+            deadAccent = 0
+            val joined = if (plain != 0) KeyEvent.getDeadChar(accent, plain) else 0
+            if (joined != 0) plain = joined else typeCodePoint(accent)
+        }
+        val alt = event.getUnicodeChar(meta and (KeyEvent.META_CTRL_MASK or KeyEvent.META_META_MASK).inv())
+        val modifiers = TerminalHardwareModifiers(event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed)
+        when (val action = TerminalHardwareKeys.action(event.keyCode, plain, alt, modifiers)) {
+            is TerminalHardwareAction.Send -> model.press(action.key, action.mods)
+            is TerminalHardwareAction.Type -> model.typeKey(action.text)
+            TerminalHardwareAction.DeleteBackward -> model.deleteBackward()
+            TerminalHardwareAction.Paste -> TerminalClipboard.text(context)?.let(model::paste)
+            TerminalHardwareAction.System -> return false
+        }
+        keysDown += event.keyCode
+        return true
+    }
+
+    private fun typeCodePoint(codePoint: Int) {
+        if (Character.isValidCodePoint(codePoint)) model.typeKey(String(Character.toChars(codePoint)))
+    }
 
     // Drawing
 
