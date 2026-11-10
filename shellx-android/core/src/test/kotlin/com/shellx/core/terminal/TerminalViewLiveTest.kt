@@ -7,6 +7,9 @@ import com.shellx.core.testing.eventually
 import com.shellx.core.testing.hubRig
 import com.shellx.core.testing.linkTerminal
 import com.shellx.core.testing.linkWorkspace
+import com.shellx.link.core.TerminalInputUnit.Key
+import com.shellx.link.core.TerminalInputUnit.Text
+import com.shellx.link.core.TerminalKey
 import com.shellx.link.core.TerminalViewOpenOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -83,6 +86,18 @@ class TerminalViewLiveTest {
         assertTrue(eventually {
             model.phase == TerminalViewPhase.Unavailable(TerminalUnavailableReason.FAILED) && mac.terminalViewOpens.size == 2
         }, "one retry after 1 s, then Try Again")
+    } }
+
+    @Test fun typingEchoesThroughAFakeMac() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val model = makeModel(mac, rig)
+        model.setPhoneGrid(30, 6); model.show("t1")
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live && model.screen.screenText().firstOrNull() == "$" })
+        model.insertText("ls"); model.press(TerminalKey.ENTER)
+        assertTrue(eventually { model.screen.screenText().take(2) == listOf("$ ls", "$") }, "${model.screen.screenText()}")
+        assertEquals(listOf(listOf(Text("ls")), listOf(Key(TerminalKey.ENTER))), mac.terminalViewInputs("t1"))
     } }
 
     /**
