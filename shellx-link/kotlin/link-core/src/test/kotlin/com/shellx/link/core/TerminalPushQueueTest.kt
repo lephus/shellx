@@ -464,5 +464,56 @@ class TerminalPushQueueTest {
         }
     }
 
+    /** A small delta: one short row. */
+    private fun small(revision: Long) = TerminalFramePart(
+        revision,
+        head = TerminalFrameHead(TerminalFrameKind.DELTA, 80, 1, cursor = TerminalCursor(0, 0)),
+        lines = listOf(TerminalLine(0, listOf(TerminalRun(text = "y")))),
+    )
+
+    /**
+     * Final review I-1: a long backlog hands the collector's thread back between pushes (after 16 pushes or about 4 ms),
+     * so on the phone's main thread frames are drawn and touches handled (ctrl c reaches `yes`) while a flood is
+     * delivered. On one thread, another coroutine runs before the queue is empty.
+     */
+    @Test
+    fun aLongBacklogLetsTheCollectorsThreadRunOtherWork() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                for (r in 1L..1_000L) queue.offer(Frame("t-1", small(r)))
+                var taken = 0
+                val collector = launch { queue.pushes.take(1_001).collect { taken += 1 } }
+                var seenByOther = -1
+                launch { seenByOther = taken }
+                collector.join()
+                assertEquals(1_001, taken)
+                assertTrue(seenByOther in 0 until 1_001, "the other coroutine ran after $seenByOther pushes")
+            }
+        }
+    }
+
+    /** A collector cancelled while it hands its thread back takes nothing more: the next one goes on, nothing lost. */
+    @Test
+    fun aCollectorCancelledAtItsYieldLosesNothing() {
+        runBlocking {
+            within {
+                val queue = TerminalPushQueue()
+                queue.offer(Opened("t-1"))
+                for (r in 1L..100L) queue.offer(Frame("t-1", small(r)))
+                val first = mutableListOf<TerminalViewPush>()
+                val collector = launch { queue.pushes.collect { first += it } }
+                // Runs at the collector's first yield, and cancels it there.
+                launch { collector.cancel() }
+                collector.join()
+                assertTrue(first.size in 1 until 101, "${first.size} taken before the cancel")
+                val rest = queue.pushes.take(101 - first.size).toList()
+                assertEquals(listOf<TerminalViewPush>(Opened("t-1")) + (1L..100L).map { Frame("t-1", small(it)) }, first + rest)
+                assertEquals(0, queue.queuedPushes)
+            }
+        }
+    }
+
     private fun snapshotFrame() = snapshot(1, "$").let { TerminalGridFrame(it.head!!, it.styles, it.lines) }
 }
