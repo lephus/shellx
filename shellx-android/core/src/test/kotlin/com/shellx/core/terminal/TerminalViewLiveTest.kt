@@ -14,7 +14,9 @@ import com.shellx.link.core.TerminalViewOpenOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -113,6 +115,26 @@ class TerminalViewLiveTest {
         model.insertText("ab")
         assertTrue(eventually { mac.terminalViewInputs("t1") == listOf(listOf(Text("ab"))) })
         assertEquals(emptyList(), mac.terminalViewInputs("t2"))
+    } }
+
+    /**
+     * Review C I-1, end to end: with the hub, the fake Mac and the page all on an immediate dispatcher (the demo on the
+     * app's `Main.immediate`), the Mac's answer, `Opened` and first screen are handled inside the open's send. The page
+     * stays live, with one first-screen sample.
+     */
+    @Test fun onAnImmediateDispatcherTheFirstScreenStaysLive() { runTest {
+        val immediate = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+        val mac = FakeMac("Mac", immediate)
+        mac.setWorkspaces(listOf(linkWorkspace("a", terminals = listOf(linkTerminal("t1", selected = true)))))
+        val rig = hubRig(listOf(mac), start = true, scope = immediate)
+        assertTrue(rig.online(sessions = 0))
+        val model = TerminalViewModel(mac.machine.machineId, rig.hub, rig.hub.scope)
+        immediate.launch { model.run() }
+        model.setPhoneGrid(30, 6); model.show("t1")
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live }, "${model.phase}")
+        delay(50.milliseconds)
+        assertEquals(TerminalViewPhase.Live, model.phase)
+        assertEquals(1, rig.latency.summary(LatencyMetric.TERMINAL_FIRST_SCREEN)?.count)
     } }
 
     /**
