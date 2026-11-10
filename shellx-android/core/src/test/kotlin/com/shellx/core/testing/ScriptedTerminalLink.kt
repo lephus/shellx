@@ -38,6 +38,9 @@ class ScriptedTerminalLink : TerminalLink {
     /** Runs inside each input call, after it is recorded: the Mac echoing at once (review C I-1). */
     var onInput: ((terminalId: String, units: List<TerminalInputUnit>) -> Unit)? = null
 
+    /** Thrown by each collection of [terminalEvents] once it is counted, when set. */
+    var eventsFailure: Throwable? = null
+
     /** Every recordLatency call, in order. */
     val samples: MutableList<Pair<LatencyMetric, Duration>> = mutableListOf()
     private val subscribers = mutableListOf<Channel<TerminalHubEvent>>()
@@ -62,6 +65,7 @@ class ScriptedTerminalLink : TerminalLink {
             val channel = Channel<TerminalHubEvent>(Channel.UNLIMITED)
             subscribers += channel
             try {
+                eventsFailure?.let { throw it }
                 for (event in channel) collector.emit(event)
             } finally {
                 subscribers -= channel

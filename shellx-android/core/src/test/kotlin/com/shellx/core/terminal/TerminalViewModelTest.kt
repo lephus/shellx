@@ -21,13 +21,16 @@ import com.shellx.link.core.TerminalViewPush.Frame
 import com.shellx.link.core.TerminalViewPush.Opened
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -537,6 +540,23 @@ class TerminalViewModelTest {
         assertTrue(eventually { model.snapshots == 2 })
         assertEquals(TerminalViewPhase.Live, model.phase)
         assertEquals(1, link.firstScreens().size, "measured once, at the first snapshot")
+    } }
+
+    /** Review C m2: a run ends quietly only when a newer run or close() stopped its collection. */
+    @Test fun onlyANewerRunOrCloseEndsARunQuietly() { runTest {
+        val link = ScriptedTerminalLink()
+        val model = TerminalViewModel("m1", link, backgroundScope, sleep = ManualSleeper().sleep, now = ManualClock().monotonic)
+        val first = async { runCatching { model.run() } }
+        eventually { link.subscriberCount == 1 }
+        val second = async { runCatching { model.run() } }
+        assertTrue(first.await().isSuccess, "a newer run takes over quietly")
+        model.close().join()
+        assertTrue(second.await().isSuccess, "close() ends the run quietly")
+
+        val failing = ScriptedTerminalLink(); failing.eventsFailure = CancellationException("the events were cancelled")
+        val other = TerminalViewModel("m1", failing, backgroundScope, sleep = ManualSleeper().sleep, now = ManualClock().monotonic)
+        val ended = runCatching { other.run() }.exceptionOrNull()
+        assertIs<CancellationException>(ended, "a cancellation no newer run or close() made is the caller's to see")
     } }
 
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)
