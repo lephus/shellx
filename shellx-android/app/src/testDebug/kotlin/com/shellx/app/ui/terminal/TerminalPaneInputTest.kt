@@ -512,6 +512,18 @@ class TerminalPaneInputTest {
         assertFalse(tagged("terminal.key.escape"))
     }
 
+    /** A chip that shows another terminal while this one has the keyboard hides the keyboard (review D1 M11). */
+    @Test
+    fun anotherTerminalShownHidesTheKeyboard() {
+        livePane()
+        focus()
+        val surface = surface()
+        model.show("t-claude")
+        until { !surface.hasFocus() }
+        assertTrue(ime.hides >= 1)
+        assertFalse(tagged("terminal.key.escape"))
+    }
+
     // TerminalPaneTests.swift, re-expressed for Android (ruling 11)
 
     /** A page that stops taking input (the Mac refused the view) gives the keyboard back and hides the key bar. */

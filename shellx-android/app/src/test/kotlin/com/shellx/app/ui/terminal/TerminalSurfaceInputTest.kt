@@ -220,4 +220,12 @@ class TerminalSurfaceInputTest {
         assertTrue(eventually { model.state.value.pasteTooLarge == 1 })
         assertFalse(within(200) { inputs().isNotEmpty() })
     }
+
+    /** The keyboard's own Paste (its context menu, its clipboard key) pastes the clipboard as one paste (review D1 M11). */
+    @Test
+    fun theKeyboardsPasteSendsOnePasteUnit() {
+        activity.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("", "echo a\necho b"))
+        assertTrue(connection().performContextMenuAction(android.R.id.paste))
+        assertTrue("${inputs()}", eventually { inputs() == listOf<List<TerminalInputUnit>>(listOf(Paste("echo a\necho b"))) })
+    }
 }
