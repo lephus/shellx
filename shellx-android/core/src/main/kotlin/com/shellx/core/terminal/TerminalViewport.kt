@@ -19,7 +19,7 @@ import kotlin.math.floor
  *   (`scrollY >= maxScrollY − cellHeight × scale / 2`, as the iPhone's pane does; review B2 m1).
  * - [pinched]: with `s0` the scale before and `s1` the scale of `zoom.pinch(s0 × factor, fit)`, the content point under
  *   the focus stays: `scrollX' = (scrollX + focusX − padding) × s1 / s0 + padding − focusX`, the same for y; then
- *   clamped, and [followsBottom] as in [scrolledBy].
+ *   clamped, and [followsBottom] as in [scrolledBy]. A factor that is not finite changes nothing (review B2 m3).
  */
 data class TerminalViewport(
     val cellWidth: Float,
@@ -69,6 +69,7 @@ data class TerminalViewport(
         copy(scrollX = scrollX + dx, scrollY = scrollY + dy).clamped().following()
 
     fun pinched(factor: Float, focusX: Float, focusY: Float): TerminalViewport {
+        if (!factor.isFinite()) return this
         val s0 = scale
         val pinched = copy(zoom = zoom.pinch(s0 * factor, fit))
         val s1 = pinched.scale
