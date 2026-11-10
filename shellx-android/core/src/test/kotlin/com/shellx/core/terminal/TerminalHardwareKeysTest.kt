@@ -45,6 +45,17 @@ class TerminalHardwareKeysTest {
         assertEquals(System, a(41, ',', mods = ctrl))                                                          // AZERTY's KEYCODE_M
         assertEquals(System, a(8, '1', mods = ctrl))
     }
+    /**
+     * Re-review B N-2: a letter key whose layout types a combining mark (Hindi InScript's D is the virama, Thai
+     * Kedmanee's U a vowel sign) still chords by the physical key; punctuation on such a key stays System (ruled).
+     */
+    @Test fun ctrlOnAKeyThatTypesAMarkUsesTheKeysLatinLetter() {
+        assertEquals(send(TerminalKey.letter('d'), TerminalModifier.CTRL), a(32, '्', mods = ctrl))     // KEYCODE_D
+        assertEquals(send(TerminalKey.letter('u'), TerminalModifier.CTRL), a(49, 'ี', mods = ctrl))     // KEYCODE_U
+        assertEquals(send(TerminalKey.letter('x'), TerminalModifier.CTRL), a(52, 'ं', mods = ctrl))     // KEYCODE_X
+        assertEquals(System, a(41, ',', mods = ctrl))                                                          // AZERTY's KEYCODE_M
+        assertEquals(System, a(45, '/', mods = ctrl))                                                          // Hebrew Q
+    }
     @Test fun ctrlVIsTheKeyAndCtrlShiftVPastes() {
         assertEquals(send(TerminalKey.letter('v'), TerminalModifier.CTRL), a(50, 'v', mods = ctrl))           // KEYCODE_V
         assertEquals(TerminalHardwareAction.Paste, a(50, 'V', mods = TerminalHardwareModifiers(ctrl = true, shift = true)))
