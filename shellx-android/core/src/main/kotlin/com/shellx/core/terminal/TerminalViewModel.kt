@@ -97,22 +97,27 @@ data class TerminalViewState(
  *   `snapshots = 0`, `topShift = 0`, `screenRevision += 1`; retry budgets restored; Connecting; the first-screen clock
  *   starts (when `id` is not null); reconcile. The same id does nothing. The clock starts here, at the user's swipe or
  *   tap, not at the `ok`: the Mac may hold the first snapshot up to 500 ms for the phone's size (contracts §17) and that
- *   wait is part of criterion 3. The phase stays Connecting (the pane's loading state) after the `ok` until a snapshot
- *   is applied.
+ *   wait is part of criterion 3. It never runs while the Mac is offline or unsupported, or the page is stopped (R1, R8,
+ *   A2): the open that follows starts it again. The phase stays Connecting (the pane's loading state) after the `ok`
+ *   until a snapshot is applied.
  * - **R3 Open answers**, for the current attempt only (any other is ignored): `ok` → answered. `busy` → forget the
  *   view; after 300 ms reconcile; after 5 such retries Unavailable(FAILED). `not_found` → forget, Unavailable(GONE).
  *   `refused` → forget, Unavailable(REFUSED). `failed` (also the answer for a terminal the Mac lists but cannot view,
  *   contracts §17), an unknown outcome, or NoAnswer while `link.isOnline` → forget; the first time, reconcile after
- *   1 s; the second time Unavailable(FAILED). NotSent, or NoAnswer while not online → forget, and open again only after
- *   the next State event of this Mac or a `show`, `retry` or new `run()` (so a hub that still calls the Mac online
- *   during a reconnect cannot make the model ask in a loop); while `active`, R1 then sets Offline or Unsupported.
+ *   1 s (Connecting meanwhile); the second time Unavailable(FAILED). NoAnswer while online means the Mac may have
+ *   opened the view although its answer never came, so `close` for that view is queued first (through the same
+ *   outbox); NoAnswer while not online sends no close, the session being gone as in R8. NotSent, or NoAnswer while not
+ *   online → forget, and open again only after the next State event of this Mac or a `show`, `retry` or new `run()`
+ *   (so a hub that still calls the Mac online during a reconnect cannot make the model ask in a loop); while `active`,
+ *   R1 then sets Offline or Unsupported.
  * - **R4 `Opened(id)`** for the view's terminal on this Mac, once its open was handed to the link (`sent`: a leftover
  *   `Opened` of an earlier open is ignored): a fresh `TerminalFrameAssembler`; frames count from now on. Frames of that
  *   terminal before it are ignored. Every push for another terminal or another Mac is ignored.
  * - **R5 Frames.** `assembler.receive(part)` for every part, `TerminalFramePart.LOST` included, with no revision
  *   filter before it (plan 3G Decision 2); `resync` → queue `resync(id)`; a complete frame → R7.
  * - **R6 `Ended(id, reason)`** of the view (after its `Opened`): `gone` → Unavailable(GONE); `refused` →
- *   Unavailable(REFUSED); `not_open` → forget the view and reconcile at once (a new open); `failed` or unknown → as a
+ *   Unavailable(REFUSED); `not_open` → forget the view and reconcile at once (a new open), on the failed-open budget: a
+ *   second `not_open` (or failure) before a snapshot restores it gives Unavailable(FAILED); `failed` or unknown → as a
  *   failed open (R3). Before `Opened` it is ignored.
  * - **R7 Apply.** `screen.apply(frame)`, `screenRevision += 1`. A snapshot: `snapshots += 1`, `topShift = 0`, phase
  *   Live, the first-screen latency recorded (once per start of the clock; a reopen after R6, R8 or a new run() starts
@@ -121,8 +126,10 @@ data class TerminalViewState(
  *   after)` (`before`/`after`: history row counts around the apply; `scroll`, `rows`, `history` from the head). Every
  *   apply records TERMINAL_FRAME_APPLY (assemble plus apply); the first apply after an echo start records
  *   TERMINAL_KEY_ECHO.
- * - **R8 Mac state** `State(machineId, s)`: not Online → forget the view without a close (its session is gone) and,
- *   unless the phase is Unavailable or Unsupported, set Offline; the screen stays. Online → reconcile (a new open).
+ * - **R8 Mac state** `State(machineId, s)`: not Online → forget the view without a close (its session is gone),
+ *   restore both retry budgets (an open lost with the session, answered NoAnswer before the hub saw the drop, is no
+ *   failure of the Mac's) and, unless the phase is Unavailable or Unsupported, set Offline; the screen stays. Online →
+ *   reconcile (a new open).
  * - **R9 run().** Collects `link.terminalEvents(machineId)`, sets running, reconciles, handles events until cancelled,
  *   then clears running and reconciles (the close is queued and still goes out; A2). A `run()` that starts while an
  *   older one is still running takes over: only the newest handles events and owns running; the older one stops
@@ -421,6 +428,8 @@ class TerminalViewModel(
             return
         }
         if (!active || isUnavailable || (online && supported)) return
+        // No open while the Mac is the reason: the first-screen clock starts again at the open that brings it.
+        firstScreenStart = null
         shown.phase = when {
             online -> TerminalViewPhase.Unsupported
             shown.phase == TerminalViewPhase.Unsupported -> TerminalViewPhase.Unsupported
@@ -450,6 +459,7 @@ class TerminalViewModel(
     private fun becomeUnavailable(reason: TerminalUnavailableReason) {
         forgetView()
         shown.phase = TerminalViewPhase.Unavailable(reason)
+        firstScreenStart = null
     }
 
     /** Reconciles after [delay]; no open goes out meanwhile. */
@@ -473,6 +483,8 @@ class TerminalViewModel(
             yield()
             if (generation != runGeneration || closed) return@launch
             running = false
+            // The iPhone's suspend(): the clock stops; the open of the next run starts it again.
+            firstScreenStart = null
             // An open still waiting would be announced to the next run as its own `Opened` (re-review B N-1).
             openCall?.cancel()
             reconcile()
@@ -546,7 +558,13 @@ class TerminalViewModel(
                 TerminalViewOpenOutcome.REFUSED -> becomeUnavailable(TerminalUnavailableReason.REFUSED)
                 else -> failedOpen()
             }
-            TerminalOpenResult.NoAnswer -> if (link.isOnline(machineId)) failedOpen() else waitForMac()
+            TerminalOpenResult.NoAnswer -> if (link.isOnline(machineId)) {
+                // The Mac may have opened it although the answer never came.
+                send(Message.Close(current.terminalId))
+                failedOpen()
+            } else {
+                waitForMac()
+            }
             TerminalOpenResult.NotSent -> waitForMac()
         }
         publish()
@@ -558,13 +576,17 @@ class TerminalViewModel(
         reconcile()
     }
 
-    /** A failed open or a failed view: retried once after 1 s, then Try Again. */
+    /**
+     * A failed open or a failed view: retried once after 1 s, then Try Again. The wait is Connecting: a view that ended
+     * while live must not look live while nothing typed can reach the Mac (the iPhone's final review, core M1).
+     */
     private fun failedOpen() {
         forgetView()
         if (failedRetriesUsed >= 1) {
             becomeUnavailable(TerminalUnavailableReason.FAILED)
         } else {
             failedRetriesUsed += 1
+            shown.phase = TerminalViewPhase.Connecting
             retryAfter(FAILED_RETRY_DELAY)
         }
     }
@@ -608,8 +630,15 @@ class TerminalViewModel(
             TerminalViewEndReason.GONE -> becomeUnavailable(TerminalUnavailableReason.GONE)
             TerminalViewEndReason.REFUSED -> becomeUnavailable(TerminalUnavailableReason.REFUSED)
             TerminalViewEndReason.NOT_OPEN -> {
+                // Reopened at once, but on the failed-open budget (a snapshot restores it): a Mac that keeps ending its
+                // views before any screen cannot make the phone open them forever.
                 forgetView()
-                reconcile()
+                if (failedRetriesUsed >= 1) {
+                    becomeUnavailable(TerminalUnavailableReason.FAILED)
+                } else {
+                    failedRetriesUsed += 1
+                    reconcile()
+                }
             }
             else -> failedOpen()
         }
@@ -651,6 +680,9 @@ class TerminalViewModel(
         waitingForMac = false
         if (state != MachineLinkState.Online) {
             forgetView()   // its session is gone: nothing to close
+            firstScreenStart = null   // the open once it is back starts the clock again
+            // An open lost with the session was no failure of the Mac's: the next session starts with both retries.
+            restoreBudgets()
             if (!isUnavailable && shown.phase != TerminalViewPhase.Unsupported) shown.phase = TerminalViewPhase.Offline
             return
         }
