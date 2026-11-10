@@ -226,21 +226,118 @@ class TerminalInputConnectionTest {
         assertEquals(listOf(Text("a"), Key(TerminalKey.BACKSPACE), Key(TerminalKey.DELETE)), recorder.units.takeLast(3))
     }
 
-    /** The shadow keeps about a word (64 UTF-16 units), whole characters only. */
+    /**
+     * The shadow keeps about a word (32 UTF-16 units; re-review M-4: a rewrite of all of it is then 32 backspace messages
+     * and the text, inside the host's 64-message input queue), whole characters only.
+     */
     @Test
     fun theWordTheKeyboardSeesIsCapped() {
         val c = connection()
-        c.type("a".repeat(70))
-        assertEquals("a".repeat(64), c.sees())
-        assertEquals(Reported(64, -1, -1), reports.last())
+        c.type("a".repeat(40))
+        assertEquals("a".repeat(32), c.sees())
+        assertEquals(Reported(32, -1, -1), reports.last())
         c.commitText(" ", 1)
         c.commitText("b".repeat(100), 1)
-        assertEquals("b".repeat(64), c.sees())
+        assertEquals("b".repeat(32), c.sees())
         c.commitText(" ", 1)
-        c.commitText("x" + "👍🏽".repeat(16), 1)
-        assertEquals("never half an emoji", "👍🏽".repeat(16), c.sees())
+        c.commitText("x" + "👍🏽".repeat(8), 1)
+        assertEquals("never half an emoji", "👍🏽".repeat(8), c.sees())
         c.commitText("👍🏽", 1)
-        assertEquals("👍🏽".repeat(16), c.sees())
+        assertEquals("👍🏽".repeat(8), c.sees())
+    }
+
+    /**
+     * API 31+: Gboard reads the text around the cursor through getSurroundingText (the emulator's logcat, right after
+     * its start of input), which BaseInputConnection answers from its own empty editable unless overridden: it must say
+     * what every other read and the reported selection say (re-review I-1).
+     */
+    @Test
+    fun theKeyboardReadsTheSameTextThroughGetSurroundingText() {
+        val c = connection()
+        c.type("ti")
+        c.setComposingText("ê", 1)
+        val around = checkNotNull(c.getSurroundingText(100, 100, 0))
+        assertEquals("tiê", around.text.toString())
+        assertEquals(3, around.selectionStart)
+        assertEquals(3, around.selectionEnd)
+        assertEquals(0, around.offset)
+        val last = checkNotNull(c.getSurroundingText(1, 0, 0))
+        assertEquals("ê", last.text.toString())
+        assertEquals(2, last.offset)
+        assertEquals(1, last.selectionStart)
+        assertEquals(1, last.selectionEnd)
+        assertEquals(c.getTextBeforeCursor(100, 0).toString(), around.text.toString())
+        assertEquals(reports.last().selection, around.selectionEnd)
+    }
+
+    /** Every read (and the snapshot) says the same as the last report: after a commit, a composing change, inside a batch, and on a new connection. */
+    private fun TerminalInputConnection.assertReadsAgree(text: String, composing: IntRange?, reported: Boolean = true) {
+        val end = text.length
+        assertEquals(text, getTextBeforeCursor(1000, 0).toString())
+        assertEquals("", getTextAfterCursor(1000, 0).toString())
+        val around = checkNotNull(getSurroundingText(1000, 1000, 0))
+        assertEquals(text, around.text.toString())
+        assertEquals(end, around.selectionStart)
+        assertEquals(end, around.selectionEnd)
+        assertEquals(0, around.offset)
+        val extracted = getExtractedText(ExtractedTextRequest(), 0)
+        assertEquals(text, extracted.text.toString())
+        assertEquals(end, extracted.selectionStart)
+        assertEquals(end, extracted.selectionEnd)
+        val snapshot = checkNotNull(takeSnapshot())
+        assertEquals(text, snapshot.surroundingText.text.toString())
+        assertEquals(end, snapshot.surroundingText.selectionEnd)
+        assertEquals(composing?.first ?: -1, snapshot.compositionStart)
+        assertEquals(composing?.let { it.last + 1 } ?: -1, snapshot.compositionEnd)
+        assertEquals(0, snapshot.cursorCapsMode)
+        if (reported) assertEquals(Reported(end, composing?.first ?: -1, composing?.let { it.last + 1 } ?: -1), reports.last())
+    }
+
+    @Test
+    fun everyReadAgreesWithTheReportedSelection() {
+        val c = connection()
+        c.type("ab")
+        c.assertReadsAgree("ab", composing = null)
+        c.setComposingText("c", 1)
+        c.assertReadsAgree("abc", composing = 2..2)
+        c.setComposingText("cd", 1)
+        c.assertReadsAgree("abcd", composing = 2..3)
+        // Inside a batch the reads are live while the report waits for its end.
+        val before = reports.size
+        c.beginBatchEdit()
+        c.commitText("x", 1)
+        c.assertReadsAgree("abx", composing = null, reported = false)
+        assertEquals(before, reports.size)
+        c.endBatchEdit()
+        c.assertReadsAgree("abx", composing = null)
+        // A new connection (a restart) starts a new word, keeping the word being composed; nothing is reported until a change.
+        c.setComposingText("e", 1)
+        val restarted = connection()
+        restarted.assertReadsAgree("e", composing = 0..0, reported = false)
+        restarted.commitText("e ", 1)
+        restarted.assertReadsAgree("", composing = null)
+    }
+
+    /**
+     * Pinned deviations (re-review M-5): a region that ends before the text's end runs to the end (committed text cannot
+     * follow the word composed at the cursor), and a region inside the word being composed leaves the whole word
+     * composed. A change here must be deliberate.
+     */
+    @Test
+    fun aComposingRegionEndingBeforeTheEndRunsToIt() {
+        val c = connection()
+        c.type("tie")
+        assertTrue(c.setComposingRegion(0, 1))
+        assertEquals(Reported(3, 0, 3), reports.last())
+        assertEquals("tie", c.sees())
+        assertEquals("tie", c.document)
+        assertEquals(List(3) { Key(TerminalKey.BACKSPACE) }, recorder.units.takeLast(3))
+        c.setComposingText("tiê", 1)
+        assertEquals("tiê", c.sees())
+        assertTrue(c.setComposingRegion(0, 1))
+        assertEquals("inside the word, nothing changes", Reported(3, 0, 3), reports.last())
+        assertEquals("tiê", c.document)
+        assertEquals(3, recorder.units.count { it is Key })
     }
 
     /** Enter, a paste and a line break end the word: the keyboard reads "" after them. */

@@ -14,6 +14,7 @@ import com.shellx.app.testing.eventually
 import com.shellx.core.terminal.TerminalBarKey
 import com.shellx.core.terminal.TerminalViewModel
 import com.shellx.core.terminal.TerminalViewPhase
+import com.shellx.link.core.ShellXLink
 import com.shellx.link.core.TerminalInputUnit
 import com.shellx.link.core.TerminalInputUnit.Key
 import com.shellx.link.core.TerminalInputUnit.Paste
@@ -306,6 +307,66 @@ class TerminalSurfaceInputTest {
         val c = connection()
         for (letter in "ls  x") c.commitText(letter.toString(), 1)
         assertTrue("${inputs()}", eventually { macLine(inputs().flatten()) == "ls  x" })
+    }
+
+    // Fix round 1 (re-review of the Telex follow-up)
+
+    /** A new connection (a restart): its EditorInfo and its reads agree, the word being composed kept, the word committed gone (I-1). */
+    @Test
+    fun aNewConnectionStartsWithTheWordBeingComposedOnly() {
+        val c = connection()
+        c.commitText("ab", 1)
+        c.setComposingText("vi", 1)
+        val info = EditorInfo()
+        val fresh = checkNotNull(surface.onCreateInputConnection(info))
+        assertEquals(2, info.initialSelStart)
+        assertEquals(2, info.initialSelEnd)
+        assertEquals("vi", fresh.getTextBeforeCursor(100, 0).toString())
+        val around = checkNotNull(fresh.getSurroundingText(100, 100, 0))
+        assertEquals("vi", around.text.toString())
+        assertEquals(2, around.selectionStart)
+        assertEquals(2, around.selectionEnd)
+        assertEquals(0, around.offset)
+    }
+
+    /** The key bar's ctrl, then a hardware letter or Backspace, is a chord: the Mac got no letter, so the word ends (M-2). */
+    @Test
+    fun aHardwareKeyTakenAsAChordEndsTheWordTheKeyboardSees() {
+        val c = connection()
+        c.commitText("t", 1)
+        TerminalPane.perform(TerminalKeyBarItem.Key(TerminalBarKey.CTRL), model) {}
+        press(KeyEvent.KEYCODE_X)
+        assertEquals("", c.sees())
+        val chord = listOf(listOf(Text("t")), listOf(Key(TerminalKey.letter('x'), listOf(TerminalModifier.CTRL))))
+        assertTrue("${inputs()}", eventually { inputs() == chord })
+        c.commitText("a", 1)
+        c.commitText("b", 1)
+        TerminalPane.perform(TerminalKeyBarItem.Key(TerminalBarKey.CTRL), model) {}
+        press(KeyEvent.KEYCODE_DEL)
+        assertEquals("", c.sees())
+        assertTrue("${inputs()}", eventually { inputs().lastOrNull() == listOf(Key(TerminalKey.BACKSPACE, listOf(TerminalModifier.CTRL))) })
+    }
+
+    /**
+     * A rewrite of the whole word the keyboard sees stays inside the host's 64-message input queue (M-4): the word is at
+     * most 32 units, each backspace one message, then the text — 33 messages.
+     */
+    @Test
+    fun aFullRewriteStaysInsideTheHostsInputQueue() {
+        val c = connection()
+        c.commitText("a".repeat(64), 1)
+        assertEquals(32, c.sees().length)
+        assertTrue(eventually { inputs().size == 1 })
+        c.beginBatchEdit()
+        c.deleteSurroundingText(64, 0)
+        c.commitText("b", 1)
+        c.endBatchEdit()
+        assertTrue("${inputs().size}", eventually { inputs().size == 34 })
+        assertFalse("nothing more", within(300) { inputs().size > 34 })
+        assertEquals(List(32) { listOf(Key(TerminalKey.BACKSPACE)) }, inputs().subList(1, 33))
+        assertEquals(listOf(Text("b")), inputs().last())
+        val rewrite = inputs().size - 1
+        assertTrue("$rewrite messages for one rewrite", rewrite <= ShellXLink.TERMINAL_MAX_QUEUED_INPUTS / 2 + 1)
     }
 
     /**
