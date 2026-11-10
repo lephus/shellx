@@ -51,10 +51,10 @@ class TerminalRenderTest {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun page(model: TerminalViewModel) {
+    private fun page(model: TerminalViewModel, showsKeyBar: Boolean = false) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             TopAppBar(title = { Text("shellx-ios") })
-            TerminalPane(model, model.terminalId ?: "t", "zsh", shown = true, modifier = Modifier.weight(1f))
+            TerminalPane(model, model.terminalId ?: "t", "zsh", shown = true, modifier = Modifier.weight(1f), showsKeyBar = showsKeyBar)
         }
     }
 
@@ -149,6 +149,25 @@ class TerminalRenderTest {
 
     @Test
     fun rendersFailed() = rendersState("terminal-failed")
+
+    @Test
+    fun rendersTheKeyBar() {
+        assertRenders("terminal-key-bar") { page(TerminalViewModel.fixed("t-zsh", screen(DemoTerminalScreens.SHELL)), showsKeyBar = true) }
+    }
+
+    @Test
+    fun rendersTheKeyBarWithCtrlLatched() {
+        val latched = TerminalViewModel.fixed("t-zsh", screen(DemoTerminalScreens.SHELL), markedText = "việ", ctrlLatched = true)
+        assertRenders("terminal-key-bar-ctrl") { page(latched, showsKeyBar = true) }
+        val plain = TerminalViewModel.fixed("t-zsh", screen(DemoTerminalScreens.SHELL))
+        fun lightEn(name: String, model: TerminalViewModel) = ShellXSnapshots.capture(name) {
+            CompositionLocalProvider(LocalSpinner provides StillSpinner) { page(model, showsKeyBar = true) }
+        }.first { it.theme == "light" && it.language == "en" }.argb
+        assertTrue(
+            "the latch and the marked text show",
+            !lightEn("terminal-key-bar", plain).contentEquals(lightEn("terminal-key-bar-ctrl", latched)),
+        )
+    }
 
     @Test
     fun theFiveStatesLookDifferent() {

@@ -1,0 +1,386 @@
+package com.shellx.app.ui.terminal
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.shellx.app.R
+import com.shellx.app.screenshots.StillSpinner
+import com.shellx.app.testing.WorkRig
+import com.shellx.app.ui.components.LocalSpinner
+import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.demo.DemoTerminalScreens
+import com.shellx.core.terminal.TerminalInputBatcher
+import com.shellx.core.terminal.TerminalUnavailableReason
+import com.shellx.core.terminal.TerminalViewModel
+import com.shellx.core.terminal.TerminalViewPhase
+import com.shellx.link.core.TerminalInputUnit
+import com.shellx.link.core.TerminalInputUnit.Key
+import com.shellx.link.core.TerminalInputUnit.Paste
+import com.shellx.link.core.TerminalInputUnit.Text
+import com.shellx.link.core.TerminalKey
+import com.shellx.link.core.TerminalModifier
+import com.shellx.link.core.TerminalScreen
+import com.shellx.link.core.TerminalViewEndReason
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
+
+/**
+ * The terminal page live in a window, against the fake Mac's `t-zsh` (plan 3G Task 13 and `TerminalPaneTests.swift`):
+ * a tap takes the keyboard and shows the key bar, the key bar drives the model, a long press offers Paste; and who
+ * holds the keyboard, when the key bar shows, and which terminal the keys reach.
+ */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics: the grid's cell is the font's.
+@Config(qualifiers = "w400dp-h900dp")
+class TerminalPaneInputTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
+    private val rig = WorkRig.make()
+    private val ime = RecordingIme()
+    private val model = TerminalViewModel(rig.machineId, rig.hub, rig.hub.scope)
+    private var run: Job? = null
+
+    @After
+    fun tearDown() {
+        run?.cancel()
+        rig.close()
+    }
+
+    /** The model runs as the workspace screen runs it, and shows `t-zsh`. */
+    private fun start() {
+        run = rig.hub.scope.launch { model.run() }
+        model.show("t-zsh")
+    }
+
+    private fun show(content: @Composable () -> Unit) = compose.setContent {
+        ShellXTheme {
+            CompositionLocalProvider(LocalTerminalIme provides ime, LocalSpinner provides StillSpinner) { content() }
+        }
+    }
+
+    /** `t-zsh`'s page, the one shown, live. */
+    private fun livePane() {
+        start()
+        show { TerminalPane(model, "t-zsh", "zsh", shown = true) }
+        until { model.phase == TerminalViewPhase.Live }
+    }
+
+    /** Waits on real time while the main looper's clock moves on 5 ms a round, so the model's delays come due. */
+    private fun until(condition: () -> Boolean) = compose.waitUntil(10_000) {
+        compose.waitForIdle()
+        ShadowLooper.idleMainLooper(5, TimeUnit.MILLISECONDS)
+        condition()
+    }
+
+    /** Lets [ms] of the main looper's time pass. */
+    private fun idle(ms: Long) {
+        repeat((ms / 10).toInt()) {
+            compose.waitForIdle()
+            ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+        }
+        compose.waitForIdle()
+    }
+
+    private fun tagged(tag: String): Boolean = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+
+    private fun surfaces(): List<TerminalSurfaceView> {
+        fun find(view: View): List<TerminalSurfaceView> = when (view) {
+            is TerminalSurfaceView -> listOf(view)
+            is ViewGroup -> (0 until view.childCount).flatMap { find(view.getChildAt(it)) }
+            else -> emptyList()
+        }
+        return find(compose.activity.window.decorView)
+    }
+
+    private fun surface(): TerminalSurfaceView = surfaces().single()
+
+    private fun InputConnection(surface: TerminalSurfaceView): InputConnection =
+        checkNotNull(surface.onCreateInputConnection(EditorInfo()))
+
+    private fun inputs(id: String = "t-zsh") = rig.mac.terminalViewInputs(id)
+
+    private fun clipboard(text: String?) {
+        val manager = context.getSystemService(ClipboardManager::class.java)
+        if (text == null) manager.clearPrimaryClip() else manager.setPrimaryClip(ClipData.newPlainText("", text))
+    }
+
+    /** A tap on the surface: it takes the keyboard and the key bar shows. */
+    private fun focus() {
+        compose.onNodeWithTag("terminal.surface").performClick()
+        until { surface().hasFocus() && tagged("terminal.key.escape") }
+    }
+
+    // Plan 3G Task 13
+
+    @Test
+    fun aTapFocusesAndShowsTheKeyboardAndTheKeyBar() {
+        livePane()
+        compose.onNodeWithTag("terminal.surface").performClick()
+        until { ime.shows == 1 }
+        compose.onNodeWithTag("terminal.key.escape").assertIsDisplayed()
+    }
+
+    @Test
+    fun theKeyBarDrivesTheModel() {
+        livePane()
+        focus()
+        compose.onNodeWithTag("terminal.key.ctrl").performClick()
+        compose.onNodeWithTag("terminal.key.ctrl").assertIsSelected()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, context.getString(R.string.terminal_key_ctrl_latched)))
+        compose.onNodeWithTag("terminal.key.escape").performClick()
+        until { inputs() == listOf(listOf(Key(TerminalKey.ESCAPE, listOf(TerminalModifier.CTRL)))) }
+        compose.onNodeWithTag("terminal.key.hideKeyboard").performClick()
+        until { !tagged("terminal.key.escape") }
+        assertEquals(1, ime.hides)
+    }
+
+    @Test
+    fun aLongPressOffersPasteThatSendsOnePasteUnit() {
+        clipboard("echo a\necho b")
+        livePane()
+        compose.onNodeWithTag("terminal.surface").performTouchInput { longClick() }
+        until { tagged("terminal.paste") }
+        compose.onNodeWithTag("terminal.paste").performClick()
+        until { inputs() == listOf<List<TerminalInputUnit>>(listOf(Paste("echo a\necho b"))) }
+    }
+
+    @Test
+    fun aPasteOverTheLimitShowsTheNoticeAndSendsNothing() {
+        clipboard("a".repeat(262_145))
+        livePane()
+        compose.onNodeWithTag("terminal.surface").performTouchInput { longClick() }
+        until { tagged("terminal.paste") }
+        val notice = context.getString(R.string.terminal_paste_too_large)
+        // Frame by frame from here, so the 4 s count from the frame the notice shows.
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("terminal.paste").performClick()
+        compose.waitUntil(10_000) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.onAllNodesWithText(notice).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(emptyList<List<TerminalInputUnit>>(), inputs())
+        compose.mainClock.advanceTimeBy(4_100)
+        assertTrue("the notice goes after 4 s", compose.onAllNodesWithText(notice).fetchSemanticsNodes().isEmpty())
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test
+    fun withNothingToPasteTheItemIsDisabled() {
+        clipboard(null)
+        livePane()
+        compose.onNodeWithTag("terminal.surface").performTouchInput { longClick() }
+        until { tagged("terminal.paste") }
+        compose.onNodeWithTag("terminal.paste").assertIsNotEnabled()
+    }
+
+    // TerminalPaneTests.swift, re-expressed for Android (ruling 11)
+
+    /** A page that stops taking input (the Mac refused the view) gives the keyboard back and hides the key bar. */
+    @Test
+    fun aCoveredPageGivesUpTheKeyboardAndTheKeyBar() {
+        livePane()
+        focus()
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.REFUSED)
+        until { model.phase == TerminalViewPhase.Unavailable(TerminalUnavailableReason.REFUSED) }
+        until { !surface().hasFocus() && !tagged("terminal.key.escape") }
+        assertTrue(ime.hides >= 1)
+    }
+
+    /** Keys typed into the surface of a page that is no longer the one shown never reach the terminal shown now. */
+    @Test
+    fun aPageNoLongerShownSendsNoKeys() {
+        livePane()
+        val surface = surface()
+        val connection = InputConnection(surface)
+        model.show("t-claude")
+        connection.commitText("x", 1)
+        connection.commitText("\n", 1)
+        assertFalse(surface.handleKey(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_X)))
+        until { rig.mac.terminalViewOpens.any { it.terminalId == "t-claude" } }
+        idle(300)
+        assertEquals(emptyList<List<TerminalInputUnit>>(), inputs("t-claude"))
+        assertEquals(emptyList<List<TerminalInputUnit>>(), inputs("t-zsh"))
+    }
+
+    /** A text field that takes the keyboard keeps it while the terminal it took it from keeps changing. */
+    @Test
+    fun aTerminalNeverTakesTheKeyboardBack() {
+        start()
+        show {
+            Column(Modifier.fillMaxSize()) {
+                TerminalPane(model, "t-zsh", "zsh", shown = true, modifier = Modifier.weight(1f))
+                var text by remember { mutableStateOf("") }
+                BasicTextField(text, { text = it }, Modifier.fillMaxWidth().testTag("field"))
+            }
+        }
+        until { model.phase == TerminalViewPhase.Live }
+        focus()
+        compose.onNodeWithTag("field").performClick()
+        // The terminal changes in the same turn, before the pane hears the surface lost the keyboard.
+        model.toggleCtrl()
+        idle(300)
+        compose.onNodeWithTag("field").assertIsFocused()
+        assertFalse(surface().hasFocus())
+    }
+
+    /** Only the page shown says a paste is too large: a neighbour composed with the same model says nothing. */
+    @Test
+    fun onlyThePageShownSaysAPasteIsTooLarge() {
+        val screen = TerminalScreen().apply { apply(DemoTerminalScreens.SHELL.snapshot) }
+        val fixed = TerminalViewModel.fixed("t-zsh", screen)
+        show {
+            Column(Modifier.fillMaxSize()) {
+                TerminalPane(fixed, "t-zsh", "zsh", shown = true, modifier = Modifier.weight(1f))
+                TerminalPane(fixed, "t-web", "zsh", shown = true, modifier = Modifier.weight(1f))
+            }
+        }
+        compose.waitForIdle()
+        fixed.paste("x".repeat(TerminalInputBatcher.MAX_PASTE_BYTES + 1))
+        val notice = context.getString(R.string.terminal_paste_too_large)
+        until { compose.onAllNodesWithText(notice).fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(1, compose.onAllNodesWithText(notice).fetchSemanticsNodes().size)
+    }
+
+    /** A page that is reopening (its view ended `failed`; the last screen stays, uncovered) takes no input: the
+     *  keyboard and the key bar go. */
+    @Test
+    fun aReopeningPageGivesUpTheKeyboardAndTheKeyBar() {
+        livePane()
+        focus()
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.FAILED)
+        until { model.phase == TerminalViewPhase.Connecting }
+        until { !surface().hasFocus() && !tagged("terminal.key.escape") }
+    }
+
+    /** Review Focus 1 through a pager: after A → B → A there is one surface, on the page shown, and keys typed into it
+     *  reach A only. */
+    @Test
+    fun swipingBackAndForthLeavesOneSurfaceOnThePageShown() {
+        start()
+        val ids = listOf("t-zsh", "t-claude")
+        lateinit var pager: PagerState
+        lateinit var scope: CoroutineScope
+        show {
+            val state = rememberPagerState { ids.size }
+            pager = state
+            scope = rememberCoroutineScope()
+            // The workspace screen's wiring: the page the pager settles on is the terminal the model shows.
+            LaunchedEffect(state.settledPage) { model.show(ids[state.settledPage]) }
+            HorizontalPager(state, Modifier.fillMaxSize()) { page ->
+                TerminalPane(model, ids[page], "zsh", shown = state.settledPage == page)
+            }
+        }
+        fun shows(id: String) = until { model.phase == TerminalViewPhase.Live && surfaces().map { it.terminalId } == listOf(id) }
+        shows("t-zsh")
+        compose.runOnIdle { scope.launch { pager.scrollToPage(1) } }
+        shows("t-claude")
+        compose.runOnIdle { scope.launch { pager.scrollToPage(0) } }
+        shows("t-zsh")
+        InputConnection(surface()).commitText("ls", 1)
+        until { inputs() == listOf(listOf(Text("ls"))) }
+        assertEquals(emptyList<List<TerminalInputUnit>>(), inputs("t-claude"))
+    }
+
+    /** The screen stops and starts again (the background, a rotation) while the user is typing: the keyboard and the key
+     *  bar stay through the reopen, and a key typed before the first screen comes back reaches the reopened view. */
+    @Test
+    fun theKeyboardStaysThroughAResume() {
+        livePane()
+        focus()
+        run?.cancel()
+        until { rig.mac.terminalViewCloses == listOf("t-zsh") }
+        rig.mac.holdTerminalViewOpens()
+        run = rig.hub.scope.launch { model.run() }
+        until { rig.mac.terminalViewOpens.size == 2 && model.phase == TerminalViewPhase.Connecting }
+        idle(200)
+        assertTrue("the keyboard stays while the view reopens", surface().hasFocus())
+        assertTrue("the key bar stays", tagged("terminal.key.escape"))
+        InputConnection(surface()).commitText("ls", 1)
+        rig.mac.releaseTerminalViewOpens()
+        until { inputs() == listOf(listOf(Text("ls"))) }
+        until { model.phase == TerminalViewPhase.Live }
+        assertTrue(surface().hasFocus())
+    }
+
+    /** A view the Mac ends `not_open` is reopened at once: the keyboard stays. */
+    @Test
+    fun theKeyboardStaysThroughANotOpenReopen() {
+        livePane()
+        focus()
+        rig.mac.holdTerminalViewOpens()
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.NOT_OPEN)
+        until { rig.mac.terminalViewOpens.size == 2 && model.phase == TerminalViewPhase.Connecting }
+        idle(200)
+        assertTrue("the keyboard stays while the view reopens", surface().hasFocus())
+        rig.mac.releaseTerminalViewOpens()
+        until { model.phase == TerminalViewPhase.Live }
+        assertTrue(surface().hasFocus())
+    }
+
+    /** The wait before a failed view is reopened has no view to type into: it takes the keyboard away and sends nothing
+     *  typed meanwhile. */
+    @Test
+    fun aFailedViewsRetryWaitSendsNothing() {
+        livePane()
+        focus()
+        val connection = InputConnection(surface())
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.FAILED)
+        until { model.phase == TerminalViewPhase.Connecting }
+        connection.commitText("rm", 1)
+        until { !surface().hasFocus() }
+        until { model.phase == TerminalViewPhase.Live }
+        idle(100)
+        assertEquals("nothing typed during the wait is sent", emptyList<List<TerminalInputUnit>>(), inputs())
+    }
+}
