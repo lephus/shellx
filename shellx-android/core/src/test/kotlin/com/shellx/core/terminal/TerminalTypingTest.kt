@@ -99,6 +99,23 @@ class TerminalTypingTest {
         assertTrue(typing.ctrlLatched)
     }
 
+    /**
+     * Review B2 I-2 (plan 3G A-g3): a key event that carries text (Enter, a digit, a hardware letter) commits the word
+     * being composed first, as a named key does; a latched ctrl applies to the key's letter, not to the word.
+     */
+    @Test fun aKeyEventWhileComposingCommitsTheWordFirst() {
+        val typing = TerminalTyping()
+        typing.setMarked("việ")
+        assertEquals(listOf(Text("việ"), Key(TerminalKey.ENTER)), typing.typeKey("\n"))
+        assertEquals("", typing.markedText)
+        typing.setMarked("việ")
+        assertEquals(listOf(Text("việ"), Text("1")), typing.typeKey("1"))
+        typing.setMarked("việ"); typing.toggleCtrl()
+        assertEquals(listOf(Text("việ"), Key(TerminalKey.letter('c'), ctrl)), typing.typeKey("c"))
+        assertFalse(typing.ctrlLatched)
+        assertEquals(listOf(Text("x")), typing.typeKey("x"))
+    }
+
     /** Review Focus 2 of plan 2C. */
     @Test fun aKeyWhileComposingCommitsTheWordFirst() {
         val typing = TerminalTyping()
