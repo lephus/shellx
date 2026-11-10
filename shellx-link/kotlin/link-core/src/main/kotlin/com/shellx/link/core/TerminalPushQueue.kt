@@ -26,9 +26,9 @@ import kotlinx.coroutines.flow.FlowCollector
  * The frames of any other terminal, which the client ignores (11.1), are kept while they fit the bound and dropped
  * when they do not, with no LOST part, and leave no state behind, so a host that names many terminals grows nothing.
  * [TerminalViewPush.Opened] (one per open the phone sent) and the viewed terminal's [TerminalViewPush.Ended] are never
- * dropped, and weigh nothing. An Ended of any other terminal, which the client ignores too, is kept only while none of
- * that terminal is queued and fewer than [MAX_QUEUED_OTHER_ENDS] are, so a host that streams `terminal.view.ended`
- * while nobody collects grows nothing either (re-review B).
+ * dropped, and weigh nothing. An Ended of any other terminal, which the client ignores too, is kept only while fewer
+ * than [MAX_QUEUED_OTHER_ENDS] such are queued, so a host that streams `terminal.view.ended` while nobody collects
+ * grows nothing either (re-review B).
  *
  * A frame's weight is about the size of its JSON: the UTF-8 bytes of its texts, counted exactly, and a fixed estimate
  * for the rest. So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of each view opened while the
@@ -50,8 +50,8 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
         const val MAX_QUEUED_OTHER_ENDS = 16
     }
 
-    /** [otherEnd]: the terminal of an Ended that was not the one viewed, counted in [otherEnds] while it is queued. */
-    private class Entry(val push: TerminalViewPush, val weight: Int, val otherEnd: String? = null)
+    /** [otherEnd]: an Ended of a terminal other than the one viewed, counted in [otherEnds] while it is queued. */
+    private class Entry(val push: TerminalViewPush, val weight: Int, val otherEnd: Boolean = false)
 
     /** The frame of a terminal whose parts are arriving; [next] is the index of the part it lacks first. */
     private class Arriving(val revision: Long, val parts: Int, val snapshot: Boolean) {
@@ -74,8 +74,8 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     /** The view's frame whose parts are arriving. */
     private var viewArriving: Arriving? = null
 
-    /** The terminals of the queued Ended pushes that were not of the terminal viewed. */
-    private val otherEnds = HashSet<String>()
+    /** How many queued Ended pushes are of a terminal other than the one viewed. */
+    private var otherEnds = 0
 
     /** A token after each offer; a collector waits on it only when nothing is queued. */
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -101,7 +101,7 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
             val entry = synchronized(lock) {
                 entries.removeFirstOrNull()?.also { taken ->
                     weight -= taken.weight
-                    taken.otherEnd?.let(otherEnds::remove)
+                    if (taken.otherEnd) otherEnds -= 1
                 } ?: if (closed) return else null
             }
             if (entry != null) {
@@ -133,10 +133,10 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
                         view(null)
                         add(push, 0)
                     }
-                    push.terminalId in otherEnds || otherEnds.size >= MAX_QUEUED_OTHER_ENDS -> Unit
+                    otherEnds >= MAX_QUEUED_OTHER_ENDS -> Unit
                     else -> {
-                        otherEnds += push.terminalId
-                        add(push, 0, otherEnd = push.terminalId)
+                        otherEnds += 1
+                        add(push, 0, otherEnd = true)
                     }
                 }
                 is TerminalViewPush.Frame -> lostNow = offerFrame(push)
@@ -228,7 +228,7 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     }
 
     /** Caller holds [lock]. */
-    private fun add(push: TerminalViewPush, w: Int, otherEnd: String? = null) {
+    private fun add(push: TerminalViewPush, w: Int, otherEnd: Boolean = false) {
         entries.addLast(Entry(push, w, otherEnd))
         weight += w
         wake.trySend(Unit)
