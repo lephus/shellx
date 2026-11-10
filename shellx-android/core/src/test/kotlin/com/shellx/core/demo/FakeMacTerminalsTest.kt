@@ -28,13 +28,18 @@ import com.shellx.link.core.WorkspaceControlOutcome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 
 /** [FakeMac]'s terminals, through the session it serves a phone: views, typing into the fake shell, creation. */
 class FakeMacTerminalsTest {
@@ -227,6 +232,55 @@ class FakeMacTerminalsTest {
         assertTrue(eventually { reader.pushes.count { it == notOpen } == 3 }, "${reader.pushes}")
         assertEquals(emptyList(), mac.terminalViewInputs("t2"))
         assertEquals(0, mac.terminalViewSnapshotRequests("t2"))
+    } }
+
+    /**
+     * Review B1 m4a: as with 3B's client, input, resize, resync and close return once sent, even while the Mac holds an
+     * open; the Mac takes them after the open, in order, as LinkHost handles each message inline.
+     */
+    @Test fun callsWithoutAnAnswerReturnOnceSentAndActInOrder() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(ws("t1")))
+        val session = connect(mac)
+        mac.holdTerminalViewOpens()
+        val opening = backgroundScope.async { session.openTerminalView("t1", 20, 5) }
+        assertTrue(eventually { mac.terminalViewOpens.size == 1 })
+
+        withTimeout(1.seconds) {
+            session.sendTerminalInput("t1", listOf(Text("ls")))
+            session.resizeTerminalView("t1", 30, 10)
+            session.resyncTerminalView("t1")
+            session.closeTerminalView("t1")
+        }
+        assertEquals(emptyList(), mac.terminalViewInputs("t1"))
+        mac.releaseTerminalViewOpens()
+
+        assertEquals(TerminalViewOpenOutcome.OK, opening.await())
+        assertTrue(eventually { mac.terminalViewCloses == listOf("t1") }, "${mac.terminalViewCloses}")
+        assertEquals(listOf(listOf(Text("ls"))), mac.terminalViewInputs("t1"))
+        assertEquals(listOf(size("t1", 30, 10)), mac.terminalViewResizes)
+        assertEquals(1, mac.terminalViewSnapshotRequests("t1"))
+    } }
+
+    /**
+     * Review B1 m4b: an open the phone stopped waiting for still opens the view on the Mac, but the phone announces no
+     * `Opened` for it, as 3B's client does for a waiter that is gone.
+     */
+    @Test fun anOpenThePhoneStoppedWaitingForGetsNoOpened() { runTest {
+        val mac = FakeMac("Mac", backgroundScope)
+        mac.setWorkspaces(listOf(ws("t1")))
+        val session = connect(mac)
+        val reader = TerminalPushReader(session.terminalPushes, "t1", backgroundScope)
+        mac.holdTerminalViewOpens()
+        val opening = backgroundScope.launch { session.openTerminalView("t1", 20, 5) }
+        assertTrue(eventually { mac.terminalViewOpens.size == 1 })
+
+        opening.cancel()
+        runCurrent()
+        mac.releaseTerminalViewOpens()
+
+        assertTrue(eventually { reader.pushes.any { it is Frame } }, "${reader.pushes}")
+        assertFalse(Opened("t1") in reader.pushes)
     } }
 
     @Test fun sessionEndClosesTheView() { runTest {
