@@ -425,8 +425,8 @@ at a time, every outgoing message through one FIFO outbox), `TerminalTyping` (ma
 hub's terminal calls `TerminalLink` / `TerminalHubEvent` / `TerminalOpenResult`, the `WorkspaceScreenModel`
 additions, the "View as Terminal" / "View as Chat" menu items, three latency metrics, the demo fixtures and
 the `FakeMac` terminal API, and 20 new string keys incl. `terminal.paste.tooLarge` (Android imports them).
-Plan 3G removes `workspace.shell.placeholder` from the iPhone catalog when it lands; older Macs get
-`terminal.needsUpdate`.
+Plan 3G removed `workspace.shell.placeholder` from the iPhone catalog (landed 2026-11-10, §28); older Macs get
+`terminal.needsUpdate` / `terminal_needs_update`.
 
 Behaviour Android (3G) mirrors:
 - Rendering: every row's layout is cached; cells are placed by column so fallback fonts (CJK, emoji) never
@@ -468,7 +468,8 @@ Behaviour Android (3G) mirrors:
 - Shared names 3E expects from 3D (3E's Task 0 maps them if 3D named them differently): the signed-in
   scope, `AppComposition`, `ShellXNavHost`, `NotificationsSettingsSection()`; and names 3E creates if 3D
   left them out: `PlatformServices`, `SignedInWork`, `WorkRoutes`, `LocalVoice` / `VoiceEnvironment`,
-  `LocalAttachmentReader`, `PushHost`.
+  `LocalAttachmentReader`, `PushHost`. As landed: 3D's environment class is `AppEnvironment`; `PlatformServices`
+  is 3E's and sits beside it (§26, §27).
 - 3E builds each account's `VoiceService` (it needs a capability probe beyond the two contract interfaces).
 - Push: channel id `needs_you`; notification ids 1 and 2; tap action `com.shellx.app.action.OPEN_PENDING`;
   settings key `shellx.notifications.asked`; pushes from a Mac the phone no longer has are dropped; one group
@@ -489,7 +490,8 @@ Behaviour Android (3G) mirrors:
 - Hardware keys: Ctrl+V sends ctrl-v to the shell; Ctrl+Shift+V pastes.
 - Android-only strings (`strings_android.xml`): `terminal_paste` and three key-bar labels.
 - The terminal view runs while the screen is STARTED; a rotation reopens the view.
-- Parity-ledger rows A-g1 to A-g5.
+- Parity-ledger rows A-g1 to A-g5 are rows **A-31 to A-35** of `docs/superpowers/ledgers/shellx-android-parity.md`;
+  **A-36** (landscape), **A-37** (history size cap) and **A-38** (the word the keyboard sees) were added before landing (§28).
 
 ## 22. Additions from plan 3A (Tasks 6–11, landed 7b2c58fdd6)
 
@@ -629,3 +631,325 @@ For later plans:
   `WorkspaceScreenModel.Absence`/`absence(machine)` are `internal` hooks; the fake Mac never answers `too_large`.
 - iPhone follow-up: `SpeechRunSlot.swift:78-90` has the gap Android fixed in 77c032a0a1 (a cancelled run that held
   the mic can be claimed again by the fallback after a quick tap).
+
+## 26. Additions from plan 3D (landed with the 3D merge on 2026-11-10)
+
+Composition (`com.shellx.app`):
+- `AppComposition(environment: AppEnvironment, appScope, speechEngine = NoSpeechEngine, voicePermissions = NoVoicePermissions,
+  pushRegistrar = NoPushRegistrar, updateChecker: UpdateChecker? = null, attachmentReader = NoAttachmentReader,
+  makeVoice: ((MachineHub, LatencyLog, KeyValueStore, Clock) -> VoiceService)? = null,
+  relays: (AccountVault) -> RelayBundle = { RelayBundle.relay(environment, it) },
+  demoEnvironment: ((CoroutineScope) -> DemoEnvironment)? = null)`. 3E passes its five pieces by type and `makeVoice = platform::makeVoice`.
+- Members: `real: AccountGraph`; `demo: DemoSession` (not a graph: `demo.graph: StateFlow<AccountGraph?>`, `start()`, `exit()`);
+  `active: StateFlow<AccountGraph>` (`demo.graph ?: real`); `root: StateFlow<String>`, `inbox`, `appearance`, `lifecycle`,
+  `takeLink()`; `vault`, `latency`, `settings`, `clock`, `push`, `updatePrompt` (release builds with a checker only), `appScope`,
+  `environment`. Companion `AppComposition.makeScope(hub, relay, vault, history, latency, launch, settings, clock, voice)`.
+- `AccountGraph`: `coordinator`, `relay`, `vault`, `settings`, `scopes: SignedInScopes` (`current: StateFlow<SignedInScope?>`),
+  `launch`, `push?`, `updatePrompt?`, `isDemo`.
+- `SignedInScope(hub, decisions, pairing, history, launch, endedDismissals, goneRemovals, clock, latency, voice: VoiceService? = null,
+  sheets = SheetPresence())`; `listNotice`, `chatCopies`, `agentThread(ref)`, `homeShown()`, `workspacesListed()`.
+  `start()` runs the chat-copy sweeper and `decisions.sync(hub.pendingItems)` in `hub.scope` — nothing else may sync again.
+- `ShellXApplication.composition: StateFlow<AppComposition?>` and `awaitComposition()` (built after the settings load).
+  "3D's ON_START hook" is `AppLifecycle.onStart()`; `AppLifecycle` sends `appDidEnterBackground` UNDISPATCHED.
+- `AppEnvironment` is the shell's environment class (not `PlatformServices`).
+
+Navigation (`com.shellx.app.ui.nav`):
+- `Routes`: `LAUNCH`, `SIGN_IN`, `FIRST_MAC`, `PAIRING`, `HOME`, `DEMO`, `MACHINES`, `SETTINGS`,
+  `SESSIONS = "sessions/{kind}?machineId={machineId}"`, `SESSIONS_ARGUMENTS`, `SIGNED_IN_ROOTS`, `sessions(kind, machineId)`.
+  `SessionListKind { ENDED, OTHER }` (`wire` `ended` / `other`). Pairing is a full-screen route, not a sheet.
+- `ShellXNavigator`: `openWorkspace`, `openAgent`, `openPending(only)`, `openSessions(kind, machineId)`, `openMachines`,
+  `openSettings`, `openPairing`, `showPairing`, `back()`. **Every screen leaves with `navigator::back`, never `nav.popBackStack()`**
+  (`NavControllerNavigator.back()` pops only a RESUMED top entry and never the root). Screens take the navigator from
+  `rememberShellXNavigator(nav, scope)` (internal `NavigatorRelay`: work that outlives a recreation opens its page in the new window).
+- `ShellXNavHost(composition, nav, modifier)`. `RootSync(nav, root)` compares `root` with the stack's real bottom entry
+  (internal `bottomRoute(nav)`) on every back-stack change; the `first_mac` / `home` swap waits while a page sits above the root.
+- `SignedInFrame(composition, nav, root, content)` is where 3E's `SignedInWork` goes (`content` is movable, so the NavHost survives).
+- `MainActivity` delivers a link only when `savedInstanceState == null` and the launch is not from history (`launchedFromHistory`).
+
+Shared UI (`com.shellx.app.ui.*`), in the shapes 3E needed:
+- Theme: `StatusTone` (`.color()`), `AgentStateStyle(text, shortText, tone)` (data class; `of(row, res)`, `elapsedText`),
+  `MachineStateStyle`, `StatusDot`, `AppLanguage`, `AppAppearance` (settings key `shellx.appearance`), `ShellXAppTheme`.
+- Components: `PrimaryButton`, `SecondaryButton`, `Modifier.waitingBorder(isActive, cornerRadius)`, `WaitingBorder.isActive`,
+  `ActionRow` (`modifier` is the semantics node), `RowAction` / `RowActionKind` (`menuAction(run)`, `swipeAction(run)`), `RowActions`,
+  `ConfirmDialog` (confirms once), `MessageDialog`, `SectionTitle`, `isLargeText()` (fontScale >= 1.3), `rememberNowMs`, `HomeTicks`,
+  `Modifier.shellXCard(shape, outline)`.
+- `com.shellx.app.ui.workspaces`: `ListNotice` (`show`, `Notice`, `DURATION` 4 s), `NoticeCapsule`, `WorkspaceFeedback`,
+  `WorkspaceAlert`, `WorkspaceCommand`, `WorkspaceAlertDialog`, `AgentCloseConfirmation`, `WorkspaceRenameSheet`, `FocusRowView`,
+  `FocusKind`; `WorkspaceListActions.canClose`, `closeAgent(ref, hub, alert): Deferred<WorkspaceFeedback>?`, `canCloseTab`,
+  `closeTab(machineId, workspaceId, terminalId, hub, alert): Deferred<WorkspaceFeedback>?` (both return null while a close of the
+  same agent or tab runs), `make(...)`.
+- Settings: `SettingsSection(title: String?, footer: String? = null) { }`, `settingsRowColors()`, `SettingsDivider()`,
+  `NotificationsSettingsSection()` (3E fills it), `DeleteAccountDialog(flow, onDismiss, scope)`, `DeleteAccountCard(..., spinner)`.
+
+Platform:
+- Keystore alias `shellx.secrets.v1`; secrets in `noBackupFilesDir/secrets/<account>.bin` (`0x01` ‖ IV12 ‖ GCM, AAD
+  `shellx-secret/1/<account>`) with a `<account>.failures` counter beside it (ledger A-19: permanent errors read as absent; a
+  possibly-transient error keeps the file, and API < 33 errors count as lost after 3 starts). Settings in
+  `noBackupFilesDir/settings.preferences_pb`; history in `noBackupFilesDir/ShellX` (demo: `ShellXDemo`).
+- Settings keys `shellx.appearance`, `shellx.legacyFlutterCleaned`. Gradle property `shellxApiBase` -> `BuildConfig.SHELLX_API_BASE`
+  (debug only; debug builds allow cleartext to loopback; release keeps the default of none, and `dev.sh build-release` checks it).
+- `ActivityTracker` is a class; the app instance is `ActivityTracker.shared`; it holds only the resumed activity and
+  `awaitResumed()` replaces `current()`. `CredentialManagerIdentity` waits for it up to `RESUME_WAIT` (5 min), then `Cancelled`.
+- `dev.sh check-release-permissions`: a release refuses `USE_BIOMETRIC` and `USE_FINGERPRINT`.
+- Web client id placeholder is exactly `0-shellx-placeholder.apps.googleusercontent.com`; `GoogleWebClient.isReal` refuses it
+  (`NotConfigured` before Credential Manager). **For 3H:** the release script must grep for it, and refuse a release bundle
+  without `drawable/ic_google_g` (looked up by name, kept by `res/raw/keep_google_branding.xml`).
+- Google's button: `GoogleBranding.MARK` = `ic_google_g` (mdpi to xxxhdpi, the centre 20 dp of the Light, no-text, Square Android+Web
+  PNGs); `assets/fonts/GoogleSans.ttf` + `GoogleSans-OFL.txt`; both are in.
+- Pins: navigation-compose 2.9.8 and lifecycle 2.10.0 (newer need compileSdk 37). The v1 `createComposeRule` is deprecated (review D m-8, undecided).
+
+`:app` test support (`app/src/test/kotlin/com/shellx/app/testing/`): `ManualClock`, `TestIdentity`, `TestNetworkMonitor`,
+`ScriptedRelay`, `testEnvironment`, `TestComposition`, `testComposition`, `mainComposition`, `RecordingNavigator`, `waitFor`,
+`HomeFixtures`; `com.shellx.app.screenshots`: `assertRenders(name) { }`, `LargeText { }`, `chroma`. Renders never hold an endless
+animation (an indeterminate spinner fails the capture after 60 s; use a render hook such as `spinner =`). Robolectric
+`waitUntil` needs `waitForIdle()` inside the condition. Google fakes must be JWT-shaped.
+
+Open minors: review D m-2 (a cold-start link is lost if the activity is recreated before the composition exists), m-4
+(`launchSingleTop` replaces a sibling page of the same route), m-5 (`NavigatorRelay` drops a call with no window), review B m-1
+(`LaunchMark` counts from process start), A-19 (a Keystore stuck on "transient" holds the launch screen).
+
+Verified on emulators API 26 and 36 (debug and R8 release, 2026-11-10). Phone checks and live Google sign-in are the user's
+(one app id `com.shellx.prod`; the production relay answers 404 to `POST /v1/auth/nonce` until 1D deploys 1A).
+
+---
+
+## 27. Additions from plan 3E (landed with the 3E merge on 2026-11-10)
+
+Plug points for 3G, now consumed (`com.shellx.app.ui.workspaces`):
+- `PaneContent(pane: WorkspacePane, shown: Boolean, agent: @Composable (MachineSession) -> Unit,
+  shell: @Composable (WorkspacePane, Boolean) -> Unit = { _, _ -> ShellPanePlaceholder() })` — `shown` is true only for the pager's
+  settled page; only that pane may open a terminal view.
+- `WorkspaceScreen(title, branch, panes, selected, nowMs, canControl = true, canCloseTab = false, pagingLocked = false,
+  notice: AgentNotice? = null, alert: WorkspaceAlert? = null, onAlertDismiss = {}, actions = WorkspaceScreenActions(), back = {},
+  pane: @Composable (WorkspacePane, Boolean) -> Unit)` (3G adds `canCreateTerminal`, `canViewTerminals`, `shownAsTerminal`,
+  `creatingTerminal`, all defaulted).
+- `PaneChips(panes, selected, nowMs, select, close: ((WorkspacePane) -> Unit)? = null, trailing: @Composable () -> Unit = {})`
+  (+ `modifier`); `trailing` holds 3G's ＋ chip.
+- `WorkspaceMenuItem(@StringRes title)` { RENAME, CLOSE_TAB, CLOSE_WORKSPACE } with `items(canCloseTab)`.
+- `WorkspaceScreenActions(select, rename, close, closeTab)` with `make(scope, model, alert, closing, done)`; each command runs in `hub.scope`.
+- `WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open, back)`; its model lives in a `viewModel` holder keyed
+  `workspace/<machineId>/<workspaceId>`.
+- `ShellPanePlaceholder(modifier)` stays as the page of a Mac whose ShellX shows no terminals.
+- `ComposerBarState(scope, initial)` (held by `AgentScreenHolder`, in `viewModelScope`): a pick still being read survives a swipe
+  to another pane and a rotation. `CompactHeight` (`MAX_DP = 480`, `TOP_BAR = 48.dp`, `isCompactHeight()`, `topBarHeight()`):
+  in a window under 480 dp tall the work screens use 48 dp bars (ledger A-30).
+
+Routes (`WorkRoutes`): `PENDING = "pending?machineId={machineId}&workspaceId={workspaceId}"` (both optional), `WORKSPACE =
+"workspace/{machineId}/{workspaceId}"`, `AGENT = "agent/{machineId}/{sessionId}"`; `workspace(ref)`, `agent(ref)`, `pending()`,
+`pendingIn(machineId, workspaceId)`, `sessionRef(hub: HubState, machineId, sessionId)`. Destinations open with
+`launchSingleTop`; they leave with `navigator::back`. A push tap while the stack is exactly `[root, pending]` with no filter is
+taken and navigates nowhere (the open sheet and its text stay).
+
+Composition:
+- `PlatformServices(app, debugBuild, updateManager: (Context) -> AppUpdateManager, pushRegistrar: FcmPushRegistrar = FcmPushRegistrar())`:
+  `permissions: PermissionRequester`, `voice: SystemVoice`, `voicePermissions`, `speechEngine`, `pushTaps: PushTapInbox`,
+  `playUpdates: PlayUpdateChecker?` (null in debug), `updateChecker`, `attachmentReader`, `makeVoice(hub, latency, settings, clock)`,
+  `makeNotifier(vault)`.
+- `open class ShellXApplication : Application(), PushHost` — `platform`, `receiveLink(uri)`, `pushHooks`; each ON_START runs
+  `composition.lifecycle.onStart()` then `pushHooks.notifier.clearAll()`; follows `real.coordinator.phase` with
+  `pushRegistrar.followSignOuts`. `LaunchMark.restart()` on the first start.
+- `SignedInWork(scope, platform, push: PushRegistration?, settings, openPending: (() -> Unit)?, content)` (null `openPending` =
+  the stack's bottom is not the signed-in root yet; a tap waits); `PushRegistrationEffect(machinesEmpty, signedIn, askPermission)`
+  starts `signedIn()` UNDISPATCHED and asks for the notification permission without waiting for it.
+  `SignedInFrame(composition, nav, root, platform: PlatformServices? = null, content)`, `ShellXApp(composition, nav, platform = null)`;
+  a null platform (the demo) never registers push or asks the permission.
+- `LocalVoice` (`VoiceEnvironment(service, meter, scope, activity)`), `LocalAttachmentReader`.
+- A third voice platform piece: `VoiceCapabilityProbe(sdkInt, onDeviceAvailable, standardAvailable, installedLanguages)`
+  (`capabilities(language)`, `markFailed`, `SUPPORT_TIMEOUT = 2.seconds`, `system(context)`), given to `VoiceCapabilityCache`.
+  `SystemVoice.primaryFailed` tells every live service the on-device recognizer failed.
+
+Push (`com.shellx.app.platform`):
+- Channel id `needs_you`; alert id 1 with tag `request_id`; per-Mac summary id 2 with tag `machine_id`; group `machine_id`;
+  tap action `com.shellx.app.action.OPEN_PENDING` -> `MainActivity` -> `PushTapInbox` (`hasTap`, `receive()`, `take()`,
+  `isOpenPending(intent)`). Android-only settings key `shellx.notifications.asked`.
+- `PushNotifier(context, inForeground, knownMachines: suspend () -> Set<String>?, active)`; `handle(payload)`, `clearAll()`;
+  `KNOWN_MACHINES_TIMEOUT = 2.seconds`. Foreground: nothing posts, and every ShellX alert clears on ON_START. A needs-you from a
+  Mac not among the paired Macs is dropped; if the vault is unreadable for 2 s, it posts.
+- `ShellXMessagingService : FirebaseMessagingService` is data-only (`PushPayload.parse`, then `notifier.handle`); `onNewToken`
+  sends the token before returning (`TOKEN_TIMEOUT = 10.seconds`). `interface PushHost { pushHooks }`, `PushHooks(notifier, tokenArrived)`.
+- **`FcmPushRegistrar(messaging: () -> FcmMessaging = FcmMessaging::firebase) : PushRegistrar`** — `currentToken()` turns FCM
+  auto-init on, awaits the token, null on failure; `signedOut()` turns auto-init off; `followSignOuts(phase: Flow<AppPhase>)`.
+  `FcmMessaging { setAutoInit(enabled); token() }`. Auto-init is off until 3C's `PushRegistration` first asks.
+- `NotificationPermission`: `ASKED_KEY`, `requestOnce(requester, settings, sdkInt)`, `isOn(context)`, `noDialogShown(before, after)`
+  (Settings › Notifications "Turn On" opens the system page only when the rationale flag was off before and after).
+  `PermissionRequester.request(permission, onLaunch)` prompts only while RESUMED (shared contract change; the mic shares it).
+- `PlayUpdateChecker(manager) : UpdateChecker` (`InstallPhase`, `installs`, `attach`, `check`, `startUpdate`, `completeUpdate`);
+  after "No thanks" no Play dialog until the next cold start (ruled 2026-11; one-line change). `UpdateAlert(prompt, installs,
+  modifier, restart)`. Play's dialog is the prompt; a Snackbar offers Restart.
+- Settings: `NotificationsSettingsSection(settings: KeyValueStore? = null)`, `SettingsScreen(..., back, settings = null)`,
+  `OemGuide.of(manufacturer)`, `NotificationSettingsIntents.appNotifications / appDetails`.
+- Voice: `VoiceInputModel.read` — a run the recognizer ends by itself with nothing heard sets `Phase.Idle` (3C change, accepted).
+  Android has the microphone permission only (`speech()` always true; `voice_denied` has Android wording). Mic TalkBack: the
+  tap's label carries the hint (`voice_mic_hint`, Android-only, ledger A-29), no state description.
+
+Deferred 3C items (3C owns; not done by 3E):
+- **FCM `deleteToken()` at sign-out.** Today `followSignOuts` only turns auto-init off. 3C needs a sign-out hook on
+  `PushRegistration`, called from `AppCoordinator`'s sign-out, account deletion and 401 paths, that forgets `latest` and `sent`;
+  then `FcmPushRegistrar.signedOut()` can also call `deleteToken()`.
+- **Token rotation after a same-process re-sign-in.** After sign-out and sign-in in one process, auto-init stays off and
+  `PushRegistration.signedIn()` / `appBecameActive()` skip the registrar while `latest` is set; a rotation in that process is
+  not synced until the next process start.
+- **3H Data safety wording:** "no FCM token request or refresh while signed out" — not "no FCM token on the phone". A fresh
+  install makes no FCM token until the first sign-in (the user's phone check item 10). The token also goes to the ShellX relay.
+  The on-device recognizer keeps voice on the phone; the standard recognizer is the phone's own speech service; ShellX never
+  receives or sends audio. Notification text (agent, workspace) comes from the Mac through the relay and is built on the phone.
+- The relay already forgets the token at sign-out (A-8); a sign-out while offline cannot delete it (hence the unknown-Mac guard).
+
+Test kit: `TestClock`, `eventually`, `WorkRig` (3G adds `servesTerminalViews`), `FakeSpeechEngine`, `FakeVoicePermissions`,
+`FakeResultRegistry`, `TestOwner`, `ManifestTest`.
+
+Open (ruled fine to defer): compact bar gated on height only (portrait split screen leaves chips ~80 dp); a 48 dp bar can clip
+titles at font scale >= 1.8 in landscape; a first permission dialog dismissed with Back / outside tap opens the system page;
+`attachNote` is not saved across process death. Phone checks Part A (works through "Try without an account") and Part B (needs a
+relay with 1A and 3F, FCM both ends, Google sign-in) are the user's; POST_NOTIFICATIONS needs an Android 13+ phone (neither test phone is).
+
+---
+
+## 28. Additions from plan 3G (landed with the 3G merge on 2026-11-10)
+
+Supersedes §21's name list where they differ. Ledger rows: A-g1..A-g5 = **A-31..A-35**, plus **A-36** (landscape),
+**A-37** (history size cap) and **A-38** (the word the keyboard sees). Names checked against the landed tip `aef7f0faf5`.
+
+**Kotlin Link (`com.shellx.link.core`)**
+- Enums `TerminalViewOpenOutcome`, `TerminalViewEndReason`, `TerminalModifier`, `TerminalFrameKind`, `TerminalCursorShape`,
+  `TerminalAttribute`, `TerminalKey`; `TerminalInputUnit`, `TerminalInputCheck`, `TerminalInputException`; grid types,
+  `TerminalFrameAssembler`, `TerminalScreen` (mutable, `DEFAULT_MAX_HISTORY_ROWS`), `TerminalRow`, `TerminalStyledRun`,
+  `TerminalCell`; the ten terminal `LinkMessage`s; `ShellXLink.TERMINAL_*` constants; `TerminalViewPush { Opened, Frame, Ended }`,
+  `TerminalCreated`; `LinkSession` members `terminalPushes`, `openTerminalView`, `closeTerminalView`, `sendTerminalInput`,
+  `resizeTerminalView`, `resyncTerminalView`, `createTerminal` (defaults, so older fakes compile). No frame splitter on the phone.
+- Frame integers are read as 64-bit and held at Int limits (`wideInt` / `optWideInt`), so Kotlin accepts and refuses exactly the
+  frames Swift does.
+
+**Bounds: socket inbox and `TerminalPushQueue`**
+- Socket inbox (`OkHttpRelaySocket`, internal): binary messages <= `MAX_QUEUED_BYTES = 1_048_576` (1 MiB; 16 Noise messages);
+  `InboxBudget.take` blocks OkHttp's reader thread (TCP back-pressure); nothing dropped (Noise nonces are implicit); text
+  messages are not counted and never wait; a message larger than the bound enters alone when the inbox is empty.
+- `TerminalPushQueue(maxQueuedWeight = MAX_QUEUED_WEIGHT)`, `MAX_QUEUED_WEIGHT = 2_097_152` (about 2 MiB of frame JSON; weight =
+  exact UTF-8 bytes of run text + 64 per part, 48 per style, 2 560 per palette, 16 per line, 24 per run). `offer()` never
+  suspends, so replies, pings and other pushes pass an unread flood. Rules:
+  - a frame that would pass the bound is dropped unless the queue is empty; the first drop of a run of drops queues
+    `TerminalFramePart.LOST` = `TerminalFramePart(revision = 0, part = 1, parts = 2)` — the codec refuses revision 0, so LOST
+    cannot come from the wire; the assembler reads it as a gap and asks for exactly one resync;
+  - after a LOST, that terminal's deltas and history frames are dropped silently until its next snapshot;
+  - **the viewed terminal's snapshot is exempt from the bound** (viewed = last `Opened` until its `Ended`), and a kept snapshot's
+    part 0 replaces every queued frame of that terminal, LOST included — at most one snapshot per view queued; later parts count
+    only in order (`next` index);
+  - `Opened` and viewed `Ended` are never dropped; **`Ended` of non-viewed terminals is capped at 16 queued
+    (`MAX_QUEUED_OTHER_ENDS`)**, no coalescing; frames of other terminals follow the bound and leave no state;
+  - drop state is kept for the viewed terminal only (`viewLost`, `viewArriving`), cleared by its `Ended`, the next `Opened`, `close()`;
+  - one `LinkLog` event per run of drops ("client dropped terminal frames over the bound"), no content.
+  - Collectors: one at a time; a collector cancelled while waiting gives its entry back; `pushes` is a hand-written `Flow` that
+    emits straight from the collector's coroutine. **No `buffer`, `flowOn`, `shareIn`, `produceIn`, channel or filter (revision
+    filters included) between `pushes` and the assembler.** Memory about 2-6 MiB per session plus one snapshot per view opened while lagging.
+- **The relay's real behaviour** (`cmux-relay` `relay.rs` ~1113-1116, 1325-1340, `config.rs` 22-23): it queues <= 128 frames or
+  2 MiB per socket and **ends the circuit when full**. The phone's bound therefore engages only when decoding lags the network;
+  a phone that stays behind loses the circuit and reconnects; the Mac does not send "fewer, larger deltas".
+- `LinkClient`: an open that times out and its late `Opened` are decided in one locked step (no `Opened` for a timed-out open).
+
+**`:core` (`com.shellx.core.terminal` unless noted)**
+- Hub: `MachineHub : DecisionSending, TerminalLink`; `supportsTerminalCreate(machineId)`; `suspend createTerminal(ref: WorkspaceRef):
+  TerminalCreation`; `HubState.supportsTerminalView / supportsTerminalCreate`; `MachineEvent.TerminalPushes(pushes)` (the flow, sent
+  just before a session's `Online`); `LatencyMetric.TERMINAL_FIRST_SCREEN`, `TERMINAL_KEY_ECHO`, `TERMINAL_FRAME_APPLY`.
+- `interface TerminalLink`: `terminalEvents(machineId): Flow<TerminalHubEvent>` (`Push(machineId, push)` | `State(machineId, state)`),
+  `isOnline`, `supportsTerminalView`, `openTerminalView(machineId, terminalId, cols, rows): TerminalOpenResult` (`Outcome` |
+  `NotSent` | `NoAnswer`), `closeTerminalView`, `resyncTerminalView`, `sendTerminalInput`, `resizeTerminalView`, `recordLatency`.
+- **`hub.terminalEvents(machineId)` and the newest-page-per-Mac rule:** per Mac, only the newest collection takes the pushes
+  (a session views one terminal; two collectors would split frames); the older gets states only and takes the pushes again when
+  the newer ends. A new collection cancels the older one's taking scope at once. While nobody collects, pushes wait in the bounded
+  queue (no drainer). A collection told `Online` is always told a non-`Online` state before that session's pushes end; states
+  are conflated. Consequence: two workspace screens of one Mac STARTED at once (navigation transition, predictive back) -> only the
+  newer sees frames; the older may sit on Connecting until it reopens.
+- `TerminalViewModel(machineId, link: TerminalLink, scope, maxHistoryRows = TerminalScreen.DEFAULT_MAX_HISTORY_ROWS,
+  sleep = { delay(it) }, now = TimeSource.Monotonic) : TerminalTextInput`; companion `RESIZE_DELAY` 200 ms, `BUSY_RETRY_DELAY` 300 ms,
+  `BUSY_RETRIES = 5`, `FAILED_RETRY_DELAY` 1 s, `SCROLL_COALESCING`, `ECHO_TIMEOUT`; `fixed(...)`.
+  - State: `state: StateFlow<TerminalViewState(terminalId, phase, screenRevision: Long, snapshots, topShift, markedText,
+    ctrlLatched, sentInputs, pasteTooLarge: Int, acceptsInput)>` and getters for each; `screen` (main thread only);
+    `TerminalViewPhase { Connecting, Live, Offline, Unsupported, Unavailable(reason) }`, `TerminalUnavailableReason { GONE, REFUSED, FAILED }`.
+  - Lifecycle: `suspend run()`, `show(terminalId?)`, `setPhoneGrid(cols, rows)`, `retry()`, **`close(): Job`**.
+  - Input: `insertText`, `setMarkedText`, `unmarkText`, `deleteBackward`, **`typeKey(text)`** (= unmark + insert, one message; hardware
+    `Type(text)` goes here, not `insertText`), `press(key, mods)`, `toggleCtrl()`, `paste(text)`, `scroll(lines)`.
+  - **`acceptsInput`:** true while Live, and while Connecting once a screen came and an open is in flight (queues behind the open,
+    R10); false in waits with no view in flight and under every card. The pane's check is
+    `acceptsInput && model.terminalId == the surface's terminalId`.
+  - Every send is the last step of a change (an inline answer on `Main.immediate` must not be overwritten); one FIFO outbox.
+  - **Dispatcher rule: run the model on `hub.scope` (`Main.immediate`) or a standard test dispatcher, never `Unconfined` /
+    `UnconfinedTestDispatcher`** (its `yield()` deferral of a same-turn restart needs a dispatcher that really defers).
+  - `WorkspaceView` runs `repeatOnLifecycle(STARTED) { terminal.run() }`; the holder's `onCleared()` calls `terminal.close()`.
+- `WorkspaceScreenModel`: `shownAsTerminal: Set<String>`, `terminalShown: String?`, `showAsTerminal(id, on)`, `expect(id)`,
+  **`settle()`** (typing in or focusing a terminal settles the screen, so an agent that starts waiting never moves the selection),
+  **`creatingTerminal: Boolean`**, **`startCreatingTerminal(): Boolean`**, **`finishCreatingTerminal(terminalId: String?)`** (on every
+  way out, in a `finally` run in `hub.scope` so it survives rotation); `WorkspaceScreenState.shownAsTerminal / creatingTerminal`.
+  ＋ is dimmed while a create is in flight; a pick made meanwhile wins.
+- Typing / keys / geometry: `TerminalTextInput`, `TerminalTyping`, `TerminalInputBatcher` (`MAX_PASTE_BYTES` 256 KiB, `pasteFits`,
+  `pasteUnits`, `scrollUnits`), `TerminalKeyCodes`, `TerminalHardwareModifiers`, `TerminalHardwareAction { Send, Type, DeleteBackward,
+  Paste, System }`, `TerminalHardwareKeys.action(keyCode, plainChar, altChar, modifiers)`, `TerminalBarKey`, `TerminalGeometry`,
+  `TerminalGridSize`, `TerminalScrollStep`, `TerminalZoom`, `TerminalViewport`, `TerminalColors`, `TerminalRgb`, `TerminalResolvedStyle`.
+- Demo: `DemoTerminalFixture`, `DemoTerminalScreens`, `DemoEnvironment.TERMINALS`; `FakeMac` terminal API (hostFeatures include
+  `terminal_view`, `terminal_create`; `servesTerminalViews`, `acceptsTerminalCreate`); the fake answers `ok` after the Mac has the
+  message in order and never answers `too_large`. Demo terminals are fixed 50 x 40 fixtures (the iPhone's are too).
+- Test kit: `ScriptedTerminalLink` (`calls`, `openAnswers`, `openGate`, `onOpen`, `onInput`, `eventsFailure`, `openFailure`,
+  `openCancelledAtClose`), `TerminalPushReader`, `Collector`, `hubRig(scope = backgroundScope)`, `TerminalFixtures`.
+
+**`:app` (`com.shellx.app.ui.terminal`, `com.shellx.app.ui.workspaces`)**
+- `TerminalPane(model, terminalId, title, shown, modifier, locksPaging, showsKeyBar = false, engaged = {})`, `TerminalPane.perform`,
+  `TerminalSurfaceView(context, model, terminalId, font, ime)`, `TerminalInputConnection`, `TerminalIme` / `SystemTerminalIme` /
+  `LocalTerminalIme`, `TerminalClipboard`, `TerminalKeyBar` / `TerminalKeyBarItem`, `TerminalFont`, `TerminalGlyphMetrics`,
+  `TerminalRowLayout`, `TerminalRowCache` (keys rows by identity). Test tags `terminal.surface`, `terminal.connecting`,
+  `terminal.unavailable`, `terminal.offline`, `terminal.retry`, `terminal.paste`, `terminal.keyBar`, `terminal.key.*`, `workspace.chip.add`.
+- On 3E's screens: `NewTerminalChip(enabled, onClick)`, `WorkspaceMenuItem.VIEW_AS_TERMINAL / VIEW_AS_CHAT` and `AgentChip`
+  (`items(canCloseTab, agentChip = null)`), `WorkspaceCommand.CREATE_TERMINAL`, `WorkspaceScreenActions.createTerminal / showAsTerminal`,
+  `WorkspaceScreenHolder(model, terminal)`; paging is locked while a voice hold or a zoomed terminal is active.
+- Soft keyboard / TalkBack: the §21 `EditorInfo` rule holds. TalkBack reads the terminal from the surface `View` (an
+  accessibility delegate: "Terminal <title>" with the screen as text), because a Compose node under the pane never reaches a service.
+- **The word the keyboard sees (A-38):** `TerminalInputConnection` keeps a shadow of the word committed since the last word
+  boundary (<= 32 UTF-16 units, memory only) before the composing text, and answers `getTextBeforeCursor`,
+  `getSurroundingText`, `getExtractedText` and the snapshot from it, with `updateSelection` after every change. A rewrite of
+  committed text (`deleteSurroundingText` + `commitText`, a composing region over the word, `replaceText`) goes to the Mac as
+  backspaces plus the new text (<= 33 messages per rewrite). A space, Enter, a paste, a named key, a chord, a key-bar key, a
+  hardware key event, the focus lost and a restart end the word. `TYPE_TEXT_FLAG_NO_SUGGESTIONS` stays: without it Gboard
+  turns auto-correct on (`lss` -> `less`). Telex verified on the API 36 emulator (`tieengs` -> `tiếng`, `vieetj` -> `việt`);
+  VNI unit-tested only (the emulator's Gboard has no VNI layout).
+- Key bar: eight keys, each touch slot 48-58 dp; under 384 dp wide the row scrolls instead of shrinking a slot.
+- A-36: in a window under 480 dp tall, while a terminal page holds the soft keyboard and it takes room, the workspace top bar
+  and the demo banner step aside and return with the keyboard; a hardware or floating keyboard keeps them
+  (`terminalHoldsKeyboard`, `TerminalPane.holdsKeyboard`, `DemoFrame`, `CompactHeight.TerminalKeyboard`).
+- Later fixes on the branch (after `0721606992`): metric logcat lines are debug-only; `TerminalViewState.toString` prints the
+  composed word as `<N chars>`; Paste is offered only for a clip whose text the reader takes (a copied file pastes nothing);
+  a rotation keeps the keyboard and the key bar (taken back once the window has the focus, asked again if the system hides
+  it), and a page that comes back after Back does not take it; the surface is never laid out with no height; a glyph run is
+  cut where a glyph would sit more than 0.5 px off its column; `TerminalPushQueue` yields the collector's thread every
+  16 pushes or 4 ms; the screen stays out of content capture (`IMPORTANT_FOR_CONTENT_CAPTURE_NO`, data-sensitive on API 34+).
+
+**Strings.** Android-only (`strings_android.xml`): `terminal_paste` (Paste / Dán), `terminal_cap_esc`, `terminal_cap_tab`,
+`terminal_cap_ctrl` (untranslatable). `workspace.shell.placeholder` is **deleted** from the iPhone catalog (no Swift or Android
+string use; only an `accessibilityIdentifier`); Android's `workspace_shell_placeholder` went with it; `import-strings: ok (266 strings, 1 plurals)`.
+Rule for any later Android text surface that must keep Vietnamese composing: §21's `EditorInfo` (never `TYPE_NULL` / password).
+
+**Parity deviations (all in the ledger)**
+- A-31 Ctrl+V sends ctrl-v, Ctrl+Shift+V pastes. A-32 a multi-line commit is a paste. A-33 a key that reaches the view while
+  composing commits the word first (the keyboard sees keys first on Android). A-34 `IME_FLAG_NO_PERSONALIZED_LEARNING`.
+  A-35 the view closes whenever the screen stops (background, another screen, rotation) and reopens on start. A-36 landscape.
+- A-37: history is capped at about 16 MiB by estimated size (`TerminalScreen.maxHistoryBytes`, link-core, Android only)
+  besides `DEFAULT_MAX_HISTORY_ROWS` = 10 000 rows; the iPhone has the row cap only.
+- **m3 retry budgets (differs from the iPhone):** a run that starts with no view restores both open budgets (busy x5, one failed
+  retry), the pending retry wait is kept, `Unavailable` is sticky — at most one extra failed open or five extra busy opens per
+  stop+start against a Mac that keeps failing (ledger row for `TerminalViewModel`).
+- **Ctrl on non-Latin layouts:** Ctrl+letter on a key that types another script (or a combining mark) uses the key's Latin letter
+  by physical key code (iPhone parity); **punctuation chords stay `System`** (cannot tell from AZERTY `,` without a layout signal) — a few rare chords.
+- Follow-the-bottom threshold is half a row (iPhone parity); non-finite pinch factors / focus / scroll deltas are ignored;
+  `Type.toString` prints `<N bytes>`.
+- Fixed 12 dp monospace font with pinch zoom (not the system font size); the hide-keyboard key; while zoomed wider than the pane
+  paging is locked so a sideways drag always pans (the chips still switch pages).
+
+**Upstream notes (for 3C and the iPhone)**
+- A frame's `history` count is **uncapped in both apps** (m8, same as Swift).
+- `graphemes()` (Android) vs Swift `Character` differ on edge clusters; the bytes sent are identical.
+- Gboard on API 36 shows its suggestion strip despite `TYPE_TEXT_FLAG_NO_SUGGESTIONS`, commits each letter and rewrites the
+  word it committed; A-38 turns the rewrites into backspaces and text. Telex/VNI on a real phone are still the user's check
+  (Part A item 3).
+- R8: only the demo's in-process link has run under R8; add terminal traffic to a release smoke once a live relay is reachable.
+
+**Part B (pending).** Latency capture (`terminalFirstScreen` p95 < 1 000 ms, `terminalKeyEcho` p95 < 300 ms, `terminalFrameApply`
+p95 < 16 ms), two-chip swiping, floods (`yes | head -100000`, base64 of 5 MB), vim / htop, ＋ without moving the Mac's selection,
+and home / back — all need a relay that answers sign-in (the production relay answers 404 to `/v1/auth/nonce` until 1D deploys 1A)
+plus plan 2B's Mac build. Record "Part B pending: needs a relay with 1A (and 1D's Android client) and the 2B Mac build" in the ledger.
