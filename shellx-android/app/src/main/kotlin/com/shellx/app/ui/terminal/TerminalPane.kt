@@ -3,8 +3,14 @@ package com.shellx.app.ui.terminal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -164,6 +170,7 @@ internal fun covers(phase: TerminalViewPhase, snapshots: Int): Boolean = when (p
 }
 
 /** The page shown: composed only while it is, so whatever it holds (focus, a notice, a paging lock) goes with it. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColumnScope.ShownPage(
     model: TerminalViewModel,
@@ -227,18 +234,26 @@ private fun ColumnScope.ShownPage(
         if (notice?.id == said.id) notice = null
     }
 
-    // The soft keyboard went down while the surface had it: the focus goes too, so the key bar hides as on the iPhone.
-    // A hardware keyboard never shows the soft one, so its focus and bar stay.
-    val imeUp = WindowInsets.ime.getBottom(density) > 0
-    var imeWasUp by remember { mutableStateOf(false) }
-    LaunchedEffect(imeUp) {
-        if (imeWasUp && !imeUp && focused) surface?.clearTerminalFocus()
-        imeWasUp = imeUp
+    // The soft keyboard went from shown to hidden while the surface had it (system Back, its own key): the focus goes
+    // too, so the key bar hides as on the iPhone. A hardware keyboard never shows the soft one, and a floating one is
+    // shown though it takes no room, so their focus and bar stay. Not while the window is away or the page is not
+    // resumed: leaving the app hides the keyboard too, and the focus stays for the return.
+    val imeShown = WindowInsets.isImeVisible
+    val windowFocused by rememberUpdatedState(LocalWindowInfo.current.isWindowFocused)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var imeWasShown by remember { mutableStateOf(false) }
+    LaunchedEffect(imeShown) {
+        val here = windowFocused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        if (imeWasShown && !imeShown && focused && here) surface?.clearTerminalFocus()
+        imeWasShown = imeShown
     }
 
-    // The page holds the soft keyboard: it has the focus and the keyboard takes room. A hardware keyboard (or a floating
-    // one, which reports no room) holds nothing, so the bars above stay where nothing would take their place.
-    val holds = focused && imeUp
+    // The page holds the soft keyboard: it has the focus and the keyboard takes room (read as one flag, so the page does
+    // not recompose on every frame of the keyboard's animation). A hardware keyboard, or a floating one, holds nothing,
+    // so the bars above stay where nothing would take their place.
+    val imeInsets = WindowInsets.ime
+    val imeTakesRoom by remember(imeInsets, density) { derivedStateOf { imeInsets.getBottom(density) > 0 } }
+    val holds = focused && imeTakesRoom
     val currentHolds by rememberUpdatedState(holdsKeyboard)
     var toldHolds by remember { mutableStateOf(false) }
     LaunchedEffect(holds) {
