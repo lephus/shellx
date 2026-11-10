@@ -389,7 +389,8 @@ class TerminalSurfaceView(
 
     /**
      * A hardware key, or a key event the keyboard sent ("Hardware keys"): downs (repeats included) go through
-     * `TerminalHardwareKeys`; the up of a down it took is taken too; text of a KEYCODE_UNKNOWN multiple is committed text.
+     * `TerminalHardwareKeys`; the up of a down it took is taken too; text of a KEYCODE_UNKNOWN multiple is typed as a key
+     * (the word being composed is committed first), or pasted when it is one ([TerminalInputConnection.isPaste]).
      * A dead key waits for the next character and joins it (`KeyEvent.getDeadChar`), or is typed first when they do not
      * join. False for the system's keys (Back, volume, Meta shortcuts, function keys), and for every key while the page
      * does not take input.
@@ -400,7 +401,10 @@ class TerminalSurfaceView(
             KeyEvent.ACTION_UP -> return keysDown.remove(event.keyCode)
             KeyEvent.ACTION_MULTIPLE -> {
                 if (event.keyCode != KeyEvent.KEYCODE_UNKNOWN) return false
-                event.characters?.takeIf { it.isNotEmpty() }?.let(model::insertText)
+                // A key's text: the word being composed is committed first; a line break or a long text is a paste (A-32).
+                event.characters?.takeIf { it.isNotEmpty() }?.let {
+                    if (TerminalInputConnection.isPaste(it)) model.paste(it) else model.typeKey(it)
+                }
                 return true
             }
             KeyEvent.ACTION_DOWN -> Unit

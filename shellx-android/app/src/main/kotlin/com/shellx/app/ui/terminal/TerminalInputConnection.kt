@@ -1,5 +1,6 @@
 package com.shellx.app.ui.terminal
 
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -9,7 +10,11 @@ import android.view.inputmethod.CorrectionInfo
 import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputContentInfo
+import android.view.inputmethod.TextAttribute
+import androidx.annotation.RequiresApi
 import com.shellx.core.terminal.TerminalTextInput
+import com.shellx.core.text.utf8Size
+import com.shellx.link.core.ShellXLink
 import com.shellx.link.core.TerminalKey
 
 /**
@@ -19,9 +24,11 @@ import com.shellx.link.core.TerminalKey
  *
  * Every call that forwards to [input] first checks [accepts] (the surface's terminal is the one shown, and it takes
  * input): otherwise it is dropped and answers true, so a word the keyboard commits after the page moved never reaches
- * either terminal (Review Focus 1). A commit that still holds a line break once one trailing break is set aside is
- * pasted as one paste, not typed line by line (Review Focus 2). Backspace and Enter arrive once whichever way the keyboard
- * sends them (Review Focus 3). After each change the connection [report]s the document; inside a batch edit, once at its
+ * either terminal (Review Focus 1). Text that still holds a line break once one trailing break is set aside, or is longer
+ * than one input message, is pasted as one paste under the paste limit, not typed ([isPaste]; Review Focus 2, A-32).
+ * Backspace and Enter arrive once whichever way the keyboard sends them (Review Focus 3); a Backspace key event inside a
+ * word being composed edits the word here, as deleteSurroundingText does, so the keyboard is not restarted (a restart
+ * closes the connection, which commits the word). After each change the connection [report]s the document; inside a batch edit, once at its
  * end. When the model did not keep what the keyboard composed (a latched ctrl took the first letter), it asks to
  * [restart] the keyboard. Main thread only.
  */
@@ -85,14 +92,27 @@ class TerminalInputConnection(
 
     override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean = forward {
         val sent = text?.toString().orEmpty()
-        // One trailing line break is the keyboard's Enter; any other makes it a paste.
-        val body = when {
-            sent.endsWith("\r\n") -> sent.dropLast(2)
-            sent.endsWith('\n') || sent.endsWith('\r') -> sent.dropLast(1)
-            else -> sent
-        }
-        if ('\n' in body || '\r' in body) input.paste(sent) else input.insertText(sent)
+        if (isPaste(sent)) input.paste(sent) else input.insertText(sent)
         document = input.markedText
+    }
+
+    /**
+     * API 34: a range inside the word being composed is replaced and the word committed; any other range is text the Mac
+     * already has, which the phone cannot edit, so [text] is committed after the word.
+     */
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    override fun replaceText(start: Int, end: Int, text: CharSequence, newCursorPosition: Int, textAttribute: TextAttribute?): Boolean {
+        if (!accepts()) return true
+        val from = minOf(start, end)
+        val to = maxOf(start, end)
+        if (from >= 0 && to <= document.length) {
+            return commitText(document.substring(0, from) + text + document.substring(to), newCursorPosition)
+        }
+        beginBatchEdit()
+        finishComposingText()
+        commitText(text, newCursorPosition)
+        endBatchEdit()
+        return true
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean = forward {
@@ -107,6 +127,14 @@ class TerminalInputConnection(
 
     override fun sendKeyEvent(event: KeyEvent): Boolean {
         if (!accepts()) return true
+        val chorded = event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
+        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_DEL && !chorded && document.isNotEmpty()) {
+            // Its up goes on to the surface, which takes only the ups of downs it took.
+            input.deleteBackward()
+            document = input.markedText
+            changed()
+            return true
+        }
         keys(event)
         return true
     }
@@ -173,5 +201,21 @@ class TerminalInputConnection(
     override fun closeConnection() {
         finishComposingText()
         super.closeConnection()
+    }
+
+    companion object {
+        /**
+         * Whether keyboard text goes out as a paste (A-32): it holds a line break once one trailing break (the keyboard's
+         * Enter) is set aside, or it is longer than one input message (a long line from the clipboard chip or voice
+         * typing), so the paste limit applies and the Mac's 64-message queue never cuts it.
+         */
+        fun isPaste(text: String): Boolean {
+            val body = when {
+                text.endsWith("\r\n") -> text.dropLast(2)
+                text.endsWith('\n') || text.endsWith('\r') -> text.dropLast(1)
+                else -> text
+            }
+            return '\n' in body || '\r' in body || text.utf8Size > ShellXLink.TERMINAL_MAX_TEXT_BYTES
+        }
     }
 }
