@@ -1,6 +1,7 @@
 package com.shellx.core.link
 
 import com.shellx.core.demo.FakeMac
+import com.shellx.core.platform.CoreLog
 import com.shellx.core.terminal.TerminalHubEvent
 import com.shellx.core.terminal.TerminalOpenResult
 import com.shellx.core.testing.Collector
@@ -16,7 +17,9 @@ import com.shellx.link.core.TerminalFrameAssembler
 import com.shellx.link.core.TerminalFrameHead
 import com.shellx.link.core.TerminalFrameKind
 import com.shellx.link.core.TerminalGridFrame
+import com.shellx.link.core.TerminalInputUnit.Key
 import com.shellx.link.core.TerminalInputUnit.Text
+import com.shellx.link.core.TerminalKey
 import com.shellx.link.core.TerminalLine
 import com.shellx.link.core.TerminalPushQueue
 import com.shellx.link.core.TerminalRun
@@ -403,6 +406,98 @@ class MachineHubTerminalTest {
         assertEquals(0, terminals.subscriberCount)
     } }
 
+    /** Review B1 m3a: one collection follows the Mac across a reconnect, and takes the new session's pushes after a reopen. */
+    @Test fun aCollectionFollowsTheMacAcrossAReconnect() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val id = mac.machine.machineId
+        val view = HubView(rig.hub, id, "t1", backgroundScope)
+        view.start()
+        runCurrent()
+        rig.hub.openTerminalView(id, "t1", 50, 20)
+        assertTrue(eventually { view.screen.screenText().firstOrNull() == "$" })
+
+        mac.dropLiveSessions()
+        assertTrue(eventually {
+            rig.backoff.release()
+            view.states.lastOrNull() == MachineLinkState.Online && MachineLinkState.Reconnecting in view.states
+        }, "${view.states}")
+        val opened = view.pushes.count { it == Opened("t1") }
+        // The model reopens on Online (R8); the same collection takes the new session's pushes.
+        assertEquals(ok, rig.hub.openTerminalView(id, "t1", 50, 20))
+        mac.emitTerminalFrame("t1", row0("again"))
+
+        assertTrue(eventually { view.screen.screenText().firstOrNull() == "again" }, "${view.screen.screenText()}")
+        assertEquals(opened + 1, view.pushes.count { it == Opened("t1") })
+        assertEquals(0, view.resyncs)
+    } }
+
+    /** Review B1 m3b: a revoked Mac and a background that ran out reach terminal pages as states. */
+    @Test fun aRevokeAndAnExpiredBackgroundReachTerminalPages() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val view = HubView(rig.hub, mac.machine.machineId, "t1", backgroundScope)
+        view.start()
+        runCurrent()
+
+        rig.hub.backgroundTimeExpired()
+        assertTrue(eventually { view.states.lastOrNull() == MachineLinkState.Reconnecting }, "${view.states}")
+
+        rig.relay.setGrants(emptyList())
+        rig.hub.refreshGrants()
+        assertTrue(eventually { view.states.lastOrNull() == MachineLinkState.Revoked }, "${view.states}")
+    } }
+
+    /** Review B1 m3c: a state that is not Online is told at once, and what the old session still queued is not handed on. */
+    @Test fun aStateThatIsNotOnlineCutsOffThePushesStillQueued() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val id = mac.machine.machineId
+        val view = HubView(rig.hub, id, "t1", backgroundScope)
+        view.start()
+        runCurrent()
+        rig.hub.openTerminalView(id, "t1", 50, 20)
+        assertTrue(eventually { view.screen.screenText().firstOrNull() == "$" })
+        val frames = view.frames
+
+        val gate = Gate()
+        view.gate = gate
+        repeat(3) { mac.emitTerminalFrame("t1", row0("q$it")) }
+        // The page took q0 and is busy with it; q1 and q2 wait in the queue.
+        runCurrent()
+        rig.hub.backgroundTimeExpired()
+        gate.open()
+
+        assertTrue(eventually { view.states.lastOrNull() == MachineLinkState.Reconnecting }, "${view.states}")
+        runCurrent()
+        assertEquals(frames + 1, view.frames)
+        assertEquals("q0", view.screen.screenText().first())
+    } }
+
+    /** Review B1 m3d: an input the protocol refuses is logged by name, and nothing reaches the Mac. */
+    @Test fun aRefusedInputIsLoggedAndNotSent() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val id = mac.machine.machineId
+        rig.hub.openTerminalView(id, "t1", 50, 20)
+        val lines = mutableListOf<String>()
+        CoreLog.sink = { synchronized(lines) { lines += it } }
+        try {
+            val before = mac.phoneCallCount
+            rig.hub.sendTerminalInput(id, "t1", List(65) { Key(TerminalKey.TAB) })
+            runCurrent()
+            assertEquals(before, mac.phoneCallCount)
+            assertTrue("terminal_input_refused" in synchronized(lines) { lines.toList() })
+            assertEquals(emptyList(), mac.terminalViewInputs("t1"))
+        } finally {
+            CoreLog.sink = {}
+        }
+    } }
+
     /** A delta of the 50 × 20 prompt view, every row full: about 1.8 KB of frame JSON. */
     private val flood = TerminalGridFrame(
         TerminalFrameHead(TerminalFrameKind.DELTA, 50, 20, cursor = TerminalCursor(0, 0)),
@@ -430,6 +525,7 @@ class MachineHubTerminalTest {
         var frames = 0
         var resyncs = 0
         val pushes = mutableListOf<TerminalViewPush>()
+        val states = mutableListOf<MachineLinkState>()
         var gate: Gate? = null
 
         /** Set: right after the next frame, the collection stops and a new one starts, in the same turn. */
@@ -450,6 +546,7 @@ class MachineHubTerminalTest {
         }
 
         private suspend fun take(event: TerminalHubEvent) {
+            if (event is TerminalHubEvent.State && event.machineId == machineId) states += event.state
             if (event !is TerminalHubEvent.Push || event.machineId != machineId) return
             gate?.wait()
             val push = event.push
