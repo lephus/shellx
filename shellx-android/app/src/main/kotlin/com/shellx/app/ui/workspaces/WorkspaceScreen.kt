@@ -204,6 +204,9 @@ enum class WorkspaceMenuItem(@StringRes val title: Int) {
  *   terminal of an agent chip in [shownAsTerminal]). While a mic listens or a terminal is zoomed in ([pagingLocked])
  *   the pages stay put.
  * - [notice] floats over the top of the pages (a polite live region).
+ * - In a window short in height (a phone in landscape), while a terminal page holds the keyboard
+ *   ([terminalHoldsKeyboard]), the top bar steps aside so the key bar and the keyboard leave the terminal a grid; it
+ *   comes back when the keyboard goes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -219,6 +222,7 @@ fun WorkspaceScreen(
     canViewTerminals: Boolean = false,
     shownAsTerminal: Set<String> = emptySet(),
     creatingTerminal: Boolean = false,
+    terminalHoldsKeyboard: Boolean = false,
     pagingLocked: Boolean = false,
     notice: AgentNotice? = null,
     alert: WorkspaceAlert? = null,
@@ -271,7 +275,9 @@ fun WorkspaceScreen(
     Scaffold(
         containerColor = background,
         topBar = {
-            if (compact) {
+            if (compact && terminalHoldsKeyboard) {
+                // The terminal's keyboard and key bar take the window's height: no bar (Back first hides the keyboard).
+            } else if (compact) {
                 // One compact row: back, the name, the chips (they take the rest) and `⋮`.
                 Row(
                     Modifier

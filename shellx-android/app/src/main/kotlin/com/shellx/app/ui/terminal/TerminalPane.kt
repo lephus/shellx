@@ -82,6 +82,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shellx.app.R
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.app.ui.components.Spinner
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.app.ui.workspaces.NoticeCapsule
 import com.shellx.app.ui.workspaces.ShellPanePlaceholder
 import com.shellx.core.terminal.TerminalGeometry
@@ -118,6 +119,8 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
  * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`. [engaged] is called when the user takes the
  * keyboard on the page shown or sends it input (a tap, the focus, typing): the workspace screen settles on its chip.
+ * [holdsKeyboard] is told whether the page shown holds the keyboard (false again when it leaves): a window short in
+ * height (a phone in landscape) gives it the workspace's top bar meanwhile.
  */
 @Composable
 fun TerminalPane(
@@ -129,6 +132,7 @@ fun TerminalPane(
     locksPaging: (Boolean) -> Unit = {},
     showsKeyBar: Boolean = false,
     engaged: () -> Unit = {},
+    holdsKeyboard: (Boolean) -> Unit = {},
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val pageShown = shown && state.terminalId == terminalId
@@ -138,7 +142,7 @@ fun TerminalPane(
                 if (state.phase == TerminalViewPhase.Unsupported) ShellPanePlaceholder() else EmptyCard()
             }
         } else {
-            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging, engaged)
+            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging, engaged, holdsKeyboard)
         }
     }
 }
@@ -170,6 +174,7 @@ private fun ColumnScope.ShownPage(
     showsKeyBar: Boolean,
     locksPaging: (Boolean) -> Unit,
     engaged: () -> Unit,
+    holdsKeyboard: (Boolean) -> Unit,
 ) {
     // Leaving the page (a swipe, a chip, the pane gone) unlocks the pager.
     val currentLocks by rememberUpdatedState(locksPaging)
@@ -192,7 +197,16 @@ private fun ColumnScope.ShownPage(
 
     // The user took the keyboard here, or sent this page input: the screen settles on its chip.
     val currentEngaged by rememberUpdatedState(engaged)
-    LaunchedEffect(focused) { if (focused) currentEngaged() }
+    val currentHolds by rememberUpdatedState(holdsKeyboard)
+    var toldHolds by remember { mutableStateOf(false) }
+    LaunchedEffect(focused) {
+        if (focused) currentEngaged()
+        if (focused != toldHolds) {
+            toldHolds = focused
+            currentHolds(focused)
+        }
+    }
+    DisposableEffect(Unit) { onDispose { if (toldHolds) currentHolds(false) } }
     var inputsSeen by remember { mutableIntStateOf(state.sentInputs) }
     LaunchedEffect(state.sentInputs) {
         if (state.sentInputs != inputsSeen) currentEngaged()
@@ -232,11 +246,13 @@ private fun ColumnScope.ShownPage(
 
     val phase = state.phase
     val covered = covers(phase, state.snapshots)
+    val compact = isCompactHeight()
     Box(Modifier.weight(1f).fillMaxWidth()) {
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(start = 12.dp, end = 12.dp, bottom = if (keyBar) 6.dp else 12.dp)
+                // Over the key bar the card keeps less room below it, none in a short window (a phone in landscape).
+                .padding(start = 12.dp, end = 12.dp, bottom = if (!keyBar) 12.dp else if (compact) 0.dp else 6.dp)
                 .onSizeChanged { box = it },
         ) {
             Surface(

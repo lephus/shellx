@@ -130,6 +130,7 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
             val activity = LocalVoice.current?.activity
             val voiceLocksPaging by (activity?.anyActive ?: remember { MutableStateFlow(false) }).collectAsStateWithLifecycle()
             var terminalLocksPaging by remember { mutableStateOf(false) }
+            var terminalHoldsKeyboard by remember { mutableStateOf(false) }
             val actions = remember(model) {
                 WorkspaceScreenActions.make(
                     scope, model,
@@ -152,6 +153,7 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
                 canViewTerminals = hub.supportsTerminalView(ref.machineId),
                 shownAsTerminal = model.shownAsTerminal,
                 creatingTerminal = model.creatingTerminal,
+                terminalHoldsKeyboard = terminalHoldsKeyboard,
                 pagingLocked = voiceLocksPaging || terminalLocksPaging,
                 notice = notice,
                 alert = holder.alert,
@@ -166,6 +168,7 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
                         // Typing into a page settles the screen on it: an agent that starts asking does not pull the
                         // keyboard away mid-command.
                         engaged = model::settle,
+                        holdsKeyboard = { terminalHoldsKeyboard = it },
                     )
                 }
                 if (pane.id in model.shownAsTerminal) {
