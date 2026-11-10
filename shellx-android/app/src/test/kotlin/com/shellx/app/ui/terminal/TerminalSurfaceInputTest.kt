@@ -3,6 +3,7 @@ package com.shellx.app.ui.terminal
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -143,5 +144,80 @@ class TerminalSurfaceInputTest {
         assertTrue(eventually { rig.mac.terminalViewOpens.any { it.terminalId == "t-claude" } })
         assertFalse("nothing reaches the terminal left", within(200) { inputs().isNotEmpty() })
         assertEquals("nor the one shown now", emptyList<List<TerminalInputUnit>>(), inputs("t-claude"))
+    }
+
+    // Fix round (reviews D1 M2, M3, M7 and final m2)
+
+    /**
+     * A Backspace the keyboard sends as a key event while a word is composed edits the word on the phone, as
+     * deleteSurroundingText does: nothing restarts the keyboard (a restart closes the connection, which commits the
+     * word), and nothing goes to the Mac.
+     */
+    @Test
+    fun aDeleteKeyEventWhileComposingKeepsTheWordOnThePhone() {
+        val c = connection()
+        c.setComposingText("việ", 1)
+        c.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+        c.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+        surface.render(model.state.value)
+        ShadowLooper.idleMainLooper()
+        // What the framework does when the keyboard restarts.
+        if (ime.restarts > 0) c.closeConnection()
+        assertFalse("${inputs()}", within(200) { inputs().isNotEmpty() })
+        assertEquals("vi", model.markedText)
+        assertEquals(0, ime.restarts)
+        c.setComposingText("viê", 1)
+        c.commitText("việt", 1)
+        assertTrue("${inputs()}", eventually { inputs() == listOf(listOf(Text("việt"))) })
+    }
+
+    /** Text a key event carries (ACTION_MULTIPLE) is a key: the word being composed is committed first. */
+    @Test
+    fun aMultipleKeyEventWhileComposingCommitsTheWordFirst() {
+        connection().setComposingText("vi", 1)
+        assertTrue(surface.handleKey(KeyEvent(SystemClock.uptimeMillis(), "x", 0, 0)))
+        assertTrue("${inputs()}", eventually { inputs() == listOf(listOf(Text("vi"), Text("x"))) || inputs() == listOf(listOf(Text("vix"))) })
+    }
+
+    /** ACTION_MULTIPLE text with a line break is pasted, as a commit with one is (A-32). */
+    @Test
+    fun aMultipleKeyEventWithALineBreakIsPasted() {
+        assertTrue(surface.handleKey(KeyEvent(SystemClock.uptimeMillis(), "echo a\necho b", 0, 0)))
+        assertTrue("${inputs()}", eventually { inputs() == listOf<List<TerminalInputUnit>>(listOf(Paste("echo a\necho b"))) })
+    }
+
+    /**
+     * replaceText (API 34) reaches the model: a range inside the word being composed is replaced and the word committed;
+     * the base class would edit its own empty buffer and say it worked.
+     */
+    @Test
+    fun replaceTextReachesTheMac() {
+        val c = connection()
+        c.setComposingText("teh", 1)
+        assertTrue(c.replaceText(0, 3, "the", 1, null))
+        assertTrue("${inputs()}", eventually { inputs() == listOf(listOf(Text("the"))) })
+        assertTrue(c.replaceText(0, 0, "x", 1, null))
+        assertTrue("${inputs()}", eventually { inputs() == listOf(listOf(Text("the")), listOf(Text("x"))) })
+    }
+
+    /**
+     * A commit longer than one input message (4 096 bytes) is a paste (final review m2): 100 KB arrives whole, in paste
+     * messages, never cut by the Mac's 64-message queue.
+     */
+    @Test
+    fun aCommitLongerThanOneMessageIsPasted() {
+        val text = "a".repeat(100_000)
+        connection().commitText(text, 1)
+        assertTrue(eventually { inputs().flatten().joinToString("") { (it as? Paste)?.text.orEmpty() }.length == 100_000 })
+        assertTrue("${inputs().flatten().map { it::class.simpleName }.toSet()}", inputs().flatten().all { it is Paste })
+        assertTrue(inputs().size <= 16)
+    }
+
+    /** A commit over the paste limit sends nothing and says so, as a paste does. */
+    @Test
+    fun aCommitOverThePasteLimitIsRefused() {
+        connection().commitText("a".repeat(262_145), 1)
+        assertTrue(eventually { model.state.value.pasteTooLarge == 1 })
+        assertFalse(within(200) { inputs().isNotEmpty() })
     }
 }
