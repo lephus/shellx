@@ -4,6 +4,18 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.View
+import android.os.SystemClock
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
+import android.view.accessibility.AccessibilityNodeInfo
+import com.shellx.link.core.TerminalCursor
+import com.shellx.link.core.TerminalFrameHead
+import com.shellx.link.core.TerminalFrameKind
+import com.shellx.link.core.TerminalGridFrame
+import com.shellx.link.core.TerminalLine
+import com.shellx.link.core.TerminalRun
+import org.junit.Assert.assertNull
+import org.robolectric.Shadows.shadowOf
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -228,21 +240,154 @@ class TerminalPaneInputTest {
         compose.onNodeWithTag("terminal.paste").assertIsNotEnabled()
     }
 
+    /** The surface's node as TalkBack gets it. */
+    private fun node(surface: TerminalSurfaceView = surface()): AccessibilityNodeInfo = surface.createAccessibilityNodeInfo()
+
+    /** The screen's rows as TalkBack should read them: blank rows at either end left out. */
+    private fun screenRows(): String = model.screen.screenText().joinToString("\n").trim('\n')
+
+    /** `t-zsh`'s row 0 becomes [text] on the Mac. */
+    private fun macPrints(text: String) {
+        rig.mac.emitTerminalFrame(
+            "t-zsh",
+            TerminalGridFrame(
+                TerminalFrameHead(TerminalFrameKind.DELTA, model.screen.cols, model.screen.rows, cursor = TerminalCursor(0, 0)),
+                lines = listOf(TerminalLine(0, listOf(TerminalRun(text = text)))),
+            ),
+        )
+    }
+
+    /** Turns TalkBack on for this test (Robolectric's accessibility manager). */
+    private fun talkBackOn() {
+        shadowOf(context.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
+    }
+
+    /** Every text change [surface] tells accessibility services about. */
+    private fun textChanges(surface: TerminalSurfaceView): List<Long> {
+        val at = mutableListOf<Long>()
+        surface.accessibilityDelegate = object : View.AccessibilityDelegate() {
+            override fun sendAccessibilityEventUnchecked(host: View, event: AccessibilityEvent) {
+                if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+                    event.contentChangeTypes and AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT != 0
+                ) {
+                    at += SystemClock.uptimeMillis()
+                }
+                super.sendAccessibilityEventUnchecked(host, event)
+            }
+        }
+        return at
+    }
+
     /**
      * TalkBack reaches the terminal through the surface View itself: Compose hands an AndroidView's node to its View,
      * so semantics set on the pane never reach an accessibility service (found on the API 36 emulator). The page shown
-     * reads "Terminal zsh" and its screen; under a card the surface is hidden from it.
+     * reads "Terminal zsh", then its screen's rows (VoiceOver's label and value; TalkBack speaks a description in place
+     * of the text, so the description carries both); under a card the surface is hidden from it and reads nothing.
      */
     @Test
     fun talkBackReadsTheTerminalShownAndNothingUnderACard() {
         livePane()
         assertTrue(surface().isImportantForAccessibility)
-        val info = surface().createAccessibilityNodeInfo()
-        assertEquals(context.getString(R.string.terminal_surface_label, "zsh"), info.contentDescription?.toString())
-        assertEquals(model.screen.screenText().joinToString("\n"), info.text?.toString())
+        val info = node()
+        val rows = screenRows()
+        assertTrue("the prompt is on the screen", rows.isNotEmpty())
+        assertEquals(rows, info.text?.toString())
+        assertEquals(context.getString(R.string.terminal_surface_label, "zsh") + "\n" + rows, info.contentDescription?.toString())
         rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.REFUSED)
         until { model.phase is TerminalViewPhase.Unavailable }
         until { !surface().isImportantForAccessibility }
+        assertNull(node().text)
+        assertNull(node().contentDescription)
+    }
+
+    /** What the Mac prints is what TalkBack reads next: the node is built when asked, never kept. */
+    @Test
+    fun talkBackReadsTheScreenAsItIsNow() {
+        livePane()
+        macPrints("hello from the Mac")
+        until { model.screen.screenText().first() == "hello from the Mac" }
+        assertEquals(screenRows(), node().text?.toString())
+        assertTrue("${node().text}", node().text!!.startsWith("hello from the Mac"))
+    }
+
+    /**
+     * A change of the screen is told to TalkBack (a text change of the node, so it never keeps a stale screen), at most
+     * once a second while the Mac keeps printing; the last change still goes out.
+     */
+    @Test
+    fun talkBackHearsOfScreenChangesAtMostOnceASecond() {
+        talkBackOn()
+        livePane()
+        val changes = textChanges(surface())
+        idle(1_100)
+        macPrints("one")
+        until { changes.size == 1 }
+        repeat(5) { macPrints("line $it") }
+        until { model.screen.screenText().first() == "line 4" }
+        idle(400)
+        assertEquals("one change a second at most", 1, changes.size)
+        until { changes.size == 2 }
+        assertTrue("$changes", changes[1] - changes[0] >= 1_000)
+        idle(1_500)
+        assertEquals("$changes", 2, changes.size)
+    }
+
+    /** No change is told while a card covers the surface, or for another terminal than the one shown. */
+    @Test
+    fun aCoveredSurfaceTellsTalkBackNothing() {
+        talkBackOn()
+        livePane()
+        val changes = textChanges(surface())
+        idle(1_100)
+        val before = changes.size
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.REFUSED)
+        until { model.phase is TerminalViewPhase.Unavailable }
+        model.retry()
+        idle(1_500)
+        assertEquals(before, changes.size)
+    }
+
+    /** A TalkBack user opens the keyboard with a double tap: the node says what it does ("Double-tap to type"). */
+    @Test
+    fun aTalkBackDoubleTapOpensTheKeyboard() {
+        livePane()
+        val info = node()
+        val click = info.actionList.single { it.id == AccessibilityNodeInfo.ACTION_CLICK }
+        assertEquals(context.getString(R.string.action_type), click.label?.toString())
+        assertTrue(info.isClickable)
+        compose.runOnIdle { assertTrue(surface().performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null)) }
+        until { surface().hasFocus() && ime.shows == 1 && tagged("terminal.key.escape") }
+    }
+
+    /** The surface of a page that is no longer the terminal shown reads nothing and offers nothing. */
+    @Test
+    fun aSurfaceOfAnotherTerminalReadsNothing() {
+        livePane()
+        val surface = surface()
+        model.show("t-claude")
+        until { model.terminalId == "t-claude" }
+        val info = node(surface)
+        assertNull(info.text)
+        assertNull(info.contentDescription)
+        assertTrue(info.actionList.none { it.id == AccessibilityNodeInfo.ACTION_CLICK })
+        assertFalse(surface.performAccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, null))
+    }
+
+    /**
+     * The terminal's screen is the user's (final review I-2): the pane's Compose node carries no text (Compose 1.7+ sends
+     * semantics text to content capture), the surface takes no part in content capture or autofill, and only
+     * accessibility tools read its node (API 34+).
+     */
+    @Test
+    fun theScreenNeverReachesContentCaptureOrAutofill() {
+        livePane()
+        val config = compose.onNodeWithTag("terminal.surface").fetchSemanticsNode().config
+        assertFalse(SemanticsProperties.Text in config)
+        assertFalse(SemanticsProperties.ContentDescription in config)
+        val surface = surface()
+        assertEquals(View.IMPORTANT_FOR_CONTENT_CAPTURE_NO, surface.importantForContentCapture)
+        assertEquals(View.IMPORTANT_FOR_AUTOFILL_NO, surface.importantForAutofill)
+        assertTrue(surface.isAccessibilityDataSensitive)
     }
 
     // TerminalPaneTests.swift, re-expressed for Android (ruling 11)

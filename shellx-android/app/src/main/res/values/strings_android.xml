@@ -5,6 +5,7 @@
     <string name="app_name" translatable="false">ShellX</string>
     <string name="action_open_agent">open the agent\'s chat</string>
     <string name="action_open_your_macs">open Your Macs</string>
+    <string name="action_type">type</string>
     <string name="first_mac_step2">Scan the QR code it shows with this phone.</string>
     <string name="first_mac_subtitle">See and answer Claude Code on your Mac from this phone.</string>
     <string name="machine_state_revoked">This Mac removed this phone</string>

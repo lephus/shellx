@@ -1,6 +1,7 @@
 package com.shellx.app.ui.terminal
 
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -165,6 +167,39 @@ class TerminalPaneGestureTest {
         swipe { swipeLeft() }
         assertTrue("${surface().viewport.scrollX}", surface().viewport.scrollX > 0f)
         assertEquals(0, pager.currentPage)
+    }
+
+    /**
+     * TalkBack scrolls the history a page at a time (its scroll actions, as a swipe does) and reads the rows then shown;
+     * at the bottom only backward is offered, at the top only forward.
+     */
+    @Test
+    fun talkBackScrollsTheHistory() {
+        show(TerminalViewModel.fixed("t-zsh", screen(DemoTerminalScreens.SHELL)))
+        compose.waitForIdle()
+        val surface = surface()
+        fun actions() = surface.createAccessibilityNodeInfo().actionList.map { it.id }
+        val bottom = surface.createAccessibilityNodeInfo()
+        assertTrue(bottom.isScrollable)
+        assertTrue(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD in actions())
+        assertFalse(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD in actions())
+        compose.runOnIdle { assertTrue(surface.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null)) }
+        compose.waitForIdle()
+        val viewport = surface.viewport
+        assertTrue("${viewport.scrollY} of ${viewport.maxScrollY}", viewport.scrollY < viewport.maxScrollY)
+        val older = surface.createAccessibilityNodeInfo()
+        assertNotEquals("it reads the older rows", bottom.text?.toString(), older.text?.toString())
+        assertTrue(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD in actions())
+        compose.runOnIdle {
+            while (surface.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, null)) Unit
+        }
+        assertEquals(0f, surface.viewport.scrollY, 0.5f)
+        assertFalse(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD in actions())
+        compose.runOnIdle {
+            while (surface.performAccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD, null)) Unit
+        }
+        assertTrue(surface.viewport.followsBottom)
+        assertEquals(bottom.text?.toString(), surface.createAccessibilityNodeInfo().text?.toString())
     }
 
     @Test
