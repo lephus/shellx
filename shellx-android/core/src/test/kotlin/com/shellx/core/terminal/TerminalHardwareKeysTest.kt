@@ -75,6 +75,10 @@ class TerminalHardwareKeysTest {
         assertEquals(System, TerminalHardwareKeys.action(29, deadAcute, deadAcute, alt))
         assertEquals(System, TerminalHardwareKeys.action(29, deadAcute, 0, ctrl))
     }
+    /** Review B2 m7: typed text prints as its UTF-8 size only (the plan's privacy rule, as TerminalInputUnit.Text). */
+    @Test fun typedTextPrintsItsSizeOnly() {
+        assertEquals("Type(<5 bytes>)", TerminalHardwareAction.Type("été").toString())
+    }
     @Test fun keyBarOrderAndKeys() {
         assertEquals(listOf("ESCAPE", "TAB", "CTRL", "LEFT", "UP", "DOWN", "RIGHT"), TerminalBarKey.entries.map { it.name })
         assertEquals(listOf(TerminalKey.ESCAPE, TerminalKey.TAB, null, TerminalKey.LEFT, TerminalKey.UP, TerminalKey.DOWN,
