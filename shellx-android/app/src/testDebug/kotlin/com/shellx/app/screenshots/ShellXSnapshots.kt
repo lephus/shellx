@@ -66,15 +66,17 @@ object ShellXSnapshots {
         content: @Composable () -> Unit,
     ): List<Snapshot> = withoutAnimations { render(name, settleTimeout, ready, content) }
 
-    /** The longest [capture] waits for its `ready`, in the main looper's time. */
+    /** The longest [capture] waits for its `ready`, in real time (a rig's stores work off the main thread). */
     const val READY_TIMEOUT_MS = 10_000L
 
     /** Holds a capture until [ready], the main looper's clock moving on 10 ms a round. */
     private class WaitUntilReady(private val what: String, private val ready: () -> Boolean) : RoborazziComposeCaptureOption {
         override fun beforeCapture() {
-            repeat((READY_TIMEOUT_MS / 10).toInt()) {
+            val deadline = System.nanoTime() + READY_TIMEOUT_MS * 1_000_000
+            while (System.nanoTime() < deadline) {
                 if (ready()) return
                 ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+                Thread.sleep(2)
             }
             if (!ready()) throw AssertionError("$what was not ready to capture within $READY_TIMEOUT_MS ms")
         }

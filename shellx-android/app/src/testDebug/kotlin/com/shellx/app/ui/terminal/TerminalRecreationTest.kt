@@ -95,12 +95,15 @@ class TerminalRecreationTest {
 
     private fun idle(ms: Long) = repeat((ms / 10).toInt()) { ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS) }
 
+    /** Waits up to 10 s of real time (the rig's stores work off the main thread), the main looper's clock moving on. */
     private fun until(what: String, condition: () -> Boolean) {
-        repeat(1_000) {
+        val deadline = System.nanoTime() + 10_000_000_000L
+        while (System.nanoTime() < deadline) {
             if (condition()) return
             ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+            Thread.sleep(2)
         }
-        fail("not within 10 s: $what")
+        if (!condition()) fail("not within 10 s: $what")
     }
 
     private fun surfaceIn(controller: ActivityController<TerminalHostActivity>): TerminalSurfaceView? {
