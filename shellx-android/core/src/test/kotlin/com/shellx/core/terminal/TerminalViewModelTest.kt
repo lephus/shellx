@@ -25,6 +25,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -33,6 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -582,6 +584,35 @@ class TerminalViewModelTest {
             "the first failure after the stop is retried: ${model.phase}",
         )
         assertEquals(TerminalViewPhase.Connecting, model.phase)
+    } }
+
+    /** Review C m4, A4 during an open: close() gives up the open waiting for its answer and still closes the view on
+     *  the Mac; its job completes without the answer (the gate ignores cancellation, as a slow link might). */
+    @Test fun closeDuringTheOpenCancelsItAndStillClosesTheView() { runTest {
+        val link = ScriptedTerminalLink(); val gate = Gate(); link.openGate = gate
+        val (model, _) = makeModel(link)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { link.opens == listOf("t1") }
+        val closed = withTimeoutOrNull(1.seconds) { model.close().join() }
+        gate.open()
+        assertNotNull(closed, "close() waits for no answer")
+        assertEquals(listOf(open50x20, Call.Close("t1")), link.calls)
+    } }
+
+    /** Review C m4, A2 during an open: a run restarted in the same turn keeps the open it was waiting on. */
+    @Test fun aRestartedRunDuringTheOpenKeepsIt() { runTest {
+        val link = ScriptedTerminalLink(); val gate = Gate(); link.openGate = gate
+        val (model, first) = makeModel(link)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { link.opens == listOf("t1") }
+        first.cancel()
+        backgroundScope.launch { model.run() }
+        advanceTimeBy(100.milliseconds)
+        gate.open()
+        emit(link, Opened("t1"))
+        emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live }, "${model.phase} ${link.calls}")
+        assertEquals(listOf<Call>(open50x20), link.calls)
     } }
 
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)
