@@ -7,6 +7,8 @@ import com.shellx.link.core.TerminalFrameKind
 import com.shellx.link.core.TerminalFramePart
 import com.shellx.link.core.TerminalGridFrame
 import com.shellx.link.core.TerminalInputUnit
+import com.shellx.link.core.TerminalKey
+import com.shellx.link.core.TerminalModifier
 import com.shellx.link.core.TerminalScreen
 import com.shellx.link.core.TerminalViewEndReason
 import com.shellx.link.core.TerminalViewOpenOutcome
@@ -167,7 +169,7 @@ class TerminalViewModel(
     private val maxHistoryRows: Int = TerminalScreen.DEFAULT_MAX_HISTORY_ROWS,
     private val sleep: suspend (Duration) -> Unit = { delay(it) },
     private val now: TimeSource.WithComparableMarks = TimeSource.Monotonic,
-) {
+) : TerminalTextInput {
     companion object {
         val RESIZE_DELAY: Duration = 200.milliseconds
         val BUSY_RETRY_DELAY: Duration = 300.milliseconds
@@ -239,7 +241,7 @@ class TerminalViewModel(
     val screenRevision: Long get() = state.value.screenRevision
     val snapshots: Int get() = state.value.snapshots
     val topShift: Int get() = state.value.topShift
-    val markedText: String get() = state.value.markedText
+    override val markedText: String get() = state.value.markedText
     val ctrlLatched: Boolean get() = state.value.ctrlLatched
     val sentInputs: Int get() = state.value.sentInputs
     val pasteTooLarge: Int get() = state.value.pasteTooLarge
@@ -279,6 +281,21 @@ class TerminalViewModel(
 
     /** The open the outbox is waiting on, while it waits: A2 and A4 cancel it. */
     private var openCall: Job? = null
+
+    /** The resize waiting out RESIZE_DELAY after the last grid change (R11). */
+    private var resizeWait: Job? = null
+    private var resizeToken = 0
+
+    /** Alternate-screen scrolling summed until SCROLL_COALESCING has passed (R12). */
+    private var scrollSum = 0
+    private var scrollWait: Job? = null
+    private var scrollToken = 0
+
+    /** The echo clock (R10): from the first message of typed text or a key to the next frame applied, at most
+     *  ECHO_TIMEOUT. */
+    private var echoStart: ComparableTimeMark? = null
+    private var echoWait: Job? = null
+    private var echoToken = 0
 
     // Lifecycle (R2, R9, R11, A1, A2, A4)
 
@@ -326,6 +343,7 @@ class TerminalViewModel(
         shown.topShift = 0
         shown.screenRevision += 1
         restoreBudgets()
+        dropEcho()
         waitingForMac = false
         shown.phase = TerminalViewPhase.Connecting
         firstScreenStart = if (terminalId == null) null else now.markNow()
@@ -336,8 +354,11 @@ class TerminalViewModel(
     /** R11: the size that fits the pane. Values below 1 are ignored. */
     fun setPhoneGrid(cols: Int, rows: Int) {
         if (closed || cols < 1 || rows < 1) return
-        grid = GridSize(cols, rows)
+        val grid = GridSize(cols, rows)
+        this.grid = grid
         reconcile()
+        val current = view
+        if (current == null || grid == current.size) cancelResize() else scheduleResize()
         publish()
     }
 
@@ -366,6 +387,7 @@ class TerminalViewModel(
                 forgetView()
             }
             restoreBudgets()
+            dropEcho()
             collecting?.cancel()
             outbox.close()
         }
@@ -406,8 +428,15 @@ class TerminalViewModel(
         }
     }
 
+    /** The view's waits go with it: a resize or scroll for it never reaches the next view. */
     private fun forgetView() {
         view = null
+        cancelResize()
+        scrollWait?.cancel()
+        scrollWait = null
+        scrollToken += 1
+        scrollSum = 0
+        dropEcho()
     }
 
     private fun restoreBudgets() {
@@ -611,6 +640,10 @@ class TerminalViewModel(
             }
         }
         link.recordLatency(LatencyMetric.TERMINAL_FRAME_APPLY, started.elapsedNow())
+        echoStart?.let {
+            link.recordLatency(LatencyMetric.TERMINAL_KEY_ECHO, it.elapsedNow())
+            dropEcho()
+        }
     }
 
     /** R8. */
@@ -622,6 +655,126 @@ class TerminalViewModel(
             return
         }
         reconcile()
+    }
+
+    // Typing, paste, scrolling and resizing (R10–R12)
+
+    override fun insertText(text: String) = type { typing.insert(text) }
+
+    override fun setMarkedText(text: String) = type { typing.setMarked(text) }
+
+    override fun unmarkText() = type { typing.unmark() }
+
+    override fun deleteBackward() = type { typing.deleteBackward() }
+
+    /** Text a key event types: the word in progress goes first, in the same message (review B2 I-2). */
+    override fun typeKey(text: String) = type { typing.typeKey(text) }
+
+    override fun press(key: TerminalKey, mods: List<TerminalModifier>) = type { typing.key(key, mods) }
+
+    fun toggleCtrl() = type {
+        typing.toggleCtrl()
+        emptyList()
+    }
+
+    /**
+     * R12: refused whole when it does not fit (`pasteTooLarge`, A6; the word being composed stays), else sent in
+     * paste-sized messages after the word being composed, which is committed first as before a key.
+     */
+    override fun paste(text: String) {
+        if (closed) return
+        if (!TerminalInputBatcher.pasteFits(text)) {
+            shown.pasteTooLarge += 1
+        } else {
+            sendUnits(typing.unmark() + TerminalInputBatcher.pasteUnits(text))
+        }
+        publish()
+    }
+
+    /** R12: alternate-screen scrolling (positive: toward older content), summed for SCROLL_COALESCING. */
+    fun scroll(lines: Int) {
+        if (closed || view == null || !screen.alt || lines == 0) return
+        scrollSum += lines
+        if (scrollWait != null) return
+        val token = scrollToken
+        val wait = scope.launch(start = CoroutineStart.LAZY) {
+            sleep(SCROLL_COALESCING)
+            flushScroll(token)
+        }
+        scrollWait = wait
+        wait.start()
+    }
+
+    /** One typing call: [units] of it go out with a view, and the typing state is copied out (A3). */
+    private inline fun type(units: () -> List<TerminalInputUnit>) {
+        if (closed) return
+        sendUnits(units())
+        publish()
+    }
+
+    /** R10: [units] as input messages to the view, after any queued open; dropped without a view. */
+    private fun sendUnits(units: List<TerminalInputUnit>) {
+        val current = view ?: return
+        if (units.isEmpty()) return
+        for (message in TerminalInputBatcher.messages(units)) {
+            send(Message.Input(current.terminalId, message))
+            shown.sentInputs += 1
+            if (echoStart == null && message.any { it is TerminalInputUnit.Text || it is TerminalInputUnit.Key }) startEcho()
+        }
+    }
+
+    private fun flushScroll(token: Int) {
+        if (token != scrollToken) return
+        scrollWait = null
+        val total = scrollSum
+        scrollSum = 0
+        sendUnits(TerminalInputBatcher.scrollUnits(total))
+        publish()
+    }
+
+    private fun startEcho() {
+        echoStart = now.markNow()
+        val token = ++echoToken
+        echoWait?.cancel()
+        val wait = scope.launch(start = CoroutineStart.LAZY) {
+            sleep(ECHO_TIMEOUT)
+            if (echoToken != token) return@launch
+            echoStart = null
+            echoWait = null
+        }
+        echoWait = wait
+        wait.start()
+    }
+
+    private fun dropEcho() {
+        echoStart = null
+        echoToken += 1
+        echoWait?.cancel()
+        echoWait = null
+    }
+
+    /** R11: the grid goes out RESIZE_DELAY after its last change, unless it is the size last sent. */
+    private fun scheduleResize() {
+        resizeWait?.cancel()
+        val token = ++resizeToken
+        val wait = scope.launch(start = CoroutineStart.LAZY) {
+            sleep(RESIZE_DELAY)
+            if (resizeToken != token) return@launch
+            resizeWait = null
+            val current = view ?: return@launch
+            val grid = grid ?: return@launch
+            if (grid == current.size) return@launch
+            send(Message.Resize(current.terminalId, grid.cols, grid.rows))
+            current.size = grid
+        }
+        resizeWait = wait
+        wait.start()
+    }
+
+    private fun cancelResize() {
+        resizeWait?.cancel()
+        resizeWait = null
+        resizeToken += 1
     }
 
     private fun publish() {
