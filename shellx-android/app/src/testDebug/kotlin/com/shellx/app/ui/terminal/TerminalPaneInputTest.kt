@@ -47,6 +47,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -470,6 +471,45 @@ class TerminalPaneInputTest {
         idle(300)
         assertTrue(surface().hasFocus())
         assertTrue(tagged("terminal.key.escape"))
+    }
+
+    /** `t-zsh`'s page, live, under a tester that recreates it with its saved state (a rotation). */
+    private fun restorablePane(): StateRestorationTester {
+        start()
+        val tester = StateRestorationTester(compose)
+        tester.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(LocalTerminalIme provides ime, LocalSpinner provides StillSpinner) {
+                    TerminalPane(model, "t-zsh", "zsh", shown = true)
+                }
+            }
+        }
+        until { model.phase == TerminalViewPhase.Live }
+        return tester
+    }
+
+    /** A rotation keeps the keyboard and the key bar, as the iPhone does (review D1 M10). */
+    @Test
+    fun aRotationKeepsTheKeyboardAndTheKeyBar() {
+        val tester = restorablePane()
+        focus()
+        val shows = ime.shows
+        tester.emulateSavedInstanceStateRestore()
+        until { surfaces().size == 1 && surface().hasFocus() && tagged("terminal.key.escape") }
+        until { ime.shows > shows }
+    }
+
+    /** A keyboard the user hid stays hidden through a rotation. */
+    @Test
+    fun aRotationDoesNotBringBackAKeyboardTheUserHid() {
+        val tester = restorablePane()
+        focus()
+        compose.onNodeWithTag("terminal.key.hideKeyboard").performClick()
+        until { !tagged("terminal.key.escape") }
+        tester.emulateSavedInstanceStateRestore()
+        idle(300)
+        assertFalse(surface().hasFocus())
+        assertFalse(tagged("terminal.key.escape"))
     }
 
     // TerminalPaneTests.swift, re-expressed for Android (ruling 11)
