@@ -285,8 +285,19 @@ class TerminalViewModel(
     private var running = false
     private var closed = false
 
+    /** A run's collection of terminal events; [stopped] tells its run that a newer run() or close() cancelled it. */
+    private class Collection(private val job: Job) {
+        var stopped = false
+            private set
+
+        fun stop() {
+            stopped = true
+            job.cancel()
+        }
+    }
+
     /** The newest run's collection of terminal events, while it runs: a newer run() or close() stops it. */
-    private var collecting: Job? = null
+    private var collecting: Collection? = null
 
     /** After a NotSent (or NoAnswer while not online): no open until this Mac's next State, show, retry or run (R3). */
     private var waitingForMac = false
@@ -331,14 +342,17 @@ class TerminalViewModel(
         if (closed) return
         startOutbox()
         val generation = ++runGeneration
-        collecting?.cancel()
+        collecting?.stop()
         running = true
         waitingForMac = false
         reconcile()
         publish()
+        var mine: Collection? = null
         try {
             coroutineScope {
-                collecting = coroutineContext.job
+                val collection = Collection(coroutineContext.job)
+                mine = collection
+                collecting = collection
                 // Straight into a handler that never suspends: no operator between the hub's queue and the assembler.
                 link.terminalEvents(machineId).collect { event ->
                     if (generation == runGeneration && !closed) {
@@ -348,10 +362,11 @@ class TerminalViewModel(
                 }
             }
         } catch (e: CancellationException) {
-            // A newer run() or close() stopped this collection: the caller's own cancellation goes on.
+            // Only a newer run() or close() ends a run quietly (review C m2); the caller's own cancellation goes on.
+            if (mine?.stopped != true) throw e
             currentCoroutineContext().ensureActive()
         } finally {
-            if (generation == runGeneration) collecting = null
+            if (collecting === mine) collecting = null
             if (generation == runGeneration && !closed) stopAfterOneDispatch(generation)
         }
     }
@@ -412,7 +427,7 @@ class TerminalViewModel(
             openCall?.cancel()
             restoreBudgets()
             dropEcho()
-            collecting?.cancel()
+            collecting?.stop()
             outbox.close()
         }
         return drainer ?: Job().apply { complete() }
