@@ -13,7 +13,8 @@ import kotlin.math.floor
  * - [resized] keeps the scroll, and a viewport that follows the bottom stays at [maxScrollY].
  * - [contentChanged] first applies `zoom.gridChanged(cols)`. With `toBottom` or [followsBottom] the result is at
  *   [maxScrollY] with [followsBottom] true. Otherwise [scrollY] moves by `topShiftDelta × cellHeight × scale`.
- * - [scrolledBy] adds `dx` and `dy`, then sets [followsBottom] to `scrollY >= maxScrollY - 0.5`.
+ * - [scrolledBy] adds `dx` and `dy`, then sets [followsBottom] when [scrollY] is within half a row of [maxScrollY]
+ *   (`scrollY >= maxScrollY − cellHeight × scale / 2`, as the iPhone's pane does; review B2 m1).
  * - [pinched]: with `s0` the scale before and `s1` the scale of `zoom.pinch(s0 × factor, fit)`, the content point under
  *   the focus stays: `scrollX' = (scrollX + focusX − padding) × s1 / s0 + padding − focusX`, the same for y; then
  *   clamped, and [followsBottom] as in [scrolledBy].
@@ -82,5 +83,5 @@ data class TerminalViewport(
     private fun atBottom(): TerminalViewport =
         copy(scrollX = scrollX.coerceIn(0f, maxScrollX), scrollY = maxScrollY, followsBottom = true)
 
-    private fun following(): TerminalViewport = copy(followsBottom = scrollY >= maxScrollY - 0.5f)
+    private fun following(): TerminalViewport = copy(followsBottom = scrollY >= maxScrollY - cellHeight * scale / 2)
 }
