@@ -45,9 +45,10 @@ import com.shellx.link.core.TerminalScreen
  * row above is never painted over.
  *
  * It is the keyboard's editor ([TerminalInputConnection]; plan 3G Design, "Soft keyboard") and takes hardware keys
- * ([handleKey]; "Hardware keys"). Input reaches the model only from the page shown and only while the model takes it
- * ([accepts]); a surface that stops accepting gives the keyboard up, and it never takes the keyboard back by itself:
- * only a tap or a long press focuses it ([focusAndShowKeyboard]).
+ * ([handleKey]; "Hardware keys"), telling the connection what each key did to the text the keyboard sees, and on each
+ * [render] whether input went out past the keyboard (the key bar, Paste). Input reaches the model only from the page
+ * shown and only while the model takes it ([accepts]); a surface that stops accepting gives the keyboard up, and it never
+ * takes the keyboard back by itself: only a tap or a long press focuses it ([focusAndShowKeyboard]).
  *
  * TalkBack reads it from this View, never from the pane's Compose node (Compose hands an AndroidView's node to its
  * View), and only while it is the terminal shown and uncovered ([readable]): [accessibilityLabel] and the rows shown,
@@ -150,8 +151,12 @@ class TerminalSurfaceView(
         lastSentInputs = state.sentInputs
         lastTopShift = state.topShift
         setViewport(viewport.contentChanged(screen.cols, shownRows(screen), if (newSnapshot) 0 else shift, toBottom = newSnapshot || typed))
-        // The keyboard follows the model: a key that committed the word, a paste, another terminal shown.
-        connection?.let { if (it.document != state.markedText) it.resync(state.markedText) }
+        // The keyboard follows the model: input sent past it (the key bar, Paste) ended its word; a key that committed the
+        // word, a paste or another terminal shown restarts it.
+        connection?.let {
+            it.checkOutsideInput()
+            if (it.document != state.markedText) it.resync(state.markedText)
+        }
         // A page that stops taking input (covered, reopening, another terminal shown) gives the keyboard up.
         if (hasFocus() && !accepts()) clearTerminalFocus()
         // Under a card, or for another terminal, TalkBack does not reach it.
@@ -389,8 +394,15 @@ class TerminalSurfaceView(
             mayFocus = false
             keysDown.clear()
             deadAccent = 0
+            // The word the keyboard sees ends with the focus: nothing typed stays around for its return.
+            connection?.wordEnded()
         }
         onFocusChange(gainFocus)
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        if (!hasWindowFocus) connection?.wordEnded()
     }
 
     // Hardware keys
@@ -407,8 +419,9 @@ class TerminalSurfaceView(
      * `TerminalHardwareKeys`; the up of a down it took is taken too; text of a KEYCODE_UNKNOWN multiple is typed as a key
      * (the word being composed is committed first), or pasted when it is one ([TerminalInputConnection.isPaste]).
      * A dead key waits for the next character and joins it (`KeyEvent.getDeadChar`), or is typed first when they do not
-     * join. False for the system's keys (Back, volume, Meta shortcuts, function keys), and for every key while the page
-     * does not take input.
+     * join. The keyboard's connection is told what the key did to the text the keyboard sees: text typed joins the word,
+     * a backspace shortens it, any other key or a paste ends it. False for the system's keys (Back, volume, Meta
+     * shortcuts, function keys), and for every key while the page does not take input.
      */
     fun handleKey(event: KeyEvent): Boolean {
         if (!accepts()) return false
@@ -418,7 +431,7 @@ class TerminalSurfaceView(
                 if (event.keyCode != KeyEvent.KEYCODE_UNKNOWN) return false
                 // A key's text: the word being composed is committed first; a line break or a long text is a paste (A-32).
                 event.characters?.takeIf { it.isNotEmpty() }?.let {
-                    if (TerminalInputConnection.isPaste(it)) model.paste(it) else model.typeKey(it)
+                    if (TerminalInputConnection.isPaste(it)) paste(it) else type(it)
                 }
                 return true
             }
@@ -443,18 +456,36 @@ class TerminalSurfaceView(
         val alt = event.getUnicodeChar(meta and (KeyEvent.META_CTRL_MASK or KeyEvent.META_META_MASK).inv())
         val modifiers = TerminalHardwareModifiers(event.isShiftPressed, event.isCtrlPressed, event.isAltPressed, event.isMetaPressed)
         when (val action = TerminalHardwareKeys.action(event.keyCode, plain, alt, modifiers)) {
-            is TerminalHardwareAction.Send -> model.press(action.key, action.mods)
-            is TerminalHardwareAction.Type -> model.typeKey(action.text)
-            TerminalHardwareAction.DeleteBackward -> model.deleteBackward()
-            TerminalHardwareAction.Paste -> TerminalClipboard.text(context)?.let(model::paste)
+            is TerminalHardwareAction.Send -> {
+                model.press(action.key, action.mods)
+                connection?.wordEnded()
+            }
+            is TerminalHardwareAction.Type -> type(action.text)
+            TerminalHardwareAction.DeleteBackward -> {
+                model.deleteBackward()
+                connection?.deletedByKey()
+            }
+            TerminalHardwareAction.Paste -> TerminalClipboard.text(context)?.let(::paste) ?: connection?.wordEnded()
             TerminalHardwareAction.System -> return false
         }
         keysDown += event.keyCode
         return true
     }
 
+    /** Types [text] as a key (the word being composed goes first); the keyboard's word grows with it. */
+    private fun type(text: String) {
+        model.typeKey(text)
+        connection?.typedByKey(text)
+    }
+
+    /** Pastes [text] (the word being composed goes first); the keyboard's word ends. */
+    private fun paste(text: String) {
+        model.paste(text)
+        connection?.wordEnded()
+    }
+
     private fun typeCodePoint(codePoint: Int) {
-        if (Character.isValidCodePoint(codePoint)) model.typeKey(String(Character.toChars(codePoint)))
+        if (Character.isValidCodePoint(codePoint)) type(String(Character.toChars(codePoint)))
     }
 
     // Drawing
