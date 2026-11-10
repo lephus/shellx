@@ -108,8 +108,9 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  *
  * Gestures (plan 3G, "Renderer"): a vertical drag scrolls the history on the main screen, or sends scroll lines on the
  * alternate screen while the grid fits the height (no fling there); a horizontal drag pans while the grid is wider
- * than the pane; two fingers pinch between fit and 2. While a pinch is under way or the grid is wider than the pane,
- * [locksPaging] is told true, and false again when that ends or the page stops being shown or leaves.
+ * than the pane; two fingers pinch between fit and 2. While a pinch is under way or the grid is wider than the pane, and
+ * no card covers it, [locksPaging] is told true, and false again when that ends, a card comes, or the page stops being
+ * shown or leaves.
  *
  * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste. The key bar shows under the surface while
  * it has the keyboard ([showsKeyBar] in tests), only on the page shown and only while it takes input; when the soft
@@ -313,7 +314,9 @@ private fun BoxScope.Surface(
     var viewport by remember { mutableStateOf<TerminalViewport?>(null) }
     var pinching by remember { mutableStateOf(false) }
     val wide = (viewport?.maxScrollX ?: 0f) > 0.5f
-    LaunchedEffect(pinching || wide) { onLocks(pinching || wide) }
+    // Under a card nothing can be pinched back or panned: a zoom kept from before locks nothing.
+    val locks = !covered && (pinching || wide)
+    LaunchedEffect(locks) { onLocks(locks) }
     val currentOnFocus by rememberUpdatedState(onFocus)
 
     val emptyColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
