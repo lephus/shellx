@@ -94,6 +94,9 @@ class TerminalInputConnection(
         val sent = text?.toString().orEmpty()
         if (isPaste(sent)) input.paste(sent) else input.insertText(sent)
         document = input.markedText
+        // A keyboard keeps its own copy of what it committed, which the document never shows: after a word's space it
+        // reads the text before the cursor again (""), so a second space is not taken for a double-space period (". ").
+        if (sent.endsWith(' ')) restart()
     }
 
     /**
