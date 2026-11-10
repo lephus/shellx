@@ -79,10 +79,16 @@ class TerminalSurfaceInputTest {
     @Test
     fun theEditorInfoKeepsComposingAndTurnsOffWhatATerminalMustNotHave() {
         val info = EditorInfo().also { surface.onCreateInputConnection(it) }
-        assertEquals(
-            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
-            info.inputType,
-        )
+        // Controller ruling (emulator check, Gboard 15.1): with NO_SUGGESTIONS Gboard composes nothing, so Telex reached
+        // the Mac as "tieêngếng". Single-line plain text with no AUTO_CORRECT flag: the keyboard composes and suggests,
+        // and corrects nothing.
+        assertEquals(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL, info.inputType)
+        for (flag in listOf(
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, InputType.TYPE_TEXT_FLAG_AUTO_CORRECT, InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+            InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE, InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, InputType.TYPE_TEXT_FLAG_CAP_WORDS,
+        )) {
+            assertEquals("inputType has no $flag", 0, info.inputType and flag)
+        }
         for (flag in listOf(
             EditorInfo.IME_FLAG_NO_EXTRACT_UI, EditorInfo.IME_FLAG_NO_FULLSCREEN, EditorInfo.IME_FLAG_NO_ENTER_ACTION,
             EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING,
