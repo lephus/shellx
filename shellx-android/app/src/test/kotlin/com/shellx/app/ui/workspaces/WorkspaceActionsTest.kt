@@ -208,6 +208,20 @@ class WorkspaceActionsTest {
         assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.REFUSED_CONTROL), lastFeedback())
         assertEquals(listOf(WorkspaceAlert.REFUSED_CONTROL), alerts)
         assertEquals("t-zsh", model.selectedTerminalId)
+        assertFalse("a refused ＋ is not dimmed any more", model.creatingTerminal)
+    }
+
+    /** ＋ to a Mac that cannot be reached is an alert, and ＋ is not left dimmed (review D2 m1). */
+    @Test
+    fun aNewTerminalToAnUnreachableMacLeavesPlusEnabled() {
+        follow()
+        rig.hub.backgroundTimeExpired()
+        assertTrue(eventually { rig.hub.machines.first().state != MachineLinkState.Online })
+        actions.createTerminal()
+        assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.OFFLINE), lastFeedback())
+        assertEquals(listOf(WorkspaceAlert.OFFLINE), alerts)
+        assertFalse(model.creatingTerminal)
+        assertTrue(rig.mac.terminalCreates.isEmpty())
     }
 
     @Test
