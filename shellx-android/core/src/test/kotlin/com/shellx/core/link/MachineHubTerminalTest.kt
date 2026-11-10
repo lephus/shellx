@@ -349,6 +349,38 @@ class MachineHubTerminalTest {
         assertEquals(revisions.distinct(), revisions, "no push went to both")
     } }
 
+    /**
+     * Review B1 m2: a collection on an immediate dispatcher resumes inside the call that takes its pushes away. It must
+     * already see the newer collection then, or it takes the pushes again beside it; and the hub's stop must not trip
+     * over a collection that ends while the stop goes through the list.
+     */
+    @Test fun aCollectionThatResumesAtOnceTakesNoPushOfANewerOneAndTheStopCompletes() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val id = mac.machine.machineId
+        val immediate = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+        val older = HubView(rig.hub, id, "t1", immediate)
+        older.start()
+        rig.hub.openTerminalView(id, "t1", 50, 20)
+        assertTrue(eventually { older.screen.screenText().firstOrNull() == "$" })
+        val newer = mutableListOf<TerminalViewPush>()
+        val newerJob = backgroundScope.launch {
+            rig.hub.terminalEvents(id).collect { (it as? TerminalHubEvent.Push)?.let { e -> newer += e.push } }
+        }
+        runCurrent()
+        val olderBefore = older.pushes.size
+
+        mac.emitTerminalFrame("t1", row0("newer"))
+        assertTrue(eventually { newer.size == 1 }, "the older took ${older.pushes.size - olderBefore}")
+        assertEquals(olderBefore, older.pushes.size)
+
+        newerJob.cancel()
+        runCurrent()
+        rig.hub.stopAll()
+        assertEquals(0, rig.hub.terminalSubscriberCount)
+    } }
+
     /** A delta of the 50 × 20 prompt view, every row full: about 1.8 KB of frame JSON. */
     private val flood = TerminalGridFrame(
         TerminalFrameHead(TerminalFrameKind.DELTA, 50, 20, cursor = TerminalCursor(0, 0)),
