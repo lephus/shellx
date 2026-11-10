@@ -70,6 +70,9 @@ class TerminalSurfaceView(
     private val fill = Paint()
     private val stroke = Paint().apply { style = Paint.Style.STROKE }
 
+    /** Row layouts built so far (tests: what a frame costs). */
+    internal val rowLayoutsBuilt: Int get() = cache.builds
+
     /** Called with every new [viewport]. */
     var onViewportChange: (TerminalViewport) -> Unit = {}
 
