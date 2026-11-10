@@ -50,6 +50,20 @@ class TerminalViewportTest {
         assertEquals(928f, near.contentChanged(10, 51, 0, toBottom = false).scrollY)
         assertFalse(v(10, 50).scrolledBy(0f, -11f).followsBottom)
     }
+    /** Review B2 m2: hiding the keyboard under a view scrolled up by less than it clamps the view to the bottom: it follows. */
+    @Test fun aPaneThatGrowsPastAScrolledUpViewFollowsAgain() {
+        val up = v(10, 50).scrolledBy(0f, -100f); assertEquals(808f, up.scrollY); assertFalse(up.followsBottom)
+        val grown = up.resized(200f, 300f)
+        assertEquals(708f, grown.scrollY); assertTrue(grown.followsBottom)
+        assertEquals(728f, grown.contentChanged(10, 51, 0, toBottom = false).scrollY)
+    }
+    /** Review B2 m2: an alternate screen that fits clamps a scrolled-up view to its bottom; leaving it shows the bottom, not row 0. */
+    @Test fun anAlternateScreenThatClampsTheScrollFollowsAgainWhenItEnds() {
+        val up = v(10, 50).scrolledBy(0f, -300f); assertFalse(up.followsBottom)
+        val alt = up.contentChanged(10, 4, 0, toBottom = false)
+        assertEquals(0f, alt.scrollY); assertTrue(alt.followsBottom)
+        assertEquals(908f, alt.contentChanged(10, 50, 0, toBottom = false).scrollY)
+    }
     @Test fun aKeyboardThatShrinksThePaneKeepsTheBottom() {
         val p = v(10, 100, h = 300f).resized(200f, 150f)
         assertEquals(p.maxScrollY, p.scrollY); assertTrue(p.followsBottom)
