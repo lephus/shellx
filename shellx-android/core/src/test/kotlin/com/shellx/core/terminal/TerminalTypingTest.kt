@@ -66,6 +66,16 @@ class TerminalTypingTest {
         typing.toggleCtrl(); assertEquals(listOf(Key(TerminalKey.ENTER, ctrl)), typing.insert("\n"))
     }
 
+    /**
+     * Review B2 m6: a control character is a character of its own, as in Swift, so a tab followed by a combining mark is
+     * still the chord's tab (3C's graphemes() would join the mark to it).
+     */
+    @Test fun ctrlBeforeATabAndACombiningMarkChordsTheTab() {
+        val typing = TerminalTyping()
+        typing.toggleCtrl()
+        assertEquals(listOf(Key(TerminalKey.TAB, ctrl), Text("\u0301x")), typing.insert("\t\u0301x"))
+    }
+
     @Test fun ctrlWithAnyOtherCharacterTypesItPlain() {
         val typing = TerminalTyping()
         typing.toggleCtrl(); assertEquals(listOf(Text("1x")), typing.insert("1x")); assertFalse(typing.ctrlLatched)

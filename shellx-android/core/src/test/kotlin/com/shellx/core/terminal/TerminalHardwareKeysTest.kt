@@ -68,6 +68,13 @@ class TerminalHardwareKeysTest {
         assertEquals(System, a(31, 'c', mods = meta)); assertEquals(System, a(K.ESCAPE, mods = meta))
         assertEquals(System, a(131)); assertEquals(System, a(4)); assertEquals(System, a(24))                // F1, BACK, VOLUME_UP
     }
+    /** Review B2 m6: a dead key the surface did not handle (getUnicodeChar's COMBINING_ACCENT bit) never types. */
+    @Test fun anUnhandledDeadKeyNeverTypes() {
+        val deadAcute = 0x80000301.toInt()
+        assertEquals(System, TerminalHardwareKeys.action(29, deadAcute, 0, TerminalHardwareModifiers()))
+        assertEquals(System, TerminalHardwareKeys.action(29, deadAcute, deadAcute, alt))
+        assertEquals(System, TerminalHardwareKeys.action(29, deadAcute, 0, ctrl))
+    }
     @Test fun keyBarOrderAndKeys() {
         assertEquals(listOf("ESCAPE", "TAB", "CTRL", "LEFT", "UP", "DOWN", "RIGHT"), TerminalBarKey.entries.map { it.name })
         assertEquals(listOf(TerminalKey.ESCAPE, TerminalKey.TAB, null, TerminalKey.LEFT, TerminalKey.UP, TerminalKey.DOWN,
