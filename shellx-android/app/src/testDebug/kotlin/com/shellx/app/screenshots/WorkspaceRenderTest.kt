@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.WorkRig
 import com.shellx.app.ui.components.LocalSpinner
@@ -42,6 +43,7 @@ import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -53,6 +55,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = ShellXSnapshots.DEVICE_QUALIFIERS)
 class WorkspaceRenderTest {
+    /** No window of its own: it keeps the capture's window in step with Compose while a live render waits. */
+    @get:Rule val compose = createEmptyComposeRule()
+
     /** The embedded agent screen for [session], as `AgentView` feeds it, from fixtures. */
     @Composable
     private fun AgentPane(session: MachineSession, pending: List<MachinePendingItem>) {
@@ -237,7 +242,7 @@ class WorkspaceRenderTest {
         try {
             rig.mac.setTerminalFixtures(mapOf("t-zsh" to DemoTerminalScreens.SHELL))
             var window: View? = null
-            assertRenders("workspace-live-terminal", ready = { window?.let(::liveTerminalIn) == true }) {
+            assertRenders("workspace-live-terminal", ready = { compose.waitForIdle(); window?.let(::liveTerminalIn) == true }) {
                 window = LocalView.current
                 WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
             }
