@@ -73,7 +73,7 @@ class WorkspaceScreenTest {
         show()
         compose.onNodeWithTag("workspace.chip.t-zsh").performClick()
         assertEquals("t-zsh", selected)
-        until { compose.onAllNodesWithText(text(R.string.workspace_shell_placeholder)).fetchSemanticsNodes().isNotEmpty() }
+        until { compose.onAllNodesWithText(text(R.string.terminal_needs_update)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("workspace.shell.placeholder").assertIsDisplayed()
     }
 

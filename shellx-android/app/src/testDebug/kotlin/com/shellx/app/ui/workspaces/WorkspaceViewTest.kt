@@ -73,7 +73,7 @@ class WorkspaceViewTest {
     @Test
     fun thePaneClosedOnTheMacShowsTheNoticeThenItGoes() {
         show()
-        until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        until { shown(context.getString(R.string.terminal_needs_update)) }
         // Frame by frame from here, so the 4 s count from the frame the notice shows (the chips slide meanwhile).
         compose.mainClock.autoAdvance = false
         rig.mac.upsertWorkspace(
@@ -98,7 +98,7 @@ class WorkspaceViewTest {
     @Test
     fun aWorkspaceClosedOnTheMacLeavesWithTheListsNotice() {
         show()
-        until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        until { shown(context.getString(R.string.terminal_needs_update)) }
         rig.mac.removeWorkspace("ws-shellx")
         until { backs == 1 }
         compose.waitForIdle()
@@ -128,7 +128,7 @@ class WorkspaceViewTest {
                 }
             }
         }
-        until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        until { shown(context.getString(R.string.terminal_needs_update)) }
         // The "Needs you" page goes on top; the Mac closes the workspace meanwhile.
         compose.runOnIdle {
             entry.registry.currentState = Lifecycle.State.CREATED
@@ -175,7 +175,7 @@ class WorkspaceViewTest {
                 }
             }
         }
-        until { shown(context.getString(R.string.workspace_shell_placeholder)) }
+        until { shown(context.getString(R.string.terminal_needs_update)) }
         compose.onNodeWithTag("workspace.chip.t-claude").performClick()
         until { tagged("composer.attach") }
         compose.onNodeWithTag("composer.attach").performClick()
@@ -183,7 +183,7 @@ class WorkspaceViewTest {
         until { tagged("composer.attachments") }
 
         compose.onNodeWithTag("workspace.pager").performTouchInput { swipeLeft() }
-        until { shown(context.getString(R.string.workspace_shell_placeholder)) && !tagged("composer.attach") }
+        until { shown(context.getString(R.string.terminal_needs_update)) && !tagged("composer.attach") }
         compose.onNodeWithTag("workspace.pager").performTouchInput { swipeRight() }
         until { tagged("composer.attach") }
         compose.runOnUiThread { gate.complete(Unit) }
