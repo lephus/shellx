@@ -10,6 +10,7 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import com.shellx.core.terminal.TerminalColors
@@ -39,7 +40,8 @@ import com.shellx.link.core.TerminalScreen
  * It is the keyboard's editor ([TerminalInputConnection]; plan 3G Design, "Soft keyboard") and takes hardware keys
  * ([handleKey]; "Hardware keys"). Input reaches the model only from the page shown and only while the model takes it
  * ([accepts]); a surface that stops accepting gives the keyboard up, and it never takes the keyboard back by itself:
- * only a tap or a long press focuses it ([focusAndShowKeyboard]). Main thread only.
+ * only a tap or a long press focuses it ([focusAndShowKeyboard]). TalkBack reads it from this View
+ * ([accessibilityLabel], the screen as text) while its page is shown and uncovered. Main thread only.
  */
 @SuppressLint("ViewConstructor") // Made in code by TerminalPane only.
 class TerminalSurfaceView(
@@ -89,7 +91,18 @@ class TerminalSurfaceView(
     /** A dead key's accent, waiting for the next character. */
     private var deadAccent = 0
 
+    /**
+     * The terminal as TalkBack reads it: this label, and the screen's rows as the node's text. Set here and not in the
+     * pane's semantics, which never reach an accessibility service: Compose hands an AndroidView's node to its View.
+     */
+    var accessibilityLabel: String = ""
+        set(value) {
+            field = value
+            contentDescription = value
+        }
+
     init {
+        // Hidden until the first render says the page is shown and uncovered.
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         isFocusable = true
         isFocusableInTouchMode = true
@@ -115,7 +128,16 @@ class TerminalSurfaceView(
         connection?.let { if (it.document != state.markedText) it.resync(state.markedText) }
         // A page that stops taking input (covered, reopening, another terminal shown) gives the keyboard up.
         if (hasFocus() && !accepts()) clearTerminalFocus()
+        // Under a card, or for another terminal, TalkBack does not reach it.
+        val readable = state.terminalId == terminalId && !covers(state.phase, state.snapshots)
+        importantForAccessibility = if (readable) IMPORTANT_FOR_ACCESSIBILITY_YES else IMPORTANT_FOR_ACCESSIBILITY_NO
         invalidate()
+    }
+
+    /** The screen's rows, built only when an accessibility service asks. */
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        info.text = model.screen.screenText().joinToString("\n")
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

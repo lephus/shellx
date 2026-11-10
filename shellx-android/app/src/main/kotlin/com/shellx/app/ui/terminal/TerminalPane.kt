@@ -365,6 +365,7 @@ private fun BoxScope.Surface(
                 .then(gestures),
             update = { view ->
                 view.emptyColor = emptyColor
+                view.accessibilityLabel = label
                 view.render(state)
             },
             onRelease = { view ->
