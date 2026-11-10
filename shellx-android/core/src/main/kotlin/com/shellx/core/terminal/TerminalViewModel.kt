@@ -73,6 +73,8 @@ data class TerminalViewState(
     val sentInputs: Int = 0,
     /** Raised by one each time a paste is refused for its size (R12, A6). */
     val pasteTooLarge: Int = 0,
+    /** [TerminalViewModel.acceptsInput]. */
+    val acceptsInput: Boolean = false,
 )
 
 /**
@@ -252,6 +254,16 @@ class TerminalViewModel(
     val ctrlLatched: Boolean get() = state.value.ctrlLatched
     val sentInputs: Int get() = state.value.sentInputs
     val pasteTooLarge: Int get() = state.value.pasteTooLarge
+
+    /**
+     * Whether what is typed goes anywhere, so the page keeps or takes the keyboard and shows the key bar (the iPhone's
+     * final review): Live, or Connecting after a screen came while a view is opening (input queues behind the open,
+     * R10: a new run, a reconnect, a `not_open` reopen). Not in the wait before a busy or failed open is retried, nor
+     * while waiting for the Mac after a NotSent (no view to type into), Offline, Unsupported, Unavailable, or before the
+     * first screen (the loading card covers the surface). A stopped page (A1) keeps the phase, and so the keyboard, as
+     * it was.
+     */
+    val acceptsInput: Boolean get() = state.value.acceptsInput
 
     /** The screen shown: replaced by show() of another terminal, changed in place by each frame. Main thread only. */
     var screen: TerminalScreen = TerminalScreen(maxHistoryRows)
@@ -820,6 +832,11 @@ class TerminalViewModel(
             ctrlLatched = typing.ctrlLatched,
             sentInputs = shown.sentInputs,
             pasteTooLarge = shown.pasteTooLarge,
+            acceptsInput = when (shown.phase) {
+                TerminalViewPhase.Live -> true
+                TerminalViewPhase.Connecting -> shown.snapshots > 0 && retryWait == null && !waitingForMac
+                else -> false
+            },
         )
     }
 }
