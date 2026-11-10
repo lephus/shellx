@@ -20,6 +20,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.activity.ComponentActivity
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import kotlin.math.roundToInt
 import java.util.concurrent.TimeUnit
 import org.robolectric.shadows.ShadowLooper
 import com.shellx.app.screenshots.StillSpinner
@@ -62,7 +66,8 @@ import org.robolectric.annotation.GraphicsMode
  *
  * Robolectric draws no system bars and shows no keyboard, so the room they take is left out of the content here: the
  * status bar (24 dp), the gesture bar (24 dp) and the demo banner (48 dp) for the screens; for the sheets, the room left
- * above a landscape keyboard (about 170 dp: 393 dp less the status bar and a 200 dp keyboard).
+ * above a landscape keyboard (about 170 dp: 393 dp less the status bar and a 200 dp keyboard). A terminal's keyboard
+ * comes as the system's inset ([keyboard]), since the terminal's screen follows it.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics, so the bars are as tall as on a phone.
@@ -126,30 +131,51 @@ class CompactHeightTest {
         assertTrue("the chat is $height tall", height >= MIN_CHAT)
     }
 
-    /**
-     * A workspace's shell pane with the keyboard up (plan 3G, decision 9): Gboard takes 251 dp of a Pixel 5 held sideways
-     * (measured on the API 36 emulator), so while a terminal holds the keyboard the workspace's top bar steps aside, and
-     * the key bar and the keyboard still leave a grid to work in; a pinch still zooms it; the bar comes back with the
-     * keyboard's hide key. Real accounts show no demo banner.
-     */
-    @Test
-    fun aWorkspacesTerminalKeepsAUsableGridWithTheKeyBarAndTheKeyboardUp() {
-        compose.setContent {
-            ShellXTheme {
-                CompositionLocalProvider(LocalSpinner provides StillSpinner, LocalTerminalIme provides RecordingIme()) {
-                    Column(Modifier.fillMaxSize()) {
-                        Spacer(Modifier.height(STATUS_BAR))
-                        Box(Modifier.fillMaxWidth().height(ABOVE_GBOARD)) {
-                            WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
-                        }
+    /** The workspace screen of a real account under the status bar, its terminal's keyboard not drawn ([keyboard]). */
+    private fun showWorkspaceTerminal() = compose.setContent {
+        ShellXTheme {
+            CompositionLocalProvider(LocalSpinner provides StillSpinner, LocalTerminalIme provides RecordingIme()) {
+                Column(Modifier.fillMaxSize()) {
+                    Spacer(Modifier.height(STATUS_BAR))
+                    Box(Modifier.fillMaxWidth().weight(1f)) {
+                        WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
                     }
                 }
             }
         }
+    }
+
+    /**
+     * The soft keyboard comes up [height] tall (0: it went down, as system Back makes it), as the system tells the
+     * window: through its inset, which the pane's imePadding gives to the keyboard.
+     */
+    private fun keyboard(height: Dp) {
+        compose.runOnIdle {
+            val root = compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+            val px = (height.value * root.resources.displayMetrics.density).roundToInt()
+            val insets = WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, px))
+                .setVisible(WindowInsetsCompat.Type.ime(), px > 0)
+                .build()
+            ViewCompat.dispatchApplyWindowInsets(root, insets)
+        }
+        compose.waitForIdle()
+    }
+
+    /**
+     * A workspace's shell pane with the keyboard up (plan 3G, decision 9): Gboard takes 251 dp of a Pixel 5 held sideways
+     * (measured on the API 36 emulator), so while a terminal holds the keyboard the workspace's top bar steps aside, and
+     * the key bar and the keyboard still leave a grid to work in; a pinch still zooms it; the bar comes back when the
+     * keyboard goes down (system Back), and the key bar goes with it. Real accounts show no demo banner.
+     */
+    @Test
+    fun aWorkspacesTerminalKeepsAUsableGridWithTheKeyBarAndTheKeyboardUp() {
+        showWorkspaceTerminal()
         until { tagged("terminal.surface") && rig.mac.terminalViewOpens.isNotEmpty() }
         compose.onNodeWithTag("terminal.surface").performClick()
         until { tagged("terminal.key.escape") }
-        assertTrue("the top bar steps aside while the terminal holds the keyboard", !tagged("workspace.title"))
+        keyboard(GBOARD)
+        until { !tagged("workspace.title") }
         // The key bar took its row and the top bar gave its own: the grid that fits reaches the Mac 200 ms later.
         repeat(60) {
             compose.waitForIdle()
@@ -163,8 +189,33 @@ class CompactHeightTest {
         compose.waitForIdle()
         val viewport = terminalSurface().viewport
         assertTrue("${viewport.scale} after a pinch from ${viewport.fit}", viewport.scale > viewport.fit)
-        compose.onNodeWithTag("terminal.key.hideKeyboard").performClick()
+        keyboard(0.dp)
         until { tagged("workspace.title") && !tagged("terminal.key.escape") }
+    }
+
+    /**
+     * A hardware keyboard (or a floating one that takes no room) shows no soft keyboard: the terminal keeps the focus and
+     * the key bar, and the top bar (back, chips, ＋, ⋮) stays, since nothing takes its room (review D2 I-1).
+     */
+    @Test
+    fun aHardwareKeyboardKeepsTheTopBarInLandscape() {
+        showWorkspaceTerminal()
+        until { tagged("terminal.surface") && rig.mac.terminalViewOpens.isNotEmpty() }
+        compose.onNodeWithTag("terminal.surface").performClick()
+        until { tagged("terminal.key.escape") }
+        idle(300)
+        assertTrue("the top bar stays with no soft keyboard up", tagged("workspace.title"))
+        assertTrue(terminalSurface().hasFocus())
+        assertTrue(tagged("terminal.key.escape"))
+    }
+
+    /** Lets [ms] of the main looper's time pass. */
+    private fun idle(ms: Long) {
+        repeat((ms / 10).toInt()) {
+            compose.waitForIdle()
+            ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+        }
+        compose.waitForIdle()
     }
 
     private fun terminalSurface(): TerminalSurfaceView {
@@ -245,8 +296,8 @@ class CompactHeightTest {
         /** 393 dp less the status bar and a 200 dp landscape keyboard. */
         val ABOVE_KEYBOARD = 170.dp
 
-        /** 393 dp less the status bar and Gboard as the API 36 emulator draws it in landscape (251 dp). */
-        val ABOVE_GBOARD = 118.dp
+        /** Gboard as the API 36 emulator draws it on a phone in landscape: 118 dp of 393 are left under the status bar. */
+        val GBOARD = 251.dp
 
         /** About five lines of chat. */
         val MIN_CHAT = 120.dp
