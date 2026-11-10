@@ -93,7 +93,9 @@ data class TerminalViewState(
  * **Every send is the last step of a change** (review C I-1). On an immediate dispatcher (the app's `hub.scope` is
  * `Main.immediate`; the demo's in-process Mac answers without suspending) `send()` may deliver the message, and the
  * answer and the pushes it brings may be handled, before it returns. So the phase, the clocks, the counters and the
- * view are set before a message goes, and nothing is written after it.
+ * view are set before a message goes, and nothing an inline answer or push could change is written after it. A send
+ * made while the outbox handles an open's answer only queues (the outbox is its own and only consumer), so there the
+ * order of the rules is kept: R3's close of a timed-out open goes before its retry (re-review C N1).
  *
  * - **R1 Want.** The model wants a view while `active`, `terminalId != null`, a grid is known, `link.isOnline`,
  *   `link.supportsTerminalView`, the phase is not Unavailable, and it is not waiting for the Mac after a NotSent (R3).
@@ -320,8 +322,10 @@ class TerminalViewModel(
     /** An open the outbox waits on: [abandon] ends the wait at once and cancels the call (A2, A4). */
     private class OpenCall(private val call: Job, private val abandoned: CompletableDeferred<Unit>) {
         fun abandon() {
-            abandoned.complete(Unit)
+            // Cancelled first: completing [abandoned] may resume the outbox inline, which then sends the close queued
+            // for this view while the call would still be live at the link (re-review C N2).
             call.cancel()
+            abandoned.complete(Unit)
         }
     }
 
@@ -619,9 +623,10 @@ class TerminalViewModel(
                 else -> failedOpen()
             }
             TerminalOpenResult.NoAnswer -> if (link.isOnline(machineId)) {
-                failedOpen()
-                // The Mac may have opened it although the answer never came.
+                // The Mac may have opened it although the answer never came: its close is queued first (R3). Inside
+                // the outbox it only queues, so nothing written after it can be lost.
                 send(Message.Close(current.terminalId))
+                failedOpen()
             } else {
                 waitForMac()
             }
