@@ -75,13 +75,15 @@ class WorkspaceRenderTest {
         canControl: Boolean = true,
         notice: AgentNotice? = null,
         canCreateTerminal: Boolean = false,
+        creatingTerminal: Boolean = false,
         canViewTerminals: Boolean = false,
         shownAsTerminal: Set<String> = emptySet(),
         terminal: (@Composable (WorkspacePane, Boolean) -> Unit)? = null,
     ) {
         WorkspaceScreen(
             title = title, branch = branch, panes = panes, selected = selected, nowMs = NOW_MS, canControl = canControl, notice = notice,
-            canCreateTerminal = canCreateTerminal, canViewTerminals = canViewTerminals, shownAsTerminal = shownAsTerminal,
+            canCreateTerminal = canCreateTerminal, creatingTerminal = creatingTerminal, canViewTerminals = canViewTerminals,
+            shownAsTerminal = shownAsTerminal,
         ) { pane, shown ->
             if (pane.id in shownAsTerminal && terminal != null) {
                 terminal(pane, shown)
@@ -153,15 +155,25 @@ class WorkspaceRenderTest {
         }
     }
 
-    /** ＋ after the chips: a new terminal tab (2C). */
+    /**
+     * ＋ after the chips: a new terminal tab (2C). While one is on its way ＋ is dimmed (the iPhone's
+     * `workspace-new-terminal-creating`): that frame is drawn first under the same name, compared, then drawn over.
+     */
     @Test
     fun workspaceNewTerminal() {
+        val dimmed = ShellXSnapshots.capture("workspace-new-terminal") {
+            CompositionLocalProvider(LocalSpinner provides StillSpinner) {
+                Screen(selected = "t-zsh", canCreateTerminal = true, creatingTerminal = true)
+            }
+        }
         val plus = assertRenders("workspace-new-terminal") { Screen(selected = "t-zsh", canCreateTerminal = true) }
         val plain = ShellXSnapshots.capture("workspace-shell") {
             CompositionLocalProvider(LocalSpinner provides StillSpinner) { Screen(selected = "t-zsh") }
         }
         fun lightEn(shots: List<Snapshot>) = shots.first { it.theme == "light" && it.language == "en" }.argb
         assertFalse("＋ shows", lightEn(plus).contentEquals(lightEn(plain)))
+        assertFalse("＋ is dimmed while a new terminal is on its way", lightEn(dimmed).contentEquals(lightEn(plus)))
+        assertFalse("the dimmed ＋ still shows", lightEn(dimmed).contentEquals(lightEn(plain)))
     }
 
     /** View as Terminal: the agent chip's page is its terminal (2C). */
