@@ -46,17 +46,30 @@ class TerminalInputConnectionTest {
         override fun press(key: TerminalKey, mods: List<TerminalModifier>) { units += typing.key(key, mods) }
         override fun paste(text: String) { units += Paste(text) }
         fun toggleCtrl() = typing.toggleCtrl()
+        val ctrlLatched: Boolean get() = typing.ctrlLatched
     }
+
+    /** A selection the connection reported: the cursor and the composing region (-1, -1 when none). */
+    private data class Reported(val selection: Int, val composingStart: Int, val composingEnd: Int)
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()
     private val recorder = TypingRecorder()
-    private val reports = mutableListOf<Pair<String, Boolean>>()
+    private val reports = mutableListOf<Reported>()
+    private val extracts = mutableListOf<Pair<Int, String>>()
     private var restarts = 0
     private val keyEvents = mutableListOf<KeyEvent>()
 
     private fun connection(accepts: () -> Boolean = { true }) = TerminalInputConnection(
-        View(context), recorder, accepts, keys = { keyEvents += it; true }, clipboardText = { null },
-        report = { document, composing -> reports += document to composing }, restart = { restarts += 1 },
+        view = View(context),
+        input = recorder,
+        accepts = accepts,
+        ctrlLatched = { recorder.ctrlLatched },
+        sentInputs = { recorder.units.size },
+        keys = { keyEvents += it; true },
+        clipboardText = { null },
+        report = { selection, composingStart, composingEnd -> reports += Reported(selection, composingStart, composingEnd) },
+        extracted = { token, text -> extracts += token to text.text.toString() },
+        restart = { restarts += 1 },
     )
 
     /**
@@ -170,17 +183,15 @@ class TerminalInputConnectionTest {
     @Test
     fun theSelectionIsReportedAfterEachChangeAndOnceForABatch() {
         val c = connection()
-        c.commitText("a", 1)
-        assertEquals("" to false, reports.last())
         c.setComposingText("vi", 1)
-        assertEquals("vi" to true, reports.last())
+        assertEquals(Reported(2, 0, 2), reports.last())
         val before = reports.size
         c.beginBatchEdit()
         c.setComposingText("v", 1)
         c.setComposingText("vi", 1)
         c.endBatchEdit()
         assertEquals(before + 1, reports.size)
-        assertEquals("vi" to true, reports.last())
+        assertEquals(Reported(2, 0, 2), reports.last())
     }
 
     @Test

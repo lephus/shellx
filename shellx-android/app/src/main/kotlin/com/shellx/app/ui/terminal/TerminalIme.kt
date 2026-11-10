@@ -4,6 +4,7 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.View
+import android.view.inputmethod.ExtractedText
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -17,6 +18,9 @@ interface TerminalIme {
     fun restart(view: View)
 
     fun updateSelection(view: View, selStart: Int, selEnd: Int, composingStart: Int, composingEnd: Int)
+
+    /** The editor's text changed while the keyboard monitors it (`getExtractedText` with GET_EXTRACTED_TEXT_MONITOR). */
+    fun updateExtractedText(view: View, token: Int, text: ExtractedText)
 }
 
 /** [TerminalIme] through [InputMethodManager]. */
@@ -37,6 +41,10 @@ class SystemTerminalIme(context: Context) : TerminalIme {
 
     override fun updateSelection(view: View, selStart: Int, selEnd: Int, composingStart: Int, composingEnd: Int) {
         manager?.updateSelection(view, selStart, selEnd, composingStart, composingEnd)
+    }
+
+    override fun updateExtractedText(view: View, token: Int, text: ExtractedText) {
+        manager?.updateExtractedText(view, token, text)
     }
 }
 

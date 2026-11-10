@@ -332,11 +332,17 @@ class TerminalSurfaceView(
         outAttrs.initialSelEnd = marked
         outAttrs.initialCapsMode = 0
         return TerminalInputConnection(
-            this, model, ::accepts, ::handleKey, { TerminalClipboard.text(context) },
-            report = { document, composing ->
-                val end = document.length
-                ime.updateSelection(this, end, end, if (composing) 0 else -1, if (composing) end else -1)
+            view = this,
+            input = model,
+            accepts = ::accepts,
+            ctrlLatched = { model.state.value.ctrlLatched },
+            sentInputs = { model.sentInputs },
+            keys = ::handleKey,
+            clipboardText = { TerminalClipboard.text(context) },
+            report = { selection, composingStart, composingEnd ->
+                ime.updateSelection(this, selection, selection, composingStart, composingEnd)
             },
+            extracted = { token, text -> ime.updateExtractedText(this, token, text) },
             restart = ::restartKeyboard,
         ).also { connection = it }
     }

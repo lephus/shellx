@@ -36,9 +36,16 @@ class TerminalInputConnection(
     view: View,
     private val input: TerminalTextInput,
     private val accepts: () -> Boolean,
+    /** Whether the key bar's ctrl is latched: the model then sends the next character as a chord. */
+    private val ctrlLatched: () -> Boolean,
+    /** The model's count of input messages sent (`TerminalViewState.sentInputs`). */
+    private val sentInputs: () -> Int,
     private val keys: (KeyEvent) -> Boolean,
     private val clipboardText: () -> String?,
-    private val report: (document: String, composing: Boolean) -> Unit,
+    /** `InputMethodManager.updateSelection`: the cursor (= the text's length) and the composing region, (-1, -1) when none. */
+    private val report: (selection: Int, composingStart: Int, composingEnd: Int) -> Unit,
+    /** `InputMethodManager.updateExtractedText`, for a keyboard that asked to monitor the text. */
+    private val extracted: (token: Int, text: ExtractedText) -> Unit,
     private val restart: () -> Unit,
 ) : BaseInputConnection(view, true) {
     /** What the keyboard sees: the word being composed. */
@@ -58,8 +65,13 @@ class TerminalInputConnection(
         if (batch > 0) {
             changedInBatch = true
         } else {
-            report(document, document.isNotEmpty())
+            reportNow()
         }
+    }
+
+    private fun reportNow() {
+        val composing = document.isNotEmpty()
+        report(document.length, if (composing) 0 else -1, if (composing) document.length else -1)
     }
 
     private inline fun forward(change: () -> Unit): Boolean {
@@ -186,7 +198,7 @@ class TerminalInputConnection(
         if (batch > 0) batch -= 1
         if (batch == 0 && changedInBatch) {
             changedInBatch = false
-            report(document, document.isNotEmpty())
+            reportNow()
         }
         return batch > 0
     }
