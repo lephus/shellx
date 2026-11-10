@@ -36,7 +36,7 @@ class TerminalFont(context: Context) : TerminalGlyphMetrics {
     companion object {
         const val SIZE_DP = 12f
 
-        /** Advances kept per face before the face's cache starts again. */
+        /** Advances kept per face; past it the one used least recently goes. */
         const val ADVANCES_KEPT = 4_096
 
         private const val FEATURES = "'liga' 0, 'clig' 0, 'calt' 0"
@@ -53,7 +53,11 @@ class TerminalFont(context: Context) : TerminalGlyphMetrics {
         }
     }.toTypedArray()
 
-    private val advances: Array<HashMap<String, Float>> = Array(4) { HashMap() }
+    private val advances: Array<LinkedHashMap<String, Float>> = Array(4) {
+        object : LinkedHashMap<String, Float>(256, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Float>?): Boolean = size > ADVANCES_KEPT
+        }
+    }
 
     override val cellWidth: Float
     override val cellHeight: Float
@@ -86,7 +90,6 @@ class TerminalFont(context: Context) : TerminalGlyphMetrics {
         val index = face(bold, italic)
         val kept = advances[index]
         kept[text]?.let { return it }
-        if (kept.size >= ADVANCES_KEPT) kept.clear()
         val paint = faces[index]
         val scale = paint.textScaleX
         paint.textScaleX = 1f

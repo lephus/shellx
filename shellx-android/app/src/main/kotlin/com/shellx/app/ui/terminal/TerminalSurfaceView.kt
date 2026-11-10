@@ -468,8 +468,8 @@ class TerminalSurfaceView(
         }
         for ((index, layout) in drawn) layout.drawBackground(canvas, index * font.cellHeight)
         for ((index, layout) in drawn) layout.drawText(canvas, index * font.cellHeight, font)
-        drawCursor(canvas, screen, palette, history)
-        drawMarkedText(canvas, screen, palette, history)
+        drawCursor(canvas, screen, palette, history, visible)
+        drawMarkedText(canvas, screen, palette, history, visible)
         canvas.restore()
         if (!visible.isEmpty()) cache.retain(rowsAround(screen, visible, history))
     }
@@ -489,11 +489,15 @@ class TerminalSurfaceView(
         return (first..last).mapNotNull { row(screen, it, history) }
     }
 
-    /** The cursor's box in grid px (two columns over a wide cell), its column, and the layout of its row. */
-    private fun cursorBox(screen: TerminalScreen, palette: TerminalPalette, history: Int): Triple<FloatArray, Int, TerminalRowLayout>? {
+    /**
+     * The cursor's box in grid px (two columns over a wide cell), its column, and the layout of its row; none while its
+     * row is out of sight (scrolled far up, its row is not among the layouts kept, and would be laid out every frame).
+     */
+    private fun cursorBox(screen: TerminalScreen, palette: TerminalPalette, history: Int, visible: IntRange): Triple<FloatArray, Int, TerminalRowLayout>? {
         val cursor = screen.cursor ?: return null
         if (cursor.y !in 0 until screen.rows || cursor.x !in 0 until screen.cols) return null
         val index = history + cursor.y
+        if (index !in visible) return null
         val layout = cache.layout(row(screen, index, history) ?: BLANK, screen.cols, palette)
         val found = layout.cell(cursor.x)?.first
         val column = found?.column ?: cursor.x
@@ -504,10 +508,10 @@ class TerminalSurfaceView(
     }
 
     /** Only while Live, the cursor visible and nothing composed; it never blinks. */
-    private fun drawCursor(canvas: Canvas, screen: TerminalScreen, palette: TerminalPalette, history: Int) {
+    private fun drawCursor(canvas: Canvas, screen: TerminalScreen, palette: TerminalPalette, history: Int, visible: IntRange) {
         val cursor = screen.cursor ?: return
         if (state.phase != TerminalViewPhase.Live || !cursor.visible || state.markedText.isNotEmpty()) return
-        val (box, column, layout) = cursorBox(screen, palette, history) ?: return
+        val (box, column, layout) = cursorBox(screen, palette, history, visible) ?: return
         val color = TerminalRowLayout.argb(TerminalColors.cursor(palette))
         val (left, top, right, bottom) = box
         fill.color = color
@@ -528,17 +532,19 @@ class TerminalSurfaceView(
     }
 
     /** The text the keyboard is composing, at the cursor's cell: palette foreground on palette background, underlined. */
-    private fun drawMarkedText(canvas: Canvas, screen: TerminalScreen, palette: TerminalPalette, history: Int) {
+    private fun drawMarkedText(canvas: Canvas, screen: TerminalScreen, palette: TerminalPalette, history: Int, visible: IntRange) {
         val marked = state.markedText
         if (marked.isEmpty()) return
-        val (box, _, _) = cursorBox(screen, palette, history) ?: return
+        val (box, _, _) = cursorBox(screen, palette, history, visible) ?: return
         val left = box[0]
         val top = box[1]
-        val width = maxOf(font.advance(marked, bold = false, italic = false), font.cellWidth)
+        // Measured, not kept: every word being composed would otherwise fill the font's glyph cache.
+        val paint = font.paint(bold = false, italic = false)
+        paint.textScaleX = 1f
+        val width = maxOf(paint.measureText(marked), font.cellWidth)
         fill.color = TerminalRowLayout.argb(TerminalColors.background(palette))
         canvas.drawRect(left, top, left + width, top + font.cellHeight, fill)
         val foreground = TerminalRowLayout.argb(TerminalColors.foreground(palette))
-        val paint = font.paint(bold = false, italic = false)
         paint.color = foreground
         canvas.drawText(marked, left, top + font.baseline, paint)
         // At the cell's bottom, below the font's underline position, so the dots under Vietnamese vowels (ạ, ệ) stay clear.
