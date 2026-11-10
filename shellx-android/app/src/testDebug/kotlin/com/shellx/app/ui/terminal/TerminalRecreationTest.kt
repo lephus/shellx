@@ -12,14 +12,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.screenshots.StillSpinner
 import com.shellx.app.testing.WorkRig
 import com.shellx.app.ui.components.LocalSpinner
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.app.ui.workspaces.WorkspaceScreenHolder
 import com.shellx.app.ui.workspaces.WorkspaceView
 import com.shellx.core.terminal.TerminalViewPhase
 import com.shellx.core.workspaces.WorkspaceRef
@@ -27,6 +31,7 @@ import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Assert.fail
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -57,12 +62,18 @@ class TerminalHostActivity : ComponentActivity() {
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w400dp-h900dp")
 class TerminalRecreationTest {
+    /** No window of its own: it keeps the windows this test makes in step with Compose, as a compose test's own window. */
+    @get:Rule val compose = createEmptyComposeRule()
+
     private val rig = WorkRig.make()
     private val ime = RecordingIme()
     private var shown by mutableStateOf(true)
+    private var lastController: ActivityController<TerminalHostActivity>? = null
 
     @After
     fun tearDown() {
+        // The window goes as an app's does, so no composition of it outlives the test.
+        lastController?.pause()?.stop()?.destroy()
         TerminalHostActivity.content = {}
         rig.close()
     }
@@ -83,7 +94,7 @@ class TerminalRecreationTest {
                 }
             }
         }
-        return Robolectric.buildActivity(TerminalHostActivity::class.java).setup().also(::focusWindow)
+        return Robolectric.buildActivity(TerminalHostActivity::class.java).setup().also(::focusWindow).also { lastController = it }
     }
 
     /** The window has the focus, as the system gives it to the window in front (Robolectric gives none). */
@@ -93,17 +104,39 @@ class TerminalRecreationTest {
         idle(50)
     }
 
-    private fun idle(ms: Long) = repeat((ms / 10).toInt()) { ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS) }
+    private fun idle(ms: Long) = repeat((ms / 10).toInt()) {
+        compose.waitForIdle()
+        ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+    }
 
     /** Waits up to 10 s of real time (the rig's stores work off the main thread), the main looper's clock moving on. */
     private fun until(what: String, condition: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (System.nanoTime() < deadline) {
-            if (condition()) return
-            ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
-            Thread.sleep(2)
+        try {
+            compose.waitUntil(10_000) {
+                compose.waitForIdle()
+                ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+                condition()
+            }
+        } catch (e: ComposeTimeoutException) {
+            fail("not within 10 s: $what (${diagnose()})")
         }
-        if (!condition()) fail("not within 10 s: $what")
+    }
+
+    /** What the window shows, for a failure's message. */
+    private fun diagnose(): String {
+        val controller = lastController ?: return "no window"
+        val activity = controller.get()
+        val surface = surfaceIn(controller)
+        val holder = runCatching {
+            ViewModelProvider(activity)["workspace/${rig.machineId}/ws-shellx", WorkspaceScreenHolder::class.java]
+        }.getOrNull()
+        fun views(v: View): List<String> =
+            listOf("${v.javaClass.simpleName}(${v.width}x${v.height})") +
+                if (v is ViewGroup) (0 until v.childCount).flatMap { views(v.getChildAt(it)) } else emptyList()
+        return "surface ${surface != null}, phase ${surface?.model?.phase}, machines ${rig.hub.machines.map { it.state }}, " +
+            "lifecycle ${activity.lifecycle.currentState}, workspace ${holder?.model?.phase} selected ${holder?.model?.selectedTerminalId} " +
+            "shown ${holder?.model?.terminalShown} terminal ${holder?.terminal?.phase}/${holder?.terminal?.terminalId}, " +
+            "views ${views(activity.window.decorView).take(12)}"
     }
 
     private fun surfaceIn(controller: ActivityController<TerminalHostActivity>): TerminalSurfaceView? {
