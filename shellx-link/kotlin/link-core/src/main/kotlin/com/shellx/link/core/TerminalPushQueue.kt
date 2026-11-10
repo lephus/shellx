@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.yield
 
 /**
  * The terminal pushes of one session, between the reader that takes them off the circuit and their consumer, bounded
@@ -39,7 +40,10 @@ import kotlinx.coroutines.flow.FlowCollector
  * opened while the consumer lags.
  *
  * A collector cancelled while it waits, or while it handles a push, takes nothing more: what was queued stays for the
- * next one.
+ * next one. A collector working through a backlog yields after [PUSHES_PER_TURN] pushes or about 4 ms
+ * ([NANOS_PER_TURN]), whichever comes first, before its next take: the collector's code never suspends, so without it a
+ * flood that the reader keeps up would hold the collector's thread (the phone's main thread) until the bound trips. The
+ * iPhone's pushes hop through the main actor one by one, which gives its run loop the same turns.
  */
 class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     companion object {
@@ -48,6 +52,10 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
 
         /** At most this many Ended pushes of terminals other than the one viewed are queued at once. */
         const val MAX_QUEUED_OTHER_ENDS = 16
+
+        /** A collector hands its thread back after this many pushes in a row, or [NANOS_PER_TURN], whichever comes first. */
+        const val PUSHES_PER_TURN = 16
+        const val NANOS_PER_TURN = 4_000_000L
     }
 
     /** [otherEnd]: an Ended of a terminal other than the one viewed, counted in [otherEnds] while it is queued. */
@@ -95,7 +103,16 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     }
 
     private suspend fun deliver(collector: FlowCollector<TerminalViewPush>) {
+        var handed = 0
+        var since = System.nanoTime()
         while (true) {
+            // A backlog hands the thread back now and then (the phone's main thread draws and takes touches meanwhile):
+            // before a take, so a collector cancelled there leaves the rest queued.
+            if (handed >= PUSHES_PER_TURN || System.nanoTime() - since >= NANOS_PER_TURN) {
+                yield()
+                handed = 0
+                since = System.nanoTime()
+            }
             // Before the take, never between the take and the emit: a cancelled collector leaves the rest queued.
             currentCoroutineContext().ensureActive()
             val entry = synchronized(lock) {
@@ -106,6 +123,7 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
             }
             if (entry != null) {
                 collector.emit(entry.push)
+                handed += 1
                 continue
             }
             try {
@@ -115,6 +133,9 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
                 if (synchronized(lock) { entries.isNotEmpty() }) wake.trySend(Unit)
                 throw e
             }
+            // It waited: the thread was free meanwhile.
+            handed = 0
+            since = System.nanoTime()
         }
     }
 
