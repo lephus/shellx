@@ -116,7 +116,8 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste. The key bar shows under the surface while
  * it has the keyboard ([showsKeyBar] in tests), only on the page shown and only while it takes input; when the soft
  * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
- * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`.
+ * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`. [engaged] is called when the user takes the
+ * keyboard on the page shown or sends it input (a tap, the focus, typing): the workspace screen settles on its chip.
  */
 @Composable
 fun TerminalPane(
@@ -127,6 +128,7 @@ fun TerminalPane(
     modifier: Modifier = Modifier,
     locksPaging: (Boolean) -> Unit = {},
     showsKeyBar: Boolean = false,
+    engaged: () -> Unit = {},
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val pageShown = shown && state.terminalId == terminalId
@@ -136,7 +138,7 @@ fun TerminalPane(
                 if (state.phase == TerminalViewPhase.Unsupported) ShellPanePlaceholder() else EmptyCard()
             }
         } else {
-            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging)
+            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging, engaged)
         }
     }
 }
@@ -167,6 +169,7 @@ private fun ColumnScope.ShownPage(
     state: TerminalViewState,
     showsKeyBar: Boolean,
     locksPaging: (Boolean) -> Unit,
+    engaged: () -> Unit,
 ) {
     // Leaving the page (a swipe, a chip, the pane gone) unlocks the pager.
     val currentLocks by rememberUpdatedState(locksPaging)
@@ -186,6 +189,15 @@ private fun ColumnScope.ShownPage(
     var surface by remember { mutableStateOf<TerminalSurfaceView?>(null) }
     var focused by remember { mutableStateOf(false) }
     val keyBar = (focused || showsKeyBar) && state.acceptsInput
+
+    // The user took the keyboard here, or sent this page input: the screen settles on its chip.
+    val currentEngaged by rememberUpdatedState(engaged)
+    LaunchedEffect(focused) { if (focused) currentEngaged() }
+    var inputsSeen by remember { mutableIntStateOf(state.sentInputs) }
+    LaunchedEffect(state.sentInputs) {
+        if (state.sentInputs != inputsSeen) currentEngaged()
+        inputsSeen = state.sentInputs
+    }
 
     val padding = TerminalGeometry.PADDING_DP * density.density
     var box by remember { mutableStateOf(IntSize.Zero) }

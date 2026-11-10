@@ -77,15 +77,19 @@ class WorkspaceScreenActions(
     val close: () -> Unit = {},
     /** Confirmed: close the terminal tab with this id on the Mac, and stop what runs in it. */
     val closeTab: (String) -> Unit = {},
+    /** ＋: a new terminal tab in this workspace on the Mac. */
+    val createTerminal: () -> Unit = {},
+    /** View as Terminal (true) or View as Chat (false) for the agent chip with this terminal id. */
+    val showAsTerminal: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     companion object {
         /**
          * The controls wired to [scope]'s hub (iPhone `WorkspaceScreenActions.make`): each command runs in `hub.scope`
          * (it outlives the screen), and [WorkspaceFeedback] says what follows: a workspace that is gone refreshes the
          * list, anything that did not work goes to [alert], "done" shows nothing (the Mac's push renames the workspace,
-         * removes a tab, or removes the workspace and the screen leaves). [closing] is called when the user's close goes
-         * out; [done] gets each command's task (tests wait on it). A Close Tab while the same tab's close waits sends
-         * nothing.
+         * removes a tab, adds the tab ＋ made and its chip shows, or removes the workspace and the screen leaves).
+         * [closing] is called when the user's close goes out; [done] gets each command's task (tests wait on it). A Close
+         * Tab while the same tab's close waits sends nothing; ＋ while a new tab is on its way sends nothing.
          */
         fun make(
             scope: SignedInScope,
@@ -125,26 +129,63 @@ class WorkspaceScreenActions(
                         alert(kind)
                     }?.let(done)
                 },
+                createTerminal = {
+                    // One at a time (＋ is dimmed meanwhile); a chip picked before the answer wins over the new tab.
+                    if (model.startCreatingTerminal()) {
+                        run(WorkspaceCommand.CREATE_TERMINAL) {
+                            var made: String? = null
+                            try {
+                                val answer = hub.createTerminal(ref)
+                                made = answer.terminalId
+                                answer.result
+                            } finally {
+                                // Every way out, in the hub's scope (it outlives a rotation): ＋ never stays dimmed. Shown
+                                // as soon as the Mac's list has it; the Mac's own selected tab stays.
+                                model.finishCreatingTerminal(made)
+                            }
+                        }
+                    }
+                },
+                showAsTerminal = { id, on -> model.showAsTerminal(id, on) },
             )
         }
     }
 }
 
-/** What `⋮` offers. Plan 3G adds "View as Terminal" here. */
+/** What `⋮` offers. */
 enum class WorkspaceMenuItem(@StringRes val title: Int) {
     RENAME(R.string.workspace_menu_rename),
+
+    /** The agent chip shown shows its terminal in place of its chat (plan 3G). */
+    VIEW_AS_TERMINAL(R.string.workspace_menu_view_as_terminal),
+
+    /** The agent chip shown shows its chat again. */
+    VIEW_AS_CHAT(R.string.workspace_menu_view_as_chat),
 
     /** The tab of the chip shown, agent or shell; it asks to confirm first. */
     CLOSE_TAB(R.string.terminal_close_menu),
     CLOSE_WORKSPACE(R.string.workspace_menu_close),
     ;
 
-    /** Shown red: every item but Rename. */
-    val isDestructive: Boolean get() = this != RENAME
+    /** How the agent chip shown shows its page, when ⋮ may switch it (its Mac shows terminals). */
+    enum class AgentChip { CHAT, TERMINAL }
+
+    /** Shown red, and each asks first: Close Tab… and Close Workspace…. */
+    val isDestructive: Boolean get() = this == CLOSE_TAB || this == CLOSE_WORKSPACE
 
     companion object {
-        /** The items in the menu's order; Close Tab… only while a chip shows and its Mac takes `terminal.close`. */
-        fun items(canCloseTab: Boolean): List<WorkspaceMenuItem> = entries.filter { it != CLOSE_TAB || canCloseTab }
+        /**
+         * The items in the menu's order: Rename; View as Terminal for an agent chip shown as its chat, or View as Chat for
+         * one shown as its terminal; Close Tab… while a chip shows and its Mac takes `terminal.close`; Close Workspace….
+         */
+        fun items(canCloseTab: Boolean, agentChip: AgentChip? = null): List<WorkspaceMenuItem> = entries.filter {
+            when (it) {
+                VIEW_AS_TERMINAL -> agentChip == AgentChip.CHAT
+                VIEW_AS_CHAT -> agentChip == AgentChip.TERMINAL
+                CLOSE_TAB -> canCloseTab
+                RENAME, CLOSE_WORKSPACE -> true
+            }
+        }
     }
 }
 
@@ -153,11 +194,15 @@ enum class WorkspaceMenuItem(@StringRes val title: Int) {
  * [WorkspaceView] feeds it from the hub.
  *
  * - Top bar: a back arrow, the workspace's name over its git branch in monospace, and `⋮` (off unless [canControl])
- *   with Rename Workspace, then in red, each asking first, Close Tab… for the chip shown (while [canCloseTab]) and
+ *   with Rename Workspace, View as Terminal / View as Chat for an agent chip shown while its Mac shows terminals
+ *   ([canViewTerminals]), then in red, each asking first, Close Tab… for the chip shown (while [canCloseTab]) and
  *   Close Workspace….
- * - Under it, the chips ([PaneChips]); a long press on one offers Close Tab… while [canCloseTab] and [canControl].
- * - Below, one page per chip, swiped sideways like the chips are tapped; [pane] draws a page ([PaneContent]). While a
- *   mic listens ([pagingLocked]) the pages stay put.
+ * - Under it, the chips ([PaneChips]); a long press on one offers Close Tab… while [canCloseTab] and [canControl]. After
+ *   them ＋ ([NewTerminalChip]) while the Mac takes `terminal.create` ([canCreateTerminal]), dimmed while it is not
+ *   online or a new tab is on its way ([creatingTerminal]).
+ * - Below, one page per chip, swiped sideways like the chips are tapped; [pane] draws a page ([PaneContent], or the
+ *   terminal of an agent chip in [shownAsTerminal]). While a mic listens or a terminal is zoomed in ([pagingLocked])
+ *   the pages stay put.
  * - [notice] floats over the top of the pages (a polite live region).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -170,6 +215,10 @@ fun WorkspaceScreen(
     nowMs: Long,
     canControl: Boolean = true,
     canCloseTab: Boolean = false,
+    canCreateTerminal: Boolean = false,
+    canViewTerminals: Boolean = false,
+    shownAsTerminal: Set<String> = emptySet(),
+    creatingTerminal: Boolean = false,
     pagingLocked: Boolean = false,
     notice: AgentNotice? = null,
     alert: WorkspaceAlert? = null,
@@ -194,7 +243,12 @@ fun WorkspaceScreen(
             panes, selected, nowMs, actions.select,
             close = if (canCloseTab && canControl) ({ closingTab = it.id }) else null,
             modifier = modifier,
+            trailing = { if (canCreateTerminal) NewTerminalChip(enabled = canControl && !creatingTerminal, onClick = actions.createTerminal) },
         )
+    }
+    // How the agent chip shown shows its page, while its Mac shows terminals; null for a shell chip.
+    val agentChip = shownPane?.takeIf { canViewTerminals && it.isAgent }?.let {
+        if (it.id in shownAsTerminal) WorkspaceMenuItem.AgentChip.TERMINAL else WorkspaceMenuItem.AgentChip.CHAT
     }
 
     val backButton = @Composable {
@@ -203,9 +257,11 @@ fun WorkspaceScreen(
         }
     }
     val menu = @Composable {
-        Menu(WorkspaceMenuItem.items(canCloseTab && shownPane != null), canControl) { item ->
+        Menu(WorkspaceMenuItem.items(canCloseTab && shownPane != null, agentChip), canControl) { item ->
             when (item) {
                 WorkspaceMenuItem.RENAME -> renaming = true
+                WorkspaceMenuItem.VIEW_AS_TERMINAL -> shownPane?.let { actions.showAsTerminal(it.id, true) }
+                WorkspaceMenuItem.VIEW_AS_CHAT -> shownPane?.let { actions.showAsTerminal(it.id, false) }
                 WorkspaceMenuItem.CLOSE_TAB -> closingTab = shownPane?.id
                 WorkspaceMenuItem.CLOSE_WORKSPACE -> closing = true
             }
@@ -382,8 +438,8 @@ private fun MenuItem(item: WorkspaceMenuItem, onClick: () -> Unit) {
 
 /**
  * The pane slot (contracts §5): an agent pane shows [agent], any other shows [shell]. [shown] is true only for the
- * pager's settled page: only that pane may open a terminal view. Plan 3G passes `shell = { pane, shown ->
- * TerminalPane(…) }` from [WorkspaceView]; this function does not change.
+ * pager's settled page: only that pane may open a terminal view. [WorkspaceView] passes `shell = { pane, shown ->
+ * TerminalPane(…) }`.
  */
 @Composable
 fun PaneContent(

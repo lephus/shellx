@@ -29,17 +29,23 @@ import com.shellx.app.ui.agent.AgentNotice
 import com.shellx.app.ui.agent.AgentView
 import com.shellx.app.ui.components.rememberNowMs
 import com.shellx.app.voice.LocalVoice
+import com.shellx.app.ui.terminal.TerminalPane
+import com.shellx.core.terminal.TerminalViewModel
+import com.shellx.core.workspaces.WorkspacePane
 import com.shellx.core.workspaces.WorkspaceRef
 import com.shellx.core.workspaces.WorkspaceScreenModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
- * One workspace screen's model and what it holds across configuration changes: the last alert, whether the user closed
- * the workspace here, the notice over the pages and the `shownPaneClosed` count it last answered. Main-confined.
+ * One workspace screen's models and what it holds across configuration changes: the last alert, whether the user closed
+ * the workspace here, the notice over the pages and the `shownPaneClosed` count it last answered. [terminal] is the one
+ * terminal model of every terminal page of the screen; it stops for good when the screen goes ([onCleared]).
+ * Main-confined.
  */
-class WorkspaceScreenHolder(val model: WorkspaceScreenModel) : ViewModel() {
+class WorkspaceScreenHolder(val model: WorkspaceScreenModel, val terminal: TerminalViewModel) : ViewModel() {
     var alert: WorkspaceAlert? by mutableStateOf(null)
 
     /** The user confirmed closing the workspace here: its leaving needs no word of explanation. */
@@ -48,12 +54,21 @@ class WorkspaceScreenHolder(val model: WorkspaceScreenModel) : ViewModel() {
 
     /** The `shownPaneClosed` count the screen last said something about. */
     var paneClosedSeen: Int by mutableIntStateOf(model.shownPaneClosed)
+
+    /** The terminal view closes on the Mac (its close still goes out). */
+    override fun onCleared() {
+        terminal.close()
+    }
 }
 
 /**
  * One workspace of a Mac (`WorkspaceView.swift`): [WorkspaceScreen] fed by 3C's [WorkspaceScreenModel] and the hub.
- * An agent's chip shows the agent screen as its pane ([AgentView], embedded); a shell's chip shows [PaneContent]'s
- * shell page (plan 3G's terminal; [ShellPanePlaceholder] until then).
+ * An agent's chip shows the agent screen as its pane ([AgentView], embedded); a shell's chip, or an agent's chip shown
+ * as its terminal, shows the Mac's terminal ([TerminalPane]). One [TerminalViewModel] serves every page and shows the
+ * terminal of the chip shown (`WorkspaceScreenModel.terminalShown`), never a neighbour the pager keeps alive. It runs
+ * while the screen is STARTED: the background, another screen over it or a rotation closes the view on the Mac, and the
+ * next start opens it again (ledger A-35). Typing into a page settles the screen on its chip. The commands in `⋮` and ＋
+ * are the hub's ([WorkspaceScreenActions]).
  *
  * When the pane shown is closed on the Mac, the next chip shows and a short line says why ([paneClosedNotice]). The
  * screen leaves by itself when its workspace is closed on the Mac: it goes [back], and the list says so in a short line
@@ -63,16 +78,25 @@ class WorkspaceScreenHolder(val model: WorkspaceScreenModel) : ViewModel() {
  */
 @Composable
 fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Unit, back: () -> Unit) {
-    val holder: WorkspaceScreenHolder =
-        viewModel(key = "workspace/${ref.machineId}/${ref.workspaceId}") { WorkspaceScreenHolder(WorkspaceScreenModel(ref, scope.hub)) }
+    val holder: WorkspaceScreenHolder = viewModel(key = "workspace/${ref.machineId}/${ref.workspaceId}") {
+        WorkspaceScreenHolder(WorkspaceScreenModel(ref, scope.hub), TerminalViewModel(ref.machineId, scope.hub, scope.hub.scope))
+    }
     val model = holder.model
+    val terminal = holder.terminal
     val hub = scope.hub
     val res = LocalContext.current.resources
     // Read so that the model's and the hub's getters are read again when they change.
     model.state.collectAsStateWithLifecycle().value
     hub.state.collectAsStateWithLifecycle().value
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(model, lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { model.run() } }
+    LaunchedEffect(model, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            launch { terminal.run() }
+            model.run()
+        }
+    }
+    val terminalShown = model.terminalShown
+    LaunchedEffect(terminalShown) { terminal.show(terminalShown) }
     // Whatever finished while the user was here, the user saw.
     DisposableEffect(hub, ref) { onDispose { hub.markSeen(ref) } }
 
@@ -104,7 +128,8 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
     when (phase) {
         WorkspaceScreenModel.Phase.SHOWING -> {
             val activity = LocalVoice.current?.activity
-            val pagingLocked by (activity?.anyActive ?: remember { MutableStateFlow(false) }).collectAsStateWithLifecycle()
+            val voiceLocksPaging by (activity?.anyActive ?: remember { MutableStateFlow(false) }).collectAsStateWithLifecycle()
+            var terminalLocksPaging by remember { mutableStateOf(false) }
             val actions = remember(model) {
                 WorkspaceScreenActions.make(
                     scope, model,
@@ -123,17 +148,38 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
                 nowMs = rememberNowMs(scope.clock),
                 canControl = model.canControl,
                 canCloseTab = WorkspaceListActions.canCloseTab(ref.machineId, hub),
-                pagingLocked = pagingLocked,
+                canCreateTerminal = hub.supportsTerminalCreate(ref.machineId),
+                canViewTerminals = hub.supportsTerminalView(ref.machineId),
+                shownAsTerminal = model.shownAsTerminal,
+                creatingTerminal = model.creatingTerminal,
+                pagingLocked = voiceLocksPaging || terminalLocksPaging,
                 notice = notice,
                 alert = holder.alert,
                 onAlertDismiss = { holder.alert = null },
                 actions = actions,
                 back = back,
             ) { pane, shown ->
-                PaneContent(pane, shown, agent = { session ->
-                    // Another session in the same terminal is another chat, not this one's model.
-                    key(session.ref) { AgentView(scope, session.ref, open, back, embedded = true) }
-                })
+                val terminalPage = @Composable { page: WorkspacePane, pageShown: Boolean ->
+                    TerminalPane(
+                        terminal, page.id, PaneChips.label(page, res), pageShown,
+                        locksPaging = { terminalLocksPaging = it },
+                        // Typing into a page settles the screen on it: an agent that starts asking does not pull the
+                        // keyboard away mid-command.
+                        engaged = model::settle,
+                    )
+                }
+                if (pane.id in model.shownAsTerminal) {
+                    terminalPage(pane, shown)
+                } else {
+                    PaneContent(
+                        pane, shown,
+                        agent = { session ->
+                            // Another session in the same terminal is another chat, not this one's model.
+                            key(session.ref) { AgentView(scope, session.ref, open, back, embedded = true) }
+                        },
+                        shell = { page, pageShown -> terminalPage(page, pageShown) },
+                    )
+                }
             }
         }
         WorkspaceScreenModel.Phase.WAITING -> WorkspaceWaitingView(back)
