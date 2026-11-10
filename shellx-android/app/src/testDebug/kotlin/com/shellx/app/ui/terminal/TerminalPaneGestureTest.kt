@@ -35,6 +35,7 @@ import com.shellx.core.terminal.TerminalViewModel
 import com.shellx.core.terminal.TerminalViewPhase
 import com.shellx.link.core.TerminalInputUnit
 import com.shellx.link.core.TerminalScreen
+import com.shellx.link.core.TerminalViewEndReason
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 import org.junit.After
@@ -200,6 +201,28 @@ class TerminalPaneGestureTest {
         }
         assertTrue(surface.viewport.followsBottom)
         assertEquals(bottom.text?.toString(), surface.createAccessibilityNodeInfo().text?.toString())
+    }
+
+    /**
+     * A terminal that ends while zoomed in is covered by its card, and the card's page swipes again: a zoom under a card
+     * locks nothing (reviews D1 M4, D2 m5; the iPhone never locks paging for a zoom).
+     */
+    @Test
+    fun aCoveredZoomedPageDoesNotLockThePager() {
+        val rig = WorkRig.make().also { rig = it }
+        rig.mac.setTerminalFixtures(mapOf("t-zsh" to DemoTerminalScreens.HTOP))
+        val model = TerminalViewModel(rig.machineId, rig.hub, rig.hub.scope)
+        rig.hub.scope.launch { model.run() }
+        model.show("t-zsh")
+        show(model)
+        until { model.phase == TerminalViewPhase.Live && surface().viewport.fit < 1f }
+        compose.runOnIdle { surface().pinch(4f, 0f, 0f) }
+        until { locked }
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.GONE)
+        until { model.phase is TerminalViewPhase.Unavailable }
+        until { !locked }
+        compose.onNodeWithTag("terminal.unavailable").performTouchInput { swipeLeft() }
+        until { pager.settledPage == 1 }
     }
 
     @Test
