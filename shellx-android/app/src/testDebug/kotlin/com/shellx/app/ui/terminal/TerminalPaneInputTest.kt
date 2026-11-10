@@ -228,6 +228,23 @@ class TerminalPaneInputTest {
         compose.onNodeWithTag("terminal.paste").assertIsNotEnabled()
     }
 
+    /**
+     * TalkBack reaches the terminal through the surface View itself: Compose hands an AndroidView's node to its View,
+     * so semantics set on the pane never reach an accessibility service (found on the API 36 emulator). The page shown
+     * reads "Terminal zsh" and its screen; under a card the surface is hidden from it.
+     */
+    @Test
+    fun talkBackReadsTheTerminalShownAndNothingUnderACard() {
+        livePane()
+        assertTrue(surface().isImportantForAccessibility)
+        val info = surface().createAccessibilityNodeInfo()
+        assertEquals(context.getString(R.string.terminal_surface_label, "zsh"), info.contentDescription?.toString())
+        assertEquals(model.screen.screenText().joinToString("\n"), info.text?.toString())
+        rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.REFUSED)
+        until { model.phase is TerminalViewPhase.Unavailable }
+        until { !surface().isImportantForAccessibility }
+    }
+
     // TerminalPaneTests.swift, re-expressed for Android (ruling 11)
 
     /** A page that stops taking input (the Mac refused the view) gives the keyboard back and hides the key bar. */
