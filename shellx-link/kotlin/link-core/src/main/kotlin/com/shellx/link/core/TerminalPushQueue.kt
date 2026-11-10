@@ -25,7 +25,10 @@ import kotlinx.coroutines.flow.FlowCollector
  *
  * The frames of any other terminal, which the client ignores (11.1), are kept while they fit the bound and dropped
  * when they do not, with no LOST part, and leave no state behind, so a host that names many terminals grows nothing.
- * [TerminalViewPush.Opened] and [TerminalViewPush.Ended] are never dropped and weigh nothing.
+ * [TerminalViewPush.Opened] (one per open the phone sent) and the viewed terminal's [TerminalViewPush.Ended] are never
+ * dropped, and weigh nothing. An Ended of any other terminal, which the client ignores too, is kept only while none of
+ * that terminal is queued and fewer than [MAX_QUEUED_OTHER_ENDS] are, so a host that streams `terminal.view.ended`
+ * while nobody collects grows nothing either (re-review B).
  *
  * A frame's weight is about the size of its JSON: the UTF-8 bytes of its texts, counted exactly, and a fixed estimate
  * for the rest. So the frames queued weigh at most [maxQueuedWeight] plus one snapshot of each view opened while the
@@ -42,9 +45,13 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     companion object {
         /** About 2 MiB of frame JSON: a snapshot with its whole history fill (at most 262 144 bytes) fits many times. */
         const val MAX_QUEUED_WEIGHT = 2_097_152
+
+        /** At most this many Ended pushes of terminals other than the one viewed are queued at once. */
+        const val MAX_QUEUED_OTHER_ENDS = 16
     }
 
-    private class Entry(val push: TerminalViewPush, val weight: Int)
+    /** [otherEnd]: the terminal of an Ended that was not the one viewed, counted in [otherEnds] while it is queued. */
+    private class Entry(val push: TerminalViewPush, val weight: Int, val otherEnd: String? = null)
 
     /** The frame of a terminal whose parts are arriving; [next] is the index of the part it lacks first. */
     private class Arriving(val revision: Long, val parts: Int, val snapshot: Boolean) {
@@ -66,6 +73,9 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
 
     /** The view's frame whose parts are arriving. */
     private var viewArriving: Arriving? = null
+
+    /** The terminals of the queued Ended pushes that were not of the terminal viewed. */
+    private val otherEnds = HashSet<String>()
 
     /** A token after each offer; a collector waits on it only when nothing is queued. */
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -89,7 +99,10 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
             // Before the take, never between the take and the emit: a cancelled collector leaves the rest queued.
             currentCoroutineContext().ensureActive()
             val entry = synchronized(lock) {
-                entries.removeFirstOrNull()?.also { weight -= it.weight } ?: if (closed) return else null
+                entries.removeFirstOrNull()?.also { taken ->
+                    weight -= taken.weight
+                    taken.otherEnd?.let(otherEnds::remove)
+                } ?: if (closed) return else null
             }
             if (entry != null) {
                 collector.emit(entry.push)
@@ -115,9 +128,16 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
                     view(push.terminalId)
                     add(push, 0)
                 }
-                is TerminalViewPush.Ended -> {
-                    if (viewing == push.terminalId) view(null)
-                    add(push, 0)
+                is TerminalViewPush.Ended -> when {
+                    viewing == push.terminalId -> {
+                        view(null)
+                        add(push, 0)
+                    }
+                    push.terminalId in otherEnds || otherEnds.size >= MAX_QUEUED_OTHER_ENDS -> Unit
+                    else -> {
+                        otherEnds += push.terminalId
+                        add(push, 0, otherEnd = push.terminalId)
+                    }
                 }
                 is TerminalViewPush.Frame -> lostNow = offerFrame(push)
             }
@@ -208,8 +228,8 @@ class TerminalPushQueue(private val maxQueuedWeight: Int = MAX_QUEUED_WEIGHT) {
     }
 
     /** Caller holds [lock]. */
-    private fun add(push: TerminalViewPush, w: Int) {
-        entries.addLast(Entry(push, w))
+    private fun add(push: TerminalViewPush, w: Int, otherEnd: String? = null) {
+        entries.addLast(Entry(push, w, otherEnd))
         weight += w
         wake.trySend(Unit)
     }
