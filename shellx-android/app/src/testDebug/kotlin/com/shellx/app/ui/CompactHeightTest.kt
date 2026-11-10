@@ -26,6 +26,7 @@ import androidx.core.view.WindowInsetsCompat
 import kotlin.math.roundToInt
 import java.util.concurrent.TimeUnit
 import org.robolectric.shadows.ShadowLooper
+import com.shellx.app.demo.DemoFrame
 import com.shellx.app.screenshots.StillSpinner
 import com.shellx.app.ui.components.LocalSpinner
 import com.shellx.app.ui.terminal.LocalTerminalIme
@@ -51,8 +52,10 @@ import com.shellx.app.ui.workspaces.WorkspaceView
 import com.shellx.app.voice.LocalVoice
 import com.shellx.core.workspaces.WorkspaceRef
 import com.shellx.core.link.SessionRef
+import com.shellx.core.demo.FakeMac.TerminalViewSize
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -131,18 +134,29 @@ class CompactHeightTest {
         assertTrue("the chat is $height tall", height >= MIN_CHAT)
     }
 
-    /** The workspace screen of a real account under the status bar, its terminal's keyboard not drawn ([keyboard]). */
-    private fun showWorkspaceTerminal() = compose.setContent {
+    /**
+     * The workspace screen under the status bar, its terminal's keyboard not drawn ([keyboard]): a real account's, or
+     * the [demo]'s under its banner.
+     */
+    private fun showWorkspaceTerminal(demo: Boolean = false) = compose.setContent {
         ShellXTheme {
             CompositionLocalProvider(LocalSpinner provides StillSpinner, LocalTerminalIme provides RecordingIme()) {
                 Column(Modifier.fillMaxSize()) {
                     Spacer(Modifier.height(STATUS_BAR))
                     Box(Modifier.fillMaxWidth().weight(1f)) {
-                        WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
+                        DemoFrame(demo, exit = {}) {
+                            WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
+                        }
                     }
                 }
             }
         }
+    }
+
+    /** The grid the terminal asks the Mac for, once the last size change went out (200 ms later). */
+    private fun lastGrid(): TerminalViewSize {
+        idle(600)
+        return rig.mac.terminalViewResizes.lastOrNull() ?: rig.mac.terminalViewOpens.last()
     }
 
     /**
@@ -176,12 +190,8 @@ class CompactHeightTest {
         until { tagged("terminal.key.escape") }
         keyboard(GBOARD)
         until { !tagged("workspace.title") }
-        // The key bar took its row and the top bar gave its own: the grid that fits reaches the Mac 200 ms later.
-        repeat(60) {
-            compose.waitForIdle()
-            ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
-        }
-        val grid = rig.mac.terminalViewResizes.lastOrNull() ?: rig.mac.terminalViewOpens.last()
+        // The key bar took its row and the top bar gave its own.
+        val grid = lastGrid()
         assertTrue("$grid", grid.cols >= MIN_TERMINAL_COLS && grid.rows >= MIN_TERMINAL_ROWS)
         compose.onNodeWithTag("terminal.surface").performTouchInput {
             pinch(center - Offset(40f, 0f), center - Offset(160f, 0f), center + Offset(40f, 0f), center + Offset(160f, 0f))
@@ -191,6 +201,26 @@ class CompactHeightTest {
         assertTrue("${viewport.scale} after a pinch from ${viewport.fit}", viewport.scale > viewport.fit)
         keyboard(0.dp)
         until { tagged("workspace.title") && !tagged("terminal.key.escape") }
+    }
+
+    /**
+     * The demo, the first thing a new user tries, with the keyboard up (ledger A-36): the "Demo · Exit" banner steps
+     * aside with the workspace's top bar, so its terminal keeps a grid to type in too; both come back when the keyboard
+     * goes down.
+     */
+    @Test
+    fun theDemosTerminalKeepsAUsableGridWithTheKeyboardUp() {
+        showWorkspaceTerminal(demo = true)
+        until { tagged("demo.banner") && tagged("terminal.surface") && rig.mac.terminalViewOpens.isNotEmpty() }
+        compose.onNodeWithTag("terminal.surface").performClick()
+        until { tagged("terminal.key.escape") }
+        keyboard(GBOARD)
+        until { !tagged("workspace.title") }
+        val grid = lastGrid()
+        assertTrue("$grid", grid.cols >= MIN_TERMINAL_COLS && grid.rows >= MIN_TERMINAL_ROWS)
+        assertFalse("the banner steps aside while the terminal holds the keyboard", tagged("demo.banner"))
+        keyboard(0.dp)
+        until { tagged("demo.banner") && tagged("workspace.title") && !tagged("terminal.key.escape") }
     }
 
     /**
