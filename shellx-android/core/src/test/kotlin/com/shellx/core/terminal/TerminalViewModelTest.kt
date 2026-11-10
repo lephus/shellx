@@ -453,5 +453,51 @@ class TerminalViewModelTest {
         assertFalse(link.calls.any { it is Call.Input && it.id == "t2" })
     } }
 
+    /**
+     * Input is taken while live, or while a view reopens after a screen came (it queues behind the open, R10); not
+     * before the first screen, in the wait before a failed view is reopened, after a NotSent, nor offline (the iPhone's
+     * final review follow-up). A stopped page (A1) keeps the keyboard as it was.
+     */
+    @Test fun acceptsInputWhileLiveOrReopeningAView() { runTest {
+        val link = ScriptedTerminalLink(); val sleeper = ManualSleeper(); val (model, run) = makeModel(link, sleeper)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { link.opens == listOf("t1") }
+        assertFalse(model.acceptsInput, "before the first screen the loading card covers the page")
+        emit(link, Opened("t1"))
+        emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
+        eventually { model.phase == TerminalViewPhase.Live }
+        assertTrue(model.acceptsInput); assertTrue(model.state.value.acceptsInput)
+
+        run.cancel()
+        eventually { link.calls.last() == Call.Close("t1") }
+        assertTrue(model.acceptsInput, "a stopped page keeps the keyboard as it was")
+        val gate = Gate(); link.openGate = gate
+        backgroundScope.launch { model.run() }
+        eventually { link.opens.size == 2 }
+        assertEquals(TerminalViewPhase.Connecting, model.phase)
+        assertTrue(model.acceptsInput, "a view is opening: input queues behind it")
+        model.insertText("x")
+        gate.open()
+        assertTrue(eventually { link.calls.last() == Call.Input("t1", listOf(Text("x"))) }, "${link.calls}")
+        emit(link, Opened("t1"))
+        emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
+        eventually { model.phase == TerminalViewPhase.Live }
+
+        emit(link, Ended("t1", TerminalViewEndReason.FAILED))
+        eventually { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting }
+        assertEquals(TerminalViewPhase.Connecting, model.phase)
+        assertFalse(model.acceptsInput, "the retry wait has no view"); assertFalse(model.state.value.acceptsInput)
+        link.online = false; link.emit(TerminalHubEvent.State("m1", MachineLinkState.Reconnecting))
+        eventually { model.phase == TerminalViewPhase.Offline }
+        assertFalse(model.acceptsInput)
+
+        link.openAnswers += TerminalOpenResult.NotSent
+        link.online = true; link.emit(TerminalHubEvent.State("m1", MachineLinkState.Online))
+        eventually { link.opens.size == 3 }
+        delay(50.milliseconds)
+        assertEquals(TerminalViewPhase.Connecting, model.phase, "the hub still calls the Mac online")
+        assertFalse(model.acceptsInput, "after a NotSent there is no view to type into")
+    } }
+
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)
 }
