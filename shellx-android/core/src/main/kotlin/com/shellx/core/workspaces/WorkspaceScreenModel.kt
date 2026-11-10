@@ -34,11 +34,15 @@ data class WorkspaceScreenState(
     /** The workspace left the Mac's list (DISMISSED) after its last tabs were closed from this phone: the screen leaves
      *  without saying the workspace was closed on the Mac. */
     val lastTabClosedHere: Boolean = false,
+    /** The agent chips the user switched to their terminal ("View as Terminal"), until the screen closes. */
+    val shownAsTerminal: Set<String> = emptySet(),
+    /** ＋ was tapped and the Mac has not answered yet: ＋ is dimmed meanwhile ([WorkspaceScreenModel.startCreatingTerminal]). */
+    val creatingTerminal: Boolean = false,
 )
 
 /**
- * One workspace's screen (WorkspaceScreenModel.swift, without plan 2C's terminal page): the workspace as its Mac lists
- * it, the chip shown, and when the screen should give up (the workspace is gone, or never came).
+ * One workspace's screen (WorkspaceScreenModel.swift): the workspace as its Mac lists it, the chip shown, the terminal
+ * its page shows, and when the screen should give up (the workspace is gone, or never came).
  *
  * - The chip shown starts as [defaultTerminal] says and changes when the user swipes ([select]), or when the chip
  *   shown leaves the Mac's list: the next chip shows. The sessions and the requests can arrive after the list: until
@@ -54,6 +58,9 @@ data class WorkspaceScreenState(
  * - A Mac that goes offline leaves the last known list in place, so the chips stay.
  * - A tab the user closes from this phone ([closesHere]) leaves without a word: the next chip shows without
  *   shownPaneClosed, and a workspace that goes with its last tabs sets lastTabClosedHere.
+ * - The page shown is a terminal ([terminalShown]) for a shell chip, or an agent chip the user switched to its terminal
+ *   ([showAsTerminal]). A tab ＋ made ([startCreatingTerminal], [finishCreatingTerminal], [expect]) shows once the
+ *   list has it, unless the user picked a chip first; tapping or typing into the terminal settles the chip ([settle]).
  *
  * Main-confined. Derived getters read [state] and hub.state. reconcile() runs once at construction, so the first frame
  * already shows the workspace and its chip; [run] follows the hub while the screen is shown.
@@ -181,6 +188,12 @@ class WorkspaceScreenModel(
      *  for a moment before it goes. */
     private var lastTerminalIds: List<String> = emptyList()
 
+    /** The terminal the Mac made for this screen (＋, [expect]), shown as soon as the Mac's list has it. */
+    private var expected: String? = null
+
+    /** The user picked a chip while ＋ was on its way: the new tab is not shown when it arrives. */
+    private var pickedWhileCreating = false
+
     init {
         // The first frame already shows the workspace and its chip, when the list has it.
         reconcile()
@@ -192,6 +205,8 @@ class WorkspaceScreenModel(
     val selectedTerminalId: String? get() = state.value.selectedTerminalId
     val shownPaneClosed: Int get() = state.value.shownPaneClosed
     val lastTabClosedHere: Boolean get() = state.value.lastTabClosedHere
+    val shownAsTerminal: Set<String> get() = state.value.shownAsTerminal
+    val creatingTerminal: Boolean get() = state.value.creatingTerminal
 
     private val machine: MachineModel? get() = hub.state.value.machine(ref.machineId)
 
@@ -227,6 +242,65 @@ class WorkspaceScreenModel(
         if (workspace?.terminals?.any { it.terminalId == terminalId } != true) return
         _state.update { it.copy(selectedTerminalId = terminalId) }
         settled = true
+        expected = null
+        if (creatingTerminal) pickedWhileCreating = true
+    }
+
+    /**
+     * The user tapped or typed into the terminal of the chip shown: it is chosen for good, like a pick, so an agent that
+     * starts waiting for an answer no longer moves the screen away from a command being typed (an agent's chat has the
+     * same protection while it is shown).
+     */
+    fun settle() {
+        settled = true
+    }
+
+    /** Switches the agent chip [terminalId] to its terminal (true) or back to its chat; an id the workspace does not have
+     *  is ignored. */
+    fun showAsTerminal(terminalId: String, on: Boolean) {
+        if (on) {
+            if (workspace?.terminals?.any { it.terminalId == terminalId } != true) return
+            _state.update { it.copy(shownAsTerminal = it.shownAsTerminal + terminalId) }
+        } else {
+            _state.update { it.copy(shownAsTerminal = it.shownAsTerminal - terminalId) }
+        }
+    }
+
+    /**
+     * The terminal the page shown is: the chip shown when it is a shell, or an agent chip shown as its terminal
+     * ([showAsTerminal]); null while the chip shown is an agent's chat, or there is none. Reads [state] and hub.state.
+     * The workspace screen gives it to `TerminalViewModel.show`; only the newest terminal page of a Mac takes its
+     * terminal pushes (plan 3G chunk B), so two workspace screens of one Mac that are started at once (a navigation
+     * transition) show frames only on the newer.
+     */
+    val terminalShown: String?
+        get() {
+            val selected = selectedTerminalId ?: return null
+            val isAgent = panes.firstOrNull { it.id == selected }?.isAgent ?: false
+            return if (!isAgent || selected in shownAsTerminal) selected else null
+        }
+
+    /** The user tapped ＋: true when the create may go out, false while an earlier one is still on its way. */
+    fun startCreatingTerminal(): Boolean {
+        if (creatingTerminal) return false
+        _state.update { it.copy(creatingTerminal = true) }
+        pickedWhileCreating = false
+        return true
+    }
+
+    /** The Mac answered ＋: the tab it made ([terminalId], on success) is expected ([expect]) unless the user picked a
+     *  chip while the answer was on its way. */
+    fun finishCreatingTerminal(terminalId: String?) {
+        _state.update { it.copy(creatingTerminal = false) }
+        if (terminalId == null || pickedWhileCreating) return
+        expect(terminalId)
+    }
+
+    /** The Mac made [terminalId] for this screen (＋): it is shown as soon as the Mac's list has it (at once when it does).
+     *  The user picking a chip first drops it. */
+    fun expect(terminalId: String) {
+        expected = terminalId
+        reconcile()
     }
 
     /** The user closed the tab [terminalId] from this phone, and the close is on its way to the Mac: when the Mac's
@@ -280,6 +354,13 @@ class WorkspaceScreenModel(
         if (kept != workspace) kept = workspace
         s = s.copy(phase = Phase.SHOWING)
         val ids = WorkspacePane.ordered(workspace.terminals).map { it.terminalId }
+        val made = expected
+        if (made != null && made in ids) {
+            // The terminal ＋ made is listed: it shows, chosen for good.
+            expected = null
+            s = s.copy(selectedTerminalId = made)
+            settled = true
+        }
         val selected = s.selectedTerminalId
         if (selected != null && selected !in ids) {
             s = s.copy(selectedTerminalId = successor(selected, knownTerminalIds, ids))

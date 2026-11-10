@@ -4,15 +4,19 @@ import android.animation.ValueAnimator
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Composable
+import com.github.takahirom.roborazzi.RoborazziComposeCaptureOption
+import com.github.takahirom.roborazzi.RoborazziComposeOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.shellx.app.ui.theme.ShellXTheme
 import java.io.File
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.imageio.ImageIO
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.shadows.ShadowLooper
 
 /** One rendered PNG: `<name>-<theme>-<language>.png`, with its pixels as ARGB. */
 class Snapshot(
@@ -50,14 +54,37 @@ object ShellXSnapshots {
      * transitions do not read it: an indeterminate `CircularProgressIndicator` (`GoogleSignInButton(busy = true)`
      * among them) keeps asking for frames, and Roborazzi's wait for an idle main looper never ends. Such a frame fails
      * after [settleTimeout] with its file name; render a determinate or still stand-in instead.
+     *
+     * [ready], when given, holds each capture until it is true, letting the main looper's time pass (up to
+     * [READY_TIMEOUT_MS]): a screen fed by a live rig (a terminal's first screen) is drawn once it came, as the iPhone's
+     * render tests settle first.
      */
     fun capture(
         name: String,
         settleTimeout: Duration = SETTLE_TIMEOUT,
+        ready: (() -> Boolean)? = null,
         content: @Composable () -> Unit,
-    ): List<Snapshot> = withoutAnimations { render(name, settleTimeout, content) }
+    ): List<Snapshot> = withoutAnimations { render(name, settleTimeout, ready, content) }
 
-    private fun render(name: String, settleTimeout: Duration, content: @Composable () -> Unit): List<Snapshot> {
+    /** The longest [capture] waits for its `ready`, in real time (a rig's stores work off the main thread). */
+    const val READY_TIMEOUT_MS = 10_000L
+
+    /** Holds a capture until [ready], the main looper's clock moving on 10 ms a round. */
+    private class WaitUntilReady(private val what: String, private val ready: () -> Boolean) : RoborazziComposeCaptureOption {
+        override fun beforeCapture() {
+            val deadline = System.nanoTime() + READY_TIMEOUT_MS * 1_000_000
+            while (System.nanoTime() < deadline) {
+                if (ready()) return
+                ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+                Thread.sleep(2)
+            }
+            if (!ready()) throw AssertionError("$what was not ready to capture within $READY_TIMEOUT_MS ms")
+        }
+
+        override fun afterCapture() = Unit
+    }
+
+    private fun render(name: String, settleTimeout: Duration, ready: (() -> Boolean)?, content: @Composable () -> Unit): List<Snapshot> {
         val dir = System.getProperty("shellx.snapshot.dir")
             ?: error("shellx.snapshot.dir is not set; run shellx-android/scripts/dev.sh test screenshots")
         val folder = File(dir).apply { mkdirs() }
@@ -66,8 +93,9 @@ object ShellXSnapshots {
             for (theme in listOf("light", "dark")) {
                 RuntimeEnvironment.setQualifiers("+$language-${if (theme == "dark") "night" else "notnight"}")
                 val file = File(folder, "$name-$theme-$language.png")
+                val options = RoborazziComposeOptions { if (ready != null) addOption(WaitUntilReady(file.name, ready)) }
                 settlingWithin(settleTimeout, file.name) {
-                    captureRoboImage(file.absolutePath) { ShellXTheme { content() } }
+                    captureRoboImage(file.absolutePath, roborazziComposeOptions = options) { ShellXTheme { content() } }
                 }
                 val image = ImageIO.read(file) ?: error("could not read $file")
                 val width = image.width

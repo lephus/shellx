@@ -240,7 +240,6 @@
     <string name="workspace_not_found">Workspace not found</string>
     <string name="workspace_not_found_back">Back</string>
     <string name="workspace_pane_closed_on_mac">Terminal closed on the Mac</string>
-    <string name="workspace_shell_placeholder">Viewing and typing in the terminal comes in a later version.</string>
     <string name="workspaces_alert_agent_not_closable">The Mac can\'t close this agent: it has no terminal tab there, or it has already stopped.</string>
     <string name="workspaces_alert_failed">Couldn\'t do that. Try again later</string>
     <string name="workspaces_alert_offline">The Mac is offline</string>

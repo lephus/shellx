@@ -114,6 +114,12 @@ data class HubState(
     /** True when the Mac listed `terminal_close` when it was last online. False for a Mac never online yet. */
     fun supportsTerminalClose(machineId: String): Boolean = listed(machineId, ShellXLink.TERMINAL_CLOSE_FEATURE)
 
+    /** True when the Mac listed `terminal_view` when it was last online: its shell panes show its terminals. */
+    fun supportsTerminalView(machineId: String): Boolean = listed(machineId, ShellXLink.TERMINAL_VIEW_FEATURE)
+
+    /** True when the Mac listed `terminal_create` when it was last online (the ＋ chip). */
+    fun supportsTerminalCreate(machineId: String): Boolean = listed(machineId, ShellXLink.TERMINAL_CREATE_FEATURE)
+
     /**
      * True when the Mac listed `attachments` when it was last online: the composer offers photos and files for its
      * sessions only then. False for a Mac never online yet.

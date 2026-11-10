@@ -38,8 +38,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * (MachineConnection.swift). Main-confined: every member is called from the dispatcher of [scope], where the loop runs.
  *
  * One round: connect, `snapshot()`, `sessions()` (a Mac without a session list answers `unsupported`, which is not a
- * failure), `workspaces()` (only when the Mac lists the `workspaces` feature), report the session's `hostFeatures` and
- * Online, then read `changes`, `sessionChanges`, `workspaceChanges` and `chatEntries` until `changes` ends. A revision
+ * failure), `workspaces()` (only when the Mac lists the `workspaces` feature), hand on the session's terminal pushes,
+ * report its `hostFeatures` and Online, then read `changes`, `sessionChanges`, `workspaceChanges` and `chatEntries` until
+ * `changes` ends. The terminal pushes are not read here (plan 3G Decision 1): they stay in the session's bounded queue
+ * until a terminal page collects them through the hub ([MachineEvent.TerminalPushes]). A revision
  * gap resyncs inside the live session. When the session ends the items stay but are reported not actionable
  * (Reconnecting); when the first attempt after that fails they are dropped (Offline). Waits follow [schedule]; the
  * failure count starts over at every connect. A refused token ([MachineEvent.SignedOut]), a revoked grant, a changed
@@ -237,6 +239,7 @@ class MachineConnection(
         emit(MachineEvent.Pending(pending, actionable = true))
         emit(MachineEvent.Sessions(sessions, sessionsSupported))
         emit(MachineEvent.Workspaces(workspaces, workspacesSupported))
+        emit(MachineEvent.TerminalPushes(session.terminalPushes))
         emit(MachineEvent.Features(session.hostFeatures))
         emit(MachineEvent.State(MachineLinkState.Online))
     }

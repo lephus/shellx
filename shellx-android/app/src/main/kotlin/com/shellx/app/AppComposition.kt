@@ -94,7 +94,8 @@ class AppComposition(
     /** Null: `DemoEnvironment(scope, clock, demoHistoryDirectory, io)`. */
     demoEnvironment: ((CoroutineScope) -> DemoEnvironment)? = null,
 ) {
-    val latency: LatencyLog = LatencyLog()
+    /** The terminal's metrics are logged in debug builds only (final review m3); every sample counts in both. */
+    val latency: LatencyLog = LatencyLog(logsTerminalMetrics = environment.debugBuild)
 
     /** Settings › Appearance, always over the real settings (also during the demo). */
     val appearance: AppAppearanceStore = AppAppearanceStore(environment.settings)
@@ -148,7 +149,10 @@ class AppComposition(
     val demo: DemoSession = DemoSession(
         appScope = appScope,
         makeEnvironment = demoEnvironment ?: { scope ->
-            DemoEnvironment(scope, environment.clock, environment.demoHistoryDirectory, environment.io)
+            DemoEnvironment(
+                scope, environment.clock, environment.demoHistoryDirectory, environment.io,
+                latency = LatencyLog(logsTerminalMetrics = environment.debugBuild),
+            )
         },
         graphOf = { env, child ->
             val demoLaunch = LaunchMark(env.latency, environment.clock).also { it.skip() }

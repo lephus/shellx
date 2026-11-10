@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.WorkRig
 import com.shellx.app.testing.eventually
 import com.shellx.core.link.MachineLinkState
+import com.shellx.core.workspaces.WorkspaceCommandResult
 import com.shellx.core.workspaces.WorkspaceScreenModel
 import com.shellx.link.core.LinkTerminal
 import com.shellx.link.core.LinkWorkspace
@@ -184,6 +185,113 @@ class WorkspaceActionsTest {
         rig.close()
         rig = WorkRig.make(acceptsTerminalClose = false)
         assertFalse(WorkspaceListActions.canCloseTab(model.ref.machineId, rig.hub))
+    }
+
+    // Terminals (2C's additions to `WorkspaceViewTests.swift`)
+
+    @Test
+    fun aNewTerminalReachesTheMacAndItsChipShows() {
+        follow()
+        assertTrue(rig.hub.supportsTerminalCreate(model.ref.machineId))
+        actions.createTerminal()
+        assertEquals(WorkspaceFeedback.None, lastFeedback())
+        assertEquals(listOf("ws-shellx"), rig.mac.terminalCreates)
+        assertTrue("${model.selectedTerminalId}", eventually { model.selectedTerminalId?.startsWith("ws-shellx-new-") == true })
+        assertTrue(alerts.isEmpty())
+    }
+
+    @Test
+    fun aRefusedNewTerminalIsAnAlert() {
+        follow()
+        rig.mac.setNextTerminalCreateOutcome(WorkspaceControlOutcome.REFUSED)
+        actions.createTerminal()
+        assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.REFUSED_CONTROL), lastFeedback())
+        assertEquals(listOf(WorkspaceAlert.REFUSED_CONTROL), alerts)
+        assertEquals("t-zsh", model.selectedTerminalId)
+        assertFalse("a refused ＋ is not dimmed any more", model.creatingTerminal)
+    }
+
+    /** ＋ to a Mac that cannot be reached is an alert, and ＋ is not left dimmed (review D2 m1). */
+    @Test
+    fun aNewTerminalToAnUnreachableMacLeavesPlusEnabled() {
+        follow()
+        rig.hub.backgroundTimeExpired()
+        assertTrue(eventually { rig.hub.machines.first().state != MachineLinkState.Online })
+        actions.createTerminal()
+        assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.OFFLINE), lastFeedback())
+        assertEquals(listOf(WorkspaceAlert.OFFLINE), alerts)
+        assertFalse(model.creatingTerminal)
+        assertTrue(rig.mac.terminalCreates.isEmpty())
+    }
+
+    @Test
+    fun viewAsTerminalSwitchesTheAgentChipsPage() {
+        follow()
+        actions.select("t-claude")
+        assertEquals("an agent chip shows its chat", null, model.terminalShown)
+        actions.showAsTerminal("t-claude", true)
+        assertEquals("t-claude", model.terminalShown)
+        actions.showAsTerminal("t-claude", false)
+        assertEquals(null, model.terminalShown)
+        assertTrue("switching the page asks the Mac for nothing", tasks.isEmpty())
+    }
+
+    @Test
+    fun aNewTerminalsAnswers() {
+        val m = "m1"
+        assertEquals(WorkspaceFeedback.None, WorkspaceFeedback.of(WorkspaceCommandResult.Ok(null), WorkspaceCommand.CREATE_TERMINAL, m))
+        assertEquals(WorkspaceFeedback.None, WorkspaceFeedback.of(WorkspaceCommandResult.Ok("ws"), WorkspaceCommand.CREATE_TERMINAL, m))
+        assertEquals(WorkspaceFeedback.Refresh, WorkspaceFeedback.of(WorkspaceCommandResult.NotFound, WorkspaceCommand.CREATE_TERMINAL, m))
+        assertEquals(
+            WorkspaceFeedback.Alert(WorkspaceAlert.REFUSED_CONTROL),
+            WorkspaceFeedback.of(WorkspaceCommandResult.Refused, WorkspaceCommand.CREATE_TERMINAL, m),
+        )
+        assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.FAILED), WorkspaceFeedback.of(WorkspaceCommandResult.Failed, WorkspaceCommand.CREATE_TERMINAL, m))
+        assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.OFFLINE), WorkspaceFeedback.of(WorkspaceCommandResult.Offline, WorkspaceCommand.CREATE_TERMINAL, m))
+        assertEquals(WorkspaceFeedback.Alert(WorkspaceAlert.UNKNOWN), WorkspaceFeedback.of(WorkspaceCommandResult.Unknown, WorkspaceCommand.CREATE_TERMINAL, m))
+    }
+
+    /**
+     * Runs [taps] in one main-thread turn that started in the hub's scope, as the Swift tests' Task does: a command the
+     * actions start meanwhile waits for the turn to end, so the fake Mac (which answers at once) answers after [taps].
+     */
+    private fun inOneTurn(taps: () -> Unit) {
+        val turn = rig.hub.scope.launch { taps() }
+        assertTrue(eventually { turn.isCompleted })
+    }
+
+    /** ＋ again while a new terminal is on its way does nothing, and a chip the user picks before the Mac answers stays
+     *  shown when the new tab arrives (the iPhone's final review, app M6). */
+    @Test
+    fun aPickWhileANewTerminalIsOnItsWayWins() {
+        follow()
+        inOneTurn {
+            actions.createTerminal()
+            actions.createTerminal()
+            actions.select("t-claude")
+        }
+        assertTrue(eventually { tasks.all { it.isCompleted } })
+        assertEquals("one create while one is on its way", listOf("ws-shellx"), rig.mac.terminalCreates)
+        assertTrue(eventually { model.panes.any { it.id.startsWith("ws-shellx-new-") } })
+        eventually(timeoutMs = 100) { false }
+        assertEquals("the user's pick wins over the new tab", "t-claude", model.selectedTerminalId)
+    }
+
+    /** ＋ is dimmed from the tap until the Mac answers (the iPhone's final review, app M6). */
+    @Test
+    fun plusIsDimmedWhileANewTerminalIsOnItsWay() {
+        follow()
+        var dimmed = false
+        inOneTurn {
+            actions.createTerminal()
+            dimmed = model.creatingTerminal
+        }
+        assertTrue(dimmed)
+        lastFeedback()
+        assertFalse(model.creatingTerminal)
+        actions.createTerminal()
+        lastFeedback()
+        assertEquals("once answered, ＋ works again", listOf("ws-shellx", "ws-shellx"), rig.mac.terminalCreates)
     }
 
     /** The Swift test stops the hub; here the hub's scope ends with a stop, so the Mac is made unreachable instead (the

@@ -20,6 +20,9 @@ enum class WorkspaceCommand {
 
     /** Closes one terminal tab of a workspace (`MachineHub.closeTerminal`). */
     CLOSE_TAB,
+
+    /** Opens a terminal tab in the workspace (`MachineHub.createTerminal`). */
+    CREATE_TERMINAL,
 }
 
 /** What the list says when a command did not simply work. The words always say what to do next. */
@@ -68,14 +71,14 @@ sealed interface WorkspaceFeedback {
                 WorkspaceCommandResult.NotFound -> when (command) {
                     WorkspaceCommand.CLOSE_AGENT -> Alert(WorkspaceAlert.AGENT_NOT_CLOSABLE)
                     WorkspaceCommand.CLOSE_TAB -> Alert(WorkspaceAlert.TAB_NOT_CLOSABLE)
-                    WorkspaceCommand.CREATE, WorkspaceCommand.RENAME, WorkspaceCommand.CLOSE -> Refresh
+                    WorkspaceCommand.CREATE, WorkspaceCommand.RENAME, WorkspaceCommand.CLOSE, WorkspaceCommand.CREATE_TERMINAL -> Refresh
                 }
                 // Not only blocked remote control: the Mac's own rules can keep the tab too.
                 WorkspaceCommandResult.Refused -> when (command) {
                     WorkspaceCommand.CLOSE -> Alert(WorkspaceAlert.REFUSED_CLOSE)
                     WorkspaceCommand.CLOSE_AGENT -> Alert(WorkspaceAlert.REFUSED_CLOSE_AGENT)
                     WorkspaceCommand.CLOSE_TAB -> Alert(WorkspaceAlert.REFUSED_CLOSE_TAB)
-                    WorkspaceCommand.CREATE, WorkspaceCommand.RENAME -> Alert(WorkspaceAlert.REFUSED_CONTROL)
+                    WorkspaceCommand.CREATE, WorkspaceCommand.RENAME, WorkspaceCommand.CREATE_TERMINAL -> Alert(WorkspaceAlert.REFUSED_CONTROL)
                 }
                 WorkspaceCommandResult.Failed -> Alert(WorkspaceAlert.FAILED)
                 WorkspaceCommandResult.Offline -> Alert(WorkspaceAlert.OFFLINE)

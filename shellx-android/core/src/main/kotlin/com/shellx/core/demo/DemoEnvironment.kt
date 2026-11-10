@@ -44,6 +44,8 @@ class DemoEnvironment(
     approvalDelay: Duration = 2.seconds,
     private val runsScript: Boolean = true,
     private val sleep: suspend (Duration) -> Unit = { delay(it) },
+    /** The demo's own latencies (the app passes one that logs terminal metrics in debug builds only). */
+    val latency: LatencyLog = LatencyLog(),
 ) {
     val vault: AccountVault = AccountVault(DemoSecretStore(), io)
     val settings: KeyValueStore = MemoryKeyValueStore()
@@ -51,7 +53,6 @@ class DemoEnvironment(
     val second: FakeMac = FakeMac(SECOND_NAME, scope, id = "demo-2", nowMs = clock::nowMs)
     val relay: DemoRelay = DemoRelay(listOf(first.machine), setOf(second.machine.machineId), approvalDelay, sleep)
     val history: ConversationStore = ConversationStore(historyDirectory, io, clock)
-    val latency: LatencyLog = LatencyLog()
     private val connector = FakeMacFleet(listOf(first, second)) { vault.phoneKey() }
     val coordinator: AppCoordinator = AppCoordinator(
         vault, relay, UnavailableIdentityProvider(), DEVICE_NAME, listOf(history), settings, scope,
@@ -66,7 +67,7 @@ class DemoEnvironment(
     /**
      * Once it succeeded (seeding again would drop a Mac paired since): stores `StoredSession("demo", "demo-phone", "demo-token",
      * EMAIL)` and `[first.machine]` owned by "demo", then, with `runsScript`, starts the script and gives the first Mac
-     * [WORKSPACES]. The caller then calls `coordinator.launch()`.
+     * [WORKSPACES] and [TERMINALS]. The caller then calls `coordinator.launch()`.
      */
     suspend fun prepare() {
         if (prepared) return
@@ -79,6 +80,7 @@ class DemoEnvironment(
             playing = script.start(scope, sleep)
             // The Mac's sidebar as the design shows it, over the script's two sessions.
             first.setWorkspaces(WORKSPACES)
+            first.setTerminalFixtures(TERMINALS)
         }
     }
 
@@ -128,6 +130,16 @@ class DemoEnvironment(
                 workspaceId = "ws-notes", title = "notes", order = 3, directory = "~",
                 terminals = listOf(LinkTerminal(terminalId = "demo-notes-t1", title = "zsh", order = 0, selected = true)),
             ),
+        )
+
+        /** What the demo Mac's terminals show: the agents' terminals an agent's screen, the shells a session, a dev
+         *  server that keeps logging, and a note in Vietnamese, Chinese, Japanese, Korean and emoji. */
+        val TERMINALS: Map<String, DemoTerminalFixture> = mapOf(
+            "demo-shellx-t1" to DemoTerminalScreens.AGENT,
+            "demo-shellx-t2" to DemoTerminalScreens.SHELL,
+            "demo-relay-t1" to DemoTerminalScreens.DEV_SERVER,
+            "demo-web-t1" to DemoTerminalScreens.AGENT,
+            "demo-notes-t1" to DemoTerminalScreens.WIDE,
         )
     }
 }

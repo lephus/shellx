@@ -1,27 +1,17 @@
 package com.shellx.app.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.shellx.app.AppComposition
 import com.shellx.app.PlatformServices
-import com.shellx.app.demo.DemoBanner
+import com.shellx.app.demo.DemoFrame
 import com.shellx.app.ui.nav.Routes
 import com.shellx.app.ui.nav.ShellXNavHost
 import com.shellx.app.ui.nav.bottomRoute
@@ -44,16 +34,8 @@ fun ShellXApp(composition: AppComposition, nav: NavHostController = rememberNavC
     val root by composition.root.collectAsStateWithLifecycle()
     val demo = active.isDemo
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (demo) {
-            DemoBanner(
-                exit = { composition.appScope.launch { composition.demo.exit() } },
-                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
-            )
-        }
-        Box(Modifier.weight(1f).then(if (demo) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
-            SignedInFrame(composition, nav, root, platform) { host() }
-        }
+    DemoFrame(demo, exit = { composition.appScope.launch { composition.demo.exit() } }) {
+        SignedInFrame(composition, nav, root, platform) { host() }
     }
 
     val hasLink by composition.inbox.hasLink.collectAsStateWithLifecycle()

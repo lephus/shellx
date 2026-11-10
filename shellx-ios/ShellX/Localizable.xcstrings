@@ -3902,24 +3902,6 @@
         }
       }
     },
-    "workspace.shell.placeholder": {
-      "comment": "On a workspace screen, in place of a terminal chip's content: the terminal itself comes in a later version.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Viewing and typing in the terminal comes in a later version."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Xem và gõ terminal có ở bản sau"
-          }
-        }
-      }
-    },
     "workspaces.alert.agentNotClosable": {
       "comment": "Alert: the Mac could not close an agent because it has no terminal tab on the Mac, or it has stopped already.",
       "extractionState": "manual",

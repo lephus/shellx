@@ -16,6 +16,7 @@ import com.shellx.link.account.PairedMachineListing
 import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.time.Duration
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -57,7 +58,8 @@ fun listing(machine: PairedMachine, name: String? = null): PairedMachineListing 
  * The hub's sleep is [sleep] when given (MachineHubWorkspaceTests and FakeMacDemoScriptTests pass instantSleep), else
  * [sleeper]'s (the Swift rigs' ManualSleeper). onUnauthorized appends to [HubRig.unauthorized]. [saved] are the Macs in
  * the vault ([macs] by default); [connector] and [relay] wrap the fakes. [seed] runs on the store before the hub starts;
- * [start] starts the hub before returning.
+ * [start] starts the hub before returning. The hub runs in [scope] (the test's backgroundScope by default; a test can
+ * give one on an UnconfinedTestDispatcher to run it the way the app's `Dispatchers.Main.immediate` does).
  */
 suspend fun TestScope.hubRig(
     macs: List<FakeMac>,
@@ -70,6 +72,7 @@ suspend fun TestScope.hubRig(
     relay: (FakeRelayAccount) -> RelayAccountCalling = { it },
     seed: suspend (ConversationStore) -> Unit = {},
     start: Boolean = false,
+    scope: CoroutineScope = backgroundScope,
 ): HubRig {
     val directory = createTempDirectory("hub-rig").toFile()
     // Review 3b m-4: the directory goes with the test, after the hub and its writes stopped.
@@ -84,7 +87,7 @@ suspend fun TestScope.hubRig(
     val latency = LatencyLog()
     val unauthorized = mutableListOf<Unit>()
     val hub = MachineHub(
-        vault, relay(fake), connector(FakeMacFleet(macs) { vault.phoneKey() }), latency, settings, backgroundScope, clock,
+        vault, relay(fake), connector(FakeMacFleet(macs) { vault.phoneKey() }), latency, settings, scope, clock,
         sleep ?: sleeper.sleep,
     ) { unauthorized += Unit }
     if (start) hub.start()

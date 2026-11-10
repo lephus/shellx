@@ -2,6 +2,7 @@
 <resources>
     <string name="action_open_agent">mở cuộc trò chuyện với agent</string>
     <string name="action_open_your_macs">mở Máy của bạn</string>
+    <string name="action_type">gõ phím</string>
     <string name="first_mac_step2">Quét mã QR hiện ra bằng điện thoại này.</string>
     <string name="first_mac_subtitle">Xem và trả lời Claude Code trên Mac ngay từ điện thoại này.</string>
     <string name="machine_state_revoked">Mac này đã gỡ điện thoại này</string>
@@ -36,6 +37,7 @@
     <string name="signin_error_local_wipe_pending">Không xoá được dữ liệu của tài khoản trước trên điện thoại này. Thử lại.</string>
     <string name="signin_error_reauth_required">Hãy đăng nhập bằng tài khoản Google mà tài khoản ShellX này dùng, rồi thử lại.</string>
     <string name="signin_subtitle">Dùng tài khoản Google bạn dùng với ShellX trên Mac.</string>
+    <string name="terminal_paste">Dán</string>
     <string name="update_downloaded">Đã tải xong bản cập nhật.</string>
     <string name="update_message">Cập nhật ShellX trên Google Play để có các bản sửa lỗi và tính năng mới nhất.</string>
     <string name="update_restart">Khởi động lại</string>

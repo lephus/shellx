@@ -39,4 +39,54 @@ object ShellXLink {
 
     /** Longest `title` of a `workspace.rename`, in UTF-8 bytes. The host checks it; the codec does not. */
     const val MAX_WORKSPACE_TITLE_BYTES = 512
+
+    // Terminal views (PROTOCOL.md section 11; `ShellXLink+Terminal.swift`).
+
+    /** The `welcome.features` entry of a host that serves terminal views (`terminal.view.*`). */
+    const val TERMINAL_VIEW_FEATURE = "terminal_view"
+
+    /** The `welcome.features` entry of a host that takes `terminal.create`. */
+    const val TERMINAL_CREATE_FEATURE = "terminal_create"
+
+    /** Columns a phone may ask for; the host clamps into this range (PROTOCOL.md 11.3). */
+    val TERMINAL_COLUMNS: IntRange = 20..300
+
+    /** Rows a phone may ask for; the host clamps into this range (PROTOCOL.md 11.3). */
+    val TERMINAL_ROWS: IntRange = 5..120
+
+    /** Largest `cols` or `rows` in a frame (PROTOCOL.md 11.5). */
+    const val TERMINAL_MAX_GRID_SIZE = 1000
+
+    /** Most parts of one frame. */
+    const val TERMINAL_MAX_FRAME_PARTS = 256
+
+    /** Most UTF-8 bytes in the text of one cell. */
+    const val TERMINAL_MAX_CELL_TEXT_BYTES = 32
+
+    /** History rows a snapshot carries at most. */
+    const val TERMINAL_SNAPSHOT_HISTORY_ROWS = 240
+
+    /** History rows of a snapshot and its history frames together. */
+    const val TERMINAL_HISTORY_ROW_BUDGET = 4000
+
+    /** Bytes of the messages of the history frames that follow one snapshot. */
+    const val TERMINAL_HISTORY_FILL_MAX_BYTES = 262_144
+
+    /** History rows a delta carries at most. */
+    const val TERMINAL_MAX_DELTA_HISTORY_ROWS = 2000
+
+    /** Units in one `terminal.view.input`. */
+    const val TERMINAL_MAX_INPUT_UNITS = 64
+
+    /** UTF-8 bytes of typed text in one `terminal.view.input`. */
+    const val TERMINAL_MAX_TEXT_BYTES = 4096
+
+    /** UTF-8 bytes of pasted text in one `terminal.view.input`. */
+    const val TERMINAL_MAX_PASTE_BYTES = 16_384
+
+    /** Most lines of a `scroll` unit, either sign. */
+    const val TERMINAL_MAX_SCROLL_LINES = 100
+
+    /** Input and resize messages of a view a host holds unapplied. */
+    const val TERMINAL_MAX_QUEUED_INPUTS = 64
 }

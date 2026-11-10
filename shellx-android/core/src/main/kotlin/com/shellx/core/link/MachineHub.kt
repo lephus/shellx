@@ -4,11 +4,16 @@ import com.shellx.core.account.AccountVault
 import com.shellx.core.account.RelayAccountCalling
 import com.shellx.core.composer.OutgoingAttachment
 import com.shellx.core.diagnostics.LatencyLog
+import com.shellx.core.diagnostics.LatencyMetric
 import com.shellx.core.home.SessionFinishDetector
 import com.shellx.core.pending.DecisionSending
 import com.shellx.core.platform.Clock
 import com.shellx.core.platform.CoreLog
 import com.shellx.core.platform.KeyValueStore
+import com.shellx.core.terminal.TerminalCreation
+import com.shellx.core.terminal.TerminalHubEvent
+import com.shellx.core.terminal.TerminalLink
+import com.shellx.core.terminal.TerminalOpenResult
 import com.shellx.core.workspaces.WorkspaceCommandResult
 import com.shellx.core.workspaces.WorkspaceRef
 import com.shellx.core.workspaces.WorkspaceRow
@@ -27,6 +32,7 @@ import com.shellx.link.core.LinkSession
 import com.shellx.link.core.MessageUploadException
 import com.shellx.link.core.ReplyOutcome
 import com.shellx.link.core.ShellXLink
+import com.shellx.link.core.TerminalInputUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
@@ -64,6 +70,8 @@ data class MachineStateUpdate(val machineId: String, val state: MachineLinkState
  *
  * Main-confined. Its own work runs in [scope], a child of the scope it was given: [stopAll] cancels it, as its last
  * step. Every change of what it shows goes through [state].
+ *
+ * Its terminal calls and events ([TerminalLink], [createTerminal]) are [HubTerminals]'.
  */
 class MachineHub(
     private val vault: AccountVault,
@@ -75,7 +83,7 @@ class MachineHub(
     private val clock: Clock,
     private val sleep: suspend (Duration) -> Unit = { delay(it) },
     private val onUnauthorized: suspend () -> Unit,
-) : DecisionSending {
+) : DecisionSending, TerminalLink {
     companion object {
         /** How long sessions stay open after the app went to the background. */
         val BACKGROUND_GRACE: Duration = 25.seconds
@@ -135,6 +143,9 @@ class MachineHub(
     fun supportsTerminalClose(machineId: String): Boolean = state.value.supportsTerminalClose(machineId)
 
     fun acceptsAttachments(machineId: String): Boolean = state.value.acceptsAttachments(machineId)
+
+    /** True when the Mac listed `terminal_create` when it was last online (the ＋ chip). */
+    fun supportsTerminalCreate(machineId: String): Boolean = state.value.supportsTerminalCreate(machineId)
 
     /** The user looked at the workspace (its screen opened): its finished sessions stop counting as DONE, until one
      *  of them finishes again. */
@@ -215,6 +226,39 @@ class MachineHub(
         }
 
     /**
+     * Opens a terminal tab in the workspace on its Mac (`terminal.create`); [TerminalCreation.terminalId] only with Ok.
+     * Sent once, like the workspace commands: Offline and nothing sent when the Mac is not online, Failed without
+     * `terminal_create`, Unknown when the answer was lost. The tab joins [workspaceRows] when the Mac's list change
+     * arrives.
+     */
+    suspend fun createTerminal(ref: WorkspaceRef): TerminalCreation = terminals.create(ref)
+
+    // Terminal views (TerminalLink, HubTerminals)
+
+    override fun terminalEvents(machineId: String): Flow<TerminalHubEvent> = terminals.events(machineId)
+
+    override fun isOnline(machineId: String): Boolean = terminals.isOnline(machineId)
+
+    override fun supportsTerminalView(machineId: String): Boolean = terminals.supportsTerminalView(machineId)
+
+    override suspend fun openTerminalView(machineId: String, terminalId: String, cols: Int, rows: Int): TerminalOpenResult =
+        terminals.open(machineId, terminalId, cols, rows)
+
+    override suspend fun closeTerminalView(machineId: String, terminalId: String) =
+        terminals.post(machineId) { it.closeTerminalView(terminalId) }
+
+    override suspend fun sendTerminalInput(machineId: String, terminalId: String, units: List<TerminalInputUnit>) =
+        terminals.post(machineId) { it.sendTerminalInput(terminalId, units) }
+
+    override suspend fun resizeTerminalView(machineId: String, terminalId: String, cols: Int, rows: Int) =
+        terminals.post(machineId) { it.resizeTerminalView(terminalId, cols, rows) }
+
+    override suspend fun resyncTerminalView(machineId: String, terminalId: String) =
+        terminals.post(machineId) { it.resyncTerminalView(terminalId) }
+
+    override fun recordLatency(metric: LatencyMetric, duration: Duration) = latency.record(metric, duration)
+
+    /**
      * How many times the session's transcript was reset (`chat.reset`) since the hub started, counted as each reset
      * arrives, before any subscriber sees it. A screen that stopped following the chat compares it when it follows
      * again: a reset it missed voids its copy. Not observable.
@@ -228,6 +272,7 @@ class MachineHub(
     private val chatSubscribers = Subscribers<ChatUpdate>()
     private val sessionSubscribers = Subscribers<MachineSessions>()
     private val stateSubscribers = Subscribers<MachineStateUpdate>()
+    private val terminals = HubTerminals(this)
     private var started = false
     private var stopped = false
     private var unauthorizedReported = false
@@ -251,6 +296,7 @@ class MachineHub(
     internal val chatSubscriberCount: Int get() = chatSubscribers.count
     internal val connectionCount: Int get() = connections.size
     internal val sessionSubscriberCount: Int get() = sessionSubscribers.count
+    internal val terminalSubscriberCount: Int get() = terminals.subscriberCount
 
     // Lifecycle
 
@@ -290,6 +336,7 @@ class MachineHub(
             chatSubscribers.closeAll()
             sessionSubscribers.closeAll()
             stateSubscribers.closeAll()
+            terminals.stop()
             _state.update { it.copy(machines = it.machines.map { model -> model.copy(pendingActionable = false) }) }
             scope.cancel()
         }
@@ -606,7 +653,9 @@ class MachineHub(
             is MachineEvent.State -> {
                 updateModel(machineId) { it.copy(state = event.state) }
                 stateSubscribers.publish(MachineStateUpdate(machineId, event.state))
+                terminals.stateChanged(machineId, event.state)
             }
+            is MachineEvent.TerminalPushes -> terminals.sessionStarted(machineId, event.pushes)
             is MachineEvent.Pending -> _state.update { s ->
                 val before = s.machine(machineId)?.pending ?: PendingSet()
                 val handled = if (event.actionable) rememberHandled(s.handled, before, event.set, machineId) else s.handled
@@ -723,6 +772,7 @@ class MachineHub(
                 sessions = SessionSet(), workspaces = WorkspaceSet(),
             )
         }
+        terminals.stateChanged(machineId, MachineLinkState.Revoked)
         forgetFinishes(machineId)
     }
 
@@ -738,6 +788,7 @@ class MachineHub(
      */
     private fun detachAll(): List<MachineConnection> {
         suspended = true
+        val wereOnline = state.value.machines.filter { it.state == MachineLinkState.Online }.map { it.id }
         _state.update { s ->
             s.copy(
                 machines = s.machines.map { model ->
@@ -750,6 +801,7 @@ class MachineHub(
                 },
             )
         }
+        for (id in wereOnline) terminals.stateChanged(id, MachineLinkState.Reconnecting)
         for (reader in readers.values) reader.cancel()
         readers.clear()
         val detached = connections.values.toList()

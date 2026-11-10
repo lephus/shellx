@@ -1,10 +1,22 @@
 package com.shellx.app.screenshots
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import android.view.View
+import android.view.ViewGroup
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.testing.WorkRig
+import com.shellx.app.ui.components.LocalSpinner
+import com.shellx.app.ui.terminal.TerminalPane
+import com.shellx.app.ui.terminal.TerminalSurfaceView
+import com.shellx.core.terminal.TerminalViewPhase
+import com.shellx.core.demo.DemoTerminalScreens
+import com.shellx.core.terminal.TerminalViewModel
+import com.shellx.link.core.TerminalScreen
 import com.shellx.app.testing.eventually
 import com.shellx.app.ui.agent.AgentNotice
 import com.shellx.app.ui.agent.AgentScreen
@@ -29,7 +41,9 @@ import com.shellx.link.core.PendingItem
 import com.shellx.link.core.PendingKind
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -41,6 +55,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = ShellXSnapshots.DEVICE_QUALIFIERS)
 class WorkspaceRenderTest {
+    /** No window of its own: it keeps the capture's window in step with Compose while a live render waits. */
+    @get:Rule val compose = createEmptyComposeRule()
+
     /** The embedded agent screen for [session], as `AgentView` feeds it, from fixtures. */
     @Composable
     private fun AgentPane(session: MachineSession, pending: List<MachinePendingItem>) {
@@ -62,13 +79,24 @@ class WorkspaceRenderTest {
         branch: String? = "feat/workspaces",
         canControl: Boolean = true,
         notice: AgentNotice? = null,
+        canCreateTerminal: Boolean = false,
+        creatingTerminal: Boolean = false,
+        canViewTerminals: Boolean = false,
+        shownAsTerminal: Set<String> = emptySet(),
+        terminal: (@Composable (WorkspacePane, Boolean) -> Unit)? = null,
     ) {
         WorkspaceScreen(
             title = title, branch = branch, panes = panes, selected = selected, nowMs = NOW_MS, canControl = canControl, notice = notice,
+            canCreateTerminal = canCreateTerminal, creatingTerminal = creatingTerminal, canViewTerminals = canViewTerminals,
+            shownAsTerminal = shownAsTerminal,
         ) { pane, shown ->
-            PaneContent(pane, shown, agent = { session ->
-                AgentPane(session, if (session.session.sessionId == "s-claude") listOf(WorkspaceFixtures.request) else emptyList())
-            })
+            if (pane.id in shownAsTerminal && terminal != null) {
+                terminal(pane, shown)
+            } else {
+                PaneContent(pane, shown, agent = { session ->
+                    AgentPane(session, if (session.session.sessionId == "s-claude") listOf(WorkspaceFixtures.request) else emptyList())
+                })
+            }
         }
     }
 
@@ -132,6 +160,40 @@ class WorkspaceRenderTest {
         }
     }
 
+    /**
+     * ＋ after the chips: a new terminal tab (2C). While one is on its way ＋ is dimmed (the iPhone's
+     * `workspace-new-terminal-creating`): that frame is drawn first under the same name, compared, then drawn over.
+     */
+    @Test
+    fun workspaceNewTerminal() {
+        val dimmed = ShellXSnapshots.capture("workspace-new-terminal") {
+            CompositionLocalProvider(LocalSpinner provides StillSpinner) {
+                Screen(selected = "t-zsh", canCreateTerminal = true, creatingTerminal = true)
+            }
+        }
+        val plus = assertRenders("workspace-new-terminal") { Screen(selected = "t-zsh", canCreateTerminal = true) }
+        val plain = ShellXSnapshots.capture("workspace-shell") {
+            CompositionLocalProvider(LocalSpinner provides StillSpinner) { Screen(selected = "t-zsh") }
+        }
+        fun lightEn(shots: List<Snapshot>) = shots.first { it.theme == "light" && it.language == "en" }.argb
+        assertFalse("＋ shows", lightEn(plus).contentEquals(lightEn(plain)))
+        assertFalse("＋ is dimmed while a new terminal is on its way", lightEn(dimmed).contentEquals(lightEn(plus)))
+        assertFalse("the dimmed ＋ still shows", lightEn(dimmed).contentEquals(lightEn(plain)))
+    }
+
+    /** View as Terminal: the agent chip's page is its terminal (2C). */
+    @Test
+    fun workspaceAgentAsTerminal() {
+        val screen = TerminalScreen().apply { apply(DemoTerminalScreens.AGENT.snapshot) }
+        assertRenders("workspace-agent-as-terminal") {
+            val model = remember { TerminalViewModel.fixed("t-claude", screen) }
+            Screen(
+                selected = "t-claude", canViewTerminals = true, shownAsTerminal = setOf("t-claude"),
+                terminal = { _, shown -> TerminalPane(model, "t-claude", "claude", shown = true) },
+            )
+        }
+    }
+
     @Test
     fun workspaceLoading() {
         assertRenders("workspace-loading") { WorkspaceWaitingView(back = {}) }
@@ -168,6 +230,37 @@ class WorkspaceRenderTest {
         } finally {
             rig.close()
         }
+    }
+
+    /**
+     * `WorkspaceView` over a fake Mac whose shell is the demo's: the shell chip shows the Mac's terminal, drawn once its
+     * first screen came (`WorkspaceLiveRenderTests.swift` settles a second), and the open asked for the phone's grid.
+     */
+    @Test
+    fun workspaceLiveTerminal() {
+        val rig = WorkRig.make()
+        try {
+            rig.mac.setTerminalFixtures(mapOf("t-zsh" to DemoTerminalScreens.SHELL))
+            var window: View? = null
+            assertRenders("workspace-live-terminal", ready = { compose.waitForIdle(); window?.let(::liveTerminalIn) == true }) {
+                window = LocalView.current
+                WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
+            }
+            assertTrue("${rig.mac.terminalViewOpens}", rig.mac.terminalViewOpens.any { it.terminalId == "t-zsh" && it.cols >= 20 })
+        } finally {
+            rig.close()
+        }
+    }
+
+    /** The window shows `t-zsh`'s surface, its model live with a screen. */
+    private fun liveTerminalIn(window: View): Boolean {
+        fun find(view: View): TerminalSurfaceView? = when (view) {
+            is TerminalSurfaceView -> view
+            is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { find(view.getChildAt(it)) }
+            else -> null
+        }
+        val surface = find(window.rootView) ?: return false
+        return surface.terminalId == "t-zsh" && surface.model.phase == TerminalViewPhase.Live && surface.model.screen.cols > 0
     }
 
     @Test

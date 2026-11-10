@@ -206,6 +206,64 @@ class OkHttpRelaySocketsTest {
         }
     }
 
+    /** Polls [condition] every 5 ms for at most 5 s. */
+    private suspend fun eventually(condition: () -> Boolean): Boolean {
+        repeat(1000) {
+            if (condition()) return true
+            delay(5)
+        }
+        return condition()
+    }
+
+    /** Whether some thread waits for room in a socket's inbox (OkHttp's reader thread, held by the bound). */
+    private fun aReaderWaitsForRoom(): Boolean =
+        Thread.getAllStackTraces().values.any { trace -> trace.any { it.className.endsWith("InboxBudget") && it.methodName == "take" } }
+
+    @Test
+    fun anUnreadFloodIsBoundedAndNothingBehindItIsLost() {
+        runBlocking {
+            Rig().use { rig ->
+                val chunk = 60_000
+                val count = 200
+                rig.upgrade(ServerSide { ws ->
+                    for (i in 0 until count) ws.send(ByteArray(chunk) { i.toByte() }.toByteString())
+                    ws.send("reply")
+                })
+                val socket = rig.sockets.open(rig.url, bearer = "t1") as OkHttpRelaySocket
+                // Nobody reads: OkHttp's reader thread stops at the bound, and TCP holds back the rest.
+                assertTrue(eventually { socket.queuedBytes > OkHttpRelaySocket.MAX_QUEUED_BYTES - chunk }, "${socket.queuedBytes}")
+                assertTrue(eventually(::aReaderWaitsForRoom))
+                delay(300)
+                assertTrue(socket.queuedBytes <= OkHttpRelaySocket.MAX_QUEUED_BYTES, "${socket.queuedBytes}")
+                within {
+                    for (i in 0 until count) {
+                        val bytes = (socket.receive() as RelaySocketMessage.Binary).bytes
+                        assertEquals(chunk, bytes.size)
+                        assertEquals(i.toByte(), bytes.first(), "message $i")
+                        assertEquals(i.toByte(), bytes.last(), "message $i")
+                    }
+                    assertEquals(RelaySocketMessage.Text("reply"), socket.receive())
+                }
+                assertEquals(0, socket.queuedBytes)
+                socket.close()
+            }
+        }
+    }
+
+    @Test
+    fun closeFreesAReaderThatWaitsForRoom() {
+        runBlocking {
+            Rig().use { rig ->
+                rig.upgrade(ServerSide { ws -> repeat(100) { ws.send(ByteArray(60_000).toByteString()) } })
+                val socket = rig.sockets.open(rig.url, bearer = "t1") as OkHttpRelaySocket
+                assertTrue(eventually(::aReaderWaitsForRoom))
+                socket.close()
+                assertTrue(eventually { !aReaderWaitsForRoom() })
+                assertFailsWith<RelayException.Closed> { socket.sendText("x") }
+            }
+        }
+    }
+
     @Test
     fun plainSocketToARemoteHostIsRefused() {
         Rig().use { rig ->

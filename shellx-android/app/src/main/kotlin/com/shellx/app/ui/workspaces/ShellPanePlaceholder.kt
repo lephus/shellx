@@ -24,9 +24,9 @@ import androidx.compose.ui.unit.dp
 import com.shellx.app.R
 
 /**
- * The page of a shell chip until plan 3G's terminal (`ShellPanePlaceholder.swift`'s look): a terminal symbol and
- * "Viewing and typing in the terminal comes in a later version." on a card, in the place the terminal will have.
- * Tag `workspace.shell.placeholder`.
+ * The page of a shell chip on a Mac whose ShellX shows no terminals (no `terminal_view`; `ShellPanePlaceholder.swift`):
+ * a terminal symbol and "Update ShellX on the Mac to see the terminal." on a card, in the terminal's place. Tag
+ * `workspace.shell.placeholder`.
  */
 @Composable
 fun ShellPanePlaceholder(modifier: Modifier = Modifier) {
@@ -46,7 +46,7 @@ fun ShellPanePlaceholder(modifier: Modifier = Modifier) {
     ) {
         Icon(Icons.Outlined.Terminal, contentDescription = null, modifier = Modifier.size(40.dp), tint = secondary)
         Text(
-            stringResource(R.string.workspace_shell_placeholder),
+            stringResource(R.string.terminal_needs_update),
             style = MaterialTheme.typography.bodyLarge,
             color = secondary,
             textAlign = TextAlign.Center,

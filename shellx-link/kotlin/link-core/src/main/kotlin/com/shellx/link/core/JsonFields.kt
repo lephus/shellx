@@ -103,6 +103,16 @@ internal fun JsonObject.optStr(key: String): String? = get(key).present()?.asStr
 internal fun JsonObject.long(key: String): Long = required(key).asLong()
 internal fun JsonObject.optLong(key: String): Long? = get(key).present()?.asLong()
 internal fun JsonObject.int(key: String): Int = required(key).asInt()
+
+/**
+ * A JSON integer of up to 64 bits, held at Int's limits. For fields Swift reads as a 64-bit Int and checks only
+ * against small limits (a terminal frame's): a value past Int's range passes or breaks each such limit just as the
+ * held value does, so both apps accept and refuse the same frames. Past 64 bits it is a [FieldError], as in Swift.
+ */
+internal fun JsonObject.wideInt(key: String): Int = long(key).toIntHeld()
+internal fun JsonObject.optWideInt(key: String): Int? = optLong(key)?.toIntHeld()
+
+private fun Long.toIntHeld(): Int = coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
 internal fun JsonObject.uLong(key: String): ULong = required(key).asULong()
 internal fun JsonObject.bool(key: String): Boolean = required(key).asBool()
 internal fun JsonObject.optBool(key: String): Boolean? = get(key).present()?.asBool()
