@@ -95,12 +95,31 @@ data class TerminalRow(val runs: List<TerminalStyledRun> = emptyList()) {
  * the receiver rules of 11.5; `Terminal/TerminalScreen.swift`). Mutable: its owner applies frames and reads it on the
  * same thread. [screenRows] and [historyRows] are live views of what it holds.
  */
-class TerminalScreen(maxHistoryRows: Int = DEFAULT_MAX_HISTORY_ROWS) {
+class TerminalScreen(maxHistoryRows: Int = DEFAULT_MAX_HISTORY_ROWS, maxHistoryBytes: Long = DEFAULT_MAX_HISTORY_BYTES) {
     companion object {
         const val DEFAULT_MAX_HISTORY_ROWS = 10_000
+
+        /**
+         * Android only (final review m6): the history's estimated size in memory ([historyBytes]) is capped too. Output
+         * with a colour per character keeps a run per cell, and 10 000 such rows take about 100 MB, near a budget
+         * phone's whole heap; 16 MiB keeps thousands of them, and every row of plain output.
+         */
+        const val DEFAULT_MAX_HISTORY_BYTES = 16L * 1024 * 1024
+
+        /** About what a row and a run take on ART: the objects, the list, the string's header; a UTF-16 char is 2. */
+        private const val ROW_BYTES = 48
+        private const val RUN_BYTES = 80
+
+        private fun estimate(row: TerminalRow): Long =
+            ROW_BYTES + row.runs.sumOf { RUN_BYTES + 2L * it.text.length }
     }
 
     val maxHistoryRows: Int = maxOf(0, maxHistoryRows)
+    val maxHistoryBytes: Long = maxOf(0L, maxHistoryBytes)
+
+    /** The history's estimated size in memory (see [DEFAULT_MAX_HISTORY_BYTES]). */
+    var historyBytes: Long = 0L
+        private set
 
     /** 0, 0 and false before the first snapshot. */
     var cols: Int = 0
@@ -122,7 +141,7 @@ class TerminalScreen(maxHistoryRows: Int = DEFAULT_MAX_HISTORY_ROWS) {
     /** `rows` rows. */
     val screenRows: List<TerminalRow> get() = screen
 
-    /** Oldest first, at most [maxHistoryRows]. */
+    /** Oldest first, at most [maxHistoryRows] and about [maxHistoryBytes]. */
     val historyRows: List<TerminalRow> get() = history
 
     /** False once any history row was dropped since the last snapshot: history frames could no longer join. */
@@ -141,6 +160,7 @@ class TerminalScreen(maxHistoryRows: Int = DEFAULT_MAX_HISTORY_ROWS) {
                 screen.clear()
                 for (y in 0 until rows) screen += byY[y] ?: TerminalRow()
                 history.clear()
+                historyBytes = 0L
                 historyIntact = true
                 if (!alt && head.history > 0) setHistory(historyRows(head.history, head.history, byY), replacing = true)
                 setCursor(head.cursor)
@@ -194,22 +214,29 @@ class TerminalScreen(maxHistoryRows: Int = DEFAULT_MAX_HISTORY_ROWS) {
     private fun appendHistory(newRows: List<TerminalRow>) {
         if (newRows.isEmpty()) return
         history.addAll(newRows)
+        historyBytes += newRows.sumOf(::estimate)
         trimOldest()
     }
 
     /** [newRows] oldest first. Replacing: the snapshot's own history. Otherwise they go above the oldest row held. */
     private fun setHistory(newRows: List<TerminalRow>, replacing: Boolean) {
-        if (replacing) history.clear()
+        if (replacing) {
+            history.clear()
+            historyBytes = 0L
+        }
         history.addAll(0, newRows)
+        historyBytes += newRows.sumOf(::estimate)
         trimOldest()
     }
 
+    /** Drops the oldest rows past either cap. */
     private fun trimOldest() {
-        val excess = history.size - maxHistoryRows
-        if (excess > 0) {
-            repeat(excess) { history.removeFirst() }
-            historyIntact = false
+        var dropped = false
+        while (history.isNotEmpty() && (history.size > maxHistoryRows || historyBytes > maxHistoryBytes)) {
+            historyBytes -= estimate(history.removeFirst())
+            dropped = true
         }
+        if (dropped) historyIntact = false
     }
 
     /**
