@@ -97,9 +97,16 @@ internal class FakeMacTerminals(
      * `terminal.view.open` with [cols] and [rows] already clamped. Another terminal viewed → BUSY, nothing recorded.
      * The same one → its view closes, then as a new open: the size is recorded, the open waits while [hold] holds,
      * then a refused id answers its outcome, an id no workspace lists NOT_FOUND, and otherwise the view opens:
-     * `Opened` and its snapshot at revision 1 are on the session's pushes before OK is returned.
+     * `Opened` (when [announce] says the phone still waits) and its snapshot at revision 1 are on the session's pushes
+     * before OK is returned.
      */
-    suspend fun open(session: FakeMacSession, terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome {
+    suspend fun open(
+        session: FakeMacSession,
+        terminalId: String,
+        cols: Int,
+        rows: Int,
+        announce: () -> Boolean = { true },
+    ): TerminalViewOpenOutcome {
         synchronized(lock) {
             val current = views[session]
             if (current != null) {
@@ -119,7 +126,8 @@ internal class FakeMacTerminals(
             val fixture = fixtures[terminalId] ?: DemoTerminalScreens.prompt(cols, rows)
             val view = FakeMacTerminalView(terminalId, fixture, session)
             views[session] = view
-            session.offerTerminal(TerminalViewPush.Opened(terminalId))
+            // 3B's client announces an open only to a phone that still waits for it (its openingViews rule).
+            if (announce()) session.offerTerminal(TerminalViewPush.Opened(terminalId))
             view.sendSnapshotLocked()
             startTicksLocked(view)
             return TerminalViewOpenOutcome.OK

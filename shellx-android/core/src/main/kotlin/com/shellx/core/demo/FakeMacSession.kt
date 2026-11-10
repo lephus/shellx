@@ -28,8 +28,11 @@ import com.shellx.link.core.WorkspaceControlOutcome
 import com.shellx.link.core.WorkspaceCreated
 import com.shellx.link.core.WorkspaceList
 import kotlin.coroutines.cancellation.CancellationException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -52,10 +55,15 @@ import kotlinx.coroutines.yield
  *
  * Terminal views (plan 3G Task 5): there is no `LinkHost` on Android, so this session is the host the phone talks to,
  * with LinkHost.swift's checks (the feature first, then sizes of at least 1, clamped into `TERMINAL_COLUMNS` and
- * `TERMINAL_ROWS`) before [FakeMacTerminals] acts, one terminal call at a time as the host's view slot takes them. An
- * input `TerminalInputCheck` refuses throws on the phone's side, as 3B's client does: nothing was sent. The session's
- * terminal pushes go through a [TerminalPushQueue], as 3B's client's do, so a terminal flood is bounded the same way;
- * the queue closes when the session ends.
+ * `TERMINAL_ROWS`) before [FakeMacTerminals] acts. The phone's side is 3B's client's (review B1 m4):
+ * - Each terminal message goes into the session's host inbox, which the Mac takes in order, one at a time, as LinkHost
+ *   handles each message inline: a held open holds the messages sent after it, on the Mac's side.
+ * - Input, resize, resync and close return once sent; an input `TerminalInputCheck` refuses throws first: nothing was
+ *   sent. Open waits for its answer or the session's end.
+ * - An open the phone stopped waiting for (cancelled, or the session ended) still opens the view on the Mac, but its
+ *   `Opened` is not announced, as 3B's client announces none for a waiter that is gone.
+ * - The terminal pushes go through a [TerminalPushQueue], as 3B's client's do, so a terminal flood is bounded the same
+ *   way; the queue closes when the session ends.
  */
 internal class FakeMacSession(private val mac: FakeMac, override val hostFeatures: Set<String>) : LinkSession {
     val pendingQueue = Channel<PendingChange>(Channel.UNLIMITED)
@@ -65,8 +73,11 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
     private val ended = CompletableDeferred<Unit>()
     private val terminalQueue = TerminalPushQueue()
 
-    /** The host's view slot takes one terminal call at a time (LinkHost handles an open inline). */
-    private val terminalTurn = Mutex()
+    /** The terminal messages the phone sent, which the Mac takes in order ([hostLoop]); closed when the session ends. */
+    private val hostInbox = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+
+    /** Takes [hostInbox] in the Mac's scope; started by the first terminal message. Guarded by [hostInbox]. */
+    private var hostLoop: Job? = null
 
     /** One upload at a time, a message's uploads and its send together (3B's upload turn). */
     private val uploadTurn = Mutex()
@@ -206,36 +217,56 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         mac.workspaceSource.closeTerminal(workspaceId, terminalId)
     }
 
-    override suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome = ask {
-        if (!viewsTerminals()) throw LinkClientException.Remote("unsupported", "this host offers no terminal views")
-        if (cols < 1 || rows < 1) throw LinkClientException.Remote("bad_request", "cols and rows must be at least 1")
-        terminalTurn.withLock {
-            mac.terminals.open(this, terminalId, cols.coerceIn(ShellXLink.TERMINAL_COLUMNS), rows.coerceIn(ShellXLink.TERMINAL_ROWS))
+    override suspend fun openTerminalView(terminalId: String, cols: Int, rows: Int): TerminalViewOpenOutcome {
+        currentCoroutineContext().ensureActive()
+        mac.notePhoneCall()
+        if (ended.isCompleted) throw LinkClientException.SessionClosed()
+        val waiter = OpenWaiter()
+        val answer = CompletableDeferred<Result<TerminalViewOpenOutcome>>()
+        toHost {
+            val result = try {
+                Result.success(openOnHost(terminalId, cols, rows, waiter))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+            answer.complete(result)
         }
+        val result = try {
+            select<Result<TerminalViewOpenOutcome>?> {
+                answer.onAwait { it }
+                ended.onAwait { null }
+            }
+        } catch (e: CancellationException) {
+            waiter.leave()
+            throw e
+        }
+        if (result == null) {
+            waiter.leave()
+            throw LinkClientException.SessionClosed()
+        }
+        return result.getOrThrow()
     }
 
-    override suspend fun closeTerminalView(terminalId: String) = ask {
-        if (viewsTerminals()) terminalTurn.withLock { mac.terminals.close(this, terminalId) }
+    override suspend fun closeTerminalView(terminalId: String) = post {
+        if (viewsTerminals()) mac.terminals.close(this, terminalId)
     }
 
     override suspend fun sendTerminalInput(terminalId: String, units: List<TerminalInputUnit>) {
         TerminalInputCheck.check(units)
-        ask { if (viewsTerminals()) terminalTurn.withLock { mac.terminals.input(this, terminalId, units) } }
+        post { if (viewsTerminals()) mac.terminals.input(this, terminalId, units) }
     }
 
-    override suspend fun resizeTerminalView(terminalId: String, cols: Int, rows: Int) = ask {
+    override suspend fun resizeTerminalView(terminalId: String, cols: Int, rows: Int) = post {
         // The host answers sizes below 1 with an error frame that names no call: the phone sees nothing.
         if (viewsTerminals() && cols >= 1 && rows >= 1) {
-            terminalTurn.withLock {
-                mac.terminals.resize(
-                    this, terminalId, cols.coerceIn(ShellXLink.TERMINAL_COLUMNS), rows.coerceIn(ShellXLink.TERMINAL_ROWS),
-                )
-            }
+            mac.terminals.resize(this, terminalId, cols.coerceIn(ShellXLink.TERMINAL_COLUMNS), rows.coerceIn(ShellXLink.TERMINAL_ROWS))
         }
     }
 
-    override suspend fun resyncTerminalView(terminalId: String) = ask {
-        if (viewsTerminals()) terminalTurn.withLock { mac.terminals.resync(this, terminalId) }
+    override suspend fun resyncTerminalView(terminalId: String) = post {
+        if (viewsTerminals()) mac.terminals.resync(this, terminalId)
     }
 
     override suspend fun createTerminal(workspaceId: String): TerminalCreated = ask {
@@ -262,7 +293,8 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
         sessionQueue.close()
         workspaceQueue.close()
         chatQueue.close()
-        // The view goes with its session; its pushes complete once taken.
+        // The view goes with its session; its pushes complete once taken. The Mac reads no more of its messages.
+        hostInbox.close()
         mac.terminals.sessionEnded(this)
         terminalQueue.close()
     }
@@ -272,6 +304,65 @@ internal class FakeMacSession(private val mac: FakeMac, override val hostFeature
     private fun takesWorkspaceControl() = mac.servesWorkspaces && mac.acceptsWorkspaceControl
 
     private fun viewsTerminals() = mac.servesWorkspaces && mac.servesTerminalViews
+
+    /** `terminal.view.open` on the Mac's side, in the inbox's order. */
+    private suspend fun openOnHost(terminalId: String, cols: Int, rows: Int, waiter: OpenWaiter): TerminalViewOpenOutcome {
+        if (!viewsTerminals()) throw LinkClientException.Remote("unsupported", "this host offers no terminal views")
+        if (cols < 1 || rows < 1) throw LinkClientException.Remote("bad_request", "cols and rows must be at least 1")
+        return mac.terminals.open(
+            this, terminalId, cols.coerceIn(ShellXLink.TERMINAL_COLUMNS), rows.coerceIn(ShellXLink.TERMINAL_ROWS),
+            announce = waiter::answer,
+        )
+    }
+
+    /** A terminal message without an answer: counted, sent to the Mac's inbox, and back at once (3B's `post`). */
+    private suspend fun post(onHost: suspend () -> Unit) {
+        currentCoroutineContext().ensureActive()
+        mac.notePhoneCall()
+        if (ended.isCompleted) throw LinkClientException.SessionClosed()
+        toHost(onHost)
+    }
+
+    /** Puts [onHost] in the Mac's inbox; the first message starts the Mac's loop over it. */
+    private fun toHost(onHost: suspend () -> Unit) {
+        synchronized(hostInbox) {
+            if (hostLoop == null) hostLoop = mac.scope.launch { takeInbox() }
+        }
+        hostInbox.trySend(onHost)
+    }
+
+    /** The Mac's read loop for terminal messages: one at a time, in order, until the session ends. */
+    private suspend fun takeInbox() {
+        for (onHost in hostInbox) {
+            if (ended.isCompleted) return
+            try {
+                onHost()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The Mac's side of one message failed; the session goes on, as the host's loop does.
+            }
+        }
+    }
+
+    /** Whether the phone still waits for an open's answer, decided once: the Mac answers, or the phone leaves. */
+    private class OpenWaiter {
+        private val state = AtomicInteger(WAITING)
+
+        /** The Mac answers `ok`: true when the phone still waits, so its `Opened` is announced. */
+        fun answer(): Boolean = state.compareAndSet(WAITING, ANSWERED)
+
+        /** The phone stopped waiting (cancelled, or the session ended). */
+        fun leave() {
+            state.compareAndSet(WAITING, LEFT)
+        }
+
+        private companion object {
+            const val WAITING = 0
+            const val ANSWERED = 1
+            const val LEFT = 2
+        }
+    }
 
     private fun noChat() = LinkClientException.Remote("unsupported", "this host has no chat")
 

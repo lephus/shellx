@@ -282,7 +282,11 @@ class FakeMac(
     /** From now on an open of [terminalId] answers [outcome] (OK counts as FAILED, as the Mac's view slot answers). */
     fun refuseTerminalView(terminalId: String, outcome: TerminalViewOpenOutcome) = terminals.refuse(terminalId, outcome)
 
-    /** From now on terminal view opens are recorded in [terminalViewOpens] but not answered until released. */
+    /**
+     * From now on terminal view opens are recorded in [terminalViewOpens] but not answered until released. The Mac
+     * takes a session's terminal messages in order, so the ones sent after a held open wait behind it on the Mac's side;
+     * the phone's input, resize, resync and close still return at once, as with 3B's client.
+     */
     fun holdTerminalViewOpens() = terminals.hold.hold()
 
     fun releaseTerminalViewOpens() = terminals.hold.release()
