@@ -49,8 +49,8 @@
   <rect x="300" y="398" width="84" height="26" rx="8" fill="url(#logo-mint)"/>
   </svg>
   <text x="152" y="120" class="m" font-size="34" fill="#ece9f6">shellx</text>
-  <text x="80" y="268" class="h" font-size="84" fill="#ece9f6">Your terminal.</text>
-  <text x="80" y="362" class="h" font-size="84" fill="url(#t)">Everywhere.</text>
+  <text x="80" y="278" class="h" font-size="56" fill="#ece9f6">Your command center for</text>
+  <text x="80" y="352" class="h" font-size="56" fill="url(#t)">AI-powered development.</text>
   <text x="80" y="432" class="h" font-size="28" font-weight="400" fill="#a69fc0">Control your Mac or PC terminal from your phone.</text>
   <text x="80" y="472" class="h" font-size="28" font-weight="400" fill="#a69fc0">End-to-end encrypted · no open ports · free.</text>
   <rect x="80" y="514" width="260" height="60" rx="30" fill="url(#btn)"/>

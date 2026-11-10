@@ -7,7 +7,7 @@ import Downloads from './Downloads.astro';
 import VideoPlayer from './VideoPlayer.astro';
 import { ui, type Lang, pathFor } from '../i18n/ui';
 import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
-import { appId, author, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
+import { appId, author, capabilities, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
 import { video } from '../lib/videos';
 
 interface Props { lang: Lang }
@@ -176,6 +176,23 @@ const intro = video(lang, 'intro');
         </li>
       ))}
     </ul>
+  </section>
+
+  <section class="wrap section" id="desktop" aria-labelledby="desktop-h">
+    <header class="sec-head" data-reveal>
+      <p class="eyebrow">{t.capsEyebrow}</p>
+      <h2 id="desktop-h">{t.capsHeading}</h2>
+      <p class="muted">{t.capsLead}</p>
+    </header>
+    <ul class="caps">
+      {capabilities[lang].map((c, i) => (
+        <li class="cap" id={`desktop-${c.id}`} data-reveal style={`--i:${i % 3}`}>
+          <h3>{c.title}</h3>
+          <ul>{c.items.map((it) => <li>{it}</li>)}</ul>
+        </li>
+      ))}
+    </ul>
+    <p class="caps-note muted">{t.capsNote}</p>
   </section>
 
   <section class="wrap section" id="security" aria-labelledby="security-h">
@@ -361,6 +378,15 @@ const intro = video(lang, 'intro');
   .features { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(3, 1fr); }
   @media (max-width: 56rem) { .features { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 36rem) { .features { grid-template-columns: 1fr; } }
+  .caps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 56rem) { .caps { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 36rem) { .caps { grid-template-columns: 1fr; } }
+  .cap { border: 1px solid var(--border); background: var(--card); border-radius: 18px; padding: 1.25rem 1.35rem; }
+  .cap h3 { font-size: 1.1rem; margin: 0 0 0.6rem; }
+  .cap ul { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.95rem; }
+  .cap li + li { margin-top: 0.35rem; }
+  .caps-note { text-align: center; margin: 1.5rem 0 0; font-size: 0.9rem; }
+
   .feature {
     padding: 1.5rem; border-radius: 18px; background: var(--card); border: 1px solid var(--border);
   }
