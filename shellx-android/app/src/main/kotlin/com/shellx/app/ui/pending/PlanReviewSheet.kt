@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -56,6 +58,7 @@ import com.shellx.app.R
 import com.shellx.app.ui.components.PrimaryButton
 import com.shellx.app.ui.components.SavedTextSaver
 import com.shellx.app.ui.components.SecondaryButton
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.app.ui.components.isLargeText
 import com.shellx.app.ui.composer.MicButton
 import com.shellx.app.ui.composer.VoiceStatusView
@@ -109,6 +112,7 @@ fun PlanReviewSheet(
     val voiceState = model?.state?.collectAsStateWithLifecycle()?.value
     val focusManager = LocalFocusManager.current
     val field = remember { FocusRequester() }
+    val fieldInView = remember { BringIntoViewRequester() }
     var focusAsked by remember { mutableStateOf(false) }
     val res = LocalContext.current.resources
 
@@ -154,107 +158,121 @@ fun PlanReviewSheet(
     // The sheet closed: the microphone never stays on behind it.
     DisposableEffect(model) { onDispose { model?.let { m -> voiceScope.launch { m.cancel() } } } }
 
+    val compact = isCompactHeight()
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         SheetTopBar(stringResource(R.string.pending_plan_title), close)
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-            Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(
-                    PendingCardView.headline(item, false, res, MaterialTheme.colorScheme.onSurfaceVariant),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                val plan = item.item.planPreview
-                if (!plan.isNullOrEmpty()) {
-                    PlanMarkdownText(plan, color = MaterialTheme.colorScheme.onSurface, outlinesCode = true)
-                    if (PendingItem.previewMayBeCut(plan)) CutNotice()
-                } else {
-                    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Laptop, contentDescription = null, tint = secondary)
-                        Text(stringResource(R.string.pending_plan_missing), color = secondary)
-                    }
-                }
-            }
-            BottomBar {
-                PendingCardStatusLine(
-                    state.shownStatus, state.actionable, item.machineName, state.linkNote, retry = { last?.let(send) },
-                )
-                when {
-                    state.handledElsewhere -> PrimaryButton(onClick = close, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.common_close), style = MaterialTheme.typography.titleMedium)
-                    }
-                    inRevise -> {
-                        if (model != null) {
-                            val level by (env?.meter?.level ?: remember { MutableStateFlow(0f) }).collectAsStateWithLifecycle()
-                            VoiceStatusView(model, level)
+            val bar = @Composable {
+                BottomBar {
+                    PendingCardStatusLine(
+                        state.shownStatus, state.actionable, item.machineName, state.linkNote, retry = { last?.let(send) },
+                    )
+                    when {
+                        state.handledElsewhere -> PrimaryButton(onClick = close, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.common_close), style = MaterialTheme.typography.titleMedium)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                            TextField(
-                                value = text,
-                                onValueChange = { text = it },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .focusRequester(field)
-                                    .onFocusChanged { if (it.isFocused) model?.let { m -> voiceScope.launch { m.typeInstead() } } }
-                                    .testTag("pending.feedback"),
-                                placeholder = { Text(stringResource(R.string.pending_plan_feedback)) },
-                                minLines = 2,
-                                maxLines = 6,
-                                shape = RoundedCornerShape(10.dp),
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = MaterialTheme.colorScheme.background,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.background,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                ),
-                            )
+                        inRevise -> {
                             if (model != null) {
-                                MicButton(
-                                    model, R.string.pending_plan_voice, diameter = 48.dp,
-                                    onOutcome = { said ->
-                                        val current = text.trim()
-                                        text = if (current.isEmpty()) said.words else current + " " + said.words
-                                    },
-                                    onKeyboard = ::typeFeedback,
+                                val level by (env?.meter?.level ?: remember { MutableStateFlow(0f) }).collectAsStateWithLifecycle()
+                                VoiceStatusView(model, level)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                                TextField(
+                                    value = text,
+                                    onValueChange = { text = it },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .focusRequester(field)
+                                        .bringIntoViewRequester(fieldInView)
+                                        .onFocusChanged {
+                                            if (it.isFocused) {
+                                                model?.let { m -> voiceScope.launch { m.typeInstead() } }
+                                                // The whole field comes into view (a short window scrolls it
+                                                // above the keyboard).
+                                                localScope.launch { fieldInView.bringIntoView() }
+                                            }
+                                        }
+                                        .testTag("pending.feedback"),
+                                    placeholder = { Text(stringResource(R.string.pending_plan_feedback)) },
+                                    minLines = 2,
+                                    maxLines = 6,
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.background,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.background,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                    ),
                                 )
+                                if (model != null) {
+                                    MicButton(
+                                        model, R.string.pending_plan_voice, diameter = 48.dp,
+                                        onOutcome = { said ->
+                                            val current = text.trim()
+                                            text = if (current.isEmpty()) said.words else current + " " + said.words
+                                        },
+                                        onKeyboard = ::typeFeedback,
+                                    )
+                                }
+                            }
+                            ByteCounter(bytes, DecisionCenter.MAX_FEEDBACK_BYTES)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SecondaryButton(
+                                    onClick = {
+                                        // The mic goes with this step: a dictation in progress stops with it.
+                                        cancelMic()
+                                        inRevise = false
+                                        focusManager.clearFocus()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                ) { Text(stringResource(R.string.common_cancel), style = MaterialTheme.typography.bodyLarge) }
+                                PrimaryButton(
+                                    onClick = {
+                                        if (canSendFeedback) {
+                                            cancelMic()
+                                            focusManager.clearFocus()
+                                            decide(LinkDecision.ExitPlan(ExitPlanMode.DENY, trimmed))
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).testTag("pending.sendFeedback"),
+                                    enabled = canSendFeedback,
+                                ) { Text(stringResource(R.string.pending_plan_send_feedback), style = MaterialTheme.typography.titleMedium) }
                             }
                         }
-                        ByteCounter(bytes, DecisionCenter.MAX_FEEDBACK_BYTES)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SecondaryButton(
-                                onClick = {
-                                    // The mic goes with this step: a dictation in progress stops with it.
-                                    cancelMic()
-                                    inRevise = false
-                                    focusManager.clearFocus()
-                                },
-                                modifier = Modifier.weight(1f),
-                            ) { Text(stringResource(R.string.common_cancel), style = MaterialTheme.typography.bodyLarge) }
-                            PrimaryButton(
-                                onClick = {
-                                    if (canSendFeedback) {
-                                        cancelMic()
-                                        focusManager.clearFocus()
-                                        decide(LinkDecision.ExitPlan(ExitPlanMode.DENY, trimmed))
-                                    }
-                                },
-                                modifier = Modifier.weight(1f).testTag("pending.sendFeedback"),
-                                enabled = canSendFeedback,
-                            ) { Text(stringResource(R.string.pending_plan_send_feedback), style = MaterialTheme.typography.titleMedium) }
-                        }
+                        else -> DecisionButtons(
+                            approvals, actions, state.canSend,
+                            decide = ::decide,
+                            revise = {
+                                inRevise = true
+                                focusAsked = true
+                            },
+                        )
                     }
-                    else -> DecisionButtons(
-                        approvals, actions, state.canSend,
-                        decide = ::decide,
-                        revise = {
-                            inRevise = true
-                            focusAsked = true
-                        },
-                    )
                 }
             }
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        PendingCardView.headline(item, false, res, MaterialTheme.colorScheme.onSurfaceVariant),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    val plan = item.item.planPreview
+                    if (!plan.isNullOrEmpty()) {
+                        PlanMarkdownText(plan, color = MaterialTheme.colorScheme.onSurface, outlinesCode = true)
+                        if (PendingItem.previewMayBeCut(plan)) CutNotice()
+                    } else {
+                        val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Laptop, contentDescription = null, tint = secondary)
+                            Text(stringResource(R.string.pending_plan_missing), color = secondary)
+                        }
+                    }
+                }
+                // A short window (a phone in landscape, the keyboard up): the bar scrolls with the plan, so the
+                // feedback field and its buttons stay in reach.
+                if (compact) bar()
+            }
+            if (!compact) bar()
         }
     }
 }

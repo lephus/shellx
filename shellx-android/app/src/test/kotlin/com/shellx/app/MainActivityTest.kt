@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.platform.PushNotifier
 import com.shellx.app.platform.PushTapInbox
+import com.shellx.app.testing.TestShellXApplication
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -18,7 +19,7 @@ import org.robolectric.annotation.Config
 
 /** A `shellx-link` link opened from another app reaches the pairing inbox (contracts §5), once. */
 @RunWith(AndroidJUnit4::class)
-@Config(application = ShellXApplication::class)
+@Config(application = TestShellXApplication::class)
 class MainActivityTest {
     @Test
     fun aShellXLinkFromAnotherAppReachesTheInbox() {

@@ -58,8 +58,11 @@ import com.shellx.app.platform.AndroidClock
 import com.shellx.app.ui.components.ConfirmDialog
 import com.shellx.app.ui.components.HomeTicks
 import com.shellx.app.ui.components.Spinner
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.app.ui.components.rememberNowMs
+import com.shellx.app.ui.components.topBarHeight
 import com.shellx.app.ui.composer.ComposerBar
+import com.shellx.app.ui.composer.ComposerBarState
 import com.shellx.app.ui.home.NeedsYouBar
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.app.ui.workspaces.AgentCloseConfirmation
@@ -152,6 +155,8 @@ fun AgentScreen(
     back: () -> Unit = {},
     /** The clock the header's "Running for" is read against, again every second. */
     clock: Clock = AndroidClock,
+    /** The composer's state beyond its composition, from the screen's holder ([ComposerBar]'s `state`). */
+    composer: ComposerBarState? = null,
 ) {
     var confirmsForceStop by rememberSaveable { mutableStateOf(false) }
     // The name in the Close Agent confirmation while it is up.
@@ -174,7 +179,7 @@ fun AgentScreen(
             }
             ComposerBar(
                 draft, onDraftChange, send = actions.send, attachmentsEnabled = attachmentsEnabled, sending = sending,
-                sendVoice = actions.sendVoice,
+                sendVoice = actions.sendVoice, state = composer,
             )
         }
     }
@@ -201,6 +206,7 @@ fun AgentScreen(
                             )
                         }
                     },
+                    expandedHeight = topBarHeight(),
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
                 )
             },
@@ -235,17 +241,34 @@ private fun Top(
     clock: Clock,
 ) {
     val now = rememberNowMs(clock, remember { HomeTicks.every(1.seconds) })
+    val header = @Composable { modifier: Modifier ->
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Read again every second, for the "Running for" time.
+            val current = remember(now, row) { row() }
+            AgentHeader(place, current, gone, offline, Modifier.weight(1f))
+            if (showsStop) StopButton(actions.stop, askForceStop)
+        }
+    }
     Column(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Read again every second, for the "Running for" time.
-                val current = remember(now, row) { row() }
-                AgentHeader(place, current, gone, offline, Modifier.weight(1f))
-                if (showsStop) StopButton(actions.stop, askForceStop)
-            }
-            if (offersRemove) RemoveFromPhoneButton(actions.removeFromPhone)
-            if (pending.isNotEmpty()) {
-                NeedsYouBar(pending, showsMachineName, open = actions.seeAllPending, modifier = Modifier.padding(bottom = 8.dp))
+            if (isCompactHeight() && pending.isNotEmpty()) {
+                // A short window (a phone in landscape): the header and the "Needs you" bar share a row, so the chat
+                // keeps room.
+                Row(
+                    Modifier.padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    header(Modifier.weight(1f))
+                    NeedsYouBar(pending, showsMachineName, open = actions.seeAllPending, modifier = Modifier.weight(1f))
+                }
+                if (offersRemove) RemoveFromPhoneButton(actions.removeFromPhone)
+            } else {
+                header(Modifier)
+                if (offersRemove) RemoveFromPhoneButton(actions.removeFromPhone)
+                if (pending.isNotEmpty()) {
+                    NeedsYouBar(pending, showsMachineName, open = actions.seeAllPending, modifier = Modifier.padding(bottom = 8.dp))
+                }
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

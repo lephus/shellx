@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -33,27 +34,40 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.shellx.app.R
 import com.shellx.app.platform.NotificationPermission
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.core.platform.CoreLog
+import com.shellx.core.platform.KeyValueStore
 
 /**
  * Settings › Notifications (S3 §7.4c; ledger A-1, A-28): whether alerts are on, Turn On when they are off, and
- * "Notifications arriving late?" with this phone maker's steps. Read again each time the screen resumes, so a change
+ * "Notifications arriving late?" with this phone maker's steps. Turn On shows Android's dialog while it still can; a
+ * "Don't allow" there just leaves alerts off, and only an answer given with no dialog opens the system page. Read again each time the screen resumes, so a change
  * made in the system's settings shows on return.
+ *
+ * [settings] (the phone's): Turn On's dialog is one of the two Android shows, so it spends the automatic ask too
+ * ([NotificationPermission.ASKED_KEY], review C m-8). Null records nothing.
  */
 @Composable
-fun NotificationsSettingsSection() {
+fun NotificationsSettingsSection(settings: KeyValueStore? = null) {
     val context = LocalContext.current
     var on by remember { mutableStateOf(NotificationPermission.isOn(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { on = NotificationPermission.isOn(context) }
+    // Whether Android would explain the permission, just before Turn On's launch (kept across a recreated screen).
+    var rationaleBefore by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         on = NotificationPermission.isOn(context)
-        // Android shows the dialog at most twice; after that only the system page can turn alerts on.
-        if (!granted) open(context, NotificationSettingsIntents.appNotifications(context))
+        val before = rationaleBefore
+        rationaleBefore = null
+        // "Don't allow" in the dialog just leaves alerts off (iPhone parity). Android shows the dialog at most twice;
+        // after that it answers at once, and only the system page can turn alerts on.
+        if (!granted && NotificationPermission.noDialogShown(before, rationale(context))) {
+            open(context, NotificationSettingsIntents.appNotifications(context))
+        }
     }
     val guide = remember { OemGuide.of(Build.MANUFACTURER) }
     NotificationsSettingsContent(
@@ -65,7 +79,9 @@ fun NotificationsSettingsSection() {
             if (permitted) {
                 open(context, NotificationSettingsIntents.appNotifications(context))
             } else {
+                rationaleBefore = rationale(context)
                 ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+                settings?.putBoolean(NotificationPermission.ASKED_KEY, true)
             }
         },
         openAppSettings = { open(context, NotificationSettingsIntents.appDetails(context)) },
@@ -141,6 +157,14 @@ internal fun NotificationsSettingsContent(
             }
         }
     }
+}
+
+/** Android would explain POST_NOTIFICATIONS before asking: it was denied once, so its last dialog can still show. */
+private fun rationale(context: Context): Boolean {
+    var c: Context? = context
+    while (c is ContextWrapper && c !is Activity) c = c.baseContext
+    val activity = c as? Activity ?: return false
+    return ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)
 }
 
 /** Opens a system page; a phone without it (some work profiles, custom ROMs) opens nothing and logs only a name. */

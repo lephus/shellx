@@ -20,12 +20,16 @@ class FakeResultRegistry : ActivityResultRegistry() {
     /** Answers each launch at once with what it returns; null holds the launch for [answerLast]. */
     var answer: ((Launch) -> Any?)? = null
 
+    /** Thrown by the next launches instead of launching (no activity to start the prompt, say). */
+    var failure: RuntimeException? = null
+
     override fun <I, O> onLaunch(
         requestCode: Int,
         contract: ActivityResultContract<I, O>,
         input: I,
         options: ActivityOptionsCompat?,
     ) {
+        failure?.let { throw it }
         val launch = Launch(requestCode, contract, input)
         made += launch
         answer?.let { dispatchResult(requestCode, it(launch)) }

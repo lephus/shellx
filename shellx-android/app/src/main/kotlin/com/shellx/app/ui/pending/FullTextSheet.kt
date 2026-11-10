@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.shellx.app.R
+import com.shellx.app.ui.components.topBarHeight
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.core.pending.previewFields
 import com.shellx.core.pending.previewMayBeCut
@@ -85,6 +86,7 @@ internal fun SheetTopBar(title: String, close: () -> Unit) {
                 Text(stringResource(R.string.common_close), color = ShellXTheme.colors.accentText)
             }
         },
+        expandedHeight = topBarHeight(),
         windowInsets = WindowInsets(0),
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
     )

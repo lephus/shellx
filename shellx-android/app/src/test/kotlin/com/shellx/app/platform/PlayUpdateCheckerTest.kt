@@ -60,6 +60,24 @@ class PlayUpdateCheckerTest {
         }
     }
 
+    /** Final review m-2: once the user postponed Play's dialog ("No thanks"), it does not come back until the next cold
+     *  start, though each return from the Photo Picker, Files or the system's settings checks again. */
+    @Test
+    fun aPostponedUpdateIsNotOfferedAgainUntilTheNextColdStart() {
+        runTest {
+            fake.setUpdateAvailable(101)
+            val checker = attached()
+            assertEquals(AvailableUpdate(101), checker.check())
+            checker.startUpdate(AvailableUpdate(101))
+            assertTrue(fake.isConfirmationDialogVisible)
+            fake.userRejectsUpdate()
+
+            assertNull("a return to the app offers nothing", checker.check())
+            assertNull("nor the next one", checker.check())
+            assertEquals("a new process offers it again", AvailableUpdate(101), PlayUpdateChecker(fake).check())
+        }
+    }
+
     @Test
     fun anImmediateOnlyUpdateIsNotOffered() {
         runTest {

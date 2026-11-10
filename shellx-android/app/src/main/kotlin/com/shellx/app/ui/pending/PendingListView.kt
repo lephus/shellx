@@ -33,10 +33,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shellx.app.R
+import com.shellx.app.ui.components.topBarHeight
 import com.shellx.core.link.MachineHub
 import com.shellx.core.link.MachinePendingItem
 import com.shellx.core.pairing.SheetPresence
@@ -44,6 +47,7 @@ import com.shellx.core.pending.DecisionCenter
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /** The open sheet of one pending page, kept across configuration changes (`viewModel(key = "pending")`). */
 class PendingListHolder : ViewModel() {
@@ -54,7 +58,8 @@ class PendingListHolder : ViewModel() {
  * "Needs You": the pending cards, opened from a "Needs you" bar (the home's shows every one, an agent screen's only its
  * workspace's, through [only]; `PendingListView.swift`). It only reads the decision center; the signed-in scope keeps
  * it synced with the hub. Once the last card is handled it says so for a moment ([PendingListView.LEAVE_DELAY]) and
- * goes [back] by itself; never while a sheet is up (closing it would lose an answer being typed).
+ * goes [back] by itself, once the page is in front; never while a sheet is up (closing it would lose an answer being
+ * typed).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,9 +82,13 @@ fun PendingListView(
     val route = holder.route
     val finished = hadItems && items.isEmpty() && route == null
     val leave by rememberUpdatedState(back)
-    LaunchedEffect(finished) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(finished, lifecycle) {
         if (!finished) return@LaunchedEffect
         delay(PendingListView.LEAVE_DELAY)
+        // The navigator goes back only from the page in front: a page paused meanwhile (Home, a dialog over it)
+        // leaves once it is there again, as the workspace page does.
+        lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
         leave()
     }
     val background = MaterialTheme.colorScheme.background
@@ -93,6 +102,7 @@ fun PendingListView(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                     }
                 },
+                expandedHeight = topBarHeight(),
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
             )
         },

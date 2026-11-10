@@ -11,6 +11,7 @@ import com.shellx.core.voice.FallbackTranscriber
 import com.shellx.core.voice.SpeechEngine
 import com.shellx.core.voice.SpeechRunSlot
 import com.shellx.core.voice.VoiceCapabilityCache
+import com.shellx.core.voice.VoiceLanguage
 import com.shellx.core.voice.VoicePermissionChecking
 import com.shellx.core.voice.VoiceService
 import java.lang.ref.WeakReference
@@ -36,8 +37,9 @@ class SystemVoice(
     private val known = VoiceCapabilityCache(timeSource = timeSource, ask = probe::capabilities)
     private val intents = RecognizerIntents(app.packageName)
 
-    /** The newest service made: it hears that the on-device recognizer failed, so Settings names the path used. */
-    @Volatile private var newest: WeakReference<VoiceService>? = null
+    /** Every live service made (held weakly): each hears that the on-device recognizer failed, so every account's
+     *  Settings names the path used, not only the newest's (the demo's, after a demo run; final review m-5). */
+    private val services = ArrayList<WeakReference<VoiceService>>()
 
     val engine: SpeechEngine = FallbackTranscriber(
         slot = slot,
@@ -49,16 +51,24 @@ class SystemVoice(
             preferOffline = { known.capabilities(it).standardOnDevice },
         ),
         usePrimary = { known.capabilities(it).onDeviceRecognizer },
-        primaryFailed = { language ->
-            probe.markFailed(language)
-            known.forget(language)
-            newest?.get()?.primaryFellBack(language)
-        },
+        primaryFailed = ::primaryFailed,
     )
+
+    /** The on-device recognizer failed to start for [language] (the fallback's `primaryFailed`): it is not offered
+     *  again, and the services hear it, so Settings names the path used. */
+    internal suspend fun primaryFailed(language: VoiceLanguage) {
+        probe.markFailed(language)
+        known.forget(language)
+        val live = synchronized(services) {
+            services.removeAll { it.get() == null }
+            services.mapNotNull { it.get() }
+        }
+        for (service in live) service.primaryFellBack(language)
+    }
 
     /**
      * The account's voice input over [hub]: [engine], its capabilities through the process-level answers, the hub's
-     * scope, and the phone's preferred languages. The newest one made hears `primaryFellBack`.
+     * scope, and the phone's preferred languages. Every live one hears `primaryFellBack`.
      */
     fun makeService(
         hub: MachineHub,
@@ -78,7 +88,10 @@ class SystemVoice(
             preferredLanguages = preferredLanguages(),
             contextualStrings = VoiceService.contextualStrings(hub),
         )
-        newest = WeakReference(service)
+        synchronized(services) {
+            services.removeAll { it.get() == null }
+            services += WeakReference(service)
+        }
         return service
     }
 

@@ -80,6 +80,7 @@ fun PaneChips(
     nowMs: Long,
     select: (String) -> Unit,
     close: ((WorkspacePane) -> Unit)? = null,
+    modifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {},
 ) {
     val list = rememberLazyListState()
@@ -93,7 +94,7 @@ fun PaneChips(
     }
     LazyRow(
         state = list,
-        modifier = Modifier.testTag("workspace.chips"),
+        modifier = modifier.testTag("workspace.chips"),
         contentPadding = PaddingValues(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,

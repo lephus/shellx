@@ -43,5 +43,5 @@
     <string name="update_message">Update ShellX on Google Play to get the latest fixes and features.</string>
     <string name="update_restart">Restart</string>
     <string name="voice_denied">ShellX needs microphone access to hear you.</string>
-    <string name="voice_mic_hint">Hold to talk and release to finish. With TalkBack, double-tap to start and double-tap again to finish.</string>
+    <string name="voice_mic_hint">start talking. Double-tap again to finish.</string>
 </resources>

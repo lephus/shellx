@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Build
+import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.shellx.app.MainActivity
@@ -35,11 +36,21 @@ class PushNotifier(
     context: Context,
     private val inForeground: () -> Boolean,
     private val knownMachines: suspend () -> Set<String>?,
+    /** The alerts Android lists now (tests give their own: Android lists a new one only once its service got to it). */
+    private val active: () -> List<StatusBarNotification> = {
+        context.getSystemService(NotificationManager::class.java).activeNotifications.toList()
+    },
 ) {
     private val app = context.applicationContext
     private val compat = NotificationManagerCompat.from(app)
-    private val manager = app.getSystemService(NotificationManager::class.java)
     private val lock = Any()
+
+    /**
+     * The request ids of the alerts this process posted and has not removed, per Mac (under [lock]). Android lists a
+     * new alert only once its service got to it, so in a burst (`needs_you r2`, then `resolved r1`) only this knows r2
+     * is there; cancelling the summary then would take r2 with it (review C m-1).
+     */
+    private val posted = HashMap<String, MutableSet<String>>()
 
     suspend fun handle(payload: PushPayload) {
         when (payload) {
@@ -50,7 +61,10 @@ class PushNotifier(
 
     /** The app came to the front, which shows what waits: every alert goes (iPhone `removeAllDeliveredNotifications`). */
     fun clearAll() {
-        synchronized(lock) { compat.cancelAll() }
+        synchronized(lock) {
+            compat.cancelAll()
+            posted.clear()
+        }
     }
 
     private suspend fun needsYou(payload: PushPayload.NeedsYou) {
@@ -90,8 +104,12 @@ class PushNotifier(
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
         synchronized(lock) {
+            // Again, under the lock clearAll takes: the app may have come to the front (and cleared the alerts) while
+            // the paired Macs were read (review C m-2).
+            if (inForeground()) return
             post(payload.requestId, NOTIFICATION_ID, alert)
             post(payload.machineId, SUMMARY_ID, summary)
+            posted.getOrPut(payload.machineId) { mutableSetOf() } += payload.requestId
         }
         CoreLog.log("push_posted")
     }
@@ -99,8 +117,12 @@ class PushNotifier(
     private fun resolved(payload: PushPayload.Resolved) {
         synchronized(lock) {
             compat.cancel(payload.requestId, NOTIFICATION_ID)
+            val mine = posted[payload.machineId]
+            mine?.remove(payload.requestId)
+            if (mine?.isEmpty() == true) posted.remove(payload.machineId)
+            // The Mac still has alerts when this process posted one, or Android lists one (posted by an earlier process).
             // The cancel may not have reached the list yet, so the resolved alert never counts.
-            val others = manager.activeNotifications.any {
+            val others = mine?.isNotEmpty() == true || active().any {
                 it.id == NOTIFICATION_ID && it.tag != payload.requestId && it.notification.group == payload.machineId
             }
             if (!others) compat.cancel(payload.machineId, SUMMARY_ID)

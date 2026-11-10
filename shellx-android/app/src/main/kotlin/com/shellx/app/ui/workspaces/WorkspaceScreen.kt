@@ -1,14 +1,19 @@
 package com.shellx.app.ui.workspaces
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -49,9 +54,11 @@ import androidx.compose.ui.unit.dp
 import com.shellx.app.R
 import com.shellx.app.SignedInScope
 import com.shellx.app.ui.agent.AgentNotice
+import com.shellx.app.ui.components.CompactHeight
 import com.shellx.app.ui.components.ConfirmDialog
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.app.ui.components.Spinner
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.core.link.MachineSession
 import com.shellx.core.workspaces.WorkspaceCommandResult
@@ -179,35 +186,63 @@ fun WorkspaceScreen(
     // The chip shown: the one selected, else the first.
     val shownPane = panes.firstOrNull { it.id == (selected ?: panes.firstOrNull()?.id) }
     val background = MaterialTheme.colorScheme.background
+    // A short window (a phone in landscape): the chips sit in the compact top bar, beside the name, so the pane keeps
+    // room for its chat.
+    val compact = isCompactHeight()
+    val chips = @Composable { modifier: Modifier ->
+        PaneChips(
+            panes, selected, nowMs, actions.select,
+            close = if (canCloseTab && canControl) ({ closingTab = it.id }) else null,
+            modifier = modifier,
+        )
+    }
+
+    val backButton = @Composable {
+        IconButton(onClick = back) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
+        }
+    }
+    val menu = @Composable {
+        Menu(WorkspaceMenuItem.items(canCloseTab && shownPane != null), canControl) { item ->
+            when (item) {
+                WorkspaceMenuItem.RENAME -> renaming = true
+                WorkspaceMenuItem.CLOSE_TAB -> closingTab = shownPane?.id
+                WorkspaceMenuItem.CLOSE_WORKSPACE -> closing = true
+            }
+        }
+    }
 
     Scaffold(
         containerColor = background,
         topBar = {
-            TopAppBar(
-                title = { TitleBlock(title, branch) },
-                navigationIcon = {
-                    IconButton(onClick = back) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
-                    }
-                },
-                actions = {
-                    Menu(WorkspaceMenuItem.items(canCloseTab && shownPane != null), canControl) { item ->
-                        when (item) {
-                            WorkspaceMenuItem.RENAME -> renaming = true
-                            WorkspaceMenuItem.CLOSE_TAB -> closingTab = shownPane?.id
-                            WorkspaceMenuItem.CLOSE_WORKSPACE -> closing = true
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
-            )
+            if (compact) {
+                // One compact row: back, the name, the chips (they take the rest) and `⋮`.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(background)
+                        .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+                        .height(CompactHeight.TOP_BAR)
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    backButton()
+                    TitleBlock(title, branch, Modifier.padding(start = 4.dp, end = 4.dp).widthIn(max = COMPACT_TITLE_WIDTH))
+                    chips(Modifier.weight(1f))
+                    menu()
+                }
+            } else {
+                TopAppBar(
+                    title = { TitleBlock(title, branch) },
+                    navigationIcon = { backButton() },
+                    actions = { menu() },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
+                )
+            }
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            PaneChips(
-                panes, selected, nowMs, actions.select,
-                close = if (canCloseTab && canControl) ({ closingTab = it.id }) else null,
-            )
+            if (!compact) chips(Modifier)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (panes.isEmpty()) {
                     Text(
@@ -256,6 +291,9 @@ fun WorkspaceScreen(
     WorkspaceAlertDialog(alert, onAlertDismiss)
 }
 
+/** The name's widest in a compact top bar, where the chips take the rest. */
+private val COMPACT_TITLE_WIDTH = 220.dp
+
 /** The pages, in step with the chips: the pager follows [selected], and a settled page selects its chip. */
 @Composable
 private fun Pager(
@@ -296,8 +334,8 @@ private fun Pager(
 
 /** The name over the branch: one heading for TalkBack. */
 @Composable
-private fun TitleBlock(title: String, branch: String?) {
-    Column(Modifier.semantics(mergeDescendants = true) { heading() }.testTag("workspace.title")) {
+private fun TitleBlock(title: String, branch: String?, modifier: Modifier = Modifier) {
+    Column(modifier.semantics(mergeDescendants = true) { heading() }.testTag("workspace.title")) {
         Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (!branch.isNullOrEmpty()) {
             Text(

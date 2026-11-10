@@ -48,6 +48,20 @@ class PushNotifierTest {
         }
     }
 
+    /** Review C m-2: the app came to the front while the paired Macs were read, so its clearAll ran first; the alert
+     *  must not post after it and stay while the app is in front. */
+    @Test
+    fun theAppComingToTheFrontDuringTheMacCheckPostsNothing() {
+        runTest {
+            val notifier = PushNotifier(app, { foreground }, {
+                foreground = true
+                setOf("m1")
+            })
+            notifier.handle(needsYou("m1", "r1"))
+            assertTrue(shown.isEmpty())
+        }
+    }
+
     @Test
     fun aMacThisPhoneDoesNotHaveIsIgnored() {
         runTest {
@@ -95,6 +109,33 @@ class PushNotifierTest {
             assertFalse(shown.any { it.tag == "m1" || it.tag == "r1" || it.tag == "r2" })
             assertTrue(shown.any { it.id == PushNotifier.NOTIFICATION_ID && it.tag == "r3" })
             assertTrue(shown.any { it.id == PushNotifier.SUMMARY_ID && it.tag == "m2" })
+        }
+    }
+
+    /**
+     * Review C m-1: Android lists a posted alert only once its service got to it, so in a burst (`needs_you r2`, then
+     * `resolved r1`) the list may not show r2 yet. The notifier's own record keeps the summary, whose cancel would take
+     * r2 with it; clearAll empties the record too.
+     */
+    @Test
+    fun theSummaryStaysForAnAlertAndroidDoesNotListYet() {
+        runTest {
+            val notifier = PushNotifier(app, { false }, { machines }, active = { emptyList() })
+            notifier.handle(needsYou("m1", "r1"))
+            notifier.handle(needsYou("m1", "r2"))
+
+            notifier.handle(PushPayload.Resolved("m1", "r1"))
+            assertTrue("r2 is still on the record", shown.any { it.id == PushNotifier.SUMMARY_ID && it.tag == "m1" })
+            assertEquals(listOf("r2"), shown.filter { it.id == PushNotifier.NOTIFICATION_ID }.map { it.tag })
+
+            notifier.handle(PushPayload.Resolved("m1", "r2"))
+            assertTrue(shown.isEmpty())
+
+            notifier.handle(needsYou("m1", "r3"))
+            notifier.clearAll()
+            notifier.handle(needsYou("m1", "r4"))
+            notifier.handle(PushPayload.Resolved("m1", "r4"))
+            assertTrue("clearAll forgot r3", shown.isEmpty())
         }
     }
 

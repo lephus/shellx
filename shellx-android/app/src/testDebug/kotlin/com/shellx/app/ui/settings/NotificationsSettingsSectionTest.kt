@@ -15,9 +15,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
+import com.shellx.app.platform.NotificationPermission
 import com.shellx.app.testing.FakeResultRegistry
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.platform.MemoryKeyValueStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -44,6 +47,8 @@ class NotificationsSettingsSectionTest {
         rule.onNodeWithTag("settings.notifications.turnOn").assertDoesNotExist()
     }
 
+    /** Android no longer shows its dialog (denied twice): the answer comes at once, the rationale flag off before and
+     *  after, and only the system page can turn alerts on. */
     @Test
     fun offTurnOnAsksForThePermissionThenOpensSettings() {
         shadowOf(activity.application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
@@ -66,6 +71,63 @@ class NotificationsSettingsSectionTest {
         val opened = shadowOf(activity).nextStartedActivity
         assertEquals(Settings.ACTION_APP_NOTIFICATION_SETTINGS, opened.action)
         assertEquals(activity.packageName, opened.getStringExtra(Settings.EXTRA_APP_PACKAGE))
+    }
+
+    /** Turn On whose dialog [deny] answers "Don't allow", with the rationale flag [before] the launch and [after]. */
+    private fun turnOnAndDeny(before: Boolean, after: Boolean) {
+        shadowOf(activity.application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val packages = shadowOf(activity.packageManager)
+        packages.setShouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS, before)
+        val registry = FakeResultRegistry().apply {
+            answer = {
+                packages.setShouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS, after)
+                false
+            }
+        }
+        rule.setContent {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides registry.owner) {
+                ShellXTheme { NotificationsSettingsSection() }
+            }
+        }
+        rule.onNodeWithTag("settings.notifications.turnOn").performClick()
+        rule.waitForIdle()
+        assertEquals(1, registry.launches.size)
+    }
+
+    /** iPhone parity: "Don't allow" tapped in the first dialog (the flag turns on) just leaves alerts off. */
+    @Test
+    fun dontAllowInTheFirstDialogLeavesItOff() {
+        turnOnAndDeny(before = false, after = true)
+        assertNull("no system page", shadowOf(activity).nextStartedActivity)
+        rule.onNodeWithText(string(R.string.settings_notifications_off)).assertIsDisplayed()
+        rule.onNodeWithTag("settings.notifications.turnOn").assertIsDisplayed()
+    }
+
+    /** The same in Android's second and last dialog (the flag turns off). */
+    @Test
+    fun dontAllowInTheLastDialogLeavesItOff() {
+        turnOnAndDeny(before = true, after = false)
+        assertNull("no system page", shadowOf(activity).nextStartedActivity)
+        rule.onNodeWithText(string(R.string.settings_notifications_off)).assertIsDisplayed()
+    }
+
+    /** Review C m-8: Turn On shows Android's dialog, which spends one of its two showings, so the automatic ask (when
+     *  the first Mac is paired) is spent too and does not use the last one. */
+    @Test
+    fun turnOnSpendsTheAutomaticAsk() {
+        shadowOf(activity.application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val registry = FakeResultRegistry().apply { answer = { false } }
+        val settings = MemoryKeyValueStore()
+        rule.setContent {
+            CompositionLocalProvider(LocalActivityResultRegistryOwner provides registry.owner) {
+                ShellXTheme { NotificationsSettingsSection(settings) }
+            }
+        }
+        rule.onNodeWithTag("settings.notifications.turnOn").performClick()
+        rule.waitForIdle()
+
+        assertEquals(1, registry.launches.size)
+        assertTrue(settings.getBoolean(NotificationPermission.ASKED_KEY))
     }
 
     @Test

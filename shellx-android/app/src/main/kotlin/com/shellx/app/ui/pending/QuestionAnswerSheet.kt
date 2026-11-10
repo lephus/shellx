@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,6 +64,7 @@ import com.shellx.app.R
 import com.shellx.app.ui.components.PrimaryButton
 import com.shellx.app.ui.components.SavedTextMapSaver
 import com.shellx.app.ui.components.SecondaryButton
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.app.ui.composer.MicButton
 import com.shellx.app.ui.composer.VoiceStatusView
 import com.shellx.app.ui.theme.ShellXTheme
@@ -195,89 +198,98 @@ fun QuestionAnswerSheet(
     } else {
         stringResource(R.string.pending_question_title)
     }
+    val compact = isCompactHeight()
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
         SheetTopBar(title, close)
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-            Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(
-                    PendingCardView.headline(item, false, res, MaterialTheme.colorScheme.onSurfaceVariant),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if (question != null) {
-                    Prompt(question)
-                    Options(
-                        question, answers, editable, fieldText(question), question.id in open,
-                        tooLongPicks = answers.isTooLong(question.id), unmatched = question.id in noMatch,
-                        field = fields.getOrPut(question.id) { FocusRequester() },
-                        pick = { label ->
-                            answers = answers.toggle(question.id, label)
-                            // A pick replaces the typed answer, in the field too.
-                            typed = typed - question.id
-                            noMatch = noMatch - question.id
-                            focusManager.clearFocus()
-                        },
-                        other = { openOther(question) },
-                        edit = { text ->
-                            typed = typed + (question.id to text)
-                            answers = answers.setFreeText(question.id, text)
-                        },
-                        focused = { model?.let { m -> voiceScope.launch { m.typeInstead() } } },
+            val bar = @Composable {
+                BottomBar {
+                    if (model != null && editable && question != null) {
+                        val level by (env?.meter?.level ?: remember { MutableStateFlow(0f) }).collectAsStateWithLifecycle()
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            VoiceStatusView(model, level)
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                MicButton(
+                                    model, R.string.pending_question_voice,
+                                    onOutcome = { answer(question, it.words) }, onKeyboard = { openOther(question) },
+                                )
+                                Text(
+                                    stringResource(R.string.pending_question_voice),
+                                    // The mic carries the same words for TalkBack.
+                                    modifier = Modifier.weight(1f).clearAndSetSemantics { },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    PendingCardStatusLine(state.shownStatus, state.actionable, item.machineName, state.linkNote, retry = ::sendDraft)
+                    if (tooLong && !state.handledElsewhere) {
+                        ErrorLine(stringResource(R.string.pending_question_too_long))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (shownPage > 0 && !state.handledElsewhere) {
+                            SecondaryButton(onClick = { shownPage -= 1 }, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.pending_question_back), style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                        when {
+                            state.handledElsewhere -> PrimaryButton(onClick = close, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.common_close), style = MaterialTheme.typography.titleMedium)
+                            }
+                            !isLastPage -> PrimaryButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    shownPage += 1
+                                },
+                                modifier = Modifier.weight(1f).testTag("pending.next"),
+                                enabled = question?.let { answers.isAnswered(it.id) } ?: false,
+                            ) { Text(stringResource(R.string.pending_question_next), style = MaterialTheme.typography.titleMedium) }
+                            else -> PrimaryButton(
+                                onClick = ::sendDraft,
+                                modifier = Modifier.weight(1f).testTag("pending.send"),
+                                enabled = state.canSend && answers.isComplete && !tooLong,
+                            ) { Text(stringResource(R.string.pending_send), style = MaterialTheme.typography.titleMedium) }
+                        }
+                    }
+                }
+            }
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(
+                        PendingCardView.headline(item, false, res, MaterialTheme.colorScheme.onSurfaceVariant),
+                        style = MaterialTheme.typography.bodyMedium,
                     )
-                }
-            }
-            BottomBar {
-                if (model != null && editable && question != null) {
-                    val level by (env?.meter?.level ?: remember { MutableStateFlow(0f) }).collectAsStateWithLifecycle()
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        VoiceStatusView(model, level)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            MicButton(
-                                model, R.string.pending_question_voice,
-                                onOutcome = { answer(question, it.words) }, onKeyboard = { openOther(question) },
-                            )
-                            Text(
-                                stringResource(R.string.pending_question_voice),
-                                // The mic carries the same words for TalkBack.
-                                modifier = Modifier.weight(1f).clearAndSetSemantics { },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                PendingCardStatusLine(state.shownStatus, state.actionable, item.machineName, state.linkNote, retry = ::sendDraft)
-                if (tooLong && !state.handledElsewhere) {
-                    ErrorLine(stringResource(R.string.pending_question_too_long))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (shownPage > 0 && !state.handledElsewhere) {
-                        SecondaryButton(onClick = { shownPage -= 1 }, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.pending_question_back), style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                    when {
-                        state.handledElsewhere -> PrimaryButton(onClick = close, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.common_close), style = MaterialTheme.typography.titleMedium)
-                        }
-                        !isLastPage -> PrimaryButton(
-                            onClick = {
+                    if (question != null) {
+                        Prompt(question)
+                        Options(
+                            question, answers, editable, fieldText(question), question.id in open,
+                            tooLongPicks = answers.isTooLong(question.id), unmatched = question.id in noMatch,
+                            field = fields.getOrPut(question.id) { FocusRequester() },
+                            pick = { label ->
+                                answers = answers.toggle(question.id, label)
+                                // A pick replaces the typed answer, in the field too.
+                                typed = typed - question.id
+                                noMatch = noMatch - question.id
                                 focusManager.clearFocus()
-                                shownPage += 1
                             },
-                            modifier = Modifier.weight(1f).testTag("pending.next"),
-                            enabled = question?.let { answers.isAnswered(it.id) } ?: false,
-                        ) { Text(stringResource(R.string.pending_question_next), style = MaterialTheme.typography.titleMedium) }
-                        else -> PrimaryButton(
-                            onClick = ::sendDraft,
-                            modifier = Modifier.weight(1f).testTag("pending.send"),
-                            enabled = state.canSend && answers.isComplete && !tooLong,
-                        ) { Text(stringResource(R.string.pending_send), style = MaterialTheme.typography.titleMedium) }
+                            other = { openOther(question) },
+                            edit = { text ->
+                                typed = typed + (question.id to text)
+                                answers = answers.setFreeText(question.id, text)
+                            },
+                            focused = { model?.let { m -> voiceScope.launch { m.typeInstead() } } },
+                        )
                     }
                 }
+                // A short window (a phone in landscape, the keyboard up): the bar scrolls with the questions, so the
+                // field being typed in and the buttons stay in reach.
+                if (compact) bar()
             }
+            if (!compact) bar()
         }
         Announcement(announcement)
     }
@@ -323,6 +335,9 @@ private fun Options(
     edit: (String) -> Unit,
     focused: () -> Unit,
 ) {
+    // The whole field comes into view when it takes the focus (a short window scrolls it above the keyboard).
+    val inView = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Column(Modifier.fillMaxWidth().sheetCard(RoundedCornerShape(12.dp))) {
             for (option in question.options) {
@@ -363,7 +378,13 @@ private fun Options(
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
                             .focusRequester(field)
-                            .onFocusChanged { if (it.isFocused) focused() }
+                            .bringIntoViewRequester(inView)
+                            .onFocusChanged {
+                                if (it.isFocused) {
+                                    focused()
+                                    scope.launch { inView.bringIntoView() }
+                                }
+                            }
                             .testTag("pending.otherField"),
                         placeholder = { Text(stringResource(R.string.pending_question_other_placeholder)) },
                         maxLines = 5,

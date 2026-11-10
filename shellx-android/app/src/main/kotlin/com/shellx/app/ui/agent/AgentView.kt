@@ -14,9 +14,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shellx.app.R
 import com.shellx.app.SignedInScope
+import com.shellx.app.ui.composer.ComposerBarState
 import com.shellx.app.ui.composer.byteCount
 import com.shellx.app.ui.nav.WorkRoutes
 import com.shellx.app.ui.theme.AppLanguage
@@ -46,6 +48,10 @@ import kotlinx.coroutines.launch
  */
 class AgentScreenHolder(val model: AgentThreadModel) : ViewModel() {
     var draft: ComposerDraft by mutableStateOf(ComposerDraft())
+
+    /** The composer's picks still being read, on this holder's scope: a swipe to another pane (whose composer goes)
+     *  or a rotation does not drop them (final review m-3). */
+    val composer: ComposerBarState = ComposerBarState(viewModelScope)
     var notice: AgentNotice? by mutableStateOf(null)
     var alert: WorkspaceAlert? by mutableStateOf(null)
 
@@ -148,6 +154,7 @@ fun AgentView(scope: SignedInScope, ref: SessionRef, open: (String) -> Unit, bac
         notice = notice,
         draft = draft,
         onDraftChange = { holder.draft = it },
+        composer = holder.composer,
         embedded = embedded,
         attachmentsEnabled = hub.acceptsAttachments(ref.machineId) || draft.attachments.isNotEmpty(),
         sending = if (draft.isSending) model.uploadProgress ?: 0.0 else null,

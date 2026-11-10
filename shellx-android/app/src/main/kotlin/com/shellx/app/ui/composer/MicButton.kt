@@ -48,7 +48,6 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,8 +71,9 @@ import kotlinx.coroutines.launch
  * - Only a lift sends (3C's [MicHold]): a hold taken away without one (the pager or a list claimed the touch, the
  *   system cancelled it, the mic left while held) cancels, so half-spoken words never reach the agent (RF 1).
  * - Haptics: a tick as listening starts, a confirm when the words are taken whole, a reject on cancel.
- * - With TalkBack the hold gesture is off and the button works by taps: the first starts, the next one finishes.
- *   Cancel (while listening) and "Type instead" are custom actions.
+ * - With TalkBack the hold gesture is off and the button works by taps: the first starts, the next one finishes. The
+ *   tap's label says so (the iPhone's hint), never the button's state. Cancel (while listening) and "Type instead" are
+ *   custom actions.
  *
  * Mic actions run in `LocalVoice.current.scope` (the hub's), so a stop outlives the composable. The model's active
  * state is reported to `LocalVoice.current.activity`.
@@ -145,8 +145,8 @@ fun MicButton(
             .semantics {
                 role = Role.Button
                 contentDescription = if (active) stop else talk
-                if (!active) stateDescription = hint
-                onClick {
+                // The iPhone's hint is what a double-tap does: TalkBack reads "Double-tap to …" (Compose has no hint).
+                onClick(label = if (active) stop else hint) {
                     if (model.isActive) actions.finish() else actions.start()
                     true
                 }

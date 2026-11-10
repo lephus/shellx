@@ -1,5 +1,6 @@
 package com.shellx.app.platform
 
+import android.app.Activity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.IntentSenderRequest
@@ -38,6 +39,13 @@ class PlayUpdateChecker(private val manager: AppUpdateManager) : UpdateChecker {
     /** The newest info, until a start uses it (Play takes each [AppUpdateInfo] once). */
     private var latest: AppUpdateInfo? = null
 
+    /**
+     * Play's dialog was started in this process and the user has not taken the update ("No thanks", Back, or no answer
+     * yet): nothing is offered again until the next cold start. On Android the Photo Picker, Files and the system's
+     * settings are other activities, so each return is a new check (final review m-2).
+     */
+    private var postponed = false
+
     init {
         manager.registerListener { state -> _installs.value = phase(state.installStatus()) }
     }
@@ -45,8 +53,10 @@ class PlayUpdateChecker(private val manager: AppUpdateManager) : UpdateChecker {
     /** A StartIntentSenderForResult launcher (key [KEY]) for Play's dialog; call in `MainActivity.onCreate`. */
     fun attach(registry: ActivityResultRegistry, owner: LifecycleOwner) {
         val registered = registry.register(KEY, owner, ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            // Update or No thanks; Play's install listener reports the download.
+            // Update or No thanks; Play's install listener reports the download. Only Update lets a later check offer
+            // again (a download that failed, say).
             CoreLog.log("update_flow_result ${result.resultCode}")
+            if (result.resultCode == Activity.RESULT_OK) postponed = false
         }
         launcher = registered
         owner.lifecycle.addObserver(
@@ -57,8 +67,8 @@ class PlayUpdateChecker(private val manager: AppUpdateManager) : UpdateChecker {
     }
 
     /**
-     * `AvailableUpdate(availableVersionCode)` when an update is available, the flexible flow is allowed and nothing is
-     * pending, downloading, downloaded or installing; else null. Also sets [installs] from the install status, so a
+     * `AvailableUpdate(availableVersionCode)` when an update is available, the flexible flow is allowed, nothing is
+     * pending, downloading, downloaded or installing, and the user did not postpone it in this process; else null. Also sets [installs] from the install status, so a
      * download that finished while the app was away asks to restart.
      */
     override suspend fun check(): AvailableUpdate? {
@@ -68,7 +78,8 @@ class PlayUpdateChecker(private val manager: AppUpdateManager) : UpdateChecker {
         _installs.value = phase
         val offered = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
             info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) &&
-            phase != InstallPhase.DOWNLOADING && phase != InstallPhase.DOWNLOADED && phase != InstallPhase.INSTALLING
+            phase != InstallPhase.DOWNLOADING && phase != InstallPhase.DOWNLOADED && phase != InstallPhase.INSTALLING &&
+            !postponed
         return if (offered) AvailableUpdate(info.availableVersionCode().toLong()) else null
     }
 
@@ -77,7 +88,8 @@ class PlayUpdateChecker(private val manager: AppUpdateManager) : UpdateChecker {
         val current = launcher ?: return
         val info = latest ?: manager.appUpdateInfo.await()
         latest = null
-        manager.startUpdateFlowForResult(info, current, AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build())
+        val started = manager.startUpdateFlowForResult(info, current, AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build())
+        if (started) postponed = true
     }
 
     /** Play installs the downloaded update and restarts the app into the new version. */
