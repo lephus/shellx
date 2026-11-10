@@ -38,7 +38,10 @@ sealed interface TerminalHardwareAction {
     /** A named key or a ctrl chord, sent as a `key` unit. */
     data class Send(val key: TerminalKey, val mods: List<TerminalModifier>) : TerminalHardwareAction
 
-    /** Text typed through the model's typing (a latched ctrl applies; `"\n"` becomes `enter`). */
+    /**
+     * Text a key types, through `TerminalTextInput.typeKey`: the word being composed is committed first (A-g3), a
+     * latched ctrl applies, `"\n"` becomes `enter`.
+     */
     data class Type(val text: String) : TerminalHardwareAction {
         override fun toString(): String = "Type(<${text.length} chars>)"
     }

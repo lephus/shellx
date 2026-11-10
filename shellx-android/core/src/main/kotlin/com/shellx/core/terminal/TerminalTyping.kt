@@ -59,6 +59,13 @@ class TerminalTyping(markedText: String = "", ctrlLatched: Boolean = false) {
         return key(TerminalKey.BACKSPACE)
     }
 
+    /**
+     * A key event that types [text] (a hardware letter or digit, Enter as `"\n"`, or a soft keyboard's key event): the
+     * word in progress goes first, as for [key] (plan 3G A-g3), then [text] as committed text, where a latched ctrl
+     * takes its first letter.
+     */
+    fun typeKey(text: String): List<TerminalInputUnit> = unmark() + insert(text)
+
     /** A key bar or hardware key. The word in progress goes first; a latched ctrl joins the key's modifiers. */
     fun key(key: TerminalKey, mods: List<TerminalModifier> = emptyList()): List<TerminalInputUnit> {
         val units = unmark().toMutableList()

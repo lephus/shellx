@@ -20,6 +20,13 @@ interface TerminalTextInput {
     /** Edits the word in progress, or sends one backspace when there is none. */
     fun deleteBackward()
 
+    /**
+     * Text a key event types (TerminalHardwareAction.Type, and a soft keyboard's key events): the word in progress
+     * goes first, then [text] as committed text (`TerminalTyping.typeKey`, sent as one message). Not [insertText],
+     * which replaces the word as Android's `commitText` does.
+     */
+    fun typeKey(text: String)
+
     /** A key bar or hardware key; the word in progress goes first. */
     fun press(key: TerminalKey, mods: List<TerminalModifier> = emptyList())
 
