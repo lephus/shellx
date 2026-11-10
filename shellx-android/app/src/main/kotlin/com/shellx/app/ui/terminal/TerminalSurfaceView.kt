@@ -322,12 +322,9 @@ class TerminalSurfaceView(
     override fun onCheckIsTextEditor(): Boolean = true
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
-        // Single-line plain text: the keyboard composes each language's word (Telex, VNI, CJK) and may show suggestions,
-        // but with no AUTO_CORRECT flag it corrects nothing (LatinIME/Gboard's rule), and with no CAP_* flag capitalises
-        // nothing. Not NO_SUGGESTIONS: under it Gboard 15.1 composes nothing, commits letters and rewrites them, which a
-        // terminal cannot take back (API 36 emulator; controller ruling, plan 3G Spec note 13 superseded). Enter stays a
-        // key (NO_ENTER_ACTION), whichever way the keyboard sends it.
-        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL
+        // A text class keeps each language's composing (Telex, VNI, CJK); no suggestions, so letters go out one by one;
+        // no CAP_* or AUTO_* flag, so nothing is capitalised or rewritten; multi-line, so Enter is a key, never an action.
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or
             EditorInfo.IME_FLAG_NO_ENTER_ACTION or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
         val marked = if (accepts()) model.markedText.length else 0
