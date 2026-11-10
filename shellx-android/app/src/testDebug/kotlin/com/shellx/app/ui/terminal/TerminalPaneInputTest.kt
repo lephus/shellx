@@ -421,6 +421,15 @@ class TerminalPaneInputTest {
         idle(50)
     }
 
+    /** The window gains or loses the focus as the system tells it (another window, Recents, the shade). */
+    private fun windowFocus(has: Boolean) {
+        compose.runOnIdle {
+            val viewRoot = View::class.java.getMethod("getViewRootImpl").invoke(compose.activity.window.decorView)
+            viewRoot.javaClass.getMethod("windowFocusChanged", Boolean::class.javaPrimitiveType).invoke(viewRoot, has)
+        }
+        idle(50)
+    }
+
     /** The keyboard going down (system Back, its own key) takes the focus and the key bar with it, as on the iPhone. */
     @Test
     fun theKeyboardGoingDownGivesUpTheFocus() {
@@ -453,12 +462,11 @@ class TerminalPaneInputTest {
         livePane()
         focus()
         keyboard(300)
-        compose.runOnIdle { compose.activity.window.decorView.dispatchWindowFocusChanged(false) }
-        idle(50)
+        windowFocus(false)
         keyboard(0)
         idle(300)
         assertTrue(surface().hasFocus())
-        compose.runOnIdle { compose.activity.window.decorView.dispatchWindowFocusChanged(true) }
+        windowFocus(true)
         idle(300)
         assertTrue(surface().hasFocus())
         assertTrue(tagged("terminal.key.escape"))
