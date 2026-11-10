@@ -127,8 +127,10 @@ class CompactHeightTest {
     }
 
     /**
-     * A workspace's shell pane with the keyboard up (plan 3G): under the compact top bar, the key bar and the keyboard
-     * still leave a grid to work in, and a pinch still zooms it. Real accounts show no demo banner.
+     * A workspace's shell pane with the keyboard up (plan 3G, decision 9): Gboard takes 251 dp of a Pixel 5 held sideways
+     * (measured on the API 36 emulator), so while a terminal holds the keyboard the workspace's top bar steps aside, and
+     * the key bar and the keyboard still leave a grid to work in; a pinch still zooms it; the bar comes back with the
+     * keyboard's hide key. Real accounts show no demo banner.
      */
     @Test
     fun aWorkspacesTerminalKeepsAUsableGridWithTheKeyBarAndTheKeyboardUp() {
@@ -137,7 +139,7 @@ class CompactHeightTest {
                 CompositionLocalProvider(LocalSpinner provides StillSpinner, LocalTerminalIme provides RecordingIme()) {
                     Column(Modifier.fillMaxSize()) {
                         Spacer(Modifier.height(STATUS_BAR))
-                        Box(Modifier.fillMaxWidth().height(ABOVE_KEYBOARD)) {
+                        Box(Modifier.fillMaxWidth().height(ABOVE_GBOARD)) {
                             WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
                         }
                     }
@@ -147,13 +149,13 @@ class CompactHeightTest {
         until { tagged("terminal.surface") && rig.mac.terminalViewOpens.isNotEmpty() }
         compose.onNodeWithTag("terminal.surface").performClick()
         until { tagged("terminal.key.escape") }
-        // The key bar took its row: the grid that fits now reaches the Mac 200 ms later.
-        compose.waitUntil(10_000) {
+        assertTrue("the top bar steps aside while the terminal holds the keyboard", !tagged("workspace.title"))
+        // The key bar took its row and the top bar gave its own: the grid that fits reaches the Mac 200 ms later.
+        repeat(60) {
             compose.waitForIdle()
             ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
-            rig.mac.terminalViewResizes.isNotEmpty()
         }
-        val grid = rig.mac.terminalViewResizes.last()
+        val grid = rig.mac.terminalViewResizes.lastOrNull() ?: rig.mac.terminalViewOpens.last()
         assertTrue("$grid", grid.cols >= MIN_TERMINAL_COLS && grid.rows >= MIN_TERMINAL_ROWS)
         compose.onNodeWithTag("terminal.surface").performTouchInput {
             pinch(center - Offset(40f, 0f), center - Offset(160f, 0f), center + Offset(40f, 0f), center + Offset(160f, 0f))
@@ -161,6 +163,8 @@ class CompactHeightTest {
         compose.waitForIdle()
         val viewport = terminalSurface().viewport
         assertTrue("${viewport.scale} after a pinch from ${viewport.fit}", viewport.scale > viewport.fit)
+        compose.onNodeWithTag("terminal.key.hideKeyboard").performClick()
+        until { tagged("workspace.title") && !tagged("terminal.key.escape") }
     }
 
     private fun terminalSurface(): TerminalSurfaceView {
@@ -240,6 +244,9 @@ class CompactHeightTest {
 
         /** 393 dp less the status bar and a 200 dp landscape keyboard. */
         val ABOVE_KEYBOARD = 170.dp
+
+        /** 393 dp less the status bar and Gboard as the API 36 emulator draws it in landscape (251 dp). */
+        val ABOVE_GBOARD = 118.dp
 
         /** About five lines of chat. */
         val MIN_CHAT = 120.dp
