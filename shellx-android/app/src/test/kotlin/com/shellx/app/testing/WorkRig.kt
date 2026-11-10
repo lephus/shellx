@@ -71,11 +71,14 @@ class WorkRig(
             voice: VoiceService? = null,
             /** False: the hub is not started, so it has loaded no Mac yet (the test starts it). */
             started: Boolean = true,
+            /** False: a ShellX from before terminal views (no `terminal_view`, no `terminal_create`). */
+            servesTerminalViews: Boolean = true,
         ): WorkRig {
             val main = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val mac = FakeMac(
                 "MacBook Pro", main, acceptsAttachments = acceptsAttachments, acceptsAgentClose = acceptsAgentClose,
-                acceptsTerminalClose = acceptsTerminalClose,
+                acceptsTerminalClose = acceptsTerminalClose, servesTerminalViews = servesTerminalViews,
+                acceptsTerminalCreate = servesTerminalViews,
             )
             mac.setWorkspaces(
                 listOf(

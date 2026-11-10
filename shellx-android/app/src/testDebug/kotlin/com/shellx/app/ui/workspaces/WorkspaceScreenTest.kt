@@ -199,6 +199,78 @@ class WorkspaceScreenTest {
         assertTrue(displayed("pane.s-claude"))
     }
 
+    // Terminals (2C's additions to `WorkspaceRenderTests.swift`)
+
+    private var createTerminals = 0
+    private val showAsTerminal = mutableListOf<Pair<String, Boolean>>()
+
+    private fun showTerminals(
+        canControl: () -> Boolean = { true },
+        canCreateTerminal: () -> Boolean = { false },
+        creatingTerminal: () -> Boolean = { false },
+        canViewTerminals: Boolean = false,
+        shownAsTerminal: () -> Set<String> = { emptySet() },
+    ) = compose.setContent {
+        ShellXTheme {
+            WorkspaceScreen(
+                title = "shellx-ios", branch = "feat/workspaces", panes = WorkspaceFixtures.panes, selected = selected, nowMs = NOW_MS,
+                canControl = canControl(), canCreateTerminal = canCreateTerminal(), canViewTerminals = canViewTerminals,
+                shownAsTerminal = shownAsTerminal(), creatingTerminal = creatingTerminal(),
+                actions = WorkspaceScreenActions(
+                    select = { selected = it }, createTerminal = { createTerminals++ },
+                    showAsTerminal = { id, on -> showAsTerminal += id to on },
+                ),
+            ) { pane, shown ->
+                PaneContent(pane, shown, agent = { s -> Text("agent ${s.session.sessionId}", Modifier.testTag("pane.${s.session.sessionId}")) })
+            }
+        }
+    }
+
+    @Test
+    fun thePlusChipOpensANewTerminal() {
+        var canControl by mutableStateOf(true)
+        var canCreate by mutableStateOf(true)
+        var creating by mutableStateOf(false)
+        showTerminals(canControl = { canControl }, canCreateTerminal = { canCreate }, creatingTerminal = { creating })
+        compose.onNodeWithTag("workspace.chip.add").performClick()
+        assertEquals(1, createTerminals)
+        creating = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("workspace.chip.add").assertIsNotEnabled()
+        creating = false
+        canControl = false
+        compose.waitForIdle()
+        compose.onNodeWithTag("workspace.chip.add").assertIsNotEnabled()
+        canCreate = false
+        compose.waitForIdle()
+        compose.onNodeWithTag("workspace.chip.add").assertDoesNotExist()
+    }
+
+    @Test
+    fun theMenuSwitchesAnAgentChipToItsTerminalAndBack() {
+        var asTerminal by mutableStateOf(emptySet<String>())
+        selected = "t-claude"
+        showTerminals(canViewTerminals = true, shownAsTerminal = { asTerminal })
+        compose.onNodeWithTag("workspace.menu").performClick()
+        compose.onNodeWithText(text(R.string.workspace_menu_view_as_terminal)).performClick()
+        assertEquals(listOf("t-claude" to true), showAsTerminal)
+        asTerminal = setOf("t-claude")
+        compose.waitForIdle()
+        compose.onNodeWithTag("workspace.menu").performClick()
+        compose.onNodeWithText(text(R.string.workspace_menu_view_as_chat)).performClick()
+        assertEquals(listOf("t-claude" to true, "t-claude" to false), showAsTerminal)
+    }
+
+    @Test
+    fun aShellChipNeverOffersViewAsTerminal() {
+        selected = "t-zsh"
+        showTerminals(canViewTerminals = true)
+        compose.onNodeWithTag("workspace.menu").performClick()
+        compose.onNodeWithText(text(R.string.workspace_menu_rename)).assertExists()
+        assertTrue(compose.onAllNodesWithText(text(R.string.workspace_menu_view_as_terminal)).fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText(text(R.string.workspace_menu_view_as_chat)).fetchSemanticsNodes().isEmpty())
+    }
+
     /** The iPhone's `scrollTo(id, anchor: .center)`: on first show and on each pick, the chip shown sits mid-row. */
     @Test
     fun theChipShownSitsInTheMiddleOfTheRow() {

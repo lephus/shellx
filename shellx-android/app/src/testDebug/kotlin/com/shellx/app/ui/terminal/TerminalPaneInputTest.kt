@@ -46,6 +46,10 @@ import com.shellx.app.screenshots.StillSpinner
 import com.shellx.app.testing.WorkRig
 import com.shellx.app.ui.components.LocalSpinner
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.app.ui.workspaces.WorkspaceView
+import com.shellx.core.workspaces.WorkspaceRef
+import com.shellx.link.core.AgentSession
+import com.shellx.link.core.AgentState
 import com.shellx.core.demo.DemoTerminalScreens
 import com.shellx.core.terminal.TerminalInputBatcher
 import com.shellx.core.terminal.TerminalUnavailableReason
@@ -290,6 +294,24 @@ class TerminalPaneInputTest {
         val notice = context.getString(R.string.terminal_paste_too_large)
         until { compose.onAllNodesWithText(notice).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(1, compose.onAllNodesWithText(notice).fetchSemanticsNodes().size)
+    }
+
+    /** A shell the user is typing into stays shown when an agent of the workspace starts waiting for an answer: the
+     *  keyboard is not pulled away mid-command (the workspace screen settles on the page typed into). */
+    @Test
+    fun typingIntoAShellKeepsItShownWhenAnAgentAsks() {
+        show { WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {}) }
+        until { surfaces().singleOrNull()?.let { it.model.terminalId == "t-zsh" && it.model.phase == TerminalViewPhase.Live } == true }
+        focus()
+        InputConnection(surface()).commitText("ec", 1)
+        until { inputs() == listOf(listOf(Text("ec"))) }
+        val nowMs = System.currentTimeMillis()
+        rig.mac.upsertSession(
+            AgentSession("s1", "claude", "ws-shellx", "shellx-ios", state = AgentState.NEEDS_INPUT, stateSinceMs = nowMs, lastActivityMs = nowMs),
+        )
+        until { rig.hub.liveSessions.firstOrNull()?.session?.state == AgentState.NEEDS_INPUT }
+        idle(300)
+        assertEquals("the shell being typed into stays shown", "t-zsh", surface().model.terminalId)
     }
 
     /** A page that is reopening (its view ended `failed`; the last screen stays, uncovered) takes no input: the

@@ -26,19 +26,28 @@ import org.junit.runner.RunWith
 class WorkspaceTextsTest {
     private val res: Resources get() = ApplicationProvider.getApplicationContext<Context>().resources
 
+    /** `testTheMenuOffersRenameViewAsTerminalCloseTabAndCloseWorkspace`. */
     @Test
-    fun theMenuOffersRenameCloseTabAndCloseWorkspace() {
-        assertEquals("a Mac from before terminal_close", listOf(WorkspaceMenuItem.RENAME, WorkspaceMenuItem.CLOSE_WORKSPACE), WorkspaceMenuItem.items(false))
+    fun theMenuOffersRenameViewAsTerminalCloseTabAndCloseWorkspace() {
+        assertEquals(listOf(WorkspaceMenuItem.RENAME, WorkspaceMenuItem.CLOSE_WORKSPACE), WorkspaceMenuItem.items(canCloseTab = false))
+        assertEquals(listOf(WorkspaceMenuItem.RENAME, WorkspaceMenuItem.CLOSE_TAB, WorkspaceMenuItem.CLOSE_WORKSPACE), WorkspaceMenuItem.items(true))
         assertEquals(
-            "any tab, agent or shell: it replaces Close Agent… here",
-            listOf(WorkspaceMenuItem.RENAME, WorkspaceMenuItem.CLOSE_TAB, WorkspaceMenuItem.CLOSE_WORKSPACE), WorkspaceMenuItem.items(true),
+            listOf(WorkspaceMenuItem.RENAME, WorkspaceMenuItem.VIEW_AS_TERMINAL, WorkspaceMenuItem.CLOSE_TAB, WorkspaceMenuItem.CLOSE_WORKSPACE),
+            WorkspaceMenuItem.items(true, WorkspaceMenuItem.AgentChip.CHAT),
+        )
+        assertEquals(
+            listOf(WorkspaceMenuItem.RENAME, WorkspaceMenuItem.VIEW_AS_CHAT, WorkspaceMenuItem.CLOSE_TAB, WorkspaceMenuItem.CLOSE_WORKSPACE),
+            WorkspaceMenuItem.items(true, WorkspaceMenuItem.AgentChip.TERMINAL),
         )
         val titles = WorkspaceMenuItem.entries.map { res.getString(it.title) }
         assertEquals(
-            listOf(res.getString(R.string.workspace_menu_rename), res.getString(R.string.terminal_close_menu), res.getString(R.string.workspace_menu_close)),
+            listOf(
+                R.string.workspace_menu_rename, R.string.workspace_menu_view_as_terminal, R.string.workspace_menu_view_as_chat,
+                R.string.terminal_close_menu, R.string.workspace_menu_close,
+            ).map(res::getString),
             titles,
         )
-        assertEquals(3, titles.toSet().size)
+        assertEquals(5, titles.toSet().size)
         assertEquals(listOf(WorkspaceMenuItem.CLOSE_TAB, WorkspaceMenuItem.CLOSE_WORKSPACE), WorkspaceMenuItem.entries.filter { it.isDestructive })
     }
 

@@ -13,7 +13,20 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pinch
+import androidx.compose.ui.geometry.Offset
+import androidx.activity.ComponentActivity
+import android.view.View
+import android.view.ViewGroup
+import java.util.concurrent.TimeUnit
+import org.robolectric.shadows.ShadowLooper
+import com.shellx.app.screenshots.StillSpinner
+import com.shellx.app.ui.components.LocalSpinner
+import com.shellx.app.ui.terminal.LocalTerminalIme
+import com.shellx.app.ui.terminal.RecordingIme
+import com.shellx.app.ui.terminal.TerminalSurfaceView
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -55,7 +68,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics, so the bars are as tall as on a phone.
 @Config(qualifiers = "w851dp-h393dp-land")
 class CompactHeightTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val rig = WorkRig.make()
 
@@ -111,6 +124,52 @@ class CompactHeightTest {
         until { tagged("agent.chat") && tagged("home.needsYou") }
         val height = chatHeight()
         assertTrue("the chat is $height tall", height >= MIN_CHAT)
+    }
+
+    /**
+     * A workspace's shell pane with the keyboard up (plan 3G): under the compact top bar, the key bar and the keyboard
+     * still leave a grid to work in, and a pinch still zooms it. Real accounts show no demo banner.
+     */
+    @Test
+    fun aWorkspacesTerminalKeepsAUsableGridWithTheKeyBarAndTheKeyboardUp() {
+        compose.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(LocalSpinner provides StillSpinner, LocalTerminalIme provides RecordingIme()) {
+                    Column(Modifier.fillMaxSize()) {
+                        Spacer(Modifier.height(STATUS_BAR))
+                        Box(Modifier.fillMaxWidth().height(ABOVE_KEYBOARD)) {
+                            WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {})
+                        }
+                    }
+                }
+            }
+        }
+        until { tagged("terminal.surface") && rig.mac.terminalViewOpens.isNotEmpty() }
+        compose.onNodeWithTag("terminal.surface").performClick()
+        until { tagged("terminal.key.escape") }
+        // The key bar took its row: the grid that fits now reaches the Mac 200 ms later.
+        compose.waitUntil(10_000) {
+            compose.waitForIdle()
+            ShadowLooper.idleMainLooper(10, TimeUnit.MILLISECONDS)
+            rig.mac.terminalViewResizes.isNotEmpty()
+        }
+        val grid = rig.mac.terminalViewResizes.last()
+        assertTrue("$grid", grid.cols >= MIN_TERMINAL_COLS && grid.rows >= MIN_TERMINAL_ROWS)
+        compose.onNodeWithTag("terminal.surface").performTouchInput {
+            pinch(center - Offset(40f, 0f), center - Offset(160f, 0f), center + Offset(40f, 0f), center + Offset(160f, 0f))
+        }
+        compose.waitForIdle()
+        val viewport = terminalSurface().viewport
+        assertTrue("${viewport.scale} after a pinch from ${viewport.fit}", viewport.scale > viewport.fit)
+    }
+
+    private fun terminalSurface(): TerminalSurfaceView {
+        fun find(view: View): TerminalSurfaceView? = when (view) {
+            is TerminalSurfaceView -> view
+            is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { find(view.getChildAt(it)) }
+            else -> null
+        }
+        return checkNotNull(find(compose.activity.window.decorView))
     }
 
     /** The field's part in view, and its whole height. */
@@ -184,5 +243,9 @@ class CompactHeightTest {
 
         /** About five lines of chat. */
         val MIN_CHAT = 120.dp
+
+        /** A terminal still worth typing into: a shell's prompt and the lines just above it, a full command's width. */
+        const val MIN_TERMINAL_ROWS = 4
+        const val MIN_TERMINAL_COLS = 80
     }
 }

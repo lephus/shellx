@@ -10,7 +10,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import com.shellx.app.screenshots.StillSpinner
 import com.shellx.app.testing.FakeResultRegistry
+import com.shellx.app.ui.components.LocalSpinner
 import com.shellx.app.ui.composer.LocalAttachmentReader
 import com.shellx.core.composer.AttachmentChecks
 import com.shellx.link.core.AttachmentKind
@@ -22,6 +24,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -53,14 +56,18 @@ class WorkspaceViewTest {
     @get:Rule val compose = createComposeRule()
 
     private val context: Context get() = ApplicationProvider.getApplicationContext()
-    private val rig = WorkRig.make()
+    private var rig = WorkRig.make()
     private var backs = 0
 
     @After
     fun tearDown() = rig.close()
 
     private fun show() = compose.setContent {
-        ShellXTheme { WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = { backs++ }) }
+        ShellXTheme {
+            CompositionLocalProvider(LocalSpinner provides StillSpinner) {
+                WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = { backs++ })
+            }
+        }
     }
 
     private fun until(condition: () -> Boolean) = compose.waitUntil(10_000) {
@@ -73,7 +80,7 @@ class WorkspaceViewTest {
     @Test
     fun thePaneClosedOnTheMacShowsTheNoticeThenItGoes() {
         show()
-        until { shown(context.getString(R.string.terminal_needs_update)) }
+        until { tagged("workspace.chip.t-zsh") }
         // Frame by frame from here, so the 4 s count from the frame the notice shows (the chips slide meanwhile).
         compose.mainClock.autoAdvance = false
         rig.mac.upsertWorkspace(
@@ -98,7 +105,7 @@ class WorkspaceViewTest {
     @Test
     fun aWorkspaceClosedOnTheMacLeavesWithTheListsNotice() {
         show()
-        until { shown(context.getString(R.string.terminal_needs_update)) }
+        until { tagged("workspace.chip.t-zsh") }
         rig.mac.removeWorkspace("ws-shellx")
         until { backs == 1 }
         compose.waitForIdle()
@@ -119,7 +126,7 @@ class WorkspaceViewTest {
         var dropped = 0
         compose.setContent {
             ShellXTheme {
-                CompositionLocalProvider(LocalLifecycleOwner provides entry) {
+                CompositionLocalProvider(LocalLifecycleOwner provides entry, LocalSpinner provides StillSpinner) {
                     if (!covered) {
                         WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = {
                             if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) backs++ else dropped++
@@ -128,7 +135,7 @@ class WorkspaceViewTest {
                 }
             }
         }
-        until { shown(context.getString(R.string.terminal_needs_update)) }
+        until { tagged("workspace.chip.t-zsh") }
         // The "Needs you" page goes on top; the Mac closes the workspace meanwhile.
         compose.runOnIdle {
             entry.registry.currentState = Lifecycle.State.CREATED
@@ -146,6 +153,40 @@ class WorkspaceViewTest {
         compose.runOnIdle { entry.registry.currentState = Lifecycle.State.RESUMED }
         until { backs == 1 }
         assertEquals(context.getString(R.string.workspace_closed_on_mac), rig.scope.listNotice.current.value?.text)
+    }
+
+    // Terminals (2C's additions to `WorkspaceViewTests.swift`; plan 3G ruling 8)
+
+    @Test
+    fun theShellPaneOpensItsTerminalAtThePhoneSize() {
+        show()
+        until { rig.mac.terminalViewOpens.firstOrNull()?.terminalId == "t-zsh" }
+        assertTrue("${rig.mac.terminalViewOpens}", rig.mac.terminalViewOpens.first().cols >= 20)
+        until { tagged("terminal.surface") }
+        compose.onNodeWithTag("terminal.surface").assertIsDisplayed()
+    }
+
+    @Test
+    fun viewAsTerminalOpensTheAgentsTerminal() {
+        show()
+        until { rig.mac.terminalViewOpens.any { it.terminalId == "t-zsh" } }
+        compose.onNodeWithTag("workspace.chip.t-claude").performClick()
+        compose.onNodeWithTag("workspace.menu").performClick()
+        compose.onNodeWithText(context.getString(R.string.workspace_menu_view_as_terminal)).performClick()
+        until { rig.mac.terminalViewOpens.any { it.terminalId == "t-claude" } }
+        assertEquals("the shell's view closed first", listOf("t-zsh"), rig.mac.terminalViewCloses)
+    }
+
+    /** A Mac whose ShellX shows no terminals: the shell's page still says to update it, and there is no ＋. */
+    @Test
+    fun anOldMacStillShowsTheShellPlaceholder() {
+        rig.close()
+        rig = WorkRig.make(servesTerminalViews = false)
+        show()
+        until { tagged("workspace.shell.placeholder") }
+        assertTrue(shown(context.getString(R.string.terminal_needs_update)))
+        assertTrue("no new terminal on a Mac that takes none", !tagged("workspace.chip.add"))
+        assertTrue(rig.mac.terminalViewOpens.isEmpty())
     }
 
     /** Names a photo as AttachmentPreparer does, once [gate] opens (a HEIC conversion or a cloud file takes seconds). */
@@ -170,12 +211,13 @@ class WorkspaceViewTest {
                 CompositionLocalProvider(
                     LocalAttachmentReader provides GatedReader(gate),
                     LocalActivityResultRegistryOwner provides registry.owner,
+                    LocalSpinner provides StillSpinner,
                 ) {
                     WorkspaceView(rig.scope, WorkspaceRef(rig.machineId, "ws-shellx"), open = {}, back = { backs++ })
                 }
             }
         }
-        until { shown(context.getString(R.string.terminal_needs_update)) }
+        until { tagged("workspace.chip.t-zsh") }
         compose.onNodeWithTag("workspace.chip.t-claude").performClick()
         until { tagged("composer.attach") }
         compose.onNodeWithTag("composer.attach").performClick()
@@ -183,7 +225,7 @@ class WorkspaceViewTest {
         until { tagged("composer.attachments") }
 
         compose.onNodeWithTag("workspace.pager").performTouchInput { swipeLeft() }
-        until { shown(context.getString(R.string.terminal_needs_update)) && !tagged("composer.attach") }
+        until { tagged("terminal.surface") && !tagged("composer.attach") }
         compose.onNodeWithTag("workspace.pager").performTouchInput { swipeRight() }
         until { tagged("composer.attach") }
         compose.runOnUiThread { gate.complete(Unit) }
