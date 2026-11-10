@@ -30,6 +30,7 @@ import com.shellx.core.workspaces.WorkspaceRef
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
@@ -200,6 +201,48 @@ class TerminalRecreationTest {
         controller.recreate()
         focusWindow(controller)
         until("the new surface has the keyboard") { surfaceIn(controller)?.hasFocus() == true }
+    }
+
+    /**
+     * The API 36 emulator after a rotation: the keyboard the new page asks for before its window has the focus is shown
+     * and then hidden by the system as the window takes the focus. The page takes it once the window has the focus, so
+     * the keyboard stays.
+     */
+    @Test
+    fun aRotationTakesTheKeyboardBackOnceTheWindowHasTheFocus() {
+        val controller = host()
+        takeKeyboard(controller)
+        controller.recreate()
+        liveSurface(controller)
+        idle(100)
+        keyboard(controller, 300)
+        idle(50)
+        keyboard(controller, 0)
+        focusWindow(controller)
+        until("the new surface has the keyboard") { surfaceIn(controller)?.hasFocus() == true }
+        idle(800)
+        assertTrue("the keyboard stays", surfaceIn(controller)!!.hasFocus())
+    }
+
+    /**
+     * The API 36 emulator after a rotation: once the page took the keyboard back, the system hid it once more as it
+     * settled the new window, and the "keyboard went down" rule gave the focus up. Just after a page took the keyboard
+     * back, the keyboard going down asks for it again.
+     */
+    @Test
+    fun aKeyboardTheSystemHidesJustAfterARotationIsAskedForAgain() {
+        val controller = host()
+        takeKeyboard(controller)
+        controller.recreate()
+        focusWindow(controller)
+        until("the new surface has the keyboard") { surfaceIn(controller)?.hasFocus() == true }
+        val shows = ime.shows
+        keyboard(controller, 300)
+        idle(50)
+        keyboard(controller, 0)
+        idle(800)
+        assertTrue("the keyboard stays with the terminal", surfaceIn(controller)!!.hasFocus())
+        assertTrue("the keyboard is asked for again", ime.shows > shows)
     }
 
     @Test
