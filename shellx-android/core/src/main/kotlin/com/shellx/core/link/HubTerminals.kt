@@ -118,8 +118,9 @@ internal class HubTerminals(private val hub: MachineHub) {
     /** The hub stopped: every collection completes. */
     fun stop() {
         stopped = true
+        // A copy: a collection on an immediate dispatcher ends inside takeAway and leaves the list.
         for (feed in feeds.values) {
-            for (subscriber in feed.subscribers) subscriber.takeAway()
+            for (subscriber in feed.subscribers.toList()) subscriber.takeAway()
         }
         changed()
     }
