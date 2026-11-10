@@ -88,6 +88,11 @@ data class TerminalViewState(
  * to the Mac goes through one FIFO outbox drained by one coroutine in [scope] (started by the first `run()`, finished by
  * [close]); it awaits each call, and an open's answer is handled before the next message goes.
  *
+ * **Every send is the last step of a change** (review C I-1). On an immediate dispatcher (the app's `hub.scope` is
+ * `Main.immediate`; the demo's in-process Mac answers without suspending) `send()` may deliver the message, and the
+ * answer and the pushes it brings may be handled, before it returns. So the phase, the clocks, the counters and the
+ * view are set before a message goes, and nothing is written after it.
+ *
  * - **R1 Want.** The model wants a view while `active`, `terminalId != null`, a grid is known, `link.isOnline`,
  *   `link.supportsTerminalView`, the phase is not Unavailable, and it is not waiting for the Mac after a NotSent (R3).
  *   reconcile() (after every change below) first queues `close` for a view that is no longer wanted or is for another
@@ -400,11 +405,11 @@ class TerminalViewModel(
         if (!closed) {
             closed = true
             running = false
-            openCall?.cancel()
             view?.let {
-                send(Message.Close(it.terminalId))
                 forgetView()
+                send(Message.Close(it.terminalId))
             }
+            openCall?.cancel()
             restoreBudgets()
             dropEcho()
             collecting?.cancel()
@@ -427,16 +432,17 @@ class TerminalViewModel(
         val wanted = active && id != null && grid != null && online && supported && !isUnavailable && !waitingForMac
         val current = view
         if (current != null && (!wanted || current.terminalId != id)) {
-            send(Message.Close(current.terminalId))
             forgetView()
+            send(Message.Close(current.terminalId))
         }
         if (wanted) {
             if (view != null || retryWait != null) return
             attempts += 1
             view = View(id, attempts, grid)
-            send(Message.Open(id, grid.cols, grid.rows, attempts))
             if (firstScreenStart == null) firstScreenStart = now.markNow()
             shown.phase = TerminalViewPhase.Connecting
+            // Last: the answer, the Opened and the first screen may all be handled inside it.
+            send(Message.Open(id, grid.cols, grid.rows, attempts))
             return
         }
         if (!active || isUnavailable || (online && supported)) return
@@ -497,9 +503,10 @@ class TerminalViewModel(
             running = false
             // The iPhone's suspend(): the clock stops; the open of the next run starts it again.
             firstScreenStart = null
-            // An open still waiting would be announced to the next run as its own `Opened` (re-review B N-1).
-            openCall?.cancel()
             reconcile()
+            // An open still waiting would be announced to the next run as its own `Opened` (re-review B N-1). After
+            // reconcile(), which forgot its view and queued its close: the cancel may be handled inside this call.
+            openCall?.cancel()
             publish()
         }
     }
@@ -529,14 +536,15 @@ class TerminalViewModel(
                     try {
                         call.await()
                     } catch (e: CancellationException) {
-                        // Only the open was cancelled (A2, A4): the drainer's own cancellation goes on.
+                        // Only the open was cancelled (A2, A4): the drainer's own cancellation goes on. Whoever
+                        // cancelled it forgot its view and queued its close; there is no answer to handle.
                         ensureActive()
-                        TerminalOpenResult.NoAnswer
+                        null
                     } finally {
                         if (openCall === call) openCall = null
                     }
                 }
-                openAnswered(result, message.attempt)
+                if (result != null) openAnswered(result, message.attempt)
             }
             is Message.Close -> link.closeTerminalView(machineId, message.terminalId)
             is Message.Input -> link.sendTerminalInput(machineId, message.terminalId, message.units)
@@ -571,9 +579,9 @@ class TerminalViewModel(
                 else -> failedOpen()
             }
             TerminalOpenResult.NoAnswer -> if (link.isOnline(machineId)) {
+                failedOpen()
                 // The Mac may have opened it although the answer never came.
                 send(Message.Close(current.terminalId))
-                failedOpen()
             } else {
                 waitForMac()
             }
@@ -631,8 +639,8 @@ class TerminalViewModel(
         view?.takeIf { it.terminalId == id && it.opened } ?: return
         val started = now.markNow()
         val result = assembler.receive(part)
-        if (result.resync) send(Message.Resync(id))
         result.frame?.let { apply(it, started) }
+        if (result.resync) send(Message.Resync(id))
     }
 
     /** R6. */
@@ -761,9 +769,11 @@ class TerminalViewModel(
         val current = view ?: return
         if (units.isEmpty()) return
         for (message in TerminalInputBatcher.messages(units)) {
-            send(Message.Input(current.terminalId, message))
+            // A message handled inside its send may have ended the view: the rest would go to a view that is gone.
+            if (view !== current) return
             shown.sentInputs += 1
             if (echoStart == null && message.any { it is TerminalInputUnit.Text || it is TerminalInputUnit.Key }) startEcho()
+            send(Message.Input(current.terminalId, message))
         }
     }
 
@@ -808,8 +818,8 @@ class TerminalViewModel(
             val current = view ?: return@launch
             val grid = grid ?: return@launch
             if (grid == current.size) return@launch
-            send(Message.Resize(current.terminalId, grid.cols, grid.rows))
             current.size = grid
+            send(Message.Resize(current.terminalId, grid.cols, grid.rows))
         }
         resizeWait = wait
         wait.start()
