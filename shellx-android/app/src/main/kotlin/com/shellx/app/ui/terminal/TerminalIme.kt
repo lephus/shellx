@@ -1,5 +1,6 @@
 package com.shellx.app.ui.terminal
 
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.View
@@ -44,11 +45,16 @@ val LocalTerminalIme: ProvidableCompositionLocal<TerminalIme?> = staticCompositi
 
 /** The clipboard as Paste reads it. */
 object TerminalClipboard {
-    /** Whether the clipboard holds text. Reads only its description, never the text (Android 12 and later say so). */
+    /**
+     * Whether the clipboard holds text that [text] pastes. Reads only its description, never the text (Android 12 and
+     * later say so): text of any kind but a list of URIs or an Intent, which paste nothing. A file that says it is
+     * `text/plain` cannot be told apart without reading the clip, so Paste is offered for it and pastes nothing.
+     */
     fun hasText(context: Context): Boolean {
         val manager = context.getSystemService(ClipboardManager::class.java) ?: return false
         if (!manager.hasPrimaryClip()) return false
-        return manager.primaryClipDescription?.hasMimeType("text/*") == true
+        val types = manager.primaryClipDescription?.filterMimeTypes("text/*") ?: return false
+        return types.any { it != ClipDescription.MIMETYPE_TEXT_URILIST && it != ClipDescription.MIMETYPE_TEXT_INTENT }
     }
 
     /**
