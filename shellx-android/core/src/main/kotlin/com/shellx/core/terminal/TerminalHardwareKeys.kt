@@ -1,5 +1,6 @@
 package com.shellx.core.terminal
 
+import com.shellx.core.text.utf8Size
 import com.shellx.link.core.TerminalKey
 import com.shellx.link.core.TerminalModifier
 
@@ -43,7 +44,7 @@ sealed interface TerminalHardwareAction {
      * latched ctrl applies, `"\n"` becomes `enter`.
      */
     data class Type(val text: String) : TerminalHardwareAction {
-        override fun toString(): String = "Type(<${text.length} chars>)"
+        override fun toString(): String = "Type(<${text.utf8Size} bytes>)"
     }
 
     /** Backspace through the model's typing: it edits the word being composed, or sends one backspace. */
