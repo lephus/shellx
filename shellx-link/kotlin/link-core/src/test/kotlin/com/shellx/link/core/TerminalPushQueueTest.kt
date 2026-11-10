@@ -436,8 +436,8 @@ class TerminalPushQueueTest {
     /**
      * Re-review B, out of scope 1: Opened and Ended weigh nothing, so while nobody collects, a host that streams
      * `terminal.view.ended` for terminals the session does not view must not grow the queue without bound. The viewed
-     * terminal's Ended is never dropped, and an Ended of a terminal not viewed still passes once taken ones make room
-     * (the page ignores it, PROTOCOL.md 11.1).
+     * terminal's Ended is never dropped, and each Ended of a terminal not viewed passes while few are queued (the host
+     * answers every input, resize or resync of a terminal not open with one, PROTOCOL.md 11.1).
      */
     @Test
     fun endedOfTerminalsNotViewedStayBoundedWithNoCollector() {
@@ -457,7 +457,7 @@ class TerminalPushQueueTest {
                 queue.offer(Ended("t-2", TerminalViewEndReason.NOT_OPEN))
                 queue.offer(Ended("t-2", TerminalViewEndReason.NOT_OPEN))
                 assertEquals(
-                    listOf<TerminalViewPush>(Ended("t-2", TerminalViewEndReason.NOT_OPEN)),
+                    List<TerminalViewPush>(2) { Ended("t-2", TerminalViewEndReason.NOT_OPEN) },
                     List(queue.queuedPushes) { queue.pushes.first() },
                 )
             }
