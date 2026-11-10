@@ -163,7 +163,7 @@ data class TerminalViewState(
  *   once, so a run() started in the same main-loop turn (a restarted effect) takes over. Then, if no newer run()
  *   started, the model stops being active: it cancels an open that has no answer yet, so the client announces no
  *   `Opened` for it that a later run would take as its own (re-review B N-1), and reconciles (the close is queued and
- *   still goes out).
+ *   still goes out). An open still queued then is never sent (review C m1).
  * - **A3 (state).** The observable part is [state]; `markedText` and `ctrlLatched` are copied out of the mutable
  *   `TerminalTyping` after every change. [screen] is the mutable `TerminalScreen`, replaced by R2 and changed in place
  *   by R7 (`screenRevision` says when).
@@ -527,6 +527,9 @@ class TerminalViewModel(
     private suspend fun deliver(message: Message) {
         when (message) {
             is Message.Open -> {
+                // A stopped page's open that was still queued (review C m1): its view is forgotten and its close queued.
+                // Sent now, its `Opened` would wait in the queue for the next run, which would take it as its own.
+                if (!running && view?.attempt != message.attempt) return
                 openSending(message.attempt)
                 val result = coroutineScope {
                     val call = async(start = CoroutineStart.UNDISPATCHED) {
