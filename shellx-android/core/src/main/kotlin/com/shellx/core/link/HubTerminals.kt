@@ -40,9 +40,13 @@ import kotlinx.coroutines.job
  * Per Mac, the newest collection takes the pushes; an older one waits, getting only states, and takes them again when
  * the newer one ends: a session views one terminal, and two collectors of one queue would split its frames. While no
  * collection runs, the pushes wait in the bounded queue for the next one (review B1 I-1): a page may send its open
- * before its collection starts, and the open's `Opened` and first snapshot must still reach it. What waits is harmless
- * to a page: it ignores other terminals and frames before its view's `Opened`, and the queue starts a view afresh at
- * each `Opened` and drops a terminal's queued frames at its next snapshot.
+ * before its collection starts, and the open's `Opened` and first snapshot must still reach it. What waits comes
+ * first at the next collection. A page ignores other terminals and frames before its view's `Opened`, and the queue
+ * starts a view afresh at each `Opened` and drops a terminal's queued frames at its next snapshot. But a leftover
+ * `Opened` of the terminal the page opens now (an open answered `ok` after the run that sent it stopped), with the
+ * frames that followed it, is taken as the new view's: the old screen shows until the new view's snapshot (re-review
+ * B N-1). A page avoids it by cancelling its unanswered open when it stops (TerminalViewModel's A2 cleanup): the
+ * client then announces no `Opened` for it.
  */
 internal class HubTerminals(private val hub: MachineHub) {
     private class Feed {
@@ -118,8 +122,9 @@ internal class HubTerminals(private val hub: MachineHub) {
     /** The hub stopped: every collection completes. */
     fun stop() {
         stopped = true
-        // A copy: a collection on an immediate dispatcher ends inside takeAway and leaves the list.
-        for (feed in feeds.values) {
+        // Copies: a collection on an immediate dispatcher ends inside takeAway and leaves the list; nothing reachable
+        // from it adds a feed today (deliver returns once stopped), but the map is not iterated live either way.
+        for (feed in feeds.values.toList()) {
             for (subscriber in feed.subscribers.toList()) subscriber.takeAway()
         }
         changed()

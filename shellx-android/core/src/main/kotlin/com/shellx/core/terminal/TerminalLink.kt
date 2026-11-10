@@ -46,8 +46,10 @@ interface TerminalLink {
      *   no suspension in the collector's code. Only the newest collection of a Mac takes its pushes; an older one gets
      *   only the states until the newer one ends, then takes them again where it stopped. Pushes made while nobody
      *   collects wait in the queue for the next collection, so an open sent before the collection starts keeps its
-     *   `Opened` and first snapshot; the leftovers of earlier views come first (other terminals, frames before the
-     *   view's `Opened`), which a page ignores.
+     *   `Opened` and first snapshot. The leftovers of earlier views come first: a page ignores other terminals and
+     *   frames before its view's `Opened`, but a leftover `Opened` of the terminal it opens now (an open answered `ok`
+     *   after the page stopped), with the frames after it, is taken as its own until its own snapshot arrives. So a
+     *   page that stops cancels its unanswered open (the client then announces no `Opened` for it).
      * - **States** are the newest the hub set, not each one in between; but a collection told Online for a session
      *   is always told a state that is not Online (Reconnecting, when the Mac is back already) before it is told Online
      *   for the next one, and Online before that session's first push.
