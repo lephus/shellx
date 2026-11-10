@@ -51,12 +51,19 @@ object TerminalClipboard {
         return manager.primaryClipDescription?.hasMimeType("text/*") == true
     }
 
-    /** The clipboard's text, or null when it holds none. */
+    /**
+     * The clipboard's text, or null when it holds none. An item's own text only (its styled text as plain text): a file
+     * on the clipboard (a content URI, even one that says `text/plain`) is never opened, so nothing is read from disk or
+     * from another app on the main thread, and an Intent is not text to paste. The iPhone pastes the pasteboard's
+     * string, which no file fills either.
+     */
     fun text(context: Context): String? {
         val manager = context.getSystemService(ClipboardManager::class.java) ?: return null
         val clip = manager.primaryClip ?: return null
-        // Text only: coerceToText would read a content URI's file.
         if (clip.itemCount == 0 || clip.description?.hasMimeType("text/*") != true) return null
-        return clip.getItemAt(0).coerceToText(context)?.toString()?.takeIf { it.isNotEmpty() }
+        val item = clip.getItemAt(0)
+        // coerceToText opens a URI and spells out an Intent; with neither it only turns styled text into plain text.
+        if (item.uri != null || item.intent != null) return item.text?.toString()?.takeIf { it.isNotEmpty() }
+        return item.coerceToText(context)?.toString()?.takeIf { it.isNotEmpty() }
     }
 }
