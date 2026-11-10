@@ -1,6 +1,6 @@
 # Hand-off: ShellX mobile programme (sign-in, phone terminal, Android)
 
-State on 2026-11-10 (afternoon, second machine `/Users/richard/Documents/helper/shellx`). The user writes Vietnamese, so reply in Vietnamese.
+State on 2026-11-10 (evening, second machine `/Users/richard/Documents/helper/shellx`). The user writes Vietnamese, so reply in Vietnamese.
 
 Plans and their order are in `docs/superpowers/plans/2026-11-07-shellx-mobile-contracts.md` §1:
 {1A, 2A, 3A, 3F} → {1B, 1C, 2B, 2C, 3B} → 3C → 3D → 3E → 3G → {1D, 3H}.
@@ -61,6 +61,13 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
   - **Deferred minors (3G):** a lagging consumer holds one exempt snapshot per view opened (≤ ~16 MiB worst case from a hostile host); a stale `Opened` leftover can show the previous view's screen for a moment; a11y scroll events not fired on scroll actions; small per-frame allocations in drawing; the 4 ms yield turn is uninjectable in tests; the upstream notes for the iPhone/Swift side are in §28 of the contracts draft.
 - Before the first live dogfood: run 3B's `RelayIntegrationTest` with `CMUX_RELAY_BIN` on a machine that has the binary.
 
+## Email + code sign-in through Resend: design written, waiting for the user (2026-11-10 evening)
+
+- User request (2026-11-10): "làm thêm cho tôi một option là login bằng cách nhập email và nhận mã OTP từ ứng dụng gửi qua mail bằng resend; nhập OTP xong là đăng nhập", then "Làm xong đẩy lên develop cho tôi".
+- Design: `docs/superpowers/specs/2026-11-10-shellx-email-code-sign-in-design.md` (Vietnamese; brainstorming recon and builder check done). **No code yet: the brainstorming gate holds until the user approves the design** ("cứ làm" = accept the defaults listed in its §11). After approval: superpowers:writing-plans (one plan per part), then subagent-driven development, each part on its own `feat/shellx-email-code-signin-<part>` branch from `develop`, reviewed, merged with `--no-ff` and pushed to `develop`; landing order relay → Android → iPhone → shellx-core + Mac → Windows. Contracts get a new section and this file gets the user's Resend steps at landing.
+- Shape (the spec is authoritative): the relay (`relay/`, TypeScript, Hono + better-sqlite3) gets `POST /v1/auth/email/code {email, locale?}` → 202 `{challenge_id, expires_in: 600, resend_in: 60, email}` and `POST /v1/auth/email/verify {challenge_id, code, device}` → 200 `{user_id, device_id, token, email}` (401 `invalid_code`, 410 `code_expired`, 409 `switch_from_signed_in_device`); `DELETE /v1/account` also accepts `{challenge_id, code}`. Identity provider `email` (subject = normalized email), linked by the verified email into an existing Google-created account; 6-digit code, 10 min, 5 attempts, only hashes stored (`email_codes` table, migration `0011_email_sign_in.sql`, which also widens the identities/tokens CHECKs and turns the four `!= 'apple'` sites into `IN ('google','test')`); limiters 10/min per IP, 3/min and 10/hour per email. `EmailGateway` + `ResendClient` (`POST https://api.resend.com/emails`, Idempotency-Key, 10 s timeout) behind `RESEND_API_KEY` + `EMAIL_FROM`: both set → on, both missing → 503 `email_sign_in_disabled`, one → ConfigError at start. Clients show "Continue with email" unconditionally and map 404/503 to `providerUnavailable`; Android `StoredSession` gains `authMethod` (absent → google); new strings `signin.email.*`, `signin.error.{invalidEmail,disposableEmail,invalidCode,codeExpired,emailSendFailed}`, `settings.account.method.email`; shellx-core RPCs `auth.email.begin` / `auth.email.finish` for Mac and Windows; delete-by-code only on the phones (desktop keeps the privacy link); `web/src/pages/privacy.md` loses "We do not send verification … emails" (web lands on `main` only on the user's push).
+- User's part: verify the sender domain in Resend (DNS) and set `RESEND_API_KEY` and `EMAIL_FROM` (`ShellX <sign-in@shellx.pro>` proposed) in the VPS `~/phu/shellx/.env` with a `deploy/docker-compose.yml` passthrough, as part of the 1D deploy. A real send test from a local relay needs the key at `/Users/richard/Downloads/key/resend` and the words "thử gửi"; never a key in chat. No Resend key exists on this Mac today.
+
 ## Waiting on the user
 
 1. **A Google OAuth client of type iOS** for bundle `com.shellx.prod` (Google Cloud project `shellxpro`). Decision: no dev client; "làm thẳng Prod".
@@ -72,10 +79,12 @@ Specs: `docs/superpowers/specs/2026-11-07-shellx-{google-sign-in,mobile-terminal
 5. **Android phone checks for 3D, 3E and 3G on `develop`** (lists above and in `.superpowers/sdd/2026-11-07-shellx-android-3g-terminal/phone-check-3g.md`). The three plans landed 2026-11-10 on the user's directive before the check could run: with the cable used, the Pixel 3 never appeared on the Mac's USB bus (`ioreg -p IOUSB` listed only hubs, the Type-C AV adapter, a keyboard and a receiver) — try the Pixel's own data cable straight into the Mac, or Wireless debugging (Android 12: pair with `adb pair ip:port code`, then `adb connect ip:port`). Install from the main checkout with `dev.sh device --serial 93BX1XMU7`. The vsmart Live (serial in `~/.config/shellx/android-serial`) is not on this Mac. Anything off becomes a follow-up branch; nothing is reverted.
 6. **HEIC on Android (3E):** default ruling is to convert HEIC/HEIF picks to JPEG like the iPhone; the user may say otherwise.
 7. **iPhone follow-up:** `SpeechRunSlot.swift:78-90` has the quick-tap gap Android fixed in 3C (contracts §25).
+8. **Email + code sign-in: approve the design** (section above; spec §11). Three decisions: (1) all four apps, or phones first (default: all four); (2) a code sent to foo@gmail.com signs into the account created with Google foo@gmail.com (default: yes; alternative: separate account + QR link through the Mac, like Apple, which adds an Android "Connect to your Mac" screen); (3) sender `ShellX <sign-in@shellx.pro>`, domain verified in Resend, `RESEND_API_KEY` / `EMAIL_FROM` on the VPS. "cứ làm" = the defaults.
 
 ## Next after these
 
-- {1D, 3H} after 3G. Not started.
+- {1D, 3H} after 3G. Not started. 1D now also carries the Resend variables.
+- Email + code sign-in (section above) as soon as the design is approved: plans, then relay → Android → iPhone → Mac → Windows, each pushed to `develop` after review.
 
 ## Known noise
 
