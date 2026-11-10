@@ -242,6 +242,24 @@ class CompactHeightTest {
     }
 
     /**
+     * With "Remove animations" on, the keyboard's inset lands whole in one frame, before the bars above step aside: the
+     * demo's terminal is squeezed to nothing for that frame, and Android takes the focus off a View laid out with no
+     * size (re-review A m1, seen on the API 36 emulator). The terminal keeps the keyboard, and gets its grid once the
+     * bars stepped aside.
+     */
+    @Test
+    fun aKeyboardThatLandsInOneFrameKeepsTheDemosTerminal() {
+        showWorkspaceTerminal(demo = true)
+        until { tagged("demo.banner") && tagged("terminal.surface") && rig.mac.terminalViewOpens.isNotEmpty() }
+        compose.onNodeWithTag("terminal.surface").performClick()
+        until { tagged("terminal.key.escape") }
+        imeInset(GBOARD)
+        until { !tagged("workspace.title") && !tagged("demo.banner") }
+        assertTrue(terminalSurface().hasFocus())
+        assertUsableGrid()
+    }
+
+    /**
      * A hardware keyboard (or a floating one that takes no room) shows no soft keyboard: the terminal keeps the focus and
      * the key bar, and the top bar (back, chips, ＋, ⋮) stays, since nothing takes its room (review D2 I-1).
      */
