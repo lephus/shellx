@@ -131,6 +131,17 @@ background, foreground and monochrome layers) are drawn from `design/shellx-logo
 768-unit viewport with the logo's 512 units offset by 128, so the glyphs stay inside the launcher's safe
 circle.
 
+## Third-party assets
+
+`app/src/main/res/drawable-{mdpi,xhdpi,xxhdpi,xxxhdpi}/ic_google_g.png` is Google's official "G", cropped unchanged
+(20 × 20 dp) from the Light, no-text, Square Android + Web icons of Google's sign-in bundle
+(https://developers.google.com/static/identity/images/signin-assets.zip, SHA-256
+`ba884069e12093b06bcfd776915081254a7c95094b80d50be2c5dc6bac1c1da1`, linked from
+https://developers.google.com/identity/branding-guidelines, "Download Pre-Approved Brand Icons").
+`app/src/main/assets/fonts/GoogleSans.ttf` is Google Sans, the static Medium face from fonts.google.com, under the
+SIL OFL 1.1 (`GoogleSans-OFL.txt`, shipped next to it). Both serve only the Continue with Google button, which
+follows that page. Never replace them with a Google logo from `ios/`, `Packages/` or `Sources/`, or with a drawn one.
+
 ## Render tests
 
 Render tests run on the JVM: Robolectric's native graphics with Roborazzi's capture (no Gradle plugin, record

@@ -25,9 +25,17 @@ android {
         targetSdk = libs.versions.androidTargetSdk.get().toInt()
         versionCode = versionProperty("VERSION_CODE").toInt()
         versionName = versionProperty("VERSION_NAME")
+        // The relay override (3C's ShellXEndpoints.of, ledger A-6): empty in release builds.
+        buildConfigField("String", "SHELLX_API_BASE", "\"\"")
     }
 
     buildTypes {
+        debug {
+            // `-PshellxApiBase=http://127.0.0.1:<port>` points a debug build at a relay on this Mac (adb reverse).
+            val apiBase = providers.gradleProperty("shellxApiBase").getOrElse("")
+            require(!apiBase.contains('"') && !apiBase.contains('\\')) { "shellxApiBase must not contain quotes or backslashes" }
+            buildConfigField("String", "SHELLX_API_BASE", "\"$apiBase\"")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -81,6 +89,22 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.zxing.core)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)

@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="action_open_agent">mở cuộc trò chuyện với agent</string>
+    <string name="action_open_your_macs">mở Máy của bạn</string>
     <string name="first_mac_step2">Quét mã QR hiện ra bằng điện thoại này.</string>
     <string name="first_mac_subtitle">Xem và trả lời Claude Code trên Mac ngay từ điện thoại này.</string>
     <string name="machine_state_revoked">Mac này đã gỡ điện thoại này</string>
     <string name="machines_unpair_message">Điện thoại này sẽ không còn nhận việc chờ từ Mac này. Muốn dùng lại thì ghép cặp lại.</string>
+    <string name="nav_back">Quay lại</string>
     <string name="pairing_error_needs_update">Mã này từ bản ShellX mới hơn. Hãy cập nhật ShellX trên điện thoại này.</string>
     <string name="pairing_instructions">Trên Mac, mở ShellX, bấm chuột phải vào “Mac này” rồi chọn Ghép cặp điện thoại…</string>
     <string name="pairing_waiting_detail">Giữ ShellX mở trên điện thoại này cho tới khi Mac trả lời.</string>
+    <string name="row_actions">hiện tác vụ</string>
     <string name="settings_account_delete_message">Thao tác này xoá vĩnh viễn tài khoản ShellX của bạn. Mọi Mac và điện thoại đang đăng nhập bị đăng xuất, các ghép cặp và phiên chia sẻ kết thúc, lịch sử trên điện thoại này bị xoá. Để xác nhận, bạn đăng nhập lại một lần.</string>
     <string name="settings_account_sign_out_confirm">Điện thoại này sẽ bị gỡ khỏi mọi Mac đã ghép cặp, và lịch sử trên điện thoại sẽ bị xoá.</string>
     <string name="settings_appearance_system">Theo máy</string>

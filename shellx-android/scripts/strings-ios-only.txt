@@ -14,3 +14,8 @@ settings.account.switchToGoogle
 settings.account.switchToGoogle.detail
 switchToGoogle.banner.later
 switchToGoogle.banner.switch
+
+# Plan 1C: Sign in with Apple, and the password-session switch that Android never has (the relay's 409 answers to
+# linking an Apple ID or switching a password session to Google; the other 1C keys are listed above).
+signin.error.emailInUse
+signin.error.identityInUse

@@ -18,14 +18,26 @@ org.jetbrains.kotlinx:*      ship  Apache-2.0
 com.almworks.sqlite4java:sqlite4java                      test  Apache-2.0     # The Apache Software License, Version 2.0
 com.dropbox.differ:differ                                 test  Apache-2.0     # The Apache Software License, Version 2.0
 com.dropbox.differ:differ-jvm                             test  Apache-2.0     # The Apache Software License, Version 2.0
-com.google.auto.value:auto-value-annotations              test  Apache-2.0     # Apache 2.0 (parent auto-value-parent)
-com.google.code.findbugs:jsr305                           test  Apache-2.0     # The Apache Software License, Version 2.0
-com.google.errorprone:error_prone_annotations             test  Apache-2.0     # Apache 2.0
-com.google.guava:failureaccess                            test  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
-com.google.guava:guava                                    test  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
+com.google.android.gms:play-services-auth                 ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-auth-api-phone       ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-auth-base            ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-auth-blockstore      ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-base                 ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-basement             ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-fido                 ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-identity-credentials ship  Google-SDK     # Android Software Development Kit License
+com.google.android.gms:play-services-tasks                ship  Google-SDK     # Android Software Development Kit License
+com.google.android.libraries.identity.googleid:googleid   ship  Google-SDK     # Android Software Development Kit License
+com.google.auto.value:auto-value-annotations              ship  Apache-2.0     # Apache 2.0 (parent auto-value-parent)
+com.google.code.findbugs:jsr305                           ship  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.dagger:dagger                                  ship  Apache-2.0     # Apache 2.0
+com.google.errorprone:error_prone_annotations             ship  Apache-2.0     # Apache 2.0
+com.google.guava:failureaccess                            ship  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
+com.google.guava:guava                                    ship  Apache-2.0     # Apache License, Version 2.0 (parent guava-parent)
 com.google.guava:listenablefuture                         ship  Apache-2.0     # The Apache Software License, Version 2.0 (parent guava-parent)
-com.google.j2objc:j2objc-annotations                      test  Apache-2.0     # Apache License, Version 2.0
+com.google.j2objc:j2objc-annotations                      ship  Apache-2.0     # Apache License, Version 2.0
 com.google.testparameterinjector:test-parameter-injector  test  Apache-2.0     # The Apache Software License, Version 2.0
+com.google.zxing:core                                     ship  Apache-2.0     # The Apache Software License, Version 2.0 (parent zxing-parent)
 com.ibm.icu:icu4j                                         test  ICU            # Unicode-3.0
 com.squareup.okhttp3:mockwebserver3                       test  Apache-2.0     # The Apache Software License, Version 2.0
 com.squareup.okhttp3:okhttp                               ship  Apache-2.0     # The Apache Software License, Version 2.0
@@ -40,11 +52,13 @@ io.github.takahirom.roborazzi:roborazzi-core              test  Apache-2.0     #
 io.github.takahirom.roborazzi:roborazzi-core-android      test  Apache-2.0     # Apache-2.0
 io.github.takahirom.roborazzi:roborazzi-painter           test  Apache-2.0     # Apache-2.0
 io.github.takahirom.roborazzi:roborazzi-painter-jvm       test  Apache-2.0     # Apache-2.0
+jakarta.inject:jakarta.inject-api                         ship  Apache-2.0     # The Apache Software License, Version 2.0
 javax.annotation:javax.annotation-api                     test  CDDL-1.1       # CDDL + GPLv2 with classpath exception (CDDL elected)
-javax.inject:javax.inject                                 test  Apache-2.0     # The Apache Software License, Version 2.0
+javax.inject:javax.inject                                 ship  Apache-2.0     # The Apache Software License, Version 2.0
 junit:junit                                               test  EPL-1.0        # Eclipse Public License 1.0
 org.bouncycastle:bc-jdk18on-bom                           test  Bouncy-Castle  # Bouncy Castle Licence
 org.bouncycastle:bcprov-jdk18on                           ship  Bouncy-Castle  # Bouncy Castle Licence
+org.checkerframework:checker-qual                         ship  MIT            # The MIT License
 org.conscrypt:conscrypt-openjdk-uber                      test  Apache-2.0     # Apache 2
 org.hamcrest:hamcrest-core                                test  BSD-3-Clause   # New BSD License (parent hamcrest-parent)
 org.hamcrest:hamcrest-integration                         test  BSD-3-Clause   # New BSD License (parent hamcrest-parent)

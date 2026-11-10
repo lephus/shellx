@@ -1,4 +1,5 @@
-"""Tests for the install guard of scripts/dev.sh (`dev.sh check-apk <phone|emulator> <apk>`).
+"""Tests for the install guard of scripts/dev.sh (`dev.sh check-apk <phone|emulator> <apk>`) and the release APK's
+permission check (`dev.sh check-release-permissions <apk>`, run by `dev.sh build-release`).
 
 Run: python3 -m unittest discover -s shellx-android/scripts/tests -v
 """
@@ -16,7 +17,9 @@ PROD = "package: name='com.shellx.prod' versionCode='1' versionName='0.1.0'\napp
 DEBUGGABLE = "application-debuggable\n"
 
 
-class CheckApkTest(unittest.TestCase):
+class FakeSdkTest(unittest.TestCase):
+    """An SDK whose aapt2 prints the "APK" as its badging."""
+
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -30,6 +33,8 @@ class CheckApkTest(unittest.TestCase):
         self.sdk = root / "sdk"
         self.apk = root / "app.apk"
 
+
+class CheckApkTest(FakeSdkTest):
     def check(self, target: str, badging: str) -> subprocess.CompletedProcess:
         self.apk.write_text(badging)
         env = dict(os.environ, ANDROID_HOME=str(self.sdk))
@@ -58,6 +63,50 @@ class CheckApkTest(unittest.TestCase):
 
     def test_unknown_target_is_a_usage_error(self) -> None:
         self.assertEqual(self.check("tablet", PROD).returncode, 2)
+
+
+RELEASE_PERMISSIONS = (
+    "uses-permission: name='android.permission.INTERNET'\n"
+    "uses-permission: name='android.permission.ACCESS_NETWORK_STATE'\n"
+    "uses-permission: name='android.permission.CAMERA'\n"
+    "uses-feature-not-required: name='android.hardware.camera'\n"
+)
+
+
+class CheckReleasePermissionsTest(FakeSdkTest):
+    """The release APK requests exactly the shell's permissions (3D Task 1; review A I-3)."""
+
+    def release(self, badging: str) -> subprocess.CompletedProcess:
+        self.apk.write_text(badging)
+        env = dict(os.environ, ANDROID_HOME=str(self.sdk))
+        return subprocess.run(["bash", str(DEV_SH), "check-release-permissions", str(self.apk)],
+                              env=env, capture_output=True, text=True)
+
+    def assertRefused(self, badging: str, named: str) -> None:
+        r = self.release(badging)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn(named, r.stderr)
+
+    def test_accepts_the_shells_permissions(self) -> None:
+        r = self.release(PROD + RELEASE_PERMISSIONS)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_refuses_biometric_and_fingerprint(self) -> None:
+        # androidx.credentials pulls androidx.biometric, whose manifest asks for both.
+        for name in ("USE_BIOMETRIC", "USE_FINGERPRINT"):
+            self.assertRefused(PROD + RELEASE_PERMISSIONS + f"uses-permission: name='android.permission.{name}'\n", name)
+
+    def test_refuses_storage_and_media(self) -> None:
+        self.assertRefused(PROD + RELEASE_PERMISSIONS + "uses-permission: name='android.permission.READ_MEDIA_IMAGES'\n",
+                           "READ_MEDIA")
+
+    def test_refuses_a_missing_permission(self) -> None:
+        self.assertRefused(PROD + RELEASE_PERMISSIONS.replace("android.permission.CAMERA'", "android.permission.X'"),
+                           "android.permission.CAMERA")
+
+    def test_refuses_a_required_camera(self) -> None:
+        self.assertRefused(PROD + RELEASE_PERMISSIONS.replace("uses-feature-not-required", "uses-feature"),
+                           "uses-feature-not-required")
 
 
 if __name__ == "__main__":
