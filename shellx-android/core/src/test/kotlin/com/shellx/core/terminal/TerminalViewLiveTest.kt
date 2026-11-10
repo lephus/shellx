@@ -212,11 +212,11 @@ class TerminalViewLiveTest {
     )
 
     /**
-     * Final review m8 (b): a run stopped and started in one turn (a rotation, the background and back) keeps the screen
-     * meanwhile, takes every push after it, and asks for one resync at most: nothing buffers pushes before the model's
-     * assembler, where a cancel would lose them.
+     * Final review m8 (b), re-review B m-1: a run stopped and started in one turn (a rotation, the background and back)
+     * keeps the screen meanwhile, takes every push sent before, during and after it, and asks for no resync: nothing
+     * buffers pushes before the model's assembler, where a cancel would lose them.
      */
-    @Test fun aRestartedRunKeepsTheScreenAndResyncsAtMostOnce() { runTest {
+    @Test fun aRestartedRunKeepsTheScreenAndAsksForNoResync() { runTest {
         val mac = makeMac()
         val rig = hubRig(listOf(mac), start = true)
         assertTrue(rig.online(sessions = 0))
@@ -224,16 +224,16 @@ class TerminalViewLiveTest {
         var run = backgroundScope.launch { model.run() }
         model.setPhoneGrid(30, 6); model.show("t1")
         assertTrue(eventually { model.phase == TerminalViewPhase.Live && model.screen.screenText().firstOrNull() == "$" })
-        repeat(5) { mac.emitTerminalFrame("t1", row0("a$it")) }
-        assertTrue(eventually { model.screen.screenText().firstOrNull() == "a4" }, "${model.screen.screenText()}")
+        repeat(3) { mac.emitTerminalFrame("t1", row0("a$it")) }
         run.cancel()
+        repeat(2) { mac.emitTerminalFrame("t1", row0("b$it")) }
         run = backgroundScope.launch { model.run() }
-        assertEquals("a4", model.screen.screenText().first(), "the screen stays")
+        assertTrue(model.screen.screenText().first() in setOf("$", "a0", "a1", "a2", "b0", "b1"), "the screen stays")
         assertTrue(eventually { model.phase == TerminalViewPhase.Live })
         mac.emitTerminalFrame("t1", row0("after"))
         assertTrue(eventually { model.screen.screenText().firstOrNull() == "after" }, "${model.screen.screenText()}")
         delay(50.milliseconds)
-        assertTrue(mac.terminalViewSnapshotRequests("t1") <= 1, "${mac.terminalViewSnapshotRequests("t1")} resyncs")
+        assertEquals(0, mac.terminalViewSnapshotRequests("t1"), "resyncs")
         run.cancel()
     } }
 }
