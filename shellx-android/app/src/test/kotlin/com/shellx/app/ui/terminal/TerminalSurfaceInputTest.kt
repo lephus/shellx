@@ -250,6 +250,23 @@ class TerminalSurfaceInputTest {
         assertEquals("nothing was composed, so no restart", 0, ime.restarts)
     }
 
+    /**
+     * A key bar key, then the keyboard's Backspace key event before the surface rendered: the word had already ended, so
+     * the Backspace shortens nothing of it (the Mac gets the backspace all the same).
+     */
+    @Test
+    fun aKeyEventAfterInputPastTheKeyboardFindsTheWordEnded() {
+        val c = connection()
+        c.commitText("t", 1)
+        c.commitText("i", 1)
+        TerminalPane.perform(TerminalKeyBarItem.Key(TerminalBarKey.LEFT), model) {}
+        c.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+        c.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+        assertEquals("", c.sees())
+        val expected = listOf(listOf(Text("t")), listOf(Text("i")), listOf(Key(TerminalKey.LEFT)), listOf(Key(TerminalKey.BACKSPACE)))
+        assertTrue("${inputs()}", eventually { inputs() == expected })
+    }
+
     /** A hardware letter joins the word the keyboard sees, as a real editor's text would; Backspace shortens it; a chord or a named key ends it. */
     @Test
     fun hardwareKeysJoinOrEndTheWordTheKeyboardSees() {
