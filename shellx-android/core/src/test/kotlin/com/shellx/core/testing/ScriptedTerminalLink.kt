@@ -32,6 +32,12 @@ class ScriptedTerminalLink : TerminalLink {
     val openAnswers: MutableList<TerminalOpenResult> = mutableListOf()
     var openGate: Gate? = null
 
+    /** Runs inside each open, after it is recorded and before its answer: the Mac pushing at once (review C I-1). */
+    var onOpen: ((terminalId: String) -> Unit)? = null
+
+    /** Runs inside each input call, after it is recorded: the Mac echoing at once (review C I-1). */
+    var onInput: ((terminalId: String, units: List<TerminalInputUnit>) -> Unit)? = null
+
     /** Every recordLatency call, in order. */
     val samples: MutableList<Pair<LatencyMetric, Duration>> = mutableListOf()
     private val subscribers = mutableListOf<Channel<TerminalHubEvent>>()
@@ -69,6 +75,7 @@ class ScriptedTerminalLink : TerminalLink {
 
     override suspend fun openTerminalView(machineId: String, terminalId: String, cols: Int, rows: Int): TerminalOpenResult {
         calls += Call.Open(terminalId, cols, rows)
+        onOpen?.invoke(terminalId)
         openGate?.wait()
         return openAnswers.removeFirstOrNull() ?: TerminalOpenResult.Outcome(TerminalViewOpenOutcome.OK)
     }
@@ -79,6 +86,7 @@ class ScriptedTerminalLink : TerminalLink {
 
     override suspend fun sendTerminalInput(machineId: String, terminalId: String, units: List<TerminalInputUnit>) {
         calls += Call.Input(terminalId, units)
+        onInput?.invoke(terminalId, units)
     }
 
     override suspend fun resizeTerminalView(machineId: String, terminalId: String, cols: Int, rows: Int) {

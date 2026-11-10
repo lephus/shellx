@@ -26,10 +26,12 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -497,6 +499,44 @@ class TerminalViewModelTest {
         delay(50.milliseconds)
         assertEquals(TerminalViewPhase.Connecting, model.phase, "the hub still calls the Mac online")
         assertFalse(model.acceptsInput, "after a NotSent there is no view to type into")
+    } }
+
+    // Review C (fix round 1)
+
+    /** A scope whose coroutines run inline, as on the app's `Main.immediate`: the outbox delivers inside send(). */
+    private fun TestScope.immediate() = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+
+    /** Review C I-1: an open the link answers inside its own send keeps its outcome; reconcile() writes nothing after. */
+    @Test fun anOpenAnsweredInsideItsSendKeepsItsOutcome() { runTest {
+        val link = ScriptedTerminalLink(); link.openAnswers += outcome(TerminalViewOpenOutcome.NOT_FOUND)
+        val model = TerminalViewModel("m1", link, immediate(), sleep = ManualSleeper().sleep, now = ManualClock().monotonic)
+        backgroundScope.launch { model.run() }
+        eventually { link.subscriberCount == 1 }
+        model.setPhoneGrid(50, 20); model.show("t1")
+        assertEquals(TerminalViewPhase.Unavailable(TerminalUnavailableReason.GONE), model.phase)
+        delay(50.milliseconds)
+        assertEquals(TerminalViewPhase.Unavailable(TerminalUnavailableReason.GONE), model.phase)
+        assertEquals(listOf("t1"), link.opens)
+    } }
+
+    /** Review C I-1: a first screen that arrives inside the open's send stays live, and is measured once. */
+    @Test fun aScreenShownInsideTheOpensSendStaysLive() { runTest {
+        val link = ScriptedTerminalLink(); val clock = ManualClock(); val scope = immediate()
+        link.onOpen = { id ->
+            emit(link, Opened(id))
+            emit(link, Frame(id, snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
+        }
+        val model = TerminalViewModel("m1", link, scope, sleep = ManualSleeper().sleep, now = clock.monotonic)
+        scope.launch { model.run() }
+        eventually { link.subscriberCount == 1 }
+        model.setPhoneGrid(50, 20); model.show("t1")
+        assertEquals(TerminalViewPhase.Live, model.phase); assertEquals(1, model.snapshots)
+        link.onOpen = null
+        clock.advance(1.seconds)
+        emit(link, Frame("t1", snapshotPart(2, cols = 50, rows = 20, text = listOf("$ ls"))))
+        assertTrue(eventually { model.snapshots == 2 })
+        assertEquals(TerminalViewPhase.Live, model.phase)
+        assertEquals(1, link.firstScreens().size, "measured once, at the first snapshot")
     } }
 
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)

@@ -25,10 +25,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -235,6 +237,26 @@ class TerminalViewModelInputTest {
         model.paste("a".repeat(262_144) + "\u001b")
         assertTrue(eventually { link.inputs.size == 16 })
         assertTrue(link.inputs.all { it == listOf(Paste("a".repeat(16_384))) }); assertEquals(1, model.pasteTooLarge)
+    } }
+
+    /**
+     * Review C I-1: on an immediate dispatcher the outbox delivers inside send(), and the Mac's echo can be applied
+     * before send() returns. The echo clock is already running then: the echo is measured, and the next frame is not.
+     */
+    @Test fun anEchoInsideItsInputsSendIsMeasured() { runTest {
+        val link = ScriptedTerminalLink()
+        val scope = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+        val model = TerminalViewModel("m1", link, scope, sleep = ManualSleeper().sleep, now = ManualClock().monotonic)
+        scope.launch { model.run() }
+        live(model, link)
+        link.onInput = { id, _ -> emit(link, Frame(id, deltaPart(2, cols = 50, rows = 20, replacing = mapOf(0 to "$ a")))) }
+        model.insertText("a")
+        assertEquals(1, link.echoes())
+        assertEquals("$ a", model.screen.screenText().first())
+        link.onInput = null
+        emit(link, Frame("t1", deltaPart(3, cols = 50, rows = 20, replacing = mapOf(1 to "x"))))
+        assertTrue(eventually { model.screen.screenText().getOrNull(1) == "x" })
+        assertEquals(1, link.echoes(), "the next frame is no echo")
     } }
 
     /** Review B2 I-2: text a key event types commits the word in progress first, in the same message. */
