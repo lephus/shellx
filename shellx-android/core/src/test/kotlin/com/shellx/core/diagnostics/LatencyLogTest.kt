@@ -23,6 +23,25 @@ class LatencyLogTest {
         assertNull(log.summary(LatencyMetric.PENDING_ARRIVAL))
     }
 
+    /**
+     * Final review m3: a release build writes no line per terminal frame, key echo or first screen (a flood writes
+     * hundreds a second); every sample still counts. Other metrics are written as before.
+     */
+    @Test fun terminalMetricLinesAreLeftOutWhenAsked() {
+        val lines = mutableListOf<String>()
+        val log = LatencyLog(logsTerminalMetrics = false) { lines += it }
+        repeat(1_000) { log.record(LatencyMetric.TERMINAL_FRAME_APPLY, 2.milliseconds) }
+        log.record(LatencyMetric.TERMINAL_FIRST_SCREEN, 300.milliseconds)
+        log.record(LatencyMetric.TERMINAL_KEY_ECHO, 40.milliseconds)
+        log.record(LatencyMetric.REPLY_ROUND_TRIP, 90.milliseconds)
+        assertEquals(listOf("replyRoundTrip 90 ms"), lines)
+        assertEquals(200, log.summary(LatencyMetric.TERMINAL_FRAME_APPLY)?.count)
+        assertEquals(1, log.summary(LatencyMetric.TERMINAL_KEY_ECHO)?.count)
+        val debug = mutableListOf<String>()
+        LatencyLog { debug += it }.record(LatencyMetric.TERMINAL_FRAME_APPLY, 2.milliseconds)
+        assertEquals(listOf("terminalFrameApply 2 ms"), debug)
+    }
+
     @Test fun negativeDurationRecordedAsZero() {
         val lines = mutableListOf<String>()
         val log = LatencyLog { lines += it }
