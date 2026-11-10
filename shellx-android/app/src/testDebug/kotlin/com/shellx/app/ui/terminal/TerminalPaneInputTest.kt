@@ -4,6 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.View
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
@@ -399,6 +402,66 @@ class TerminalPaneInputTest {
         assertEquals(View.IMPORTANT_FOR_CONTENT_CAPTURE_NO, surface.importantForContentCapture)
         assertEquals(View.IMPORTANT_FOR_AUTOFILL_NO, surface.importantForAutofill)
         assertTrue(surface.isAccessibilityDataSensitive)
+    }
+
+    /**
+     * The soft keyboard as the system tells the window: [height] dp of room, [shown] (a floating keyboard is shown and
+     * takes no room).
+     */
+    private fun keyboard(height: Int, shown: Boolean = height > 0) {
+        compose.runOnIdle {
+            val root = compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+            val px = (height * root.resources.displayMetrics.density).toInt()
+            val insets = WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, px))
+                .setVisible(WindowInsetsCompat.Type.ime(), shown)
+                .build()
+            ViewCompat.dispatchApplyWindowInsets(root, insets)
+        }
+        idle(50)
+    }
+
+    /** The keyboard going down (system Back, its own key) takes the focus and the key bar with it, as on the iPhone. */
+    @Test
+    fun theKeyboardGoingDownGivesUpTheFocus() {
+        livePane()
+        focus()
+        keyboard(300)
+        assertTrue(surface().hasFocus())
+        keyboard(0)
+        until { !surface().hasFocus() && !tagged("terminal.key.escape") }
+    }
+
+    /** A keyboard turned floating while typing is still shown though it takes no room: the focus stays (review D1 M5). */
+    @Test
+    fun aFloatingKeyboardKeepsTheFocus() {
+        livePane()
+        focus()
+        keyboard(300)
+        keyboard(0, shown = true)
+        idle(300)
+        assertTrue(surface().hasFocus())
+        assertTrue(tagged("terminal.key.escape"))
+    }
+
+    /**
+     * The app going to the background hides the keyboard after the window lost the focus: the terminal keeps its focus
+     * for the return (final review m4; the iPhone keeps its first responder through a resume).
+     */
+    @Test
+    fun theKeyboardHiddenWhileTheWindowIsAwayKeepsTheFocus() {
+        livePane()
+        focus()
+        keyboard(300)
+        compose.runOnIdle { compose.activity.window.decorView.dispatchWindowFocusChanged(false) }
+        idle(50)
+        keyboard(0)
+        idle(300)
+        assertTrue(surface().hasFocus())
+        compose.runOnIdle { compose.activity.window.decorView.dispatchWindowFocusChanged(true) }
+        idle(300)
+        assertTrue(surface().hasFocus())
+        assertTrue(tagged("terminal.key.escape"))
     }
 
     // TerminalPaneTests.swift, re-expressed for Android (ruling 11)
