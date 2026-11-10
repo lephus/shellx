@@ -44,6 +44,8 @@ class DemoEnvironment(
     approvalDelay: Duration = 2.seconds,
     private val runsScript: Boolean = true,
     private val sleep: suspend (Duration) -> Unit = { delay(it) },
+    /** The demo's own latencies (the app passes one that logs terminal metrics in debug builds only). */
+    val latency: LatencyLog = LatencyLog(),
 ) {
     val vault: AccountVault = AccountVault(DemoSecretStore(), io)
     val settings: KeyValueStore = MemoryKeyValueStore()
@@ -51,7 +53,6 @@ class DemoEnvironment(
     val second: FakeMac = FakeMac(SECOND_NAME, scope, id = "demo-2", nowMs = clock::nowMs)
     val relay: DemoRelay = DemoRelay(listOf(first.machine), setOf(second.machine.machineId), approvalDelay, sleep)
     val history: ConversationStore = ConversationStore(historyDirectory, io, clock)
-    val latency: LatencyLog = LatencyLog()
     private val connector = FakeMacFleet(listOf(first, second)) { vault.phoneKey() }
     val coordinator: AppCoordinator = AppCoordinator(
         vault, relay, UnavailableIdentityProvider(), DEVICE_NAME, listOf(history), settings, scope,

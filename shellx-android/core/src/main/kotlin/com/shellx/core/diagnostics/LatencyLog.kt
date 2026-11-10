@@ -38,9 +38,14 @@ data class LatencySummary(val count: Int, val p50: Duration, val p95: Duration)
 
 /**
  * Keeps the last [WINDOW] samples of each metric and logs each one as `"<wire> <ms> ms"` through [sink]: the metric
- * name and milliseconds only, never content or identifiers. Thread-safe.
+ * name and milliseconds only, never content or identifiers. The terminal's metrics, a line per frame, key echo or
+ * first screen, are logged only while [logsTerminalMetrics] (debug builds: the capture of plan 3G Task 15 reads them;
+ * a release build would write hundreds of lines a second in a flood); their samples always count. Thread-safe.
  */
-class LatencyLog(private val sink: (String) -> Unit = CoreLog::log) {
+class LatencyLog(
+    private val logsTerminalMetrics: Boolean = true,
+    private val sink: (String) -> Unit = CoreLog::log,
+) {
     private val lock = Any()
     private val samples = HashMap<LatencyMetric, ArrayDeque<Duration>>()
 
@@ -52,7 +57,7 @@ class LatencyLog(private val sink: (String) -> Unit = CoreLog::log) {
             list.addLast(value)
             while (list.size > WINDOW) list.removeFirst()
         }
-        sink("${metric.wire} ${value.inWholeMilliseconds} ms")
+        if (logsTerminalMetrics || metric !in TERMINAL) sink("${metric.wire} ${value.inWholeMilliseconds} ms")
     }
 
     /** Count, median and 95th percentile (nearest rank) of the last [WINDOW] samples; null when none. */
@@ -64,6 +69,10 @@ class LatencyLog(private val sink: (String) -> Unit = CoreLog::log) {
 
     companion object {
         const val WINDOW = 200
+
+        private val TERMINAL = setOf(
+            LatencyMetric.TERMINAL_FIRST_SCREEN, LatencyMetric.TERMINAL_KEY_ECHO, LatencyMetric.TERMINAL_FRAME_APPLY,
+        )
 
         private fun percentile(fraction: Double, sorted: List<Duration>): Duration {
             val rank = ceil(fraction * sorted.size).toInt()
