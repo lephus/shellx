@@ -36,6 +36,15 @@ class TerminalHardwareKeysTest {
         assertEquals(send(TerminalKey.letter('a'), TerminalModifier.CTRL), a(45, 'a', mods = ctrl))           // KEYCODE_Q on AZERTY
         assertEquals(System, a(8, '1', mods = ctrl))                                                           // KEYCODE_1
     }
+    /** Review B2 I-1 (iPhone parity): on a Russian layout Ctrl+С is ctrl-c, as the iPhone maps the physical key. */
+    @Test fun ctrlOnANonLatinLayoutUsesTheKeysLatinLetter() {
+        val ctrlShift = TerminalHardwareModifiers(ctrl = true, shift = true)
+        assertEquals(send(TerminalKey.letter('c'), TerminalModifier.CTRL), a(31, 'с', mods = ctrl))          // KEYCODE_C
+        assertEquals(send(TerminalKey.letter('a'), TerminalModifier.CTRL, TerminalModifier.SHIFT), a(29, 'Ф', mods = ctrlShift))
+        assertEquals(TerminalHardwareAction.Paste, a(50, 'М', mods = ctrlShift))                               // KEYCODE_V
+        assertEquals(System, a(41, ',', mods = ctrl))                                                          // AZERTY's KEYCODE_M
+        assertEquals(System, a(8, '1', mods = ctrl))
+    }
     @Test fun ctrlVIsTheKeyAndCtrlShiftVPastes() {
         assertEquals(send(TerminalKey.letter('v'), TerminalModifier.CTRL), a(50, 'v', mods = ctrl))           // KEYCODE_V
         assertEquals(TerminalHardwareAction.Paste, a(50, 'V', mods = TerminalHardwareModifiers(ctrl = true, shift = true)))
