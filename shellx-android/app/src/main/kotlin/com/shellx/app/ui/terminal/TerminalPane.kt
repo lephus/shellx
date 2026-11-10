@@ -74,6 +74,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -340,6 +341,7 @@ private fun BoxScope.Surface(
     onFocus: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    val host = LocalView.current
     var surface by remember { mutableStateOf<TerminalSurfaceView?>(null) }
     var viewport by remember { mutableStateOf<TerminalViewport?>(null) }
     var pinching by remember { mutableStateOf(false) }
@@ -415,7 +417,14 @@ private fun BoxScope.Surface(
             },
             onRelease = { view ->
                 view.onFocusChange = {}
-                if (view.hasFocus()) view.clearTerminalFocus()
+                // The page left (a chip, a swipe, another terminal shown): its keyboard goes too. Removing the View may
+                // have taken its focus already, so the keyboard it took is hidden unless another editor has the focus now.
+                val focus = host.rootView.findFocus()
+                if (view.hasFocus()) {
+                    view.clearTerminalFocus()
+                } else if (view.tookKeyboard && (focus == null || !focus.onCheckIsTextEditor())) {
+                    ime.hide(host)
+                }
             },
         )
     }

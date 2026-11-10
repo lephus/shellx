@@ -351,10 +351,15 @@ class TerminalSurfaceView(
         }
     }
 
+    /** The surface asked for the keyboard and has not hidden it since (its page leaving hides it, [TerminalPane]). */
+    internal var tookKeyboard: Boolean = false
+        private set
+
     /** A tap or a long press: the surface takes the focus and the keyboard shows, while the page takes input. */
     fun focusAndShowKeyboard() {
         if (!accepts()) return
         mayFocus = true
+        tookKeyboard = true
         requestFocus()
         post { ime.show(this) }
     }
@@ -362,6 +367,7 @@ class TerminalSurfaceView(
     /** Hides the soft keyboard and gives up the focus. */
     fun clearTerminalFocus() {
         ime.hide(this)
+        tookKeyboard = false
         mayFocus = false
         clearFocus()
     }
