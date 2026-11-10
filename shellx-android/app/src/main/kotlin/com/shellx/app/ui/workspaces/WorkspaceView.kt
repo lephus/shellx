@@ -53,6 +53,13 @@ class WorkspaceScreenHolder(val model: WorkspaceScreenModel, val terminal: Termi
     var closedHere: Boolean = false
     var notice: AgentNotice? by mutableStateOf(null)
 
+    /**
+     * A terminal page of the screen held the keyboard when the window went to be made again (a rotation): the page made
+     * again takes it back. Cleared when the page leaves otherwise (a swipe, a navigation push), so a page that comes
+     * back after Back does not take it, as on the iPhone; it does not outlive the process.
+     */
+    var terminalKeepsKeyboard: Boolean = false
+
     /** The `shownPaneClosed` count the screen last said something about. */
     var paneClosedSeen: Int by mutableIntStateOf(model.shownPaneClosed)
 
@@ -191,6 +198,8 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
                             terminalHoldsKeyboard = it
                             windowKeyboard?.held = it
                         },
+                        retakesKeyboard = holder.terminalKeepsKeyboard,
+                        keyboardKept = { holder.terminalKeepsKeyboard = it },
                     )
                 }
                 if (pane.id in model.shownAsTerminal) {

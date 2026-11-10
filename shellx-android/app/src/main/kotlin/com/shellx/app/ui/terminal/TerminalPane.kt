@@ -1,5 +1,9 @@
 package com.shellx.app.ui.terminal
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.BoxScope
@@ -15,7 +19,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupProperties
 import com.shellx.app.ui.agent.AgentNotice
@@ -100,6 +103,16 @@ import com.shellx.core.terminal.TerminalViewport
 
 private val CARD_SHAPE = RoundedCornerShape(14.dp)
 
+/** How long the page waits after the keyboard went down before it gives the focus up (see ShownPage). */
+private val KEYBOARD_DOWN_GRACE = 300.milliseconds
+
+/** The activity this context belongs to, if any. */
+private tailrec fun Context.activity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.activity()
+    else -> null
+}
+
 /**
  * A shell chip's page, and an agent chip's shown as its terminal (`TerminalPane.swift`). [shown] is the page the pager
  * settled on (3E's `PaneContent`); the page shown is the one that is [shown] and whose [terminalId] the model shows.
@@ -121,8 +134,10 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
  * no card covers it, [locksPaging] is told true, and false again when that ends, a card comes, or the page stops being
  * shown or leaves.
  *
- * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste; a page made again by a rotation takes the
- * keyboard back once its terminal takes input, if it held it. The key bar shows under the surface while
+ * Typing (Task 13): a tap takes the keyboard; a long press also offers Paste. [keyboardKept] is told whether the page
+ * holds the keyboard, and false when the page leaves, unless the window is being made again (a rotation): a page made
+ * with [retakesKeyboard] takes the keyboard back once its terminal takes input, as the iPhone keeps it through a
+ * rotation (and not after a navigation push and Back). The key bar shows under the surface while
  * it has the keyboard ([showsKeyBar] in tests), only on the page shown and only while it takes input; when the soft
  * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
  * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`. [engaged] is called when the user takes the
@@ -142,6 +157,8 @@ fun TerminalPane(
     showsKeyBar: Boolean = false,
     engaged: () -> Unit = {},
     holdsKeyboard: (Boolean) -> Unit = {},
+    retakesKeyboard: Boolean = false,
+    keyboardKept: (Boolean) -> Unit = {},
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val pageShown = shown && state.terminalId == terminalId
@@ -151,7 +168,7 @@ fun TerminalPane(
                 if (state.phase == TerminalViewPhase.Unsupported) ShellPanePlaceholder() else EmptyCard()
             }
         } else {
-            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging, engaged, holdsKeyboard)
+            ShownPage(model, terminalId, title, state, showsKeyBar, locksPaging, engaged, holdsKeyboard, retakesKeyboard, keyboardKept)
         }
     }
 }
@@ -185,6 +202,8 @@ private fun ColumnScope.ShownPage(
     locksPaging: (Boolean) -> Unit,
     engaged: () -> Unit,
     holdsKeyboard: (Boolean) -> Unit,
+    retakesKeyboard: Boolean,
+    keyboardKept: (Boolean) -> Unit,
 ) {
     // Leaving the page (a swipe, a chip, the pane gone) unlocks the pager.
     val currentLocks by rememberUpdatedState(locksPaging)
@@ -207,22 +226,25 @@ private fun ColumnScope.ShownPage(
 
     // The user took the keyboard here, or sent this page input: the screen settles on its chip.
     val currentEngaged by rememberUpdatedState(engaged)
-    // Whether the page holds the keyboard, kept across a rotation (the iPhone keeps it): the page made again takes the
-    // keyboard back once its terminal takes input. Any other loss of the focus (the user hid the keyboard, a card) ends it.
-    var keepsKeyboard by rememberSaveable { mutableStateOf(false) }
-    var restoring by remember { mutableStateOf(keepsKeyboard) }
+    // Whether the page holds the keyboard, kept by the screen across a rotation (the iPhone keeps it): the page made
+    // again takes the keyboard back once its terminal takes input. Any other loss of the focus (the user hid the
+    // keyboard, a card) ends it, and so does the page leaving, unless the window is being made again.
+    val currentKept by rememberUpdatedState(keyboardKept)
+    var restoring by remember { mutableStateOf(retakesKeyboard) }
     LaunchedEffect(focused) {
         if (focused) currentEngaged()
         if (focused) {
-            keepsKeyboard = true
+            currentKept(true)
             restoring = false
         } else if (!restoring) {
-            keepsKeyboard = false
+            currentKept(false)
         }
     }
     LaunchedEffect(restoring, state.acceptsInput, surface) {
         if (restoring && state.acceptsInput) surface?.focusAndShowKeyboard()
     }
+    val activity = remember(context) { context.activity() }
+    DisposableEffect(Unit) { onDispose { if (activity?.isChangingConfigurations != true) currentKept(false) } }
     var inputsSeen by remember { mutableIntStateOf(state.sentInputs) }
     LaunchedEffect(state.sentInputs) {
         if (state.sentInputs != inputsSeen) currentEngaged()
@@ -254,15 +276,20 @@ private fun ColumnScope.ShownPage(
     // The soft keyboard went from shown to hidden while the surface had it (system Back, its own key): the focus goes
     // too, so the key bar hides as on the iPhone. A hardware keyboard never shows the soft one, and a floating one is
     // shown though it takes no room, so their focus and bar stay. Not while the window is away or the page is not
-    // resumed: leaving the app hides the keyboard too, and the focus stays for the return.
+    // resumed: leaving the app hides the keyboard too, and the focus stays for the return. A rotation hides the keyboard
+    // while the window still has the focus and makes the window again a moment later, so the rule waits
+    // KEYBOARD_DOWN_GRACE and looks again: by then a rotating window is no longer resumed (or gone).
     val imeShown = WindowInsets.isImeVisible
     val windowFocused by rememberUpdatedState(LocalWindowInfo.current.isWindowFocused)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var imeWasShown by remember { mutableStateOf(false) }
     LaunchedEffect(imeShown) {
-        val here = windowFocused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-        if (imeWasShown && !imeShown && focused && here) surface?.clearTerminalFocus()
+        val wentDown = imeWasShown && !imeShown
         imeWasShown = imeShown
+        if (!wentDown || !focused) return@LaunchedEffect
+        delay(KEYBOARD_DOWN_GRACE)
+        val here = windowFocused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        if (focused && here) surface?.clearTerminalFocus()
     }
 
     // The page holds the soft keyboard: it has the focus and the keyboard takes room (read as one flag, so the page does
