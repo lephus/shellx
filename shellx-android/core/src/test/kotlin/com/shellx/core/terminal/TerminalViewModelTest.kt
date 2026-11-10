@@ -161,7 +161,7 @@ class TerminalViewModelTest {
         first.cancel()
         backgroundScope.launch { model.run() }
         advanceTimeBy(100.milliseconds)
-        assertEquals(listOf(open50x20), link.calls, "a restarted run neither closes nor reopens")
+        assertEquals(listOf<Call>(open50x20), link.calls, "a restarted run neither closes nor reopens")
     } }
 
     /** A1: the iPhone's background and foreground are a run that stops and a later one. */
