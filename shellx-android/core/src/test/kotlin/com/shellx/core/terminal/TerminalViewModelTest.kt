@@ -681,5 +681,14 @@ class TerminalViewModelTest {
         assertEquals(TerminalViewPhase.Connecting, model.phase)
     } }
 
+    /** Final review m5: a state's string never holds the word being composed (a log line or an exception would). */
+    @Test
+    fun aStatesStringHidesTheWordBeingComposed() {
+        val state = TerminalViewState(terminalId = "t1", markedText = "việ")
+        assertTrue("<3 chars>" in state.toString(), state.toString())
+        assertFalse("việ" in state.toString(), state.toString())
+        assertEquals(state, state.copy())
+    }
+
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)
 }
