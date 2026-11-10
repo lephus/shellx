@@ -3,6 +3,7 @@ package com.shellx.app.ui.terminal
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.SystemClock
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -105,6 +106,9 @@ private val CARD_SHAPE = RoundedCornerShape(14.dp)
 
 /** How long the page waits after the keyboard went down before it gives the focus up (see ShownPage). */
 private val KEYBOARD_DOWN_GRACE = 300.milliseconds
+
+/** For this long after a page took the keyboard back, the keyboard going down is the system settling the window. */
+private const val RETAKE_SETTLE_MS = 1_000L
 
 /** The activity this context belongs to, if any. */
 private tailrec fun Context.activity(): Activity? = when (this) {
@@ -240,8 +244,16 @@ private fun ColumnScope.ShownPage(
             currentKept(false)
         }
     }
-    LaunchedEffect(restoring, state.acceptsInput, surface) {
-        if (restoring && state.acceptsInput) surface?.focusAndShowKeyboard()
+    // Only once the window has the focus: a keyboard asked for before is shown, then hidden by the system as the window
+    // takes the focus (API 36 emulator), and the rule below would then give the focus up.
+    val windowHasFocus = LocalWindowInfo.current.isWindowFocused
+    // When the page last took the keyboard back (uptime ms); null: it never did.
+    var retakenAt by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(restoring, state.acceptsInput, surface, windowHasFocus) {
+        if (restoring && state.acceptsInput && windowHasFocus) {
+            retakenAt = SystemClock.uptimeMillis()
+            surface?.focusAndShowKeyboard()
+        }
     }
     val activity = remember(context) { context.activity() }
     DisposableEffect(Unit) { onDispose { if (activity?.isChangingConfigurations != true) currentKept(false) } }
@@ -280,13 +292,19 @@ private fun ColumnScope.ShownPage(
     // while the window still has the focus and makes the window again a moment later, so the rule waits
     // KEYBOARD_DOWN_GRACE and looks again: by then a rotating window is no longer resumed (or gone).
     val imeShown = WindowInsets.isImeVisible
-    val windowFocused by rememberUpdatedState(LocalWindowInfo.current.isWindowFocused)
+    val windowFocused by rememberUpdatedState(windowHasFocus)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var imeWasShown by remember { mutableStateOf(false) }
     LaunchedEffect(imeShown) {
         val wentDown = imeWasShown && !imeShown
         imeWasShown = imeShown
         if (!wentDown || !focused) return@LaunchedEffect
+        // Just after the page took the keyboard back (a rotation), the system hides it once more as it settles the new
+        // window (API 36 emulator): ask for it again instead.
+        if (retakenAt?.let { SystemClock.uptimeMillis() - it < RETAKE_SETTLE_MS } == true) {
+            surface?.focusAndShowKeyboard()
+            return@LaunchedEffect
+        }
         delay(KEYBOARD_DOWN_GRACE)
         val here = windowFocused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         if (focused && here) surface?.clearTerminalFocus()
