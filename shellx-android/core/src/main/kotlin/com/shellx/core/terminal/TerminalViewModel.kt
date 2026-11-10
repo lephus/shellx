@@ -77,7 +77,13 @@ data class TerminalViewState(
     val pasteTooLarge: Int = 0,
     /** [TerminalViewModel.acceptsInput]. */
     val acceptsInput: Boolean = false,
-)
+) {
+    /** The word being composed is the user's typing: only its length is printed (`<N chars>`), as `Type` prints bytes. */
+    override fun toString(): String =
+        "TerminalViewState(terminalId=$terminalId, phase=$phase, screenRevision=$screenRevision, snapshots=$snapshots, " +
+            "topShift=$topShift, markedText=<${markedText.length} chars>, ctrlLatched=$ctrlLatched, sentInputs=$sentInputs, " +
+            "pasteTooLarge=$pasteTooLarge, acceptsInput=$acceptsInput)"
+}
 
 /**
  * One workspace screen's terminal: the one terminal it shows, opened on the Mac at the phone's size (TerminalViewModel
