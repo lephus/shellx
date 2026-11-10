@@ -65,11 +65,15 @@ data class TerminalViewport(
         return changed.copy(scrollY = scrollY + topShiftDelta * changed.cellHeight * changed.scale).clamped().following()
     }
 
-    fun scrolledBy(dx: Float, dy: Float): TerminalViewport =
-        copy(scrollX = scrollX + dx, scrollY = scrollY + dy).clamped().following()
+    /** A delta that is not finite changes nothing (coerceIn would pass NaN on into the scroll). */
+    fun scrolledBy(dx: Float, dy: Float): TerminalViewport {
+        if (!dx.isFinite() || !dy.isFinite()) return this
+        return copy(scrollX = scrollX + dx, scrollY = scrollY + dy).clamped().following()
+    }
 
+    /** A factor or a focus that is not finite changes nothing. */
     fun pinched(factor: Float, focusX: Float, focusY: Float): TerminalViewport {
-        if (!factor.isFinite()) return this
+        if (!factor.isFinite() || !focusX.isFinite() || !focusY.isFinite()) return this
         val s0 = scale
         val pinched = copy(zoom = zoom.pinch(s0 * factor, fit))
         val s1 = pinched.scale
