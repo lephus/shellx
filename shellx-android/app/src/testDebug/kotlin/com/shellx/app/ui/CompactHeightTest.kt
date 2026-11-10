@@ -52,7 +52,7 @@ import com.shellx.app.ui.workspaces.WorkspaceView
 import com.shellx.app.voice.LocalVoice
 import com.shellx.core.workspaces.WorkspaceRef
 import com.shellx.core.link.SessionRef
-import com.shellx.core.demo.FakeMac.TerminalViewSize
+import com.shellx.core.terminal.TerminalGeometry
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -153,17 +153,37 @@ class CompactHeightTest {
         }
     }
 
-    /** The grid the terminal asks the Mac for, once the last size change went out (200 ms later). */
-    private fun lastGrid(): TerminalViewSize {
+    /**
+     * Checks the grid the terminal shows, and the one it asked the Mac for once the last size change went out (200 ms
+     * later), against [MIN_TERMINAL_COLS] × [MIN_TERMINAL_ROWS]. A pane squeezed to nothing sends no size at all, so the
+     * surface's own size counts too.
+     */
+    private fun assertUsableGrid() {
         idle(600)
-        return rig.mac.terminalViewResizes.lastOrNull() ?: rig.mac.terminalViewOpens.last()
+        val asked = rig.mac.terminalViewResizes.lastOrNull() ?: rig.mac.terminalViewOpens.last()
+        assertTrue("$asked", asked.cols >= MIN_TERMINAL_COLS && asked.rows >= MIN_TERMINAL_ROWS)
+        val surface = terminalSurface()
+        val padding = TerminalGeometry.PADDING_DP * surface.resources.displayMetrics.density
+        val shown = TerminalGeometry.phoneGrid(
+            surface.width.toFloat(), surface.height.toFloat(), surface.font.cellWidth, surface.font.cellHeight, padding,
+        )
+        assertTrue("shown $shown", shown.cols >= MIN_TERMINAL_COLS && shown.rows >= MIN_TERMINAL_ROWS)
     }
 
     /**
      * The soft keyboard comes up [height] tall (0: it went down, as system Back makes it), as the system tells the
-     * window: through its inset, which the pane's imePadding gives to the keyboard.
+     * window: through its inset, which the pane's imePadding gives to the keyboard. Coming up, the inset grows from a
+     * sliver first, as the keyboard's animation makes it: a screen answers the keyboard's first frame, not its last.
      */
     private fun keyboard(height: Dp) {
+        if (height > 0.dp) {
+            imeInset(4.dp)
+            idle(50)
+        }
+        imeInset(height)
+    }
+
+    private fun imeInset(height: Dp) {
         compose.runOnIdle {
             val root = compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
             val px = (height.value * root.resources.displayMetrics.density).roundToInt()
@@ -191,8 +211,7 @@ class CompactHeightTest {
         keyboard(GBOARD)
         until { !tagged("workspace.title") }
         // The key bar took its row and the top bar gave its own.
-        val grid = lastGrid()
-        assertTrue("$grid", grid.cols >= MIN_TERMINAL_COLS && grid.rows >= MIN_TERMINAL_ROWS)
+        assertUsableGrid()
         compose.onNodeWithTag("terminal.surface").performTouchInput {
             pinch(center - Offset(40f, 0f), center - Offset(160f, 0f), center + Offset(40f, 0f), center + Offset(160f, 0f))
         }
@@ -216,8 +235,7 @@ class CompactHeightTest {
         until { tagged("terminal.key.escape") }
         keyboard(GBOARD)
         until { !tagged("workspace.title") }
-        val grid = lastGrid()
-        assertTrue("$grid", grid.cols >= MIN_TERMINAL_COLS && grid.rows >= MIN_TERMINAL_ROWS)
+        assertUsableGrid()
         assertFalse("the banner steps aside while the terminal holds the keyboard", tagged("demo.banner"))
         keyboard(0.dp)
         until { tagged("demo.banner") && tagged("workspace.title") && !tagged("terminal.key.escape") }
