@@ -29,12 +29,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -613,6 +617,68 @@ class TerminalViewModelTest {
         emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
         assertTrue(eventually { model.phase == TerminalViewPhase.Live }, "${model.phase} ${link.calls}")
         assertEquals(listOf<Call>(open50x20), link.calls)
+    } }
+
+    // Re-review C (chunk D)
+
+    /**
+     * Like the app's `Main.immediate`: inside one of its own tasks (the main thread) whatever it is given runs at once,
+     * with no unconfined event loop around it; from anywhere else (the test body) it posts. So the outbox, resumed by a
+     * real dispatch, runs what it starts inline, which an UnconfinedTestDispatcher's event loop would queue.
+     */
+    private class MainImmediate(private val posts: CoroutineDispatcher) : CoroutineDispatcher() {
+        private var onMain = false
+
+        override fun isDispatchNeeded(context: CoroutineContext): Boolean = !onMain
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            posts.dispatch(context, Runnable {
+                val was = onMain
+                onMain = true
+                try { block.run() } finally { onMain = was }
+            })
+        }
+    }
+
+    private fun TestScope.mainImmediate() =
+        CoroutineScope(backgroundScope.coroutineContext + MainImmediate(StandardTestDispatcher(testScheduler)))
+
+    /** Re-review C N1, R3's order: a timed-out open's close is queued before its retry, even when the retry's wait
+     *  returns at once inside the answer. */
+    @Test fun aTimedOutOpenIsClosedBeforeItsRetry() { runTest {
+        val link = ScriptedTerminalLink(); link.openAnswers += listOf(TerminalOpenResult.NoAnswer, outcome(TerminalViewOpenOutcome.OK))
+        val model = TerminalViewModel("m1", link, mainImmediate(), sleep = {}, now = ManualClock().monotonic)
+        backgroundScope.launch { model.run() }
+        eventually { link.subscriberCount == 1 }
+        model.setPhoneGrid(50, 20); model.show("t1")
+        assertTrue(eventually { link.calls.size >= 3 }, "${link.calls}")
+        assertEquals(listOf(open50x20, Call.Close("t1"), open50x20), link.calls)
+    } }
+
+    /** Re-review C N2: an open given up by a stop is cancelled before the close the stop queued goes out, so the link
+     *  never sees that close while the open is still live. */
+    @Test fun anAbandonedOpenIsCancelledBeforeItsCloseGoes() { runTest {
+        val link = ScriptedTerminalLink(); val gate = Gate(); link.openGate = gate
+        val model = TerminalViewModel("m1", link, mainImmediate(), sleep = ManualSleeper().sleep, now = ManualClock().monotonic)
+        val run = backgroundScope.launch { model.run() }
+        eventually { link.subscriberCount == 1 }
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { gate.waiting == 1 }
+        run.cancel()
+        assertTrue(eventually { Call.Close("t1") in link.calls }, "${link.calls}")
+        gate.open()
+        assertEquals(listOf<Boolean?>(true), link.openCancelledAtClose)
+    } }
+
+    /** Re-review C N3: an open the link itself cancels (not a stop, not close()) is an open with no answer: closed on
+     *  the Mac, and retried once after 1 s. */
+    @Test fun anOpenTheLinkCancelsIsNoAnswer() { runTest {
+        val link = ScriptedTerminalLink(); link.openFailure = CancellationException("the link gave the call up")
+        val sleeper = ManualSleeper(); val (model, _) = makeModel(link, sleeper)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        assertTrue(eventually { link.calls == listOf(open50x20, Call.Close("t1")) }, "${link.calls}")
+        assertTrue(eventually { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting })
+        assertEquals(TerminalViewPhase.Connecting, model.phase)
     } }
 
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)

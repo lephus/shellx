@@ -7,9 +7,12 @@ import com.shellx.core.terminal.TerminalOpenResult
 import com.shellx.link.core.TerminalInputUnit
 import com.shellx.link.core.TerminalViewOpenOutcome
 import kotlin.time.Duration
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.job
 
 /**
  * A [TerminalLink] the test drives (ScriptedTerminalLink in TerminalTestSupport.swift): it records every call, answers
@@ -40,6 +43,13 @@ class ScriptedTerminalLink : TerminalLink {
 
     /** Thrown by each collection of [terminalEvents] once it is counted, when set. */
     var eventsFailure: Throwable? = null
+
+    /** Thrown by each open once it is recorded (and after [onOpen]), when set: a link that gives up the call. */
+    var openFailure: Throwable? = null
+
+    /** For each close call: whether the job of the latest open call was cancelled by then (null: no open yet). */
+    val openCancelledAtClose: MutableList<Boolean?> = mutableListOf()
+    private var openJob: Job? = null
 
     /** Every recordLatency call, in order. */
     val samples: MutableList<Pair<LatencyMetric, Duration>> = mutableListOf()
@@ -79,13 +89,16 @@ class ScriptedTerminalLink : TerminalLink {
 
     override suspend fun openTerminalView(machineId: String, terminalId: String, cols: Int, rows: Int): TerminalOpenResult {
         calls += Call.Open(terminalId, cols, rows)
+        openJob = currentCoroutineContext().job
         onOpen?.invoke(terminalId)
+        openFailure?.let { throw it }
         openGate?.wait()
         return openAnswers.removeFirstOrNull() ?: TerminalOpenResult.Outcome(TerminalViewOpenOutcome.OK)
     }
 
     override suspend fun closeTerminalView(machineId: String, terminalId: String) {
         calls += Call.Close(terminalId)
+        openCancelledAtClose += openJob?.isCancelled
     }
 
     override suspend fun sendTerminalInput(machineId: String, terminalId: String, units: List<TerminalInputUnit>) {
