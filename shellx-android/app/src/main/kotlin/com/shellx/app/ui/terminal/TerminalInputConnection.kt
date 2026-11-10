@@ -351,6 +351,8 @@ class TerminalInputConnection(
                 document = input.markedText
             }
         }
+        // Input that went out past the keyboard since its last call (a key bar key before the surface rendered) ended the word first.
+        checkOutsideInput()
         keys(event)
         return true
     }
