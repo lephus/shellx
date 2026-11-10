@@ -18,6 +18,7 @@ import com.shellx.link.core.TerminalFrameKind
 import com.shellx.link.core.TerminalGridFrame
 import com.shellx.link.core.TerminalInputUnit.Text
 import com.shellx.link.core.TerminalLine
+import com.shellx.link.core.TerminalPushQueue
 import com.shellx.link.core.TerminalRun
 import com.shellx.link.core.TerminalScreen
 import com.shellx.link.core.TerminalViewOpenOutcome
@@ -379,6 +380,27 @@ class MachineHubTerminalTest {
         runCurrent()
         rig.hub.stopAll()
         assertEquals(0, rig.hub.terminalSubscriberCount)
+    } }
+
+    /**
+     * Review B1 m2: the hub's stop ends a collection that is taking pushes from a queue that never closes; on an
+     * immediate dispatcher that collection ends inside the stop, which must not trip over the list it changes.
+     */
+    @Test fun aStopEndsACollectionThatEndsAtOnce() { runTest {
+        val rig = hubRig(listOf(makeMac()), start = true)
+        val terminals = HubTerminals(rig.hub)
+        val queue = TerminalPushQueue()
+        terminals.sessionStarted("m", queue.pushes)
+        terminals.stateChanged("m", MachineLinkState.Online)
+        val immediate = CoroutineScope(backgroundScope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+        val ended = immediate.async { terminals.events("m").collect {}; true }
+        queue.offer(Opened("t1"))
+        assertEquals(1, terminals.subscriberCount)
+
+        terminals.stop()
+
+        assertTrue(ended.await())
+        assertEquals(0, terminals.subscriberCount)
     } }
 
     /** A delta of the 50 × 20 prompt view, every row full: about 1.8 KB of frame JSON. */
