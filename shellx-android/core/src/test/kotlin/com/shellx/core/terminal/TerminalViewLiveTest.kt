@@ -100,6 +100,21 @@ class TerminalViewLiveTest {
         assertEquals(listOf(listOf(Text("ls")), listOf(Key(TerminalKey.ENTER))), mac.terminalViewInputs("t1"))
     } }
 
+    /** Review Focus 1, A → B → A through a real hub and fake Mac: the keys typed after the last swipe reach A only (the
+     *  iPhone's final review, core M8). */
+    @Test fun swipingBackAndForthTypesIntoTheTerminalShown() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        val model = makeModel(mac, rig)
+        model.setPhoneGrid(30, 6)
+        model.show("t1"); model.show("t2"); model.show("t1")
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live && model.terminalId == "t1" }, "${model.phase}")
+        model.insertText("ab")
+        assertTrue(eventually { mac.terminalViewInputs("t1") == listOf(listOf(Text("ab"))) })
+        assertEquals(emptyList(), mac.terminalViewInputs("t2"))
+    } }
+
     /**
      * Re-review B N-1: a run stopped while its open waits leaves no `Opened` behind, so the next run of the same
      * terminal shows only its own view's screen. The model's outbox runs on an immediate dispatcher, as on the app's

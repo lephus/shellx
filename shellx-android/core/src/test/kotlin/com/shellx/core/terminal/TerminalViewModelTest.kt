@@ -11,6 +11,7 @@ import com.shellx.core.testing.deltaPart
 import com.shellx.core.testing.eventually
 import com.shellx.core.testing.historyPart
 import com.shellx.core.testing.snapshotPart
+import com.shellx.link.core.TerminalInputUnit.Text
 import com.shellx.link.core.TerminalScreen
 import com.shellx.link.core.TerminalViewEndReason
 import com.shellx.link.core.TerminalViewOpenOutcome
@@ -24,6 +25,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -315,6 +317,140 @@ class TerminalViewModelTest {
         assertEquals(Call.Close("t1"), link.calls.last())
         model.show("t2"); model.setPhoneGrid(40, 10); runCurrent()
         assertFalse(link.opens.contains("t2"))
+    } }
+
+    // After the iPhone's final review (plan 3G Task 10b)
+
+    @Test fun aTimedOutOpenIsClosedOnTheMac() { runTest {   // the Mac may have opened the view although its answer never came
+        val link = ScriptedTerminalLink(); link.openAnswers += TerminalOpenResult.NoAnswer
+        val sleeper = ManualSleeper(); val (model, _) = makeModel(link, sleeper)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        assertTrue(eventually { link.calls == listOf(open50x20, Call.Close("t1")) }, "${link.calls}")
+        eventually { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting }
+        assertEquals(listOf("t1"), link.opens, "the retry waits")
+        sleeper.release { it == TerminalViewModel.FAILED_RETRY_DELAY }
+        assertTrue(eventually { link.calls == listOf(open50x20, Call.Close("t1"), open50x20) }, "${link.calls}")
+        assertEquals(TerminalViewPhase.Connecting, model.phase)
+    } }
+
+    @Test fun aNoAnswerWhileOfflineSendsNoClose() { runTest {   // the session is gone, like R8
+        val link = ScriptedTerminalLink(); val gate = Gate(); link.openGate = gate; link.openAnswers += TerminalOpenResult.NoAnswer
+        val (model, _) = makeModel(link)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { link.opens == listOf("t1") }
+        link.online = false; gate.open()
+        val offline = eventually { model.phase == TerminalViewPhase.Offline }
+        delay(50.milliseconds)
+        assertTrue(offline)
+        assertEquals(listOf<Call>(open50x20), link.calls, "nothing to close")
+        link.online = true; link.emit(TerminalHubEvent.State("m1", MachineLinkState.Online))
+        assertTrue(eventually { link.calls == listOf(open50x20, open50x20) }, "${link.calls}")
+    } }
+
+    /** A view that ends `failed` is reopened after 1 s. Meanwhile the page is reopening, not live, so nothing typed can
+     *  go nowhere while it still looks live (the iPhone's final review, core M1). */
+    @Test fun aFailedViewWaitsForItsReopenAsConnecting() { runTest {
+        val link = ScriptedTerminalLink(); val sleeper = ManualSleeper(); val (model, _) = makeModel(link, sleeper)
+        live(model, link, text = listOf("$ ls"))
+        emit(link, Ended("t1", TerminalViewEndReason.FAILED))
+        assertTrue(eventually { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting })
+        assertEquals(TerminalViewPhase.Connecting, model.phase, "the reopen's wait is not live")
+        assertEquals("$ ls", model.screen.screenText().first(), "the last screen stays")
+        sleeper.release { it == TerminalViewModel.FAILED_RETRY_DELAY }
+        assertTrue(eventually { link.opens == listOf("t1", "t1") }, "${link.calls}")
+    } }
+
+    /** The first-screen clock does not run while the Mac is offline (core M3): it starts at the open that brings the
+     *  first screen. */
+    @Test fun firstScreenIsNotMeasuredAcrossAnOfflinePeriod() { runTest {
+        val link = ScriptedTerminalLink(); link.online = false
+        val clock = ManualClock(); val (model, _) = makeModel(link, clock = clock)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { model.phase == TerminalViewPhase.Offline }
+        clock.advance(600.seconds)
+        link.online = true; link.emit(TerminalHubEvent.State("m1", MachineLinkState.Online))
+        eventually { link.opens == listOf("t1") }
+        clock.advance(300.milliseconds)
+        emit(link, Opened("t1"))
+        emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
+        eventually { model.phase == TerminalViewPhase.Live }
+        assertEquals(listOf(300.milliseconds), link.firstScreens().map { it.second })
+    } }
+
+    /** Nor while the page is stopped (the iPhone's background, A1) before the first screen came (core M3). */
+    @Test fun firstScreenIsNotMeasuredAcrossTheBackground() { runTest {
+        val link = ScriptedTerminalLink()
+        val clock = ManualClock(); val (model, run) = makeModel(link, clock = clock)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { link.opens == listOf("t1") }
+        run.cancel()
+        eventually { Call.Close("t1") in link.calls }
+        clock.advance(600.seconds)
+        backgroundScope.launch { model.run() }
+        eventually { link.opens == listOf("t1", "t1") }
+        clock.advance(200.milliseconds)
+        emit(link, Opened("t1"))
+        emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("$"))))
+        eventually { model.phase == TerminalViewPhase.Live }
+        assertEquals(listOf(200.milliseconds), link.firstScreens().map { it.second })
+    } }
+
+    /** An open lost with its session (no answer while the hub still says online, then the reconnect) does not use up the
+     *  one retry of a failed open: the reconnect gives it back (core M4). */
+    @Test fun aReconnectRestoresTheRetryBudget() { runTest {
+        val link = ScriptedTerminalLink()
+        link.openAnswers += listOf(TerminalOpenResult.NoAnswer, outcome(TerminalViewOpenOutcome.FAILED))
+        val sleeper = ManualSleeper(); val (model, _) = makeModel(link, sleeper)
+        model.setPhoneGrid(50, 20); model.show("t1")
+        eventually { Call.Close("t1") in link.calls }
+        link.online = false; link.emit(TerminalHubEvent.State("m1", MachineLinkState.Reconnecting))
+        eventually { model.phase == TerminalViewPhase.Offline }
+        link.online = true; link.emit(TerminalHubEvent.State("m1", MachineLinkState.Online))
+        // A wait left from before the reconnect would hold the reopen back: let it go only if nothing reopened.
+        val atOnce = eventually(timeout = 500.milliseconds) { link.opens.size == 2 }
+        if (!atOnce) sleeper.release { it == TerminalViewModel.FAILED_RETRY_DELAY }
+        assertTrue(eventually { link.opens.size == 2 }, "${link.calls}")
+        val retried = eventually(timeout = 2.seconds) { TerminalViewModel.FAILED_RETRY_DELAY in sleeper.waiting }
+        assertTrue(retried, "the first failure after the reconnect is retried: ${model.phase}")
+        assertEquals(TerminalViewPhase.Connecting, model.phase)
+    } }
+
+    /** A Mac that keeps ending its views `not_open` before any screen cannot make the phone open them forever: the second
+     *  one without a snapshot between ends in Try Again (core M5). */
+    @Test fun repeatedNotOpenEndsInTryAgain() { runTest {
+        val link = ScriptedTerminalLink(); val (model, _) = makeModel(link)
+        live(model, link)
+        emit(link, Ended("t1", TerminalViewEndReason.NOT_OPEN))
+        assertTrue(eventually { link.opens == listOf("t1", "t1") })
+        emit(link, Opened("t1"))
+        emit(link, Ended("t1", TerminalViewEndReason.NOT_OPEN))
+        val stopped = eventually(timeout = 2.seconds) {
+            model.phase == TerminalViewPhase.Unavailable(TerminalUnavailableReason.FAILED)
+        }
+        delay(50.milliseconds)
+        assertTrue(stopped, "${model.phase} ${link.opens.size} opens")
+        assertEquals(listOf("t1", "t1"), link.opens)
+    } }
+
+    /** Review Focus 1, A → B → A: the late pushes of B and of A's first view never reach the screen, and keys go to the
+     *  view of A that is open now (core M8). */
+    @Test fun swipingBackAndForthKeepsFramesAndKeysOnTheTerminalShown() { runTest {
+        val link = ScriptedTerminalLink(); val (model, _) = makeModel(link)
+        eventually { link.subscriberCount == 1 }
+        model.setPhoneGrid(50, 20); model.show("t1"); model.show("t2"); model.show("t1")
+        assertTrue(eventually {
+            link.calls == listOf(open50x20, Call.Close("t1"), Call.Open("t2", 50, 20), Call.Close("t2"), open50x20)
+        }, "${link.calls}")
+        emit(link, Opened("t2"))
+        emit(link, Frame("t2", snapshotPart(1, cols = 50, rows = 20, text = listOf("two"))))
+        emit(link, Opened("t1"))
+        emit(link, Frame("t1", snapshotPart(1, cols = 50, rows = 20, text = listOf("one"))))
+        assertTrue(eventually { model.phase == TerminalViewPhase.Live })
+        emit(link, Frame("t2", deltaPart(2, cols = 50, rows = 20, replacing = mapOf(0 to "late two"))))
+        model.insertText("x")
+        assertTrue(eventually { link.calls.last() == Call.Input("t1", listOf(Text("x"))) }, "${link.calls}")
+        assertEquals("one", model.screen.screenText().first())
+        assertFalse(link.calls.any { it is Call.Input && it.id == "t2" })
     } }
 
     private fun outcome(outcome: TerminalViewOpenOutcome) = TerminalOpenResult.Outcome(outcome)
