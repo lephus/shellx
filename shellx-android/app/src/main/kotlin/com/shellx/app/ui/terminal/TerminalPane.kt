@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -398,6 +399,9 @@ private fun BoxScope.Surface(
                 }
             },
             modifier = Modifier
+                // Never laid out with no height: Android takes the focus (and the keyboard) off a View with no size, as
+                // in the one frame a keyboard that comes up unanimated takes the room before the bars above step aside.
+                .requiredHeightIn(min = 1.dp)
                 .fillMaxSize()
                 .clip(CARD_SHAPE)
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), CARD_SHAPE)
