@@ -168,4 +168,35 @@ class TerminalViewLiveTest {
         assertEquals(1, rig.latency.summary(LatencyMetric.TERMINAL_FIRST_SCREEN)?.count)
         assertEquals(listOf(30, 40), mac.terminalViewOpens.map { it.cols })
     } }
+
+    /**
+     * Review C m1: an open still queued behind another message when the page stops (a swipe, then the background, within
+     * one round trip) never goes out, so its `Opened` cannot wait in the queue for the next run either.
+     */
+    @Test fun aStoppedPageSendsNoOpenItHadQueued() { runTest {
+        val mac = makeMac()
+        val rig = hubRig(listOf(mac), start = true)
+        assertTrue(rig.online(sessions = 0))
+        mac.holdTerminalViewOpens()
+        val immediate = CoroutineScope(rig.hub.scope.coroutineContext + UnconfinedTestDispatcher(testScheduler))
+        val model = TerminalViewModel(mac.machine.machineId, rig.hub, immediate)
+        val first = backgroundScope.launch { model.run() }
+        model.setPhoneGrid(30, 6); model.show("t1")
+        assertTrue(eventually { mac.terminalViewOpens.size == 1 })
+        model.show("t2")
+
+        first.cancel()
+        runCurrent()
+        mac.releaseTerminalViewOpens()
+        runCurrent()
+        model.setPhoneGrid(40, 8)
+        backgroundScope.launch { model.run() }
+
+        assertTrue(
+            eventually { model.phase == TerminalViewPhase.Live && model.screen.cols == 40 },
+            "${model.phase} ${model.screen.cols}",
+        )
+        assertEquals(1, model.snapshots, "no screen of the open the stopped page had queued")
+        assertEquals(listOf("t1" to 30, "t2" to 40), mac.terminalViewOpens.map { it.terminalId to it.cols })
+    } }
 }
