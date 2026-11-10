@@ -187,8 +187,9 @@ class TerminalSurfaceInputTest {
     }
 
     /**
-     * replaceText (API 34) reaches the model: a range inside the word being composed is replaced and the word committed;
-     * the base class would edit its own empty buffer and say it worked.
+     * replaceText (API 34) reaches the model: a range inside the word being composed is replaced and the word committed
+     * (the base class would edit its own empty buffer and say it worked); a range over text the keyboard committed is
+     * taken back with backspaces, and the new text goes out with what followed the range.
      */
     @Test
     fun replaceTextReachesTheMac() {
@@ -197,7 +198,97 @@ class TerminalSurfaceInputTest {
         assertTrue(c.replaceText(0, 3, "the", 1, null))
         assertTrue("${inputs()}", eventually { inputs() == listOf(listOf(Text("the"))) })
         assertTrue(c.replaceText(0, 0, "x", 1, null))
-        assertTrue("${inputs()}", eventually { inputs() == listOf(listOf(Text("the")), listOf(Text("x"))) })
+        assertTrue("${inputs()}", eventually { macLine(inputs().flatten()) == "xthe" })
+        assertEquals("xthe", c.sees())
+    }
+
+    // The Telex follow-up: the word the keyboard sees, through the surface
+
+    /** What the keyboard reads before the cursor. */
+    private fun InputConnection.sees(): String = getTextBeforeCursor(1000, 0).toString()
+
+    /**
+     * `vieetj` with a Backspace after the `t`, as Gboard 15.1 sends it (emulator log): letters committed one by one, the
+     * rewrites as deleteSurroundingText + commitText, and the Backspace as a DEL key event, which the surface sends as one
+     * backspace while the word the keyboard sees loses its last character. The Mac's line reads `việt`.
+     */
+    @Test
+    fun vieetjWithAMidWordBackspaceReachesTheMacAsViet() {
+        val c = connection()
+        for (letter in "vie") c.commitText(letter.toString(), 1)
+        c.beginBatchEdit()
+        c.deleteSurroundingText(1, 0)
+        c.commitText("ê", 1)
+        c.endBatchEdit()
+        c.commitText("t", 1)
+        assertEquals("viêt", c.sees())
+        c.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+        c.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+        assertEquals("viê", c.sees())
+        assertEquals(RecordingIme.Selection(3, 3, -1, -1), ime.selections.last())
+        c.commitText("t", 1)
+        c.beginBatchEdit()
+        c.deleteSurroundingText(2, 0)
+        c.commitText("ệt", 1)
+        c.endBatchEdit()
+        assertEquals("việt", c.sees())
+        assertTrue("${inputs()}", eventually { macLine(inputs().flatten()) == "việt" && inputs().flatten().count { it is Key } == 4 })
+    }
+
+    /** A key bar key ends the word: the keyboard reads "" after the surface's next render and is told the cursor is at 0. */
+    @Test
+    fun aKeyBarKeyEndsTheWordTheKeyboardSees() {
+        val c = connection()
+        c.commitText("t", 1)
+        c.commitText("i", 1)
+        assertEquals("ti", c.sees())
+        TerminalPane.perform(TerminalKeyBarItem.Key(TerminalBarKey.LEFT), model) {}
+        surface.render(model.state.value)
+        assertEquals("", c.sees())
+        assertEquals(RecordingIme.Selection(0, 0, -1, -1), ime.selections.last())
+        ShadowLooper.idleMainLooper()
+        assertEquals("nothing was composed, so no restart", 0, ime.restarts)
+    }
+
+    /** A hardware letter joins the word the keyboard sees, as a real editor's text would; Backspace shortens it; a chord or a named key ends it. */
+    @Test
+    fun hardwareKeysJoinOrEndTheWordTheKeyboardSees() {
+        val c = connection()
+        c.commitText("t", 1)
+        c.commitText("i", 1)
+        press(KeyEvent.KEYCODE_X)
+        assertEquals("tix", c.sees())
+        press(KeyEvent.KEYCODE_DEL)
+        assertEquals("ti", c.sees())
+        press(KeyEvent.KEYCODE_C, KeyEvent.META_CTRL_ON)
+        assertEquals("", c.sees())
+        c.commitText("a", 1)
+        press(KeyEvent.KEYCODE_DPAD_LEFT)
+        assertEquals("", c.sees())
+        c.commitText("b", 1)
+        press(KeyEvent.KEYCODE_ENTER)
+        assertEquals("", c.sees())
+    }
+
+    /** Losing the focus ends the word. */
+    @Test
+    fun losingTheFocusEndsTheWordTheKeyboardSees() {
+        surface.focusAndShowKeyboard()
+        assertTrue(surface.hasFocus())
+        val c = connection()
+        c.commitText("t", 1)
+        c.commitText("i", 1)
+        surface.clearTerminalFocus()
+        assertFalse(surface.hasFocus())
+        assertEquals("", c.sees())
+    }
+
+    /** `ls`, two quick spaces, `x`: the Mac gets `ls  x`. */
+    @Test
+    fun twoSpacesStayTwoSpaces() {
+        val c = connection()
+        for (letter in "ls  x") c.commitText(letter.toString(), 1)
+        assertTrue("${inputs()}", eventually { macLine(inputs().flatten()) == "ls  x" })
     }
 
     /**
