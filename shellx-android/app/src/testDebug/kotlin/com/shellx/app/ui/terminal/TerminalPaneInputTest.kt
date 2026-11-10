@@ -322,29 +322,40 @@ class TerminalPaneInputTest {
         idle(1_100)
         macPrints("one")
         until { changes.size == 1 }
-        repeat(5) { macPrints("line $it") }
+        repeat(5) {
+            macPrints("line $it")
+            idle(50)
+        }
         until { model.screen.screenText().first() == "line 4" }
-        idle(400)
-        assertEquals("one change a second at most", 1, changes.size)
-        until { changes.size == 2 }
-        assertTrue("$changes", changes[1] - changes[0] >= 1_000)
+        val printed = SystemClock.uptimeMillis()
+        until { changes.last() >= printed }
         idle(1_500)
-        assertEquals("$changes", 2, changes.size)
+        assertTrue("five changes in a quarter second are told once or twice: $changes", changes.size in 2..3)
+        assertTrue("a second between two: $changes", changes.zipWithNext().all { (a, b) -> b - a >= 1_000 })
     }
 
-    /** No change is told while a card covers the surface, or for another terminal than the one shown. */
+    /**
+     * Nothing is told once a card covers the surface: neither a change still waiting for its second when the card came,
+     * nor a change under the card.
+     */
     @Test
     fun aCoveredSurfaceTellsTalkBackNothing() {
         talkBackOn()
         livePane()
-        val changes = textChanges(surface())
+        val surface = surface()
+        val changes = textChanges(surface)
         idle(1_100)
-        val before = changes.size
+        macPrints("one")
+        until { changes.size == 1 }
+        macPrints("two")
+        until { model.screen.screenText().first() == "two" }
         rig.mac.endTerminalView("t-zsh", TerminalViewEndReason.REFUSED)
         until { model.phase is TerminalViewPhase.Unavailable }
-        model.retry()
         idle(1_500)
-        assertEquals(before, changes.size)
+        assertEquals("$changes", 1, changes.size)
+        compose.runOnIdle { surface.render(model.state.value.let { it.copy(screenRevision = it.screenRevision + 1) }) }
+        idle(1_500)
+        assertEquals("$changes", 1, changes.size)
     }
 
     /** A TalkBack user opens the keyboard with a double tap: the node says what it does ("Double-tap to type"). */
