@@ -4,6 +4,11 @@ import android.annotation.SuppressLint
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -30,3 +35,16 @@ fun isCompactHeight(): Boolean = LocalConfiguration.current.screenHeightDp < Com
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun topBarHeight(): Dp = if (isCompactHeight()) CompactHeight.TOP_BAR else TopAppBarDefaults.TopAppBarExpandedHeight
+
+/**
+ * Whether a terminal page of the window holds the soft keyboard (ledger A-36). The window provides one
+ * ([LocalTerminalKeyboard]) and the workspace screen keeps it told; in a short window ([isCompactHeight]) the bars above
+ * the screens (the demo banner) step aside meanwhile, as the workspace's own top bar does. Main thread only.
+ */
+@Stable
+class TerminalKeyboard {
+    var held: Boolean by mutableStateOf(false)
+}
+
+/** The window's [TerminalKeyboard]; none outside the window's frame (tests of one screen). */
+val LocalTerminalKeyboard = staticCompositionLocalOf<TerminalKeyboard?> { null }

@@ -17,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -26,18 +28,27 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.shellx.app.R
+import com.shellx.app.ui.components.LocalTerminalKeyboard
+import com.shellx.app.ui.components.TerminalKeyboard
+import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.app.ui.theme.ShellXTheme
 
 /**
  * The window's frame (1C's `DemoRootView`): while the [demo] runs, the "Demo · Exit" banner ([DemoBanner]) under the
- * status bar, above [content].
+ * status bar, above [content]. In a window short in height (a phone in landscape) the banner steps aside while a
+ * terminal holds the soft keyboard, and comes back when the keyboard goes (ledger A-36): [content] gets the window's
+ * [TerminalKeyboard].
  */
 @Composable
 fun DemoFrame(demo: Boolean, exit: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (demo) DemoBanner(exit, Modifier.windowInsetsPadding(WindowInsets.statusBars))
-        Box(Modifier.weight(1f).then(if (demo) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
-            content()
+    val keyboard = remember { TerminalKeyboard() }
+    val banner = demo && !(isCompactHeight() && keyboard.held)
+    CompositionLocalProvider(LocalTerminalKeyboard provides keyboard) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            if (banner) DemoBanner(exit, Modifier.windowInsetsPadding(WindowInsets.statusBars))
+            Box(Modifier.weight(1f).then(if (banner) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier)) {
+                content()
+            }
         }
     }
 }

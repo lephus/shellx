@@ -27,6 +27,7 @@ import com.shellx.app.R
 import com.shellx.app.SignedInScope
 import com.shellx.app.ui.agent.AgentNotice
 import com.shellx.app.ui.agent.AgentView
+import com.shellx.app.ui.components.LocalTerminalKeyboard
 import com.shellx.app.ui.components.rememberNowMs
 import com.shellx.app.voice.LocalVoice
 import com.shellx.app.ui.terminal.TerminalPane
@@ -131,6 +132,8 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
             val voiceLocksPaging by (activity?.anyActive ?: remember { MutableStateFlow(false) }).collectAsStateWithLifecycle()
             var terminalLocksPaging by remember { mutableStateOf(false) }
             var terminalHoldsKeyboard by remember { mutableStateOf(false) }
+            // The window's bars above the screen (the demo banner) step aside with the screen's own (ledger A-36).
+            val windowKeyboard = LocalTerminalKeyboard.current
             val actions = remember(model) {
                 WorkspaceScreenActions.make(
                     scope, model,
@@ -168,7 +171,10 @@ fun WorkspaceView(scope: SignedInScope, ref: WorkspaceRef, open: (String) -> Uni
                         // Typing into a page settles the screen on it: an agent that starts asking does not pull the
                         // keyboard away mid-command.
                         engaged = model::settle,
-                        holdsKeyboard = { terminalHoldsKeyboard = it },
+                        holdsKeyboard = {
+                            terminalHoldsKeyboard = it
+                            windowKeyboard?.held = it
+                        },
                     )
                 }
                 if (pane.id in model.shownAsTerminal) {
