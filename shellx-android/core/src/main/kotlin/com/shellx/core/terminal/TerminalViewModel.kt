@@ -141,7 +141,8 @@ data class TerminalViewState(
  *   then clears running and reconciles (the close is queued and still goes out; A2). A `run()` that starts while an
  *   older one is still running takes over: only the newest handles events and owns running; the older one stops
  *   collecting and returns without touching state. `retry()` clears Unavailable and the budgets, sets Connecting,
- *   reconciles.
+ *   reconciles. A run that starts with no view (after a stop) restores both budgets: a stopped page hears no State,
+ *   so it cannot tell whether a reconnect it missed would have restored them (R8).
  * - **R10 Typing** (`insertText`, `setMarkedText`, `unmarkText`, `deleteBackward`, `typeKey`, `press`, `toggleCtrl`):
  *   `TerminalTyping` turns the call into units; with a view, each message of `TerminalInputBatcher.messages(units)` is
  *   queued as `input(id, units)` (after any queued open) and raises `sentInputs` by one; without a view they are
@@ -345,6 +346,13 @@ class TerminalViewModel(
         collecting?.stop()
         running = true
         waitingForMac = false
+        if (view == null) {
+            // After a stop (not a restart in the same turn, which keeps its view): the page heard no State meanwhile,
+            // and a reconnect it missed restores both budgets on the iPhone (R8; review C m3). A retry wait still
+            // pending stays.
+            busyRetriesUsed = 0
+            failedRetriesUsed = 0
+        }
         reconcile()
         publish()
         var mine: Collection? = null
