@@ -43,6 +43,13 @@ class TerminalViewportTest {
         val p = v(10, 100); val q = p.scrolledBy(0f, 504f - p.scrollY)
         assertEquals(504f, q.scrollY); assertEquals(25..29, q.visibleRows)
     }
+    /** Review B2 m1 (iPhone parity): a scroll that ends within half a row of the bottom follows it. */
+    @Test fun aScrollThatEndsWithinHalfARowOfTheBottomFollows() {
+        val near = v(10, 50).scrolledBy(0f, -9f)
+        assertEquals(899f, near.scrollY); assertTrue(near.followsBottom)
+        assertEquals(928f, near.contentChanged(10, 51, 0, toBottom = false).scrollY)
+        assertFalse(v(10, 50).scrolledBy(0f, -11f).followsBottom)
+    }
     @Test fun aKeyboardThatShrinksThePaneKeepsTheBottom() {
         val p = v(10, 100, h = 300f).resized(200f, 150f)
         assertEquals(p.maxScrollY, p.scrollY); assertTrue(p.followsBottom)
