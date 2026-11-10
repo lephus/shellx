@@ -71,6 +71,16 @@ class TerminalViewportTest {
             assertEquals(p, p.pinched(factor, 0f, 0f), "$factor")
         }
     }
+    /** Re-review B, out of scope 2: a pinch focus or a scroll delta that is not finite changes nothing. */
+    @Test fun aPinchFocusOrAScrollThatIsNotFiniteChangesNothing() {
+        val p = v(10, 50).scrolledBy(0f, -300f); assertEquals(608f, p.scrollY)
+        for (bad in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            assertEquals(p, p.pinched(2f, bad, 10f), "focusX $bad")
+            assertEquals(p, p.pinched(2f, 10f, bad), "focusY $bad")
+            assertEquals(p, p.scrolledBy(bad, 0f), "dx $bad")
+            assertEquals(p, p.scrolledBy(0f, bad), "dy $bad")
+        }
+    }
     @Test fun aKeyboardThatShrinksThePaneKeepsTheBottom() {
         val p = v(10, 100, h = 300f).resized(200f, 150f)
         assertEquals(p.maxScrollY, p.scrollY); assertTrue(p.followsBottom)
