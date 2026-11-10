@@ -80,4 +80,20 @@ class TerminalClipboardTest {
         clipboard.setPrimaryClip(ClipData(ClipDescription("link", arrayOf(ClipDescription.MIMETYPE_TEXT_INTENT)), item))
         assertNull(TerminalClipboard.text(context))
     }
+
+    /**
+     * Paste is offered only for a clip whose description says text the reader takes (re-review B m-4): a list of URIs
+     * or an Intent pastes nothing, so Paste stays off for them. Only the description is read (no clipboard toast).
+     */
+    @Test
+    fun pasteIsOfferedOnlyForTextItCanPaste() {
+        clipboard.setPrimaryClip(ClipData.newHtmlText("", "a b", "<b>a</b> b"))
+        assertTrue(TerminalClipboard.hasText(context))
+        val uri = Uri.parse("content://com.example.files/a.txt")
+        clipboard.setPrimaryClip(ClipData(ClipDescription("files", arrayOf(ClipDescription.MIMETYPE_TEXT_URILIST)), ClipData.Item(uri)))
+        assertFalse(TerminalClipboard.hasText(context))
+        val intent = ClipData.Item(Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")))
+        clipboard.setPrimaryClip(ClipData(ClipDescription("link", arrayOf(ClipDescription.MIMETYPE_TEXT_INTENT)), intent))
+        assertFalse(TerminalClipboard.hasText(context))
+    }
 }
