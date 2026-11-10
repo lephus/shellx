@@ -78,6 +78,36 @@ class TerminalRowLayoutTest {
         assertEquals(1f, layout.ops[3].scaleX)
     }
 
+    /** Where each glyph of [layout]'s ops starts, by its code point index along the row's text ops. */
+    private fun glyphStarts(layout: TerminalRowLayout, metrics: TerminalGlyphMetrics): List<Pair<String, Float>> =
+        layout.ops.flatMap { op ->
+            var x = op.x
+            op.text.map { char ->
+                val start = char.toString() to x
+                x += metrics.advance(char.toString(), op.bold, op.italic) * op.scaleX
+                start
+            }
+        }
+
+    /**
+     * Glyphs a little off the cell's width (a fallback face, 0.4 px here) still join runs, but never far enough to leave
+     * their columns: every glyph starts within 0.5 px of its column, the 80th of a row at 79 cells, and "x" after twenty
+     * of them at 200 (reviews D1 M9, final m1; the iPhone moves every glyph to its column).
+     */
+    @Test
+    fun aRunOfGlyphsSlightlyOffTheCellWidthStaysOnTheGrid() {
+        val metrics = FakeMetrics(advances = mapOf("─" to 10.4f))
+        val row = TerminalRowLayout(TerminalRow(listOf(TerminalStyledRun(0, "─".repeat(80)))), 80, DemoTerminalScreens.PALETTE, metrics)
+        val starts = glyphStarts(row, metrics)
+        assertEquals(80, starts.size)
+        starts.forEachIndexed { column, (_, x) -> assertEquals("column $column", column * 10f, x, 0.5f) }
+        val mixed = TerminalRowLayout(TerminalRow(listOf(TerminalStyledRun(0, "─".repeat(20) + "x"))), 21, DemoTerminalScreens.PALETTE, metrics)
+        val placed = glyphStarts(mixed, metrics)
+        placed.forEachIndexed { column, (_, x) -> assertEquals("column $column", column * 10f, x, 0.5f) }
+        assertEquals("x", placed.last().first)
+        assertEquals(200f, placed.last().second, 0.5f)
+    }
+
     @Test
     fun aClusterWiderThanItsCellsIsSqueezedIntoThem() {
         val metrics = FakeMetrics(advances = mapOf("👨‍👩‍👧" to 30f, "中" to 18f))
