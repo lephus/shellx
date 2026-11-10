@@ -5,14 +5,21 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
+import android.os.Build
+import android.os.Bundle
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import com.shellx.app.R
 import com.shellx.core.terminal.TerminalColors
 import com.shellx.core.terminal.TerminalGeometry
 import com.shellx.core.terminal.TerminalHardwareAction
@@ -40,8 +47,13 @@ import com.shellx.link.core.TerminalScreen
  * It is the keyboard's editor ([TerminalInputConnection]; plan 3G Design, "Soft keyboard") and takes hardware keys
  * ([handleKey]; "Hardware keys"). Input reaches the model only from the page shown and only while the model takes it
  * ([accepts]); a surface that stops accepting gives the keyboard up, and it never takes the keyboard back by itself:
- * only a tap or a long press focuses it ([focusAndShowKeyboard]). TalkBack reads it from this View
- * ([accessibilityLabel], the screen as text) while its page is shown and uncovered. Main thread only.
+ * only a tap or a long press focuses it ([focusAndShowKeyboard]).
+ *
+ * TalkBack reads it from this View, never from the pane's Compose node (Compose hands an AndroidView's node to its
+ * View), and only while it is the terminal shown and uncovered ([readable]): [accessibilityLabel] and the rows shown,
+ * built when asked; a double tap opens the keyboard, scroll actions page through the history, and a change of the
+ * screen is told at most once a second. The screen is the user's: no content capture, no autofill, and on API 34+ only
+ * accessibility tools read the node. Main thread only.
  */
 @SuppressLint("ViewConstructor") // Made in code by TerminalPane only.
 class TerminalSurfaceView(
@@ -91,19 +103,30 @@ class TerminalSurfaceView(
     /** A dead key's accent, waiting for the next character. */
     private var deadAccent = 0
 
-    /**
-     * The terminal as TalkBack reads it: this label, and the screen's rows as the node's text. Set here and not in the
-     * pane's semantics, which never reach an accessibility service: Compose hands an AndroidView's node to its View.
-     */
+    /** What TalkBack says first, "Terminal zsh" (VoiceOver's label); the rows shown follow it. */
     var accessibilityLabel: String = ""
-        set(value) {
-            field = value
-            contentDescription = value
-        }
+
+    private val accessibility: AccessibilityManager? = context.getSystemService(AccessibilityManager::class.java)
+    private var lastRevision = -1L
+
+    /** When the last text change was told (uptime ms), and whether one waits for its second to pass. */
+    private var lastTextChange = 0L
+    private var textChangeWaits = false
+    private val tellTextChange = Runnable {
+        textChangeWaits = false
+        sendTextChange()
+    }
 
     init {
         // Hidden until the first render says the page is shown and uncovered.
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        // The screen is the user's: it takes no part in content capture or autofill, and only accessibility tools (not
+        // every service that asks) read its node.
+        importantForAutofill = IMPORTANT_FOR_AUTOFILL_NO
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) importantForContentCapture = IMPORTANT_FOR_CONTENT_CAPTURE_NO
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            setAccessibilityDataSensitive(ACCESSIBILITY_DATA_SENSITIVE_YES)
+        }
         isFocusable = true
         isFocusableInTouchMode = true
     }
@@ -129,15 +152,106 @@ class TerminalSurfaceView(
         // A page that stops taking input (covered, reopening, another terminal shown) gives the keyboard up.
         if (hasFocus() && !accepts()) clearTerminalFocus()
         // Under a card, or for another terminal, TalkBack does not reach it.
-        val readable = state.terminalId == terminalId && !covers(state.phase, state.snapshots)
+        val readable = readable
         importantForAccessibility = if (readable) IMPORTANT_FOR_ACCESSIBILITY_YES else IMPORTANT_FOR_ACCESSIBILITY_NO
+        if (readable && state.screenRevision != lastRevision) textChanged()
+        lastRevision = state.screenRevision
         invalidate()
     }
 
-    /** The screen's rows, built only when an accessibility service asks. */
+    // Accessibility
+
+    /** TalkBack reads this surface: its terminal is the one the model shows now, and no card covers it. */
+    private val readable: Boolean
+        get() {
+            val now = model.state.value
+            return now.terminalId == terminalId && !covers(now.phase, now.snapshots)
+        }
+
+    /**
+     * The rows shown (history rows too while scrolled up), blank rows at either end left out. TalkBack speaks a node's
+     * description in place of its text, so the description is the label and then these rows, as VoiceOver reads the
+     * iPhone's label and value. Built only when an accessibility service asks.
+     */
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
-        info.text = model.screen.screenText().joinToString("\n")
+        if (!readable) return
+        val rows = shownText()
+        info.text = rows
+        info.contentDescription = if (rows.isEmpty()) accessibilityLabel else "$accessibilityLabel\n$rows"
+        if (accepts()) {
+            info.isClickable = true
+            info.addAction(AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, context.getString(R.string.action_type)))
+        }
+        if (scrollsHistory) {
+            val back = viewport.scrollY > 0.5f
+            val forward = viewport.scrollY < viewport.maxScrollY - 0.5f
+            if (back) info.addAction(AccessibilityAction.ACTION_SCROLL_BACKWARD)
+            if (forward) info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD)
+            info.isScrollable = back || forward
+        }
+    }
+
+    /** A double tap opens the keyboard (as a tap does); the scroll actions page through the history. */
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
+        if (readable) {
+            when (action) {
+                AccessibilityNodeInfo.ACTION_CLICK -> if (accepts()) {
+                    focusAndShowKeyboard()
+                    return true
+                }
+                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD, AccessibilityNodeInfo.ACTION_SCROLL_FORWARD -> if (scrollsHistory) {
+                    val page = maxOf(viewport.height - viewport.cellHeight * viewport.scale, viewport.cellHeight * viewport.scale)
+                    val before = viewport.scrollY
+                    setViewport(viewport.scrolledBy(0f, if (action == AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD) -page else page))
+                    if (viewport.scrollY == before) return false
+                    textChanged()
+                    return true
+                }
+            }
+        }
+        return super.performAccessibilityAction(action, arguments)
+    }
+
+    /** History to page through: the main screen (the alternate one's scroll goes to the Mac, by a drag). */
+    private val scrollsHistory: Boolean
+        get() = !model.screen.alt && viewport.maxScrollY > 0.5f
+
+    private fun shownText(): String {
+        val screen = model.screen
+        val history = if (screen.alt) 0 else screen.historyRows.size
+        return viewport.visibleRows.joinToString("\n") { (row(screen, it, history) ?: BLANK).text(screen.cols) }.trim('\n')
+    }
+
+    /** The text TalkBack reads changed: tell it at once, or when a second has passed since the last time. */
+    private fun textChanged() {
+        if (accessibility?.isEnabled != true || textChangeWaits) return
+        val wait = lastTextChange + TEXT_CHANGE_INTERVAL_MS - SystemClock.uptimeMillis()
+        if (lastTextChange == 0L || wait <= 0) {
+            sendTextChange()
+        } else {
+            textChangeWaits = true
+            postDelayed(tellTextChange, wait)
+        }
+    }
+
+    private fun sendTextChange() {
+        if (!readable || accessibility?.isEnabled != true) return
+        lastTextChange = SystemClock.uptimeMillis()
+        @Suppress("DEPRECATION") // AccessibilityEvent(int) is API 30.
+        val event = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            AccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+        } else {
+            AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+        }
+        event.contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT
+        sendAccessibilityEventUnchecked(event)
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        removeCallbacks(tellTextChange)
+        textChangeWaits = false
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -428,6 +542,9 @@ class TerminalSurfaceView(
     private companion object {
         /** Rows kept laid out beyond the visible ones, above and below. */
         const val CACHE_MARGIN = 40
+
+        /** At most one screen change told to TalkBack a second. */
+        const val TEXT_CHANGE_INTERVAL_MS = 1_000L
 
         val BLANK = TerminalRow()
     }

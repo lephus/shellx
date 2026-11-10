@@ -69,11 +69,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.text
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -321,7 +318,6 @@ private fun BoxScope.Surface(
 
     val emptyColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
     val label = stringResource(R.string.terminal_surface_label, title)
-    val revision = state.screenRevision
     val alt = model.screen.alt
     val vertical = rememberScrollableState { delta -> surface?.dragVertically(delta) ?: 0f }
     val horizontal = rememberScrollableState { delta -> surface?.dragHorizontally(delta) ?: 0f }
@@ -337,14 +333,8 @@ private fun BoxScope.Surface(
 
     // One modifier chain in every state, its parts switched off while covered: taking a gesture's node out of the chain
     // would take its focus target out too, and Compose then moves the focus off the surface (the keyboard with it)
-    // before the surface can hide the keyboard itself.
-    val semantics = Modifier.clearAndSetSemantics {
-        if (!covered) {
-            contentDescription = label
-            // Built only when an accessibility service or a test asks; `revision` makes a new block when the screen changes.
-            if (revision >= 0) text = AnnotatedString(model.screen.screenText().joinToString("\n"))
-        }
-    }
+    // before the surface can hide the keyboard itself. No semantics: TalkBack reads the View (TerminalSurfaceView), and
+    // Compose would pass a node's text on to content capture.
     val gestures = Modifier
         .pointerInput(covered) {
             if (!covered) detectPinch({ pinching = it }) { zoom, centroid -> surface?.pinch(zoom, centroid.x, centroid.y) }
@@ -384,7 +374,6 @@ private fun BoxScope.Surface(
                     },
                 )
                 .testTag("terminal.surface")
-                .then(semantics)
                 .then(gestures),
             update = { view ->
                 view.emptyColor = emptyColor
