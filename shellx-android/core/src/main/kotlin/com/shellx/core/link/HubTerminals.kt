@@ -182,9 +182,11 @@ internal class HubTerminals(private val hub: MachineHub) {
         if (stopped) return
         val feed = feed(machineId)
         val me = Subscriber()
-        // The newest takes the pushes: the one before it stops, before its next take.
-        feed.subscribers.lastOrNull()?.takeAway()
+        // The newest takes the pushes: the one before it stops, before its next take. It is in the list first, so a
+        // collection that resumes inside takeAway (an immediate dispatcher) already sees it.
+        val previous = feed.subscribers.lastOrNull()
         feed.subscribers += me
+        previous?.takeAway()
         // Nothing is replayed: what holds now counts as told.
         var toldVersion = feed.stateVersion
         var toldOnline: Long? = if (feed.state == MachineLinkState.Online) feed.generation else null
