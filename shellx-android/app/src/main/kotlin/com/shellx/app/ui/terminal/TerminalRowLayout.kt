@@ -16,8 +16,9 @@ import kotlin.math.abs
  *
  * Every cell is placed by its column, never by the font's advance, so a glyph the monospace face lacks (a fallback
  * font's CJK, emoji or Vietnamese letter of another width) cannot push the cells after it sideways (Review Focus 5).
- * Narrow cells whose advance is the cell's width are drawn as one run; any other glyph is drawn alone, centred in its
- * cells when narrower, squeezed into them when wider. Lengths are grid px (the font's px at scale 1). Main thread only.
+ * Narrow cells whose advance is the cell's width (within 0.5 px) are drawn as one run, cut where the run would place a
+ * glyph more than 0.5 px off its column; any other glyph is drawn alone, centred in its cells when narrower, squeezed
+ * into them when wider. Lengths are grid px (the font's px at scale 1). Main thread only.
  */
 class TerminalRowLayout(row: TerminalRow, cols: Int, palette: TerminalPalette, private val metrics: TerminalGlyphMetrics) {
     data class Cell(val column: Int, val width: Int, val text: String)
@@ -120,9 +121,12 @@ class TerminalRowLayout(row: TerminalRow, cols: Int, palette: TerminalPalette, p
             }
             // Narrow cells of the cell's width join one run (spaces inside it included, at its ends left out); every
             // other cell is drawn on its own. Cells come in column order: narrow and clusters are merged by column.
+            // A run places each glyph by the advances before it, so [drift] keeps how far the next cell would start
+            // from its column; past 0.5 px a new run starts at the column, and no glyph ever leaves its column.
             val run = StringBuilder()
             var runX = 0f
             var trailingSpaces = 0
+            var drift = 0f
             fun flush() {
                 if (run.isNotEmpty()) op(run.substring(0, run.length - trailingSpaces), runX, 1f)
                 run.setLength(0)
@@ -136,11 +140,17 @@ class TerminalRowLayout(row: TerminalRow, cols: Int, palette: TerminalPalette, p
                         if (run.isNotEmpty()) {
                             run.append(' ')
                             trailingSpaces += 1
+                            drift += advance - metrics.cellWidth
                         }
                     } else {
-                        if (run.isEmpty()) runX = cell.column * metrics.cellWidth
+                        if (run.isNotEmpty() && abs(drift) > 0.5f) flush()
+                        if (run.isEmpty()) {
+                            runX = cell.column * metrics.cellWidth
+                            drift = 0f
+                        }
                         run.append(cell.text)
                         trailingSpaces = 0
+                        drift += advance - metrics.cellWidth
                     }
                     continue
                 }
