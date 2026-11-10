@@ -45,8 +45,9 @@ interface TerminalLink {
      *   `buffer`, `flowOn`, `shareIn`, `produceIn` or other operator built on a channel or on `flow {}` in between, and
      *   no suspension in the collector's code. Only the newest collection of a Mac takes its pushes; an older one gets
      *   only the states until the newer one ends, then takes them again where it stopped. Pushes made while nobody
-     *   collects are dropped, unless a collection starts in the same main-loop turn as the last one ended (a restarted
-     *   effect): that one goes on where the other stopped.
+     *   collects wait in the queue for the next collection, so an open sent before the collection starts keeps its
+     *   `Opened` and first snapshot; the leftovers of earlier views come first (other terminals, frames before the
+     *   view's `Opened`), which a page ignores.
      * - **States** are the newest the hub set, not each one in between; but a collection told Online for a session
      *   is always told a state that is not Online (Reconnecting, when the Mac is back already) before it is told Online
      *   for the next one, and Online before that session's first push.

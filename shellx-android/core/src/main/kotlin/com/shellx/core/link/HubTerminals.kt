@@ -23,8 +23,6 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 
 /**
  * The terminal view calls (PROTOCOL.md section 11) on each Mac's live session, and the terminal events of each Mac
@@ -41,9 +39,10 @@ import kotlinx.coroutines.yield
  *
  * Per Mac, the newest collection takes the pushes; an older one waits, getting only states, and takes them again when
  * the newer one ends: a session views one terminal, and two collectors of one queue would split its frames. While no
- * collection runs, a drainer takes the pushes and drops them, as the iPhone's hub drops what no subscriber reads; it
- * waits one dispatch first, so a collection started in the same main-loop turn as the last one ended (a restarted
- * effect, plan A2) goes on where that one stopped.
+ * collection runs, the pushes wait in the bounded queue for the next one (review B1 I-1): a page may send its open
+ * before its collection starts, and the open's `Opened` and first snapshot must still reach it. What waits is harmless
+ * to a page: it ignores other terminals and frames before its view's `Opened`, and the queue starts a view afresh at
+ * each `Opened` and drops a terminal's queued frames at its next snapshot.
  */
 internal class HubTerminals(private val hub: MachineHub) {
     private class Feed {
@@ -61,9 +60,6 @@ internal class HubTerminals(private val hub: MachineHub) {
 
         /** The collections, oldest first: the last takes the pushes. */
         val subscribers = ArrayList<Subscriber>()
-
-        /** Takes and drops the pushes while no collection runs. */
-        var drainer: Job? = null
     }
 
     private class Subscriber {
@@ -105,8 +101,6 @@ internal class HubTerminals(private val hub: MachineHub) {
         feed.stateVersion += 1
         if (state != MachineLinkState.Online) {
             feed.pushes = null
-            feed.drainer?.cancel()
-            feed.drainer = null
             // What is left of the old session's pushes belongs to a view that is gone: tell the state now.
             feed.subscribers.lastOrNull()?.takeAway()
         }
@@ -116,20 +110,15 @@ internal class HubTerminals(private val hub: MachineHub) {
     /** A new session of the Mac, with its terminal pushes; its Online follows. */
     fun sessionStarted(machineId: String, pushes: Flow<TerminalViewPush>) {
         val feed = feed(machineId)
-        feed.drainer?.cancel()
-        feed.drainer = null
         feed.pushes = pushes
         feed.generation += 1
         changed()
-        if (feed.subscribers.isEmpty()) drain(feed)
     }
 
     /** The hub stopped: every collection completes. */
     fun stop() {
         stopped = true
         for (feed in feeds.values) {
-            feed.drainer?.cancel()
-            feed.drainer = null
             for (subscriber in feed.subscribers) subscriber.takeAway()
         }
         changed()
@@ -196,8 +185,6 @@ internal class HubTerminals(private val hub: MachineHub) {
         // The newest takes the pushes: the one before it stops, before its next take.
         feed.subscribers.lastOrNull()?.takeAway()
         feed.subscribers += me
-        feed.drainer?.cancel()
-        feed.drainer = null
         // Nothing is replayed: what holds now counts as told.
         var toldVersion = feed.stateVersion
         var toldOnline: Long? = if (feed.state == MachineLinkState.Online) feed.generation else null
@@ -236,7 +223,6 @@ internal class HubTerminals(private val hub: MachineHub) {
             me.takeAway()
             feed.subscribers -= me
             changed()
-            if (feed.subscribers.isEmpty()) drain(feed)
         }
     }
 
@@ -264,17 +250,6 @@ internal class HubTerminals(private val hub: MachineHub) {
         } finally {
             me.taking = null
             me.takenAway = false
-        }
-    }
-
-    /** While no collection runs, the pushes are taken and dropped, after one dispatch (see the class). */
-    private fun drain(feed: Feed) {
-        val pushes = feed.pushes ?: return
-        if (stopped || feed.subscribers.isNotEmpty() || feed.drainer?.isActive == true) return
-        feed.drainer = hub.scope.launch {
-            yield()
-            if (feed.subscribers.isNotEmpty() || feed.pushes !== pushes) return@launch
-            pushes.collect {}
         }
     }
 
