@@ -5,6 +5,7 @@ import com.shellx.app.testing.ManualClock
 import com.shellx.core.diagnostics.LatencyLog
 import com.shellx.core.diagnostics.LatencyMetric
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -43,5 +44,20 @@ class LaunchMarkTest {
 
         assertNull(latency.summary(LatencyMetric.LAUNCH_TO_HOME))
         assertNull(latency.summary(LatencyMetric.LAUNCH_TO_WORKSPACE_LIST))
+    }
+
+    /** 3D review B m-1: a process a push started in the background counts its launch from the first start in front. */
+    @Test
+    fun aRestartCountsFromThere() {
+        val latency = LatencyLog()
+        val clock = ManualClock()
+        val launch = LaunchMark(latency, clock)
+
+        clock.advance(30.seconds)
+        launch.restart()
+        clock.advance(400.milliseconds)
+        launch.homeShown()
+
+        assertEquals(400.milliseconds, latency.summary(LatencyMetric.LAUNCH_TO_HOME)?.p50)
     }
 }

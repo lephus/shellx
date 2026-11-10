@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon of the "needs you" alerts: the glyphs of design/shellx-logo.svg (elements 4-6) in solid white,
+     which Android tints; 24 dp over the logo's 512 units. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- 4. "<", the phone side -->
+    <path android:pathData="M384,122L290,234L384,346" android:strokeWidth="54" android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <!-- 5. ">", the computer side and the prompt -->
+    <path android:pathData="M128,122L222,234L128,346" android:strokeWidth="54" android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <!-- 6. the cursor -->
+    <path android:pathData="M308,398H376A8,8 0,0 1,384 406V416A8,8 0,0 1,376 424H308A8,8 0,0 1,300 416V406A8,8 0,0 1,308 398Z" android:fillColor="#FFFFFFFF" />
+</vector>

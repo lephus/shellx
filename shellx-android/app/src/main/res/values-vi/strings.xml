@@ -219,7 +219,6 @@
     <string name="update_later">Để sau</string>
     <string name="update_now">Cập nhật</string>
     <string name="update_title">Đã có bản %1$s</string>
-    <string name="voice_denied">ShellX cần quyền micro và nhận dạng giọng nói để nghe bạn.</string>
     <string name="voice_keyboard">Gõ phím</string>
     <string name="voice_language_english">Tiếng Anh</string>
     <string name="voice_language_vietnamese">Tiếng Việt</string>
