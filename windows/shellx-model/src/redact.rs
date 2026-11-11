@@ -11,6 +11,10 @@
 //! - A code more than 24 characters away from its keyword, or split (`123 456`), is not hidden;
 //!   neither is an email written `%40` or `\u0040`.
 //! - Hex-only secrets are kept; the relay's secrets are base64url.
+//! - A joined CamelCase name with 8+ capitals, 8+ lower-case letters and 32+ characters reads
+//!   as a token (`JetBrainsMonoNerdFontMono-ExtraBoldItalic`).
+//! - A code keyword in capitals glued to a capitalised word (`OTPCode`) is not recognised.
+//! - A Windows SID (`S-1-5-21-...-1001`) is hidden: it is long, with digits and dashes.
 
 /// Shortest run of token characters (without a trailing `=`) that counts as a secret.
 const TOKEN_MIN_CHARS: usize = 32;
@@ -123,8 +127,10 @@ fn redact_emails(text: &str) -> String {
     out
 }
 
+/// A Resend key is `re_` and then letters, digits, `_` or `-` (a relay token can hold `-`
+/// too, so a longer run with `re_` inside is judged as a token, not cut as a key).
 fn is_key_char(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_'
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
 /// The end (exclusive) of a Resend key that starts at `i`: `re_` and at least 8 key chars.
@@ -147,7 +153,8 @@ fn redact_keys(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
     while i < chars.len() {
-        let after_word = i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_');
+        let after_word =
+            i > 0 && (chars[i - 1].is_alphanumeric() || matches!(chars[i - 1], '_' | '-'));
         if !after_word && let Some(end) = key_end(&chars, i) {
             out.push_str("<key>");
             i = end;

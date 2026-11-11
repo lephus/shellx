@@ -390,10 +390,9 @@ fn auto_shells(found: &[ShellLaunch]) -> impl Iterator<Item = &ShellLaunch> {
     })
 }
 
-/// Windows ignores case and accepts `/` for `\\`.
+/// Windows ignores case (Unicode, `Phú` and `PHÚ` are one folder) and accepts `/` for `\\`.
 fn same_program(a: &str, b: &str) -> bool {
-    a.replace('/', "\\")
-        .eq_ignore_ascii_case(&b.replace('/', "\\"))
+    a.replace('/', "\\").to_lowercase() == b.replace('/', "\\").to_lowercase()
 }
 
 /// The first Auto shell that is not the program in `first`: the one fallback.
