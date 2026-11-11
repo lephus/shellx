@@ -83,6 +83,22 @@ class AppCoordinatorGoogleTest {
         assertNotNull(rig.coordinator.hub.value)
     } }
 
+    @Test fun aGoogleSignInStoresAGoogleSession() { runTest {
+        val rig = rig()
+        rig.coordinator.launch()
+        rig.coordinator.signInWithGoogle()
+        assertEquals(AccountAuthMethod.GOOGLE, rig.vault.session()?.authMethod)
+        assertEquals(AppPhase.SignedIn("g@example.com", AccountAuthMethod.GOOGLE), rig.coordinator.phase.value)
+    } }
+
+    @Test fun anEmailSessionIsShownAsOneAfterARelaunch() { runTest {
+        val rig = rig()
+        rig.vault.setSession(StoredSession("u1", "d1", "tok-old", "e@example.com", AccountAuthMethod.EMAIL))
+        rig.coordinator.launch()
+        assertEquals(AppPhase.SignedIn("e@example.com", AccountAuthMethod.EMAIL), rig.coordinator.phase.value)
+        assertFalse(rig.coordinator.phase.value.toString().contains("e@example.com"))
+    } }
+
     @Test fun googleSignInCancelledChangesNothing() { runTest {
         val rig = rig()
         rig.coordinator.launch()
