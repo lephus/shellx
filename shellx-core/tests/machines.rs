@@ -115,7 +115,7 @@ fn list_marks_this_machine_and_offline_after_90s() {
     assert_eq!(o["platform"], "windows");
     assert!(m["last_seen_unix"].as_u64().unwrap() >= now() - 5);
     assert_eq!(o["last_seen_unix"].as_u64().unwrap(), now() - 100);
-    assert_eq!(m["fingerprint"].as_str().unwrap().len(), 16);
+    assert_eq!(m["fingerprint"], Value::Null, "the relay sends no key, so the core has no fingerprint (D1)");
     fake.set_last_heartbeat(&other_id, now() - 80);
     let r = core.call("machines.list", json!({})).unwrap();
     let o = r["machines"].as_array().unwrap().iter().find(|m| m["machine_id"] == json!(other_id)).unwrap().clone();
@@ -123,12 +123,13 @@ fn list_marks_this_machine_and_offline_after_90s() {
 }
 
 #[test]
-fn list_fingerprint_of_this_machine_matches_login_fingerprint() {
+fn list_fingerprint_is_null_in_the_relays_shape() {
     let (core, _fake, _dir) = support::logged_out();
     let l = login(&core);
+    assert_eq!(l["fingerprint"].as_str().unwrap().len(), 16);
     core.call("machines.register", reg_params()).unwrap();
     let r = core.call("machines.list", json!({})).unwrap();
-    assert_eq!(r["machines"][0]["fingerprint"], l["fingerprint"]);
+    assert_eq!(r["machines"][0]["fingerprint"], Value::Null);
 }
 
 #[test]
@@ -178,6 +179,7 @@ fn list_fingerprint_is_computed_from_a_padded_standard_key() {
     let b64 = STANDARD.encode(key);
     assert!(b64.contains('=') && (b64.contains('+') || b64.contains('/')));
     fake.set_machine_key_b64(&id, &b64);
+    fake.set_list_machine_keys(true);
     let r = core.call("machines.list", json!({})).unwrap();
     assert_eq!(r["machines"][0]["fingerprint"], json!(shellx_core::fingerprint::fingerprint(&key)));
 }

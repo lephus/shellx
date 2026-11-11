@@ -21,7 +21,8 @@
 //! Phone requests are created with `FakeApi::add_phone_pairing` (no phone-side routes here).
 //!
 //! Machines: registering again with the same (user, key) updates the same machine.
-//! `online` = heartbeat within 90 s. Tickets follow the ledger "Ticket format"
+//! `online` = heartbeat within 90 s. `GET /v2/machines` items carry the relay's six keys and no key
+//! (`set_list_machine_keys` adds `noise_public_key_b64`). Tickets follow the ledger "Ticket format"
 //! (cmux-relay v2) and are signed with `FakeOptions::hmac_secret`; `connect` is
 //! allowed for the caller's own machine (D3) or a granted target, else 403
 //! `not_granted`.
@@ -233,6 +234,8 @@ struct State {
     shares: HashMap<String, Share>,
     /// Test hook: `GET /v2/pairings` returns every pairing of the account, ignoring `role`.
     list_all_pairings: bool,
+    /// Test hook: `GET /v2/machines` items also carry `noise_public_key_b64` (the real relay never sends it).
+    list_machine_keys: bool,
     /// id → phone pairing request (`/v2/phone-pairings`, desktop side).
     phone_pairings: HashMap<String, PhonePairing>,
     /// id → phone grant (`/v2/phone-grants`).
@@ -340,8 +343,6 @@ struct Machine {
     device_id: String,
     name: String,
     platform: String,
-    os_version: String,
-    app_version: String,
     noise_public_key_b64: String,
     slot: String,
     link_slot: String,
@@ -631,6 +632,12 @@ impl FakeApi {
         self.shared.lock().list_all_pairings = on;
     }
 
+    /// Make `GET /v2/machines` items also carry each machine's stored `noise_public_key_b64` (a relay that
+    /// sends keys; the real one does not, `relay/src/v2/machines.ts`). Test hook; off by default.
+    pub fn set_list_machine_keys(&self, on: bool) {
+        self.shared.lock().list_machine_keys = on;
+    }
+
     /// Stop serving and close the listener.
     pub fn stop(mut self) {
         self.shutdown();
@@ -837,7 +844,8 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
     let text = |k: &str, max: usize| b[k].as_str().map(str::trim).filter(|v| (1..=max).contains(&v.chars().count()));
     let key = b["noise_public_key_b64"].as_str().filter(|k| URL_SAFE_NO_PAD.decode(k).is_ok_and(|r| r.len() == 32));
     let platform = b["platform"].as_str().filter(|p| DEVICE_PLATFORMS.contains(p));
-    let (Some(name), Some(platform), Some(os), Some(app), Some(key)) =
+    // The versions are checked, not kept: the list never shows them (as the relay's).
+    let (Some(name), Some(platform), Some(_), Some(_), Some(key)) =
         (text("name", 100), platform, text("os_version", 100), text("app_version", 100), key)
     else {
         return Reply::error(400, "invalid_machine", "Machine information is not valid");
@@ -858,8 +866,6 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
             device_id: who.device_id,
             name: name.to_string(),
             platform: platform.to_string(),
-            os_version: os.to_string(),
-            app_version: app.to_string(),
             noise_public_key_b64: key.to_string(),
             slot: slot.clone(),
             link_slot: link_slot.clone(),
@@ -874,20 +880,22 @@ fn list_machines(rec: &Recorded, st: &State) -> Reply {
     let now = now_unix();
     let mut items: Vec<(&String, &Machine)> = st.machines.iter().filter(|(_, m)| m.user_id == who.user_id).collect();
     items.sort_by(|a, b| a.1.name.cmp(&b.1.name).then(a.0.cmp(b.0)));
+    // The relay's six keys (`relay/src/v2/machines.ts` GET /): no key, no versions.
     let machines: Vec<Value> = items
         .into_iter()
         .map(|(id, m)| {
-            json!({
+            let mut item = json!({
                 "machine_id": id,
                 "name": m.name,
                 "platform": m.platform,
-                "os_version": m.os_version,
-                "app_version": m.app_version,
                 "online": m.last_heartbeat.is_some_and(|t| now.saturating_sub(t) <= ONLINE_WINDOW_SECS),
                 "last_seen_unix": m.last_heartbeat,
-                "noise_public_key_b64": m.noise_public_key_b64,
                 "fingerprint": key_fingerprint(&m.noise_public_key_b64),
-            })
+            });
+            if st.list_machine_keys {
+                item["noise_public_key_b64"] = json!(m.noise_public_key_b64);
+            }
+            item
         })
         .collect();
     Reply::json(200, json!({"machines": machines}))
