@@ -389,6 +389,38 @@ mod tests {
     }
 
     #[test]
+    fn the_code_word_matches_whole_words_only() {
+        for text in [
+            "code 123456",
+            "CODE: 123456",
+            "code=123456",
+            "error_code 123456",
+            "Your OTP is 123456",
+            "otp=123456",
+            "Mã xác nhận 123456",
+            "MÃ 123456",
+            "ma\u{303} 123456",
+            "123456 is your code",
+        ] {
+            assert!(!redact(text).contains("123456"), "{text}");
+        }
+        for text in [
+            "encoder 654321 frames",
+            "Unicode decode 123456",
+            "barcode 123456",
+            "hotplug 123456",
+            "encoding 123456 bytes",
+            "codec 123456",
+            "mãi 123456",
+            // the 24-character window must not cut a longer word down to "code"
+            &format!("de{}123456", "code".to_string() + &" ".repeat(20)),
+            &format!("123456{}coded", " ".repeat(20)),
+        ] {
+            assert_eq!(redact(text), text, "{text}");
+        }
+    }
+
+    #[test]
     fn redaction_is_idempotent_and_total() {
         let samples = [
             "signed in as phu.le+test@gmail.com via email",
