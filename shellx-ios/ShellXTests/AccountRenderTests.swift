@@ -29,6 +29,7 @@ final class AccountRenderTests: XCTestCase {
         let errors: [SignInError] = [
             .invalidCredentials, .rateLimited, .network, .server(code: "x"), .localWipePending, .switchFromSignedInDevice,
             .emailInUse, .identityInUse, .reauthRequired, .providerUnavailable, .providerFailed, .switchToGoogleFirst,
+            .invalidEmail, .disposableEmail, .invalidCode, .codeExpired, .emailSendFailed,
         ]
         let messages = errors.compactMap(SignInErrorText.message(for:))
         XCTAssertEqual(messages.count, errors.count)
@@ -103,6 +104,7 @@ final class AccountRenderTests: XCTestCase {
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .password, dismissed: true))
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .google, dismissed: false))
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .apple, dismissed: false))
+        XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .email, dismissed: false))
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: nil, dismissed: false))
     }
 

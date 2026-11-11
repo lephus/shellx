@@ -671,6 +671,15 @@ private struct GatedGrantsRelay: RelayAccountCalling {
     func deleteAccount(idToken: String, nonce: String, token: String) async throws {
         try await base.deleteAccount(idToken: idToken, nonce: nonce, token: token)
     }
+    func requestEmailCode(email: String, locale: String) async throws -> EmailChallenge {
+        try await base.requestEmailCode(email: email, locale: locale)
+    }
+    func signInWithEmailCode(challengeID: String, code: String, deviceName: String, clientKey: Data) async throws -> AccountSignIn {
+        try await base.signInWithEmailCode(challengeID: challengeID, code: code, deviceName: deviceName, clientKey: clientKey)
+    }
+    func deleteAccount(challengeID: String, code: String, token: String) async throws {
+        try await base.deleteAccount(challengeID: challengeID, code: code, token: token)
+    }
     func logout(token: String) async throws { try await base.logout(token: token) }
     func machines(token: String) async throws -> [PairedMachineListing] {
         await gate.wait()
