@@ -2395,6 +2395,29 @@ mod tests {
             check("MachineInfo", format!("{m:?} {m:#?}"));
         }
         check("SignInMethod", format!("{method:?} {method:#?}"));
+        // Review M1: the sidebar's rows and the stored links.
+        let groups = crate::sidebar::build_groups(
+            &[mac.clone(), pc.clone()],
+            &|_| crate::sidebar::Access::None,
+            0,
+            crate::strings::Lang::Vi,
+        );
+        assert_eq!(groups.len(), 2);
+        for g in &groups {
+            check("MachineGroup", format!("{g:?} {g:#?}"));
+        }
+        let link = crate::links::RemoteLink {
+            machine_id: "mac".into(),
+            machine_name: "Phú's MacBook".into(),
+            relay_route: "r".into(),
+            relay_slot: "s".into(),
+            invite_path: None,
+            daemon_fingerprint: "df".into(),
+            enrolled: true,
+        };
+        check("RemoteLink", format!("{link:?} {link:#?}"));
+        let links = crate::links::Links { links: vec![link] };
+        check("Links", format!("{links:?}"));
     }
 
     #[test]
