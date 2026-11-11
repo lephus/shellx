@@ -468,6 +468,19 @@ class EmailSignInModelTest {
         assertEquals("phu@example.com", tooLate.state.email)
         assertSameCase(SignInException.CodeExpired(), tooLate.state.error)
         assertEquals(emptyList(), tooLate.fake.requested)
+        // The window may be made twice on the way back (the host replaces its restored page): what is saved from that
+        // step is what it was restored from, so the second one says "expired" too. A changed address starts afresh.
+        assertEquals(saved, tooLate.model.saved())
+        val again = rig(restored = tooLate.model.saved(), clock = ManualClock(rig.t0 + 602_000))
+        assertEquals(Step.EMAIL, again.state.step)
+        assertSameCase(SignInException.CodeExpired(), again.state.error)
+        again.model.setEmail("phu@example.org")
+        assertNull(again.state.error)
+        assertEquals(EmailSignInModel.Saved("phu@example.org", null, 0, 0), again.model.saved())
+        tooLate.model.send("en")
+        runCurrent()
+        assertEquals("c1", tooLate.model.saved()?.challengeId)
+        assertEquals(rig.t0 + 601_000 + 600_000, tooLate.model.saved()?.expiresAtMs)
 
         val emailStep = rig(restored = EmailSignInModel.Saved("a@b.c", null, 0, 0))
         assertEquals(Step.EMAIL, emailStep.state.step)
