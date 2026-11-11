@@ -28,6 +28,10 @@ leave it alone).
   (from cargo's cache, else downloaded, checked against the sha256 above) and fails unless the
   files that differ are exactly the files that carry the notice line. It prints
   `gpui-0.2.2: pristine` or `gpui-0.2.2: N patched file(s): <list>`.
+- A patch to gpui's Windows code must also pass `scripts/shellx/check-windows-build.sh` and
+  `scripts/shellx/check-windows-build.sh --release`. The second type-checks the release-only code
+  (the embedded shader bytes, `cfg(not(debug_assertions))`) with a stand-in for `fxc.exe` that
+  compiles no shader. It builds no exe; only the VPS cross build compiles the real shaders.
 
 | Patch | Files | Reason | Commit |
 | --- | --- | --- | --- |
