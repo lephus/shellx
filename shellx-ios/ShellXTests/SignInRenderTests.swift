@@ -268,47 +268,87 @@ final class SignInRenderTests: XCTestCase {
         // the line (361 points, one row) and in a narrow one (220 points, where the line breaks before "your"). On,
         // the cursor adds one block: on the row of the last typed letters, right after the last of them.
         let line = "Control your Mac from your pocket."
-        let tagline = TypedTaglineView(motion: .still, lines: [line])
         let cases: [(width: CGFloat, typed: String)] = [
             (361, "C"), (361, "Control your Mac from y"), (361, "Control your Mac from your pocke"),
             (220, "Control your M"), (220, "Control your Mac from y"), (220, "Control your Mac from your pocke"),
         ]
         for (width, typed) in cases {
-            let frame = TypewriterSchedule.Frame(line: 0, text: typed, phase: .typing, nextChange: 1)
-            func stage(cursorIsOn: Bool) -> some View {
-                tagline.typed(frame, cursorIsOn: cursorIsOn, cursorAdvance: TypedTaglineView.cursorAdvance(.large))
-                    .font(.title3)
-                    .lineLimit(2...)
-                    .frame(width: width, alignment: .leading)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(Color.appBackground)
-            }
-            let name = "signin-tagline-\(Int(width))-\(typed.count)"
-            let on = try bitmaps(SnapshotWriter().write(stage(cursorIsOn: true), name: name))
-            let off = try bitmaps(SnapshotWriter().write(stage(cursorIsOn: false), name: name + "-off"))
-            for index in on.indices {
-                let scale = CGFloat(on[index].scale)
-                let what = "\(typed), \(Int(width)) points"
-                let letters = try XCTUnwrap(off[index].inkBox(), "the typed letters are drawn (\(what))")
-                let cursor = try XCTUnwrap(on[index].differingBox(to: off[index]), "the cursor is drawn (\(what))")
-                XCTAssertLessThan(cursor.height, 34 * scale, "the cursor is one row high (\(what))")
-                XCTAssertLessThan(cursor.width, 12 * scale, "and a narrow block (\(what))")
-                if width < 300, typed.count > 30 {
-                    // 31 letters do not fit in 220 points: they are on two rows, and the cursor on the second.
-                    XCTAssertGreaterThan(letters.height, 30 * scale, "the letters are on two rows (\(what))")
-                    XCTAssertGreaterThan(cursor.minY - letters.minY, 15 * scale, "the cursor is on the second (\(what))")
-                }
-                // The typed letters on the cursor's row, and under it.
-                let beside = try XCTUnwrap(
-                    off[index].inkBox(rows: Int(cursor.minY)...Int(cursor.maxY)), "the cursor's row has typed letters (\(what))")
-                XCTAssertGreaterThanOrEqual(cursor.minX, beside.maxX - 2 * scale, "it stands after the last letter (\(what))")
-                XCTAssertLessThan(cursor.minX - beside.maxX, 8 * scale, "right after it (\(what))")
-                XCTAssertNil(
-                    off[index].inkBox(rows: (Int(cursor.maxY) + 4 * Int(scale))...(off[index].height - 1)),
-                    "and no typed letter is on a row under it (\(what))")
+            let letters = try assertTheCursorFollowsTheLetters(of: line, typed: typed.count, width: width)
+            if width < 300, typed.count > 30 {
+                // 31 letters do not fit in 220 points: they are on two rows.
+                for box in letters { XCTAssertGreaterThan(box.height, 30, "the letters are on two rows (\(typed))") }
             }
         }
+    }
+
+    func testTheCursorFollowsTheLettersOfATaglineThatBreaksBeforeItsLastTwoWords() throws {
+        // "See what your agents are doing, anywhere." in the 361 points an iPhone 16 gives it: "doing," would fit on
+        // the first row, and iOS takes it down so that "anywhere." does not stand alone. From "doing," to the last
+        // letter but one, the cursor must stay after the letters on the second row.
+        let line = try Self.tagline(2, language: "en")
+        XCTAssertEqual(line, "See what your agents are doing, anywhere.")
+        for typed in 31...40 {
+            let letters = try assertTheCursorFollowsTheLetters(of: line, typed: typed, width: 361)
+            for box in letters { XCTAssertGreaterThan(box.height, 30, "the letters are on two rows (\(typed) typed)") }
+        }
+    }
+
+    /// Tagline `number` (1 to 3) of the catalog in `language`, whatever language the test runs in.
+    private static func tagline(_ number: Int, language: String) throws -> String {
+        let path = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"), "no \(language).lproj in the app")
+        let bundle = try XCTUnwrap(Bundle(path: path))
+        let key = "signin.tagline.\(number)"
+        let text = bundle.localizedString(forKey: key, value: nil, table: nil)
+        XCTAssertNotEqual(text, key, "\(key) is not in \(language).lproj")
+        return text
+    }
+
+    /// Draws `line` with its first `typed` letters and the cursor, on and off, in `width` points, and checks that the
+    /// cursor is one narrow block on the row of the last typed letters, right after the last of them, with no typed
+    /// letter on a row under it. Returns the box around the typed letters, in points, in the light and the dark
+    /// appearance.
+    @discardableResult
+    private func assertTheCursorFollowsTheLetters(
+        of line: String, typed: Int, width: CGFloat, file: StaticString = #filePath, lineNumber: UInt = #line
+    ) throws -> [CGRect] {
+        let tagline = TypedTaglineView(motion: .still, lines: [line])
+        let frame = TypewriterSchedule.Frame(line: 0, text: String(line.prefix(typed)), phase: .typing, nextChange: 1)
+        func stage(cursorIsOn: Bool) -> some View {
+            tagline.typed(frame, cursorIsOn: cursorIsOn, cursorAdvance: TypedTaglineView.cursorAdvance(.large))
+                .font(.title3)
+                .lineLimit(2...)
+                .frame(width: width, alignment: .leading)
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Color.appBackground)
+        }
+        let name = "signin-tagline-\(Int(width))-\(line.count)-\(typed)"
+        let size = CGSize(width: 393, height: 140)
+        let insets = EdgeInsets()
+        let on = try bitmaps(SnapshotWriter().write(stage(cursorIsOn: true), name: name, size: size, safeArea: insets))
+        let off = try bitmaps(SnapshotWriter().write(stage(cursorIsOn: false), name: name + "-off", size: size, safeArea: insets))
+        var boxes: [CGRect] = []
+        for index in on.indices {
+            let scale = CGFloat(on[index].scale)
+            let what = "\(typed) of \(line.count) letters typed, \(Int(width)) points, \(index == 0 ? "light" : "dark")"
+            let letters = try XCTUnwrap(off[index].inkBox(), "the typed letters are drawn (\(what))", file: file, line: lineNumber)
+            boxes.append(letters.applying(CGAffineTransform(scaleX: 1 / scale, y: 1 / scale)))
+            let cursor = try XCTUnwrap(
+                on[index].differingBox(to: off[index]), "the cursor is drawn (\(what))", file: file, line: lineNumber)
+            XCTAssertLessThan(cursor.height, 34 * scale, "the cursor is one row high (\(what))", file: file, line: lineNumber)
+            XCTAssertLessThan(cursor.width, 12 * scale, "and a narrow block (\(what))", file: file, line: lineNumber)
+            // The typed letters on the cursor's row, and under it.
+            let beside = try XCTUnwrap(
+                off[index].inkBox(rows: Int(cursor.minY)...Int(cursor.maxY)), "the cursor's row has typed letters (\(what))",
+                file: file, line: lineNumber)
+            XCTAssertGreaterThanOrEqual(
+                cursor.minX, beside.maxX - 2 * scale, "the cursor stands after the last letter (\(what))", file: file, line: lineNumber)
+            XCTAssertLessThan(cursor.minX - beside.maxX, 8 * scale, "right after it (\(what))", file: file, line: lineNumber)
+            XCTAssertNil(
+                off[index].inkBox(rows: (Int(cursor.maxY) + 4 * Int(scale))...(off[index].height - 1)),
+                "and no typed letter is on a row under it (\(what))", file: file, line: lineNumber)
+        }
+        return boxes
     }
 
     func testTheGlowIsNotCutWhereTheSafeAreaBegins() throws {
