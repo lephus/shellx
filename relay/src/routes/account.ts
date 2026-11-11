@@ -46,7 +46,7 @@ accountRoutes.delete("/", requireAuth, jsonBodyLimit, async (c) => {
     const owner = db.get<{ user_id: string }>("SELECT user_id FROM identities WHERE provider = ? AND subject = ?", verified.provider, verified.subject);
     if (owner?.user_id !== auth.userId) return denied(Errors.invalidCredentials);
   } else if (typeof body.challenge_id === "string") {
-    const redeemed = await redeemEmailCode(db, body.challenge_id, body.code, c.get("now")());
+    const redeemed = await redeemEmailCode(db, body.challenge_id, body.code, c.get("now")(), c.get("emailCodeKey"));
     if (!redeemed.ok) return denied(redeemed.reason === "invalid_code" ? Errors.invalidCode : Errors.codeExpired);
     // The account's address as it is now, not as it was before the await (it changes on /google/link).
     const current = db.get<{ email: string }>("SELECT email FROM users WHERE id = ?", auth.userId);

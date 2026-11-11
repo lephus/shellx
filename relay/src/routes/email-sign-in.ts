@@ -54,7 +54,7 @@ emailSignInRoutes.post("/code", jsonBodyLimit, async (c) => {
   const locale: EmailLocale = body.locale === "vi" ? "vi" : "en";
   const db = c.get("db");
   const code = c.get("emailCode")();
-  const issued = await issueEmailCode(db, email, code, c.get("now")());
+  const issued = await issueEmailCode(db, email, code, c.get("now")(), c.get("emailCodeKey"));
   if (issued === null) return refuse("too_many_live", Errors.rateLimited);
 
   let sent: EmailSendResult;
@@ -108,7 +108,7 @@ emailSignInRoutes.post("/verify", jsonBodyLimit, async (c) => {
 
   // The last await. When it returns the guess is counted and a right code is spent (committed); the account
   // transaction below is synchronous and reads the account afresh.
-  const redeemed = await redeemEmailCode(db, body.challenge_id, body.code, now);
+  const redeemed = await redeemEmailCode(db, body.challenge_id, body.code, now, c.get("emailCodeKey"));
   if (!redeemed.ok) return refuse(redeemed.reason, redeemed.reason === "invalid_code" ? Errors.invalidCode : Errors.codeExpired);
   const verified: VerifiedIdToken = { provider: "email", subject: redeemed.email, email: redeemed.email, isPrivateEmail: false, audience: "" };
   const passwordLogin = c.get("config").passwordLogin;
