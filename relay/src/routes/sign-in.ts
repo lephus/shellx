@@ -64,6 +64,7 @@ signInRoutes.post("/google", jsonBodyLimit, async (c) => {
         logMeta("sign_in_refused", { provider: verified.provider, reason: "other_google_identity" });
         throw Errors.invalidCredentials();
       }
+      // No Google sign-in yet: a password account, or one created with an email code for this address.
       userId = match.userId;
       dropped = dropPasswordAccess(db, userId);
       identityId = insertIdentity(db, userId, identityFromToken(verified), now);
@@ -86,8 +87,11 @@ signInRoutes.post("/google", jsonBodyLimit, async (c) => {
 
 /**
  * POST /v1/auth/google/link {id_token, nonce} — a signed-in device (any kind) adds a Google sign-in to
- * its account in place (S1 §6.3b). The email of the account becomes Google's; the password and the
- * other devices are untouched; only this device gets a new `google` token.
+ * its account in place (S1 §6.3b), also to an account that so far has only an email-code sign-in. The
+ * email of the account becomes Google's; the password and the other devices are untouched; only this
+ * device gets a new `google` token. When the account's email changes, its email-code sign-in was for the
+ * address that went: it is removed with its sessions (spec 2026-11-10 §5), so no sign-in is left for an
+ * address the account no longer has.
  */
 signInRoutes.post("/google/link", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
@@ -105,19 +109,22 @@ signInRoutes.post("/google/link", requireAuth, jsonBodyLimit, async (c) => {
   const token = generateToken();
   const tokenHash = await hashToken(token);
 
-  const email = db.transaction(() => {
+  const result = db.transaction(() => {
     const existing = db.get<{ id: string; user_id: string }>(
       "SELECT id, user_id FROM identities WHERE provider = ? AND subject = ?", verified.provider, verified.subject,
     );
     if (existing !== undefined && existing.user_id !== auth.userId) throw Errors.identityInUse();
     let identityId: string;
+    let removed: { id: string }[] = [];
     if (existing === undefined) {
-      if (db.get("SELECT 1 FROM identities WHERE user_id = ? AND provider != 'apple'", auth.userId) !== undefined) {
+      if (db.get("SELECT 1 FROM identities WHERE user_id = ? AND provider IN ('google', 'test')", auth.userId) !== undefined) {
         throw Errors.identityInUse();
       }
       if (verified.email !== accountEmail(db, auth.userId)) {
         if (db.get("SELECT 1 FROM users WHERE email = ? AND id != ?", verified.email, auth.userId) !== undefined) throw Errors.emailInUse();
         db.run("UPDATE users SET email = ? WHERE id = ?", verified.email, auth.userId);
+        // Its tokens go with it (ON DELETE CASCADE); this device's new token is written just below.
+        removed = db.all<{ id: string }>("DELETE FROM identities WHERE user_id = ? AND provider = 'email' RETURNING id", auth.userId);
       }
       identityId = insertIdentity(db, auth.userId, identityFromToken(verified), now);
     } else {
@@ -125,11 +132,12 @@ signInRoutes.post("/google/link", requireAuth, jsonBodyLimit, async (c) => {
       db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", now, identityId);
     }
     replaceDeviceToken(db, auth.deviceId, tokenHash, verified.provider, identityId, now);
-    return accountEmail(db, auth.userId);
+    return { email: accountEmail(db, auth.userId), removed };
   });
 
   logMeta("google_linked", { device_id: auth.deviceId });
-  return c.json({ user_id: auth.userId, device_id: auth.deviceId, token, email });
+  for (const identity of result.removed) logMeta("identity_removed", { device_id: auth.deviceId, identity_id: identity.id });
+  return c.json({ user_id: auth.userId, device_id: auth.deviceId, token, email: result.email });
 });
 
 /**

@@ -17,8 +17,10 @@ export type AccountMatch =
 /**
  * S1 §6.3 steps 1 and 2: an identity with this (provider, subject) wins; else the account holding this
  * email: with `passwordLogin` on and a password still set, the user must switch from a signed-in device
- * (`switch_required`); otherwise the email links (`hasPrimary`: it already has a Google sign-in).
- * Only the Google route links on `email`; the Apple route signs in on `identity` alone (S1 §6.3 step 4).
+ * (`switch_required`); otherwise the email links (`hasPrimary`: it already has a Google or test sign-in,
+ * so its address was verified by Google; an email or Apple sign-in does not count).
+ * The Google route and the email-code route link on `email`, each with its own rule for `hasPrimary`
+ * (spec 2026-11-10 §5); the Apple route signs in on `identity` alone (S1 §6.3 step 4).
  */
 export function matchAccount(db: Db, token: VerifiedIdToken, passwordLogin: boolean): AccountMatch {
   const identity = db.get<{ id: string; user_id: string }>(
@@ -28,7 +30,7 @@ export function matchAccount(db: Db, token: VerifiedIdToken, passwordLogin: bool
   const user = db.get<{ id: string; password_hash: string | null }>("SELECT id, password_hash FROM users WHERE email = ?", token.email);
   if (user === undefined) return { kind: "none" };
   if (passwordLogin && user.password_hash !== null) return { kind: "switch_required" };
-  const primary = db.get("SELECT 1 FROM identities WHERE user_id = ? AND provider != 'apple'", user.id);
+  const primary = db.get("SELECT 1 FROM identities WHERE user_id = ? AND provider IN ('google', 'test')", user.id);
   return { kind: "email", userId: user.id, hasPrimary: primary !== undefined };
 }
 

@@ -55,6 +55,13 @@ export interface Config {
   passwordLogin: boolean;
   /** TEST_IDP_ISSUER + TEST_IDP_JWKS_PATH: a test identity provider, for test relays only; null in production. */
   testIdp: { issuer: string; jwksPath: string } | null;
+  /**
+   * RESEND_API_KEY + EMAIL_FROM: sign-in with a code mailed through Resend (spec 2026-11-10). Both set
+   * turns it on; both unset is null (`POST /v1/auth/email/code` answers 503); exactly one is a `ConfigError`.
+   * `resendApiKey` is a secret: it is never logged and never part of an error message. `from` is the sender,
+   * an address or `Name <address>`.
+   */
+  emailSignIn: { resendApiKey: string; from: string } | null;
 }
 
 export class ConfigError extends Error {
@@ -76,6 +83,9 @@ export const RELAY_HMAC_SECRET_MIN_BYTES = 32;
 
 /** Letters, digits, dots and hyphens: what a DNS name in a Host header looks like. */
 const HOST_NAME_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
+
+/** EMAIL_FROM: `address` or `Name <address>`, on one line (a line break would add a header to the mail). */
+const EMAIL_FROM_RE = /^(?:[^<>"\r\n]*<[^\s<>@]+@[^\s<>@]+>|[^\s<>@]+@[^\s<>@]+)$/;
 
 export function loadConfig(env: Readonly<Record<string, string | undefined>>): Config {
   const value = (name: string): string | undefined => {
@@ -138,6 +148,15 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   if (testIssuer !== undefined && (GOOGLE_ISSUERS.includes(testIssuer) || testIssuer === APPLE_ISSUER)) {
     throw new ConfigError("TEST_IDP_ISSUER must not be a Google or Apple issuer");
   }
+  // Neither message below may quote a value: one of the two is a secret.
+  const resendApiKey = value("RESEND_API_KEY");
+  const emailFrom = value("EMAIL_FROM");
+  if ((resendApiKey === undefined) !== (emailFrom === undefined)) {
+    throw new ConfigError("RESEND_API_KEY and EMAIL_FROM must be set together");
+  }
+  if (emailFrom !== undefined && !EMAIL_FROM_RE.test(emailFrom)) {
+    throw new ConfigError('EMAIL_FROM must be an email address or "Name <address>"');
+  }
   return {
     host: value("HOST") ?? DEFAULT_HOST,
     port,
@@ -162,5 +181,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     appleClientIds,
     passwordLogin: passwordLoginText !== "off",
     testIdp: testIssuer !== undefined && testJwksPath !== undefined ? { issuer: testIssuer, jwksPath: testJwksPath } : null,
+    emailSignIn: resendApiKey !== undefined && emailFrom !== undefined ? { resendApiKey, from: emailFrom } : null,
   };
 }

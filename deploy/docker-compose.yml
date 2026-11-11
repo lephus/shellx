@@ -53,6 +53,12 @@ services:
       APPLE_SIWA_KEY_ID: ${APPLE_SIWA_KEY_ID:-}
       APPLE_SIWA_KEY_PATH: ${APPLE_SIWA_KEY_PATH:-}
       PASSWORD_LOGIN: ${PASSWORD_LOGIN:-}
+      # Sign-in with an email code, sent through Resend (deploy/README.md, "Email sign-in"), set once by hand
+      # in .env: the Resend API key (a secret, never in this repository) and the sender, e.g.
+      # EMAIL_FROM="ShellX <sign-in@shellx.pro>". Both empty: POST /v1/auth/email/code answers 503 and the
+      # relay runs as before; exactly one set: the relay refuses to start.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       # Password of admin.shellx.pro, set once by hand in the VPS's .env (deploy/README.md, "Admin"),
       # never in this repository. Empty or under 16 characters → the dashboard stays disabled.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}

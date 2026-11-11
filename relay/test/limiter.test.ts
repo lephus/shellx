@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { clientIp } from "../src/auth/client-ip.js";
 import {
-  createRateLimiters, LOGIN_PER_EMAIL, LOGIN_PER_IP, NONCES_PER_IP, NOTIFICATIONS_PER_AGENT, NOTIFICATIONS_WINDOW_MS, RATE_WINDOW_MS, SlidingWindowLimiter, UPGRADES_PER_IP,
+  createRateLimiters, EMAIL_CODES_HOUR_WINDOW_MS, EMAIL_CODES_PER_EMAIL, EMAIL_CODES_PER_EMAIL_HOUR, EMAIL_CODES_PER_IP,
+  LOGIN_PER_EMAIL, LOGIN_PER_IP, NONCES_PER_IP, NOTIFICATIONS_PER_AGENT, NOTIFICATIONS_WINDOW_MS, RATE_WINDOW_MS, SlidingWindowLimiter, UPGRADES_PER_IP,
 } from "../src/auth/rate-limit.js";
 
 function clock(start = 1_800_000_000_000) {
@@ -118,6 +119,31 @@ describe("createRateLimiters (production wiring)", () => {
     expect(await limiters.notifyAgent.limit("agent-1")).toBe(false); // an hour, not a minute
     t.advance(NOTIFICATIONS_WINDOW_MS - RATE_WINDOW_MS);
     expect(await limiters.notifyAgent.limit("agent-1")).toBe(true);
+  });
+
+  it("limits email codes to 10 per IP and 3 per address per 60 s, and to 10 per address per hour", async () => {
+    expect([EMAIL_CODES_PER_IP, EMAIL_CODES_PER_EMAIL, EMAIL_CODES_PER_EMAIL_HOUR, EMAIL_CODES_HOUR_WINDOW_MS]).toEqual([10, 3, 10, 3_600_000]);
+    const t = clock();
+    const limiters = createRateLimiters({ rateLimitsEnabled: true }, t.now);
+    const count = async (limiter: { limit(k: string): Promise<boolean> }, key: string) => {
+      let n = 0;
+      while (n < 100 && (await limiter.limit(key))) n++;
+      return n;
+    };
+    expect(await count(limiters.emailCodeIp, "198.51.100.1")).toBe(10);
+    expect(await count(limiters.emailCodeEmail, "a@example.com")).toBe(3);
+    expect(await count(limiters.emailCodeEmailHour, "a@example.com")).toBe(10);
+    expect(await limiters.emailCodeEmail.limit("b@example.com")).toBe(true); // per address
+    t.advance(RATE_WINDOW_MS);
+    expect(await limiters.emailCodeIp.limit("198.51.100.1")).toBe(true);
+    expect(await limiters.emailCodeEmail.limit("a@example.com")).toBe(true);
+    expect(await limiters.emailCodeEmailHour.limit("a@example.com")).toBe(false); // an hour, not a minute
+    t.advance(EMAIL_CODES_HOUR_WINDOW_MS - RATE_WINDOW_MS);
+    expect(await limiters.emailCodeEmailHour.limit("a@example.com")).toBe(true);
+    const off = createRateLimiters({ rateLimitsEnabled: false });
+    for (let i = 0; i < 20; i++) {
+      for (const limiter of [off.emailCodeIp, off.emailCodeEmail, off.emailCodeEmailHour]) expect(await limiter.limit("k")).toBe(true);
+    }
   });
 
   it("RATE_LIMITS_ENABLED=false turns every limiter off", async () => {

@@ -48,11 +48,16 @@ export const Errors = {
   switchFromSignedInDevice: () => new ApiError(409, "switch_from_signed_in_device", "This email already has a ShellX account: switch it to Google from a device that is signed in"),
   emailInUse: () => new ApiError(409, "email_in_use", "Another account already uses this email address"),
   identityInUse: () => new ApiError(409, "identity_in_use", "This sign-in is already used by another account"),
-  lastGoogleIdentity: () => new ApiError(409, "last_google_identity", "The Google sign-in of an account cannot be removed"),
+  // The code keeps its name for old apps; since the email-code sign-in it means the last of Google and email.
+  lastGoogleIdentity: () => new ApiError(409, "last_google_identity", "An account must keep at least one way to sign in"),
   registrationClosed: () => new ApiError(410, "registration_closed", "Registration is closed: sign in with Google or Apple"),
   passwordSignInRemoved: () => new ApiError(410, "password_sign_in_removed", "Password sign-in was removed: sign in with Google or Apple"),
-  reauthRequired: () => new ApiError(401, "reauth_required", "Sign in again with Google or Apple to confirm"),
+  reauthRequired: () => new ApiError(401, "reauth_required", "Confirm with a fresh sign-in or an email code"),
   identityNotFound: () => new ApiError(404, "identity_not_found", "Sign-in method not found"),
+  invalidCode: () => new ApiError(401, "invalid_code", "That code is not right"),
+  codeExpired: () => new ApiError(410, "code_expired", "That code has expired or was already used: ask for a new one"),
+  emailSignInDisabled: () => new ApiError(503, "email_sign_in_disabled", "Signing in with an email code is not available on this relay"),
+  emailSendFailed: () => new ApiError(502, "email_send_failed", "The email could not be sent: try again"),
   pushUnavailable: () => new ApiError(503, "push_unavailable", "Push notifications are not configured on this relay"),
 } as const;
 

@@ -309,6 +309,36 @@ Run these on the VPS in `~/phu/shellx`, in this order:
 
 Step 3 cannot be undone except by restoring a backup. Sessions that signed in with Google or Apple stay.
 
+## Email sign-in (once, by hand)
+
+The relay can sign people in with a 6-digit code it mails through Resend (`POST /v1/auth/email/code`;
+relay README, "Sign-in"). It is off until both variables below are in the VPS's `.env`; with only one of
+them the relay refuses to start.
+
+1. Create a Resend account and add the sending domain (`shellx.pro`). Resend shows DKIM and SPF records:
+   add them to the domain's DNS and wait until Resend shows the domain as **Verified**. Before that Resend
+   only sends from `onboarding@resend.dev` to the account owner's own address, which is enough for a first try.
+2. Create an API key with **Sending access**, limited to that domain. It is a secret: it goes into `.env`
+   on the VPS and nowhere else (not this repository, not `relay.env`, not a chat).
+3. On the VPS (the key is typed at a prompt, so it is not echoed and not kept in the shell history):
+
+   ```bash
+   cd ~/phu/shellx
+   [ -z "$(tail -c1 .env)" ] || echo >> .env          # end .env with a newline first
+   read -rsp 'Resend API key: ' RESEND_KEY && echo
+   printf 'RESEND_API_KEY=%s\nEMAIL_FROM="ShellX <sign-in@shellx.pro>"\n' "$RESEND_KEY" >> .env && unset RESEND_KEY
+   docker compose config | grep EMAIL_FROM            # EMAIL_FROM: ShellX <sign-in@shellx.pro>
+   docker compose up -d --force-recreate relay
+   docker compose logs relay | grep email_sign_in     # email_sign_in_enabled
+   ```
+
+4. Ask for a code in an app with your own address. If no mail arrives, look in the spam folder and at
+   the domain's status in Resend; the relay logs `email_send_failed` with Resend's status code (never
+   the address). Resend's free plan sends 100 mails a day: past that, codes fail with 502 until the next day.
+
+To switch it off, remove both lines from `.env` and recreate the relay: `/v1/auth/email/code` answers 503,
+the apps show "not available", and Google and Apple sign-in are not affected.
+
 ## Admin (admin.shellx.pro)
 
 The relay also answers `admin.shellx.pro` (same container, chosen by Host header): a small dashboard

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { FakeEmailGateway } from "./fake-email.js";
 import { FakeAppleTokens } from "./fake-idp.js";
-import { call, db, errorCode, googleSession, linkAppleIdByQr, makeApp, registerMachine, type TestApp } from "./helpers.js";
+import { call, db, emailSession, errorCode, googleSession, linkAppleIdByQr, makeApp, registerMachine, type TestApp } from "./helpers.js";
 
 const T0 = 1_800_000_000_000;
 const UUID = /^[0-9a-f-]{36}$/;
@@ -57,5 +58,28 @@ describe("/v1/account/identities", () => {
     const foreign = db().get<{ id: string }>("SELECT id FROM identities WHERE user_id = ?", other.userId)!.id;
     for (const id of ["not-a-uuid", crypto.randomUUID(), foreign]) expect(await errorCode(await remove(app, desk.token, id))).toBe("identity_not_found");
     expect((await call(app, "GET", "/v1/account/identities")).status).toBe(401);
+  });
+
+  it("lists an email sign-in and removes Google or email while the other remains, but never the last of them", async () => {
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ now: () => T0, email: mail });
+    const g = await googleSession(app, { email: "ann@example.com", kind: "desktop" });
+    const e = await emailSession(app, mail, { email: "ann@example.com", kind: "mobile" });
+    const listed = (await (await list(app, g.token)).json<{ identities: { identity_id: string; provider: string }[] }>()).identities;
+    expect(listed).toEqual([
+      { identity_id: expect.stringMatching(UUID), provider: "google", email: "ann@example.com", is_private_email: false, linked_via_device_name: null, created_at_unix: T0 / 1000 },
+      { identity_id: expect.stringMatching(UUID), provider: "email", email: "ann@example.com", is_private_email: false, linked_via_device_name: null, created_at_unix: T0 / 1000 },
+    ]);
+    const idOf = (provider: string) => listed.find((i) => i.provider === provider)!.identity_id;
+    expect((await remove(app, g.token, idOf("email"))).status).toBe(204);
+    expect((await call(app, "GET", "/v1/devices", { token: e.token })).status).toBe(401);
+    const last = await remove(app, g.token, idOf("google"));
+    expect([last.status, await errorCode(last)]).toEqual([409, "last_google_identity"]);
+
+    const back = await emailSession(app, mail, { email: "ann@example.com", kind: "mobile" });
+    expect((await remove(app, back.token, idOf("google"))).status).toBe(204);
+    expect((await call(app, "GET", "/v1/devices", { token: g.token })).status).toBe(401);
+    const emailId = db().get<{ id: string }>("SELECT id FROM identities WHERE user_id = ?", back.userId)!.id;
+    expect(await errorCode(await remove(app, back.token, emailId))).toBe("last_google_identity");
   });
 });

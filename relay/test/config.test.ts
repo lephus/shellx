@@ -35,6 +35,7 @@ describe("loadConfig", () => {
       appleClientIds: ["com.shellx.prod", "com.shellx.dev"],
       passwordLogin: true,
       testIdp: null,
+      emailSignIn: null,
     });
   });
 
@@ -64,6 +65,22 @@ describe("loadConfig", () => {
     for (const issuer of ["https://accounts.google.com", "accounts.google.com", "https://appleid.apple.com"]) {
       expect(() => loadConfig({ ...REQUIRED, TEST_IDP_ISSUER: issuer, TEST_IDP_JWKS_PATH: "/k.json" }))
         .toThrow("TEST_IDP_ISSUER must not be a Google or Apple issuer");
+    }
+  });
+
+  it("reads the email sign-in settings: both or neither, never the key in an error", () => {
+    const KEY = "placeholder-not-a-real-key";
+    expect(loadConfig({ ...REQUIRED, RESEND_API_KEY: ` ${KEY} `, EMAIL_FROM: " ShellX <sign-in@shellx.pro> " }).emailSignIn)
+      .toEqual({ resendApiKey: KEY, from: "ShellX <sign-in@shellx.pro>" });
+    expect(loadConfig({ ...REQUIRED, RESEND_API_KEY: KEY, EMAIL_FROM: "sign-in@shellx.pro" }).emailSignIn?.from).toBe("sign-in@shellx.pro");
+    expect(loadConfig({ ...REQUIRED, RESEND_API_KEY: " ", EMAIL_FROM: "" }).emailSignIn).toBeNull();
+    for (const half of [{ RESEND_API_KEY: KEY }, { EMAIL_FROM: "ShellX <sign-in@shellx.pro>" }, { RESEND_API_KEY: KEY, EMAIL_FROM: " " }]) {
+      expect(() => loadConfig({ ...REQUIRED, ...half })).toThrow("RESEND_API_KEY and EMAIL_FROM must be set together");
+    }
+    for (const from of ["ShellX", "ShellX <sign-in>", "ShellX <sign-in@shellx.pro", "a@shellx.pro\nBcc: b@shellx.pro"]) {
+      const load = () => loadConfig({ ...REQUIRED, RESEND_API_KEY: KEY, EMAIL_FROM: from });
+      expect(load).toThrow('EMAIL_FROM must be an email address or "Name <address>"');
+      expect(load).not.toThrow(KEY);
     }
   });
 
