@@ -314,6 +314,30 @@ import Testing
     #expect(account.identity == nil)
 }
 
+@MainActor @Test func googleSignInIsRefusedWhileAnEmailCodeIsVerified() async throws {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let opened = Opened()
+    let account = googleAccount(rig, opened)
+    let challenge = try await account.requestEmailCode(email: "Foo@Bar.com", locale: "en")
+    // The sheet was closed during a slow verify (Ruling 12 lets it run on) and a new sheet starts Google.
+    rig.core.holdNext.with { $0 = "auth.email.finish" }
+    let verify = Task { await errorCode { _ = try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "004217") } }
+    #expect(await until { rig.core.isHoldingCall })
+    for purpose in [GoogleSignInPurpose.signIn, .link] {
+        let thrown = await errorCode { _ = try await account.signInWithGoogle(purpose: purpose) }
+        #expect(thrown == "email_sign_in_in_progress", "\(purpose)")
+    }
+    #expect(rig.core.count("auth.google.begin") == 0)
+    #expect(opened.urls.isEmpty)
+    #expect(account.googleStep == .idle)
+    rig.core.releaseHeldCall()
+    #expect(await verify.value == nil)
+    #expect(account.identity?.authMethod == "email")
+    // Once the verify has ended, Google works again.
+    _ = try await account.signInWithGoogle(purpose: .signIn)
+    #expect(account.identity?.authMethod == "google")
+}
+
 @MainActor @Test func cancelBeforeBeginAnswersEndsTheFlowWithoutOpeningTheBrowser() async {
     let rig = ServiceRig(gate: false, signedIn: false)
     let opened = Opened()
