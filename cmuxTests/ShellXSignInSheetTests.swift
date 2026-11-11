@@ -326,7 +326,80 @@ import Testing
         #expect(other.focusRequest == focus)
     }
 
+    /// VoiceOver: Resend keeps one name, "Resend code", and the wait is its value, so the countdown does not rename
+    /// the button every second. Once the lock is over the value is empty.
+    @Test func theResendButtonKeepsItsNameWhileItCountsDown() async throws {
+        let resend = EmailSignInTexts.localized.resend
+        let counting = emailModel()
+        counting.setEmail("Foo@Bar.com")
+        await counting.sendCode()?.value
+        #expect(counting.resendWait(at: Date()) > 0)
+        let locked = try #require(
+            Self.accessibilityNodes(of: SignInSheet(model: googleModel(), email: counting))
+                .first { $0.role == NSAccessibility.Role.button.rawValue && $0.label.hasPrefix(resend) },
+            "no Resend button in the accessibility tree"
+        )
+        #expect(locked.label == resend)
+        let valueHasTheWait = locked.value.contains { $0.isNumber }
+        #expect(valueHasTheWait, "the wait is not the value: \(locked.value)")
+
+        let dead = emailModel(verify: { _, _ in throw ShellXCoreError(code: "code_expired", message: "") })
+        dead.setEmail("Foo@Bar.com")
+        await dead.sendCode()?.value
+        await dead.setCode("123456")?.value
+        #expect(dead.resendWait(at: Date()) == 0)
+        let open = try #require(
+            Self.accessibilityNodes(of: SignInSheet(model: googleModel(), email: dead))
+                .first { $0.role == NSAccessibility.Role.button.rawValue && $0.label.hasPrefix(resend) },
+            "no Resend button in the accessibility tree"
+        )
+        #expect(open.label == resend)
+        #expect(open.value.isEmpty, "an open Resend has a value: \(open.value)")
+    }
+
     // MARK: - Hosting helpers (test scaffolding)
+
+    /// One node of SwiftUI's accessibility tree. Its nodes answer the NSAccessibility messages but are not
+    /// `NSAccessibilityProtocol` in Swift, so they are read through Objective-C messages.
+    private struct AccessibilityNode {
+        let role: String
+        let label: String
+        let value: String
+    }
+
+    /// The sheet's accessibility tree once it is laid out in a window. SwiftUI builds the tree only for an
+    /// assistive client; `AXEnhancedUserInterface` on the application, the attribute such clients set, makes it
+    /// build one here, and it is turned off again afterwards.
+    private static func accessibilityNodes(of sheet: SignInSheet) -> [AccessibilityNode] {
+        _ = NSApplication.shared
+        let enhanced = NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface")
+        NSApp.accessibilitySetValue(true, forAttribute: enhanced)
+        let (window, hosting) = offscreen(sheet)
+        defer {
+            NSApp.accessibilitySetValue(false, forAttribute: enhanced)
+            window.contentView = nil
+            window.close()
+        }
+        for _ in 0..<10 {
+            hosting.layoutSubtreeIfNeeded()
+            spinRunLoop()
+        }
+        return accessibilityNodes(under: hosting)
+    }
+
+    private static func accessibilityNodes(under root: AnyObject) -> [AccessibilityNode] {
+        var found: [AccessibilityNode] = []
+        for child in (root.accessibilityChildren?() ?? nil) ?? [] {
+            let node = child as AnyObject
+            found.append(AccessibilityNode(
+                role: ((node.accessibilityRole?() ?? nil)?.rawValue) ?? "",
+                label: (node.accessibilityLabel?() ?? nil) ?? "",
+                value: (node.accessibilityValue?() ?? nil).map { "\($0)" } ?? ""
+            ))
+            found += accessibilityNodes(under: node)
+        }
+        return found
+    }
 
     /// The sheet in an off-screen window, laid out at its fitting size.
     private static func offscreen(_ sheet: SignInSheet) -> (NSWindow, NSHostingView<SignInSheet>) {
