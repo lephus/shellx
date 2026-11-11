@@ -5,23 +5,29 @@
 #
 #   scripts/shellx/release/build-windows-cross.sh [OUT_DIR]
 #   scripts/shellx/release/build-windows-cross.sh --preflight
+#   scripts/shellx/release/build-windows-cross.sh --unlock
 #
 # Builds the committed HEAD (git archive), not the working tree. The ghostty submodule is
 # fetched on the VPS at the commit HEAD pins. Env:
 #   SHELLX_VPS          ssh destination        (default higio@42.115.41.70)
 #   SHELLX_VPS_SSH_OPTS extra ssh options      (default -S ~/.ssh/cm-shellx-vps, the ControlMaster;
 #                                               set but empty means no options)
-#   SHELLX_WINBUILD_DIR build dir on the VPS   (default phu/shellx/.winbuild, relative to ~)
+#   SHELLX_WINBUILD_DIR build dir on the VPS   (default phu/shellx/.winbuild, relative to ~; not empty,
+#                                               no "." or ".." part, no leading "/", only A-Z a-z 0-9 . _ - /)
 #   SHELLX_WINBUILD_TAG docker image tag       (default the windows/cross tree hash)
 #   SHELLX_WINBUILD_KEEP_TARGET=1 keep the cargo target dir in the cache volume
 #   SHELLX_WINBUILD_MIN_FREE_GIB  free GiB the VPS needs in ~ to start (default 14: 4 stay free
 #                                 for deploys, up to 10 for the image, caches and target)
 #
 # The VPS is shared with a production service. Guards (the preflight), checked before every
-# build and alone with --preflight (exit 0 = a build may start, 1 = it must not):
+# build and alone with --preflight (read-only; exit 0 = a build may start, 1 = it must not):
 # - at least SHELLX_WINBUILD_MIN_FREE_GIB GiB free in the build user's home;
-# - one Windows build at a time: every run is the container shellx-winbuild-run, and none
-#   may already be running.
+# - one Windows build at a time: no build holds the lock ~/<build dir>/.lock, and no container
+#   shellx-winbuild-run (the name of every container a run starts) is running.
+# A build takes the lock (an atomic mkdir) before it changes anything on the VPS and removes it
+# on exit, also after a failed step or Ctrl-C. A lock left by a lost connection makes the next
+# run refuse; --unlock removes it when no shellx-winbuild-run container is running (a run that
+# is still uploading has no container yet: unlock only when you know no run is active).
 # After a build, when the free space is under the minimum, older shellx-winbuild image tags
 # are removed (only those; never other images, never a prune).
 #
@@ -44,35 +50,72 @@ vps="${SHELLX_VPS:-higio@42.115.41.70}"
 read -r -a ssh_opts <<< "${SHELLX_VPS_SSH_OPTS-"-S $HOME/.ssh/cm-shellx-vps"}"
 min_free="${SHELLX_WINBUILD_MIN_FREE_GIB:-14}"
 [[ "$min_free" =~ ^[0-9]+$ ]] || { echo "SHELLX_WINBUILD_MIN_FREE_GIB must be a whole number of GiB: '$min_free'" >&2; exit 1; }
+# The build dir goes unquoted into remote commands (~/$remote, its rm -rf, the lock's mkdir and
+# rmdir): only a plain relative path below ~ is accepted.
+remote="${SHELLX_WINBUILD_DIR-phu/shellx/.winbuild}"
+remote_ok=1
+[[ -n "$remote" && "$remote" != /* && "$remote" != *..* && "$remote" =~ ^[A-Za-z0-9._/-]+$ ]] || remote_ok=0
+IFS=/ read -r -a remote_parts <<< "$remote"
+for part in ${remote_parts[@]+"${remote_parts[@]}"}; do
+  [[ -n "$part" && "$part" != . ]] || remote_ok=0
+done
+if [[ $remote_ok -ne 1 ]]; then
+  echo "SHELLX_WINBUILD_DIR must be a relative path below ~ on the VPS (not empty, no '.' or '..' part," \
+    "no leading '/', only A-Z a-z 0-9 . _ - /): '$remote'" >&2
+  exit 2
+fi
+lock="~/$remote/.lock"
 
 vssh() { ssh ${ssh_opts[@]+"${ssh_opts[@]}"} "$vps" "$@"; }
 vps_free_gib() { vssh "df -Pk ~ | awk 'NR==2 {print int(\$4/1048576)}'"; }
+vps_build_running() { [[ -n "$(vssh "docker ps -q -f 'name=^shellx-winbuild-run\$'")" ]]; }
+# Read-only: never creates or removes the lock.
 preflight() {
-  local free running
+  local free held
   free="$(vps_free_gib)"
   [[ "$free" =~ ^[0-9]+$ ]] || { echo "cannot read the free disk space on the VPS: '$free'" >&2; exit 1; }
   if (( free < min_free )); then
     echo "VPS has $free GiB free in ~; a Windows build needs $min_free (4 stay free for deploys)" >&2
     exit 1
   fi
-  running="$(vssh "docker ps -q -f 'name=^shellx-winbuild-run\$'")"
-  if [[ -n "$running" ]]; then
+  held="$(vssh "if [ -e $lock ]; then echo held; else echo free; fi")"
+  case "$held" in
+    free) ;;
+    held)
+      echo "another Windows build holds the lock $lock on the VPS" \
+        "(if none is running: scripts/shellx/release/build-windows-cross.sh --unlock)" >&2
+      exit 1 ;;
+    *) echo "cannot read the build lock on the VPS: '$held'" >&2; exit 1 ;;
+  esac
+  if vps_build_running; then
     echo "another Windows build is running on the VPS" >&2
     exit 1
   fi
   echo "preflight: $free GiB free, no Windows build running"
 }
-if [[ "${1:-}" == --preflight ]]; then
-  preflight
-  exit 0
-fi
+unlock() {
+  local result
+  if vps_build_running; then
+    echo "a Windows build is running on the VPS (container shellx-winbuild-run); the lock stays" >&2
+    exit 1
+  fi
+  result="$(vssh "if [ -d $lock ]; then rmdir $lock && echo removed; else echo absent; fi")"
+  case "$result" in
+    removed) echo "removed the build lock $lock on the VPS" ;;
+    absent) echo "no build lock $lock on the VPS" ;;
+    *) echo "cannot remove the build lock $lock on the VPS: '$result'" >&2; exit 1 ;;
+  esac
+}
+case "${1:-}" in
+  --preflight) preflight; exit 0 ;;
+  --unlock) unlock; exit 0 ;;
+esac
 
 # The sign-in button needs Google's official mark in the commit being built.
 branding_args=()
 [[ -z "${SHELLX_GOOGLE_BRANDING_ROOT:-}" ]] || branding_args=(--root "$SHELLX_GOOGLE_BRANDING_ROOT")
 python3 scripts/shellx/check-google-branding.py --git-rev HEAD ${branding_args[@]+"${branding_args[@]}"} >&2 || exit 1
 out_dir="${1:-$repo/dist/windows}"
-remote="${SHELLX_WINBUILD_DIR:-phu/shellx/.winbuild}"
 volume=shellx-winbuild-cargo
 
 version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' windows/Cargo.toml)"
@@ -89,9 +132,34 @@ fi
 echo "ShellX for Windows $version from $commit (ghostty $ghostty_sha), image $image"
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+locked=0
+# On every exit (success, a failed step, Ctrl-C): drop the temp dir and the lock this run took.
+# Keeps the run's own exit status.
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM
+  rm -rf "$tmp"
+  if [[ $locked -eq 1 ]] && ! vssh "rmdir $lock" </dev/null; then
+    echo "could not remove the build lock $lock on the VPS; when no build runs there:" \
+      "scripts/shellx/release/build-windows-cross.sh --unlock" >&2
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 preflight
+# The lock: an atomic mkdir, before anything on the VPS changes. A second run fails here.
+lock_result="$(vssh "mkdir -p ~/$remote && if mkdir $lock 2>/dev/null; then echo taken; else echo held; fi")"
+case "$lock_result" in
+  taken) locked=1 ;;
+  held)
+    echo "another Windows build holds the lock $lock on the VPS" \
+      "(if none is running: scripts/shellx/release/build-windows-cross.sh --unlock)" >&2
+    exit 1 ;;
+  *) echo "cannot take the build lock on the VPS: '$lock_result'" >&2; exit 1 ;;
+esac
 
 # 1. Image (cached by docker; the tag is the windows/cross tree hash).
 git archive --format=tar.gz -o "$tmp/cross.tgz" HEAD:windows/cross
