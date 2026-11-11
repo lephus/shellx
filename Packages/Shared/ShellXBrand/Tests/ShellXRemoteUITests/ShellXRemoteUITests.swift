@@ -218,7 +218,21 @@ private func rm(
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "network", message: "x"), labels: labels)
             == "Can't reach relay.shellx.pro")
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "rate_limited", message: "slow down"), labels: labels)
-            == "rate_limited")
+            == "rl")
+        // No raw code reaches the screen. A reopened sheet can meet the other flow still running.
+        #expect(SignInErrorMessage.text(forCode: "email_sign_in_in_progress", labels: labels) == "s")
+        #expect(SignInErrorMessage.text(forCode: "google_in_progress", labels: labels) == "s")
+        // Every other code the Google flow can throw: the relay's own (passed through by the core), a body-less
+        // proxy answer, the core's local ones and the Swift client's.
+        let withoutTheirOwn = [
+            "invalid_device", "bad_request", "unauthorized", "not_found", "internal_error", "payload_too_large",
+            "http_502", "http_503", "server", "not_logged_in", "not_configured", "invalid_params", "io", "crypto",
+            "state_dir_insecure", "state_file_insecure", "unknown_method", "invalid_json", "bad_response",
+            "bad_relay_url", "weird_code"
+        ]
+        for code in withoutTheirOwn {
+            #expect(SignInErrorMessage.text(forCode: code, labels: labels) == "sv", "\(code)")
+        }
         #expect(SignInErrorMessage.text(forCode: "network", labels: .english) == "Can't reach relay.shellx.pro")
         #expect(SignInErrorMessage.text(forCode: "google_timeout", labels: labels) == "t")
         #expect(SignInErrorMessage.text(forCode: "google_state_mismatch", labels: labels) == "s")
