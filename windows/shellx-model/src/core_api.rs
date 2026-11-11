@@ -226,6 +226,56 @@ impl SignInMethod {
     pub fn is_apple(&self) -> bool {
         self.provider == "apple"
     }
+
+    pub fn is_email(&self) -> bool {
+        self.provider == "email"
+    }
+}
+
+/// `auth.email.begin`: the challenge a mailed code is checked against. `email` is the relay's normalized
+/// address. `Debug` shows `expires_in` and `resend_in` only.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+pub struct EmailChallenge {
+    pub challenge_id: String,
+    pub email: String,
+    pub expires_in: u64,
+    pub resend_in: u64,
+}
+
+impl fmt::Debug for EmailChallenge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EmailChallenge")
+            .field("expires_in", &self.expires_in)
+            .field("resend_in", &self.resend_in)
+            .finish_non_exhaustive()
+    }
+}
+
+/// `auth.email.begin`: the relay mails a 6-digit code to `email`, in `locale` (`"vi"` or `"en"`).
+pub fn email_begin(
+    core: &dyn CoreCall,
+    email: &str,
+    locale: &str,
+) -> Result<EmailChallenge, CoreErr> {
+    typed(
+        core,
+        "auth.email.begin",
+        json!({"email": email, "locale": locale}),
+    )
+}
+
+/// `auth.email.finish`: signs this device in with the mailed code. The value of `auth.google.finish`
+/// with `auth_method: "email"`.
+pub fn email_finish(
+    core: &dyn CoreCall,
+    challenge_id: &str,
+    code: &str,
+) -> Result<GoogleSignIn, CoreErr> {
+    typed(
+        core,
+        "auth.email.finish",
+        json!({"challenge_id": challenge_id, "code": code}),
+    )
 }
 
 pub fn google_begin(core: &dyn CoreCall, purpose: GooglePurpose) -> Result<GoogleBegin, CoreErr> {
