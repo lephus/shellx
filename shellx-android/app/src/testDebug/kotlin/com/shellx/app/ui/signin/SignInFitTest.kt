@@ -27,9 +27,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The sign-in screen holds in every window it must: the Pixel 3 (393 × 785 dp, about 713 dp between its bars), turned
- * (737 × 369 dp), a short phone, a tablet, each with large text too (font scale 1.3). Robolectric draws no system
- * bars, so a window here is the room between them.
+ * The sign-in screen's first step, with both ways in, holds in every window it must: the Pixel 3 (393 × 785 dp, about
+ * 713 dp between its bars), turned (737 × 369 dp), a taller phone, a short phone, a tablet, each with large text too
+ * (font scale 1.3). Robolectric draws no system bars, so a window here is the room between them.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics, so the lines are as long and as tall as on a phone.
@@ -80,9 +80,11 @@ class SignInFitTest {
     }
 
     private fun assertTheLandscapeScreenFits() {
-        assertWholeOnScreen("signin.logo", "signin.title", "signin.tagline", "signin.google", "signin.demo")
+        assertWholeOnScreen(
+            "signin.logo", "signin.title", "signin.tagline", "signin.google", "signin.or", "signin.email", "signin.demo",
+        )
         assertStacked("signin.logo", "signin.title", "signin.tagline")
-        assertStacked("signin.google", "signin.demo")
+        assertStacked("signin.google", "signin.or", "signin.email", "signin.demo")
         assertDp("the logo", 72.dp, bounds("signin.logo").width)
         assertFalse("no steps under 400 dp of height", exists("signin.guide.1"))
         assertFalse(exists("signin.subtitle"))
@@ -119,6 +121,35 @@ class SignInFitTest {
     fun largeVietnameseTextOnThePixel3ClipsNothing() {
         show()
         assertThePortraitScreenFits()
+    }
+
+    /** From 800 dp of height the subtitle has room again, under the taglines. */
+    private fun assertTheTallScreenFits() {
+        val tall = PORTRAIT.flatMap { if (it == "signin.tagline") listOf(it, "signin.subtitle") else listOf(it) }.toTypedArray()
+        assertWholeOnScreen(*tall)
+        assertStacked(*tall)
+        assertDp("the logo", 96.dp, bounds("signin.logo").width)
+    }
+
+    @Test
+    @Config(qualifiers = TALL_PHONE)
+    fun aTallPhoneKeepsTheSubtitle() {
+        show()
+        assertTheTallScreenFits()
+    }
+
+    @Test
+    @Config(qualifiers = TALL_PHONE, fontScale = 1.3f)
+    fun aTallPhoneWithLargeTextKeepsTheSubtitle() {
+        show()
+        assertTheTallScreenFits()
+    }
+
+    @Test
+    @Config(qualifiers = PIXEL_3)
+    fun thePixel3LeavesTheSubtitleToTheTaglines() {
+        show()
+        assertFalse("under 800 dp the taglines stand in for the subtitle", exists("signin.subtitle"))
     }
 
     @Test
@@ -159,7 +190,7 @@ class SignInFitTest {
     @Config(qualifiers = PIXEL_3)
     fun aFailureStandsBetweenTheStepsAndTheButtons() {
         show(expired = true, error = SignInException.SwitchFromSignedInDevice())
-        assertStacked("signin.guide.3", "signin.expired", "signin.error", "signin.google", "signin.demo")
+        assertStacked("signin.guide.3", "signin.expired", "signin.error", "signin.google", "signin.or", "signin.email", "signin.demo")
         rule.onNodeWithTag("signin.demo").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("signin.logo").performScrollTo().assertIsDisplayed()
     }
@@ -182,7 +213,7 @@ class SignInFitTest {
     @Config(qualifiers = PIXEL_3_TURNED, fontScale = 1.3f)
     fun aFailureInLandscapeWithLargeTextIsReachedByAScroll() {
         show(error = SignInException.SwitchFromSignedInDevice())
-        assertStacked("signin.error", "signin.google", "signin.demo")
+        assertStacked("signin.error", "signin.google", "signin.or", "signin.email", "signin.demo")
         for (tag in listOf("signin.error", "signin.demo", "signin.logo")) {
             rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
@@ -190,22 +221,23 @@ class SignInFitTest {
 
     @Test
     @Config(qualifiers = "w360dp-h592dp-xhdpi")
-    fun aShortPhoneHasTheSmallLogoAndNoSubtitle() {
+    fun aShortPhoneHasTheSmallLogoAndNeitherSubtitleNorSteps() {
         show()
-        val shown = PORTRAIT.filterNot { it == "signin.subtitle" }.toTypedArray()
+        val shown = PORTRAIT.filterNot { it.startsWith("signin.guide.") }.toTypedArray()
         assertWholeOnScreen(*shown)
         assertStacked(*shown)
         assertDp("the logo", 72.dp, bounds("signin.logo").width)
         assertFalse("the taglines stand in for the subtitle", exists("signin.subtitle"))
+        assertFalse("under 660 dp of height the steps leave their room to the buttons", exists("signin.guide.1"))
     }
 
     @Test
     @Config(qualifiers = "w1280dp-h752dp-land-mdpi")
     fun aTabletInLandscapeKeepsTheStepsBesideTheLogo() {
         show()
-        assertWholeOnScreen(*PORTRAIT)
+        assertWholeOnScreen(*PORTRAIT, "signin.subtitle")
         assertStacked("signin.logo", "signin.title", "signin.tagline", "signin.subtitle")
-        assertStacked("signin.guide.1", "signin.guide.2", "signin.guide.3", "signin.google", "signin.demo")
+        assertStacked("signin.guide.1", "signin.guide.2", "signin.guide.3", "signin.google", "signin.or", "signin.email", "signin.demo")
         assertDp("the logo", 72.dp, bounds("signin.logo").width)
         assertTrue(bounds("signin.title").right <= bounds("signin.guide.1").left)
     }
@@ -217,10 +249,13 @@ class SignInFitTest {
         /** The same phone turned: the three-button bar is at the side. */
         const val PIXEL_3_TURNED = "w737dp-h369dp-land-440dpi"
 
-        /** Everything a tall portrait window shows, from the top. */
+        /** A phone with 852 dp between its bars. */
+        const val TALL_PHONE = "w393dp-h852dp-440dpi"
+
+        /** Everything the Pixel 3's portrait window shows, from the top (the subtitle needs 800 dp of height). */
         val PORTRAIT = arrayOf(
-            "signin.logo", "signin.title", "signin.tagline", "signin.subtitle",
-            "signin.guide.1", "signin.guide.2", "signin.guide.3", "signin.google", "signin.demo",
+            "signin.logo", "signin.title", "signin.tagline",
+            "signin.guide.1", "signin.guide.2", "signin.guide.3", "signin.google", "signin.or", "signin.email", "signin.demo",
         )
     }
 }

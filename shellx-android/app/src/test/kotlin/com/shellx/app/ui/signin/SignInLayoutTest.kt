@@ -8,29 +8,55 @@ import org.junit.Test
 /** What the sign-in screen shows for a window's size, and its intro's clock. */
 class SignInLayoutTest {
     @Test
-    fun aPhoneInPortraitHasTheBigLogoTheSubtitleAndTheSteps() {
-        // The Pixel 3 is 393 × 785 dp; about 713 dp are left between its status and navigation bars.
-        for (height in listOf(713f, 737f, 785f, 852f)) {
+    fun aPhoneInPortraitHasTheBigLogoAndTheSteps() {
+        // The Pixel 3 is 393 × 785 dp; about 713 dp are left between its status and navigation bars. With the email
+        // button in the column the subtitle no longer fits there: the taglines stand in for it.
+        for (height in listOf(713f, 737f, 785f)) {
+            assertEquals(
+                "393 × $height",
+                SignInLayout(logoDp = 96, subtitle = false, guide = true, sideBySide = false),
+                SignInLayout.of(393f, height),
+            )
+        }
+        for (height in listOf(800f, 852f)) {
             assertEquals(
                 "393 × $height",
                 SignInLayout(logoDp = 96, subtitle = true, guide = true, sideBySide = false),
                 SignInLayout.of(393f, height),
             )
         }
+        assertFalse(SignInLayout.of(393f, 799.5f).subtitle)
+        assertTrue(SignInLayout.of(393f, 660f).guide)
+        assertFalse(SignInLayout.of(393f, 659.5f).guide)
     }
 
     @Test
     fun aShorterPhoneLeavesTheSubtitleToTheTaglines() {
-        assertEquals(SignInLayout(logoDp = 96, subtitle = false, guide = true, sideBySide = false), SignInLayout.of(360f, 640f))
-        assertTrue(SignInLayout.of(393f, 700f).subtitle)
-        assertFalse(SignInLayout.of(393f, 699.5f).subtitle)
+        assertEquals(SignInLayout(logoDp = 96, subtitle = false, guide = false, sideBySide = false), SignInLayout.of(360f, 640f))
     }
 
     @Test
     fun aWindowUnder600DpTallHasTheSmallLogo() {
-        assertEquals(SignInLayout(logoDp = 72, subtitle = false, guide = true, sideBySide = false), SignInLayout.of(360f, 592f))
+        assertEquals(SignInLayout(logoDp = 72, subtitle = false, guide = false, sideBySide = false), SignInLayout.of(360f, 592f))
         assertEquals(96, SignInLayout.of(360f, 600f).logoDp)
         assertEquals(72, SignInLayout.of(360f, 599.5f).logoDp)
+    }
+
+    @Test
+    fun whileAnEmailStepShowsOnlyTheSmallLogoAndTheTitleStay() {
+        for ((width, height) in listOf(393f to 713f, 393f to 852f, 737f to 369f, 1280f to 752f)) {
+            assertEquals(
+                "$width × $height",
+                SignInLayout(
+                    logoDp = 72, subtitle = false, guide = false, sideBySide = SignInLayout.of(width, height).sideBySide,
+                    tagline = false,
+                ),
+                SignInLayout.of(width, height, form = true),
+            )
+        }
+        assertTrue("the first step keeps its taglines", SignInLayout.of(393f, 713f).tagline)
+        assertFalse(SignInLayout.of(393f, 713f, form = true).sideBySide)
+        assertTrue(SignInLayout.of(737f, 369f, form = true).sideBySide)
     }
 
     @Test

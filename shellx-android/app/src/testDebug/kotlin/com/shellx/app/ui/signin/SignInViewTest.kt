@@ -4,10 +4,14 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -16,23 +20,32 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
 import com.shellx.app.screenshots.ShellXSnapshots
+import com.shellx.app.testing.ManualClock
+import com.shellx.app.ui.components.TapOutsideHidesKeyboard
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.account.EmailCodeActions
+import com.shellx.core.account.EmailSignInModel
 import com.shellx.core.account.SignInException
+import com.shellx.link.account.EmailChallenge
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -40,16 +53,76 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Continue with Google: one sign-in at a time, the failures in words, and "Try without an account"; and the intro
- * around them (the logo, the typed taglines, the three steps), which never holds the buttons back.
+ * Continue with Google: one sign-in at a time, the failures in words, and "Try without an account"; the intro around
+ * them (the logo, the typed taglines, the three steps), which never holds the buttons back; and Continue with email:
+ * the email step and the code step in the same screen, over a relay the test scripts.
  */
 @RunWith(AndroidJUnit4::class)
 class SignInViewTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
-    private fun show(expired: Boolean = false, signIn: suspend () -> Unit, startDemo: (() -> Unit)? = {}) {
-        rule.setContent { ShellXTheme { SignInView(expired = expired, signIn = signIn, startDemo = startDemo) } }
+    private val clock = ManualClock()
+
+    /** The code requests and the verifies the screen made, in order. */
+    private val requests = mutableListOf<Pair<String, String>>()
+    private val verifies = mutableListOf<Pair<String, String>>()
+
+    /** What the next code requests and verifies throw, one each; then they succeed. */
+    private val requestFailures = ArrayDeque<SignInException>()
+    private val verifyFailures = ArrayDeque<SignInException>()
+
+    /** While set, a verify waits for it. */
+    private var heldVerify: CompletableDeferred<Unit>? = null
+
+    /** The relay as the test scripts it: every challenge is "c1", for the address trimmed and in lower case. */
+    private val email = EmailCodeActions(
+        requestCode = { address, locale ->
+            requests += address to locale
+            requestFailures.removeFirstOrNull()?.let { throw it }
+            EmailChallenge("c1", 600, 60, address.trim().lowercase())
+        },
+        verify = { challengeId, code ->
+            verifies += challengeId to code
+            heldVerify?.await()
+            verifyFailures.removeFirstOrNull()?.let { throw it }
+        },
+    )
+
+    private fun show(
+        expired: Boolean = false,
+        signIn: suspend () -> Unit = {},
+        startDemo: (() -> Unit)? = {},
+        emailRestore: MutableState<EmailSignInModel.Saved?> = mutableStateOf(null),
+    ) {
+        rule.setContent { ShellXTheme { Screen(expired, signIn, startDemo, emailRestore) } }
+    }
+
+    @Composable
+    private fun Screen(
+        expired: Boolean = false,
+        signIn: suspend () -> Unit = {},
+        startDemo: (() -> Unit)? = {},
+        emailRestore: MutableState<EmailSignInModel.Saved?>,
+    ) {
+        SignInView(
+            expired = expired, signIn = signIn, startDemo = startDemo, email = email, clock = clock, emailRestore = emailRestore,
+        )
+    }
+
+    private fun string(id: Int) = context.getString(id)
+
+    /** What a field shows: its editable text. */
+    private fun fieldText(tag: String): String =
+        rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+
+    /** From the first step to the code step for [address], by taps and typing. */
+    private fun reachTheCodeStep(address: String = "phu@example.com") {
+        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput(address)
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email.code").assertExists()
     }
 
     @Test
@@ -302,6 +375,289 @@ class SignInViewTest {
         for ((index, words) in steps.withIndex()) {
             rule.onNodeWithTag("signin.guide.${index + 1}").assertTextEquals("${index + 1}", context.getString(words))
         }
+    }
+
+    // Continue with email
+
+    @Test
+    fun continueWithEmailOpensTheEmailStepAndBackLeavesIt() {
+        show()
+        rule.onNodeWithTag("signin.or").assertIsDisplayed()
+        assertFalse("Back is the system's on the first step", rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
+
+        rule.onNodeWithTag("signin.email").assertTextEquals(string(R.string.signin_email_continue)).performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.field").assertIsDisplayed().assertIsFocused()
+        for (gone in listOf("signin.google", "signin.email", "signin.tagline", "signin.guide.1", "signin.subtitle")) {
+            rule.onNodeWithTag(gone).assertDoesNotExist()
+        }
+        rule.onNodeWithTag("signin.logo").assertIsDisplayed()
+        rule.onNodeWithTag("signin.title").assertIsDisplayed()
+        rule.onNodeWithTag("signin.demo").assertIsDisplayed()
+
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.google").assertIsDisplayed()
+        rule.onNodeWithTag("signin.email.field").assertDoesNotExist()
+        assertFalse(rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
+        assertEquals(emptyList<Pair<String, String>>(), requests)
+    }
+
+    @Test
+    fun whileGoogleRunsTheEmailButtonIsOff() {
+        val answer = CompletableDeferred<Unit>()
+        show(signIn = { answer.await() })
+        rule.onNodeWithTag("signin.email").assertIsEnabled()
+
+        rule.onNodeWithTag("signin.google").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email").assertIsNotEnabled()
+
+        answer.complete(Unit)
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email").assertIsEnabled()
+    }
+
+    /** Review Focus 1 and 3: a pasted "123 456" signs in by itself, once. */
+    @Test
+    fun aCodeSignsInOnceAndAutoSubmits() {
+        heldVerify = CompletableDeferred()
+        show()
+        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("Phu@Example.com")
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("Phu@Example.com" to "en"), requests)
+        rule.onNodeWithTag("signin.email.sentTo").assertTextEquals(context.getString(R.string.signin_email_sent_to, "phu@example.com"))
+        rule.onNodeWithTag("signin.email.code").assertIsFocused()
+        rule.onNodeWithTag("signin.demo").assertDoesNotExist()
+
+        rule.onNodeWithTag("signin.email.code").performTextInput("123 456")
+        rule.waitForIdle()
+        assertEquals("the sixth digit verifies, with no tap", listOf("c1" to "123456"), verifies)
+        rule.onNodeWithTag("signin.email.verify").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.code").assertIsNotEnabled()
+
+        heldVerify?.complete(Unit)
+        rule.waitForIdle()
+        assertEquals(1, verifies.size)
+        rule.onNodeWithTag("signin.email.verify").assertIsNotEnabled()
+    }
+
+    @Test
+    fun aWrongCodeShowsItsWordsAndTakesANewOne() {
+        verifyFailures += SignInException.InvalidCode()
+        show()
+        reachTheCodeStep()
+        rule.onNodeWithTag("signin.email.code").performTextInput("123456")
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.error").assertTextEquals(string(R.string.signin_error_invalid_code))
+        rule.onNodeWithTag("signin.email.code").assertIsEnabled()
+        assertEquals("", fieldText("signin.email.code"))
+
+        rule.onNodeWithTag("signin.email.code").performTextInput("654321")
+        rule.waitForIdle()
+        assertEquals(listOf("c1" to "123456", "c1" to "654321"), verifies)
+    }
+
+    /** Review Focus 2: the relay's 410 turns the field off and opens Resend at once, in the middle of the countdown. */
+    @Test
+    fun anExpiredCodeOffersResendAtOnce() {
+        verifyFailures += SignInException.CodeExpired()
+        show()
+        reachTheCodeStep()
+        rule.onNodeWithTag("signin.email.resend").assertTextEquals("Resend code in 60 s").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.code").performTextInput("123456")
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.error").assertTextEquals(string(R.string.signin_error_code_expired))
+        rule.onNodeWithTag("signin.email.code").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.resend").assertTextEquals("Resend code").assertIsEnabled().performClick()
+        rule.waitForIdle()
+
+        assertEquals(listOf("phu@example.com" to "en", "phu@example.com" to "en"), requests)
+        rule.onNodeWithTag("signin.email.code").assertIsEnabled()
+        rule.onNodeWithTag("signin.email.resend").assertTextEquals("Resend code in 60 s").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.error").assertDoesNotExist()
+    }
+
+    @Test
+    fun anOldRelaySaysNotAvailableInThisBuild() {
+        requestFailures += SignInException.ProviderUnavailable()
+        show()
+        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.error").assertTextEquals(string(R.string.signin_error_provider_unavailable))
+        assertEquals("phu@example.com", fieldText("signin.email.field"))
+        rule.onNodeWithTag("signin.email.code").assertDoesNotExist()
+    }
+
+    /** Review Focus 7: nothing typed is lost, and nothing retries by itself. */
+    @Test
+    fun offlineKeepsWhatWasTyped() {
+        requestFailures += SignInException.Network()
+        show()
+        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.error").assertTextEquals(string(R.string.signin_error_network))
+        assertEquals("phu@example.com", fieldText("signin.email.field"))
+        rule.onNodeWithTag("signin.email.send").assertIsEnabled()
+        assertEquals(1, requests.size)
+
+        // The same in the code step: the digits stay, and Verify works on a second tap.
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+        verifyFailures += SignInException.Network()
+        rule.onNodeWithTag("signin.email.code").performTextInput("123456")
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email.error").assertTextEquals(string(R.string.signin_error_network))
+        assertEquals("123456", fieldText("signin.email.code"))
+        assertEquals(1, verifies.size)
+        rule.onNodeWithTag("signin.email.verify").assertIsEnabled().performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("c1" to "123456", "c1" to "123456"), verifies)
+    }
+
+    @Test
+    fun useADifferentEmailGoesBackWithTheAddress() {
+        show()
+        reachTheCodeStep("Phu@Example.com")
+        rule.onNodeWithTag("signin.email.change").performClick()
+        rule.waitForIdle()
+
+        assertEquals("phu@example.com", fieldText("signin.email.field"))
+        rule.onNodeWithTag("signin.email.code").assertDoesNotExist()
+        rule.onNodeWithTag("signin.email.send").assertIsEnabled()
+
+        // Back from the code step is the same step back.
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email.code").assertExists()
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+        rule.waitForIdle()
+        assertEquals("phu@example.com", fieldText("signin.email.field"))
+    }
+
+    /** Review Focus 5: nothing is asked or sent again. */
+    @Test
+    fun theCodeStepSurvivesARotation() {
+        val restore = mutableStateOf<EmailSignInModel.Saved?>(null)
+        val screen: @Composable () -> Unit = { ShellXTheme { Screen(emailRestore = restore) } }
+        rule.setContent(screen)
+        reachTheCodeStep()
+        rule.onNodeWithTag("signin.email.code").performTextInput("123")
+        rule.waitForIdle()
+
+        rule.activityRule.scenario.recreate()
+        rule.activityRule.scenario.onActivity { it.setContent(content = screen) }
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.sentTo").assertExists()
+        assertEquals("123", fieldText("signin.email.code"))
+        assertEquals(1, requests.size)
+
+        // A verify on the relay goes on across a rotation, and is not sent a second time.
+        heldVerify = CompletableDeferred()
+        rule.onNodeWithTag("signin.email.code").performTextInput("456")
+        rule.waitForIdle()
+        assertEquals(listOf("c1" to "123456"), verifies)
+        rule.activityRule.scenario.recreate()
+        rule.activityRule.scenario.onActivity { it.setContent(content = screen) }
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email.verify").assertIsNotEnabled()
+        heldVerify?.complete(Unit)
+        rule.waitForIdle()
+        assertEquals(1, verifies.size)
+        assertEquals(1, requests.size)
+    }
+
+    /** Review Focus 4: Android killed the app while the mail was read. */
+    @Test
+    fun aSavedCodeStepIsShownAtOnce() {
+        val saved = EmailSignInModel.Saved("phu@example.com", "c1", clock.nowMs() + 600_000, clock.nowMs() + 40_000)
+        show(emailRestore = mutableStateOf(saved))
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.code").assertIsDisplayed().assertIsEnabled()
+        rule.onNodeWithTag("signin.email.sentTo").assertTextEquals(context.getString(R.string.signin_email_sent_to, "phu@example.com"))
+        rule.onNodeWithTag("signin.email.resend").assertTextEquals("Resend code in 40 s")
+        rule.onNodeWithTag("signin.google").assertDoesNotExist()
+        assertEquals(emptyList<Pair<String, String>>(), requests)
+
+        // Its code goes to the challenge that was saved.
+        rule.onNodeWithTag("signin.email.code").performTextInput("123456")
+        rule.waitForIdle()
+        assertEquals(listOf("c1" to "123456"), verifies)
+    }
+
+    @Test
+    fun theScreenWritesWhatAKilledAppNeeds() {
+        val restore = mutableStateOf<EmailSignInModel.Saved?>(null)
+        show(emailRestore = restore)
+        rule.waitForIdle()
+        assertNull("nothing on the first step", restore.value)
+
+        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.waitForIdle()
+        assertEquals(EmailSignInModel.Saved("phu@example.com", null, 0, 0), restore.value)
+
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+        assertEquals(
+            EmailSignInModel.Saved("phu@example.com", "c1", clock.nowMs() + 600_000, clock.nowMs() + 60_000),
+            restore.value,
+        )
+
+        rule.onNodeWithTag("signin.email.code").performTextInput("123456")
+        rule.waitForIdle()
+        assertEquals(1, verifies.size)
+        assertNull("signed in: nothing to come back to", restore.value)
+    }
+
+    @Test
+    fun aTapOutsideTheFieldPutsTheKeyboardDownAndKeepsTheStep() {
+        var hides = 0
+        val keyboard = object : SoftwareKeyboardController {
+            override fun show() = Unit
+
+            override fun hide() {
+                hides++
+            }
+        }
+        val restore = mutableStateOf<EmailSignInModel.Saved?>(null)
+        rule.setContent {
+            ShellXTheme {
+                CompositionLocalProvider(LocalSoftwareKeyboardController provides keyboard) {
+                    TapOutsideHidesKeyboard { Screen(emailRestore = restore) }
+                }
+            }
+        }
+        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
+
+        rule.onNodeWithTag("signin.logo").performClick()
+        rule.waitUntil(5_000) { hides == 1 }
+        rule.onNodeWithTag("signin.email.field").assertIsNotFocused()
+        assertEquals("phu@example.com", fieldText("signin.email.field"))
+
+        rule.onNodeWithTag("signin.email.field").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
+
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+        assertEquals("a tap on a button hides nothing", 1, hides)
+        assertEquals(1, requests.size)
     }
 
     @Test
