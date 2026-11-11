@@ -193,6 +193,13 @@
     <string name="signin_error_switch_from_signed_in_device">Email này đã có tài khoản ShellX. Mở ShellX trên một máy đang đăng nhập, vào Cài đặt › Tài khoản › Chuyển sang đăng nhập Google, rồi thử lại.</string>
     <string name="signin_expired">Phiên đăng nhập đã hết hạn. Đăng nhập lại.</string>
     <string name="signin_google">Tiếp tục với Google</string>
+    <string name="signin_guide_1">Đăng nhập bằng tài khoản bạn dùng với ShellX trên Mac.</string>
+    <string name="signin_guide_2">Quét mã QR trên Mac để ghép cặp.</string>
+    <string name="signin_guide_3">Theo dõi, trả lời và gõ lệnh từ xa.</string>
+    <string name="signin_logo">Logo ShellX</string>
+    <string name="signin_tagline_1">Điều khiển Mac từ túi của bạn.</string>
+    <string name="signin_tagline_2">Xem agent đang làm gì, ở bất cứ đâu.</string>
+    <string name="signin_tagline_3">Trả lời ngay khi agent cần bạn.</string>
     <string name="signin_title">Đăng nhập ShellX</string>
     <string name="terminal_close">Đóng tab</string>
     <string name="terminal_close_confirm">Tab và mọi thứ đang chạy trong nó trên Mac sẽ bị dừng. Nếu đó là tab cuối của workspace, workspace cũng đóng theo.</string>

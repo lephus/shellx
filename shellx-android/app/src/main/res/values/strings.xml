@@ -194,6 +194,13 @@
     <string name="signin_error_switch_from_signed_in_device">This email already has a ShellX account. Open ShellX on a device that is still signed in, go to Settings › Account › Switch to Google sign-in, then try again.</string>
     <string name="signin_expired">Your session expired. Sign in again.</string>
     <string name="signin_google">Continue with Google</string>
+    <string name="signin_guide_1">Sign in with the account you use with ShellX on your Mac.</string>
+    <string name="signin_guide_2">Scan the QR code on your Mac to pair.</string>
+    <string name="signin_guide_3">Follow, answer and type commands from afar.</string>
+    <string name="signin_logo">ShellX logo</string>
+    <string name="signin_tagline_1">Control your Mac from your pocket.</string>
+    <string name="signin_tagline_2">See what your agents are doing, anywhere.</string>
+    <string name="signin_tagline_3">Answer the moment an agent needs you.</string>
     <string name="signin_title">Sign in to ShellX</string>
     <string name="terminal_close">Close Tab</string>
     <string name="terminal_close_confirm">The tab and everything running in it on the Mac will be stopped. If it is the workspace\'s last tab, the workspace closes too.</string>

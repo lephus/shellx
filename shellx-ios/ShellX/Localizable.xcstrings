@@ -3362,6 +3362,78 @@
         }
       }
     },
+    "signin.guide.1": {
+      "comment": "Sign-in screen, guide step 1 (sign in).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with the account you use with ShellX on your Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập bằng tài khoản bạn dùng với ShellX trên Mac."
+          }
+        }
+      }
+    },
+    "signin.guide.2": {
+      "comment": "Sign-in screen, guide step 2 (pair).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan the QR code on your Mac to pair."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quét mã QR trên Mac để ghép cặp."
+          }
+        }
+      }
+    },
+    "signin.guide.3": {
+      "comment": "Sign-in screen, guide step 3 (use).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow, answer and type commands from afar."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theo dõi, trả lời và gõ lệnh từ xa."
+          }
+        }
+      }
+    },
+    "signin.logo": {
+      "comment": "Accessibility label of the animated ShellX logo on the sign-in screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX logo"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logo ShellX"
+          }
+        }
+      }
+    },
     "signin.subtitle": {
       "comment": "Explains which account to use on the sign-in screen.",
       "extractionState": "manual",
@@ -3376,6 +3448,60 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dùng tài khoản Google bạn dùng với ShellX trên Mac, hoặc đăng nhập bằng Apple rồi nối iPhone này với Mac một lần."
+          }
+        }
+      }
+    },
+    "signin.tagline.1": {
+      "comment": "Sign-in screen, typed tagline 1 of 3.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control your Mac from your pocket."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Điều khiển Mac từ túi của bạn."
+          }
+        }
+      }
+    },
+    "signin.tagline.2": {
+      "comment": "Sign-in screen, typed tagline 2 of 3.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See what your agents are doing, anywhere."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem agent đang làm gì, ở bất cứ đâu."
+          }
+        }
+      }
+    },
+    "signin.tagline.3": {
+      "comment": "Sign-in screen, typed tagline 3 of 3.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer the moment an agent needs you."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trả lời ngay khi agent cần bạn."
           }
         }
       }
