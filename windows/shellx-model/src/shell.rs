@@ -225,8 +225,10 @@ pub fn custom_launch(
 /// every prompt. The wrapper calls the original FIRST, so a theme (oh-my-posh, starship)
 /// still reads the real `$?` of the user's last command, and writes OSC 7 after it. Without a
 /// `prompt` function the fallback writes OSC 7 and returns the stock `PS <path>> `. The
-/// profile still loads (`-Command` runs after it).
-pub const POWERSHELL_PROMPT_HOOK: &str = r#"if ($function:prompt) { $__shellxPrompt = $function:prompt; function global:prompt { $p = & $__shellxPrompt; $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; $p } } else { function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; "PS $($l.Path)> " } }"#;
+/// profile still loads (`-Command` runs after it). Each path segment goes through
+/// `[uri]::EscapeDataString` (what `osc7_url` does), so the URL is ASCII; no backslash stands
+/// before a double quote, so portable-pty's quoting passes the text byte-exact.
+pub const POWERSHELL_PROMPT_HOOK: &str = r#"if ($function:prompt) { $__shellxPrompt = $function:prompt; function global:prompt { $p = & $__shellxPrompt; $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ((($l.ProviderPath -split '\\') | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/') + [char]27 + '\') }; $p } } else { function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ((($l.ProviderPath -split '\\') | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/') + [char]27 + '\') }; "PS $($l.Path)> " } }"#;
 
 /// The user's choice in Settings, stored as small JSON:
 /// `{"kind":"auto"}`, `{"kind":"known","shell":"pwsh"}`, `{"kind":"custom","command_line":"..."}`.
@@ -391,6 +393,27 @@ pub fn launch_plan(
             })
         }
     }
+}
+
+/// The OSC 7 URL the prompt hook sends for a PowerShell provider path: `file://{computer}/`
+/// then the path split on `\`, each segment percent-encoded per UTF-8 byte (only
+/// `A-Z a-z 0-9 - . _ ~` stay, hex in capitals, as .NET `EscapeDataString`), joined with `/`.
+pub fn osc7_url(computer_name: &str, provider_path: &str) -> String {
+    let segments: Vec<String> = provider_path
+        .split('\\')
+        .map(|segment| {
+            let mut out = String::new();
+            for byte in segment.bytes() {
+                if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+                    out.push(char::from(byte));
+                } else {
+                    out.push_str(&format!("%{byte:02X}"));
+                }
+            }
+            out
+        })
+        .collect();
+    format!("file://{computer_name}/{}", segments.join("/"))
 }
 
 #[cfg(test)]
@@ -820,5 +843,36 @@ mod tests {
         }
         assert!(serde_json::from_str::<ShellChoice>(r#"{"kind":"bash"}"#).is_err());
         assert!(serde_json::from_str::<ShellChoice>(r#"{"kind":"known","shell":"zsh"}"#).is_err());
+    }
+
+    #[test]
+    fn the_hook_percent_encodes_the_directory() {
+        assert!(POWERSHELL_PROMPT_HOOK.contains("[uri]::EscapeDataString"));
+        assert!(POWERSHELL_PROMPT_HOOK.contains("]7;file://"));
+        assert!(!POWERSHELL_PROMPT_HOOK.contains(r"-replace '\\','/'"));
+        // a backslash before a double quote would be eaten by the command-line quoting
+        assert!(!POWERSHELL_PROMPT_HOOK.contains("\\\""));
+    }
+
+    #[test]
+    fn osc7_urls_are_ascii_whatever_the_folder() {
+        let cases = [
+            (
+                r"C:\Users\Phú\Tài liệu",
+                "file://PC/C%3A/Users/Ph%C3%BA/T%C3%A0i%20li%E1%BB%87u",
+            ),
+            (r"C:\", "file://PC/C%3A/"),
+            (
+                r"\\srv\share\Dự án",
+                "file://PC///srv/share/D%E1%BB%B1%20%C3%A1n",
+            ),
+            (r"C:\a%b", "file://PC/C%3A/a%25b"),
+            (r"C:\a-b_c.d~e", "file://PC/C%3A/a-b_c.d~e"),
+        ];
+        for (path, want) in cases {
+            let url = osc7_url("PC", path);
+            assert_eq!(url, want, "{path}");
+            assert!(url.is_ascii(), "{path}");
+        }
     }
 }
