@@ -94,7 +94,7 @@ public struct SignInTextField: NSViewRepresentable {
         field.setAccessibilityLabel(placeholder)
         field.font = font
         field.contentType = contentType
-        field.isEnabled = isEnabled
+        field.takesInput = isEnabled
         let isComposing = (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
         if !isComposing, field.stringValue != text {
             field.stringValue = text
