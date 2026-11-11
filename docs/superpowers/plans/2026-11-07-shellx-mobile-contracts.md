@@ -919,6 +919,10 @@ Supersedes §21's name list where they differ. Ledger rows: A-g1..A-g5 = **A-31.
   it), and a page that comes back after Back does not take it; the surface is never laid out with no height; a glyph run is
   cut where a glyph would sit more than 0.5 px off its column; `TerminalPushQueue` yields the collector's thread every
   16 pushes or 4 ms; the screen stays out of content capture (`IMPORTANT_FOR_CONTENT_CAPTURE_NO`, data-sensitive on API 34+).
+- Follow-up from the Pixel 3 check (2026-11-11, `fix/shellx-android-tap-outside-keyboard`): a tap on an area no control
+  consumes, outside the text input and outside the terminal grid, clears the focus and hides the keyboard app-wide
+  (`TapOutsideHidesKeyboard` around the NavHost and each sheet's content). For the terminal pane this is the user's own hide,
+  the same path as the key-bar hide key and Back, so the pane does not ask for the keyboard again.
 
 **Strings.** Android-only (`strings_android.xml`): `terminal_paste` (Paste / Dán), `terminal_cap_esc`, `terminal_cap_tab`,
 `terminal_cap_ctrl` (untranslatable). `workspace.shell.placeholder` is **deleted** from the iPhone catalog (no Swift or Android
