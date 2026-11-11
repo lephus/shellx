@@ -1,13 +1,38 @@
 //! What Settings › Account draws (Ruling 33), as a pure function of the account flow, so the window
 //! only draws it.
 
+use crate::account::{AccountFlow, AccountState};
+use crate::strings::Str;
+
+/// What Settings › Account draws.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountView {
+    /// The sign-in button's label: `SignInAgain` after a server sign-out, else `SignInEllipsis`; `None`
+    /// while LoggedIn.
+    pub sign_in: Option<Str>,
+    /// "Your session expired." above the button.
+    pub session_expired: bool,
+}
+
+pub fn account_view(flow: &AccountFlow) -> AccountView {
+    let signed_in = matches!(flow.state(), AccountState::LoggedIn { .. });
+    let expired = flow.session_ended_by_server() && !signed_in;
+    AccountView {
+        sign_in: (!signed_in).then_some(if expired {
+            Str::SignInAgain
+        } else {
+            Str::SignInEllipsis
+        }),
+        session_expired: expired,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::account::{AccountEvent, AccountFlow};
+    use crate::account::AccountEvent;
     use crate::core_api::{CoreErr, GoogleBegin, GooglePurpose, GoogleSignIn};
     use crate::sidebar::MachineInfo;
-    use crate::strings::Str;
 
     fn me() -> MachineInfo {
         MachineInfo {

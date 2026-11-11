@@ -329,7 +329,8 @@ pub struct AccountFlow {
     auth_method: Option<String>,
     /// `auth.session` already asked for this session.
     session_requested: bool,
-    signed_out_by_server: bool,
+    /// The server ended a session this flow had; cleared by the next entry to LoggedIn.
+    session_ended_by_server: bool,
     methods: Option<Vec<SignInMethod>>,
     removing: Option<String>,
     /// The core has shown that it holds a session: a login or Google sign-in succeeded, a list answered
@@ -367,7 +368,7 @@ impl fmt::Debug for AccountFlow {
             .field("retry_list", &self.retry_list)
             .field("has_session", &self.has_session)
             .field("session_requested", &self.session_requested)
-            .field("signed_out_by_server", &self.signed_out_by_server)
+            .field("session_ended_by_server", &self.session_ended_by_server)
             .field("last_list_ms", &self.last_list_ms)
             .field("last_heartbeat_ms", &self.last_heartbeat_ms)
             .field("tick_pending", &self.tick_pending)
@@ -406,7 +407,7 @@ impl AccountFlow {
             email: None,
             auth_method: None,
             session_requested: false,
-            signed_out_by_server: false,
+            session_ended_by_server: false,
             methods: None,
             removing: None,
             has_session: false,
@@ -487,9 +488,12 @@ impl AccountFlow {
         }
     }
 
-    /// True once after the server ended the session (the app shows sign-in).
-    pub fn take_signed_out_by_server(&mut self) -> bool {
-        std::mem::take(&mut self.signed_out_by_server)
+    /// The server ended this session while it was signed in (a 401, or `not_logged_in` while
+    /// LoggedIn). Stays true until the flow next enters LoggedIn; reading it changes nothing: the
+    /// sidebar and Settings show "Your session expired." with "Sign in again", and no dialog opens by
+    /// itself (Ruling 29).
+    pub fn session_ended_by_server(&self) -> bool {
+        self.session_ended_by_server
     }
 
     /// The email run the dialog shows.
@@ -670,6 +674,7 @@ impl AccountFlow {
                                 if entering {
                                     self.last_heartbeat_ms = now_ms;
                                     self.drop_email_run();
+                                    self.session_ended_by_server = false;
                                 }
                                 // A later list without this machine (revoked
                                 // elsewhere) may register it once more.
@@ -709,9 +714,10 @@ impl AccountFlow {
                             || (self.logged_in()
                                 && matches!(e.code.as_str(), "unauthorized" | "http_401")) =>
                     {
-                        // The server (or a revoked token) ended the session while signed in: ask for sign-in.
+                        // The server (or a revoked token) ended the session while signed in: the notice
+                        // asks for sign-in again.
                         if self.logged_in() {
-                            self.signed_out_by_server = true;
+                            self.session_ended_by_server = true;
                         }
                         self.reset_session();
                         self.state = AccountState::LoggedOut;

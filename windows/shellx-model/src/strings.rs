@@ -190,6 +190,11 @@ pub enum Str {
     EmailSendFailed,
     /// Settings -> Account: the title of an `email` sign-in method.
     EmailCodeMethod,
+    /// The sidebar's and Settings' notice after the server ended the session (catalog
+    /// `signin.expired`, first sentence).
+    SessionExpired,
+    /// The notice's button (catalog `signin.expired`, second sentence).
+    SignInAgain,
 }
 
 impl Str {
@@ -321,6 +326,8 @@ impl Str {
         Str::CodeExpired,
         Str::EmailSendFailed,
         Str::EmailCodeMethod,
+        Str::SessionExpired,
+        Str::SignInAgain,
     ];
 }
 
@@ -471,6 +478,8 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::CodeExpired => "Mã này không còn dùng được. Hãy gửi mã mới.",
             Str::EmailSendFailed => "Chưa gửi được email. Thử lại sau giây lát.",
             Str::EmailCodeMethod => "Mã qua email",
+            Str::SessionExpired => "Phiên đăng nhập đã hết hạn.",
+            Str::SignInAgain => "Đăng nhập lại",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -612,6 +621,8 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::CodeExpired => "That code no longer works. Send a new one.",
             Str::EmailSendFailed => "Couldn't send the email. Try again in a moment.",
             Str::EmailCodeMethod => "Email code",
+            Str::SessionExpired => "Your session expired.",
+            Str::SignInAgain => "Sign in again",
         },
     }
 }

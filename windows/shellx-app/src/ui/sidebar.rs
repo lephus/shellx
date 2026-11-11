@@ -9,7 +9,8 @@
 //! Signed in, the groups are the account's machines (this PC first, the
 //! others below, offline ones dimmed with "ngoại tuyến · lần cuối HH:MM");
 //! signed out, this PC is the only group and the sidebar never asks for a
-//! password: sign-in lives in Settings -> Account (`login.rs`).
+//! password: sign-in lives in Settings -> Account (`login.rs`). After the
+//! server ended the session, a "Sign in again" notice sits above the footer.
 //! Another online machine without access shows "Xin quyền truy cập", which
 //! opens the pairing panel (`pairing.rs`); while waiting, the row shows the
 //! code instead. The "+" in the machines header opens a small list of the
@@ -24,6 +25,7 @@ use gpui::{
     Resource, SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
 };
 use shellx_model::account::AccountState;
+use shellx_model::core_api::GooglePurpose;
 use shellx_model::palette::{
     PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
 };
@@ -118,7 +120,52 @@ pub fn render(
         .child(brand(lang))
         .child(machines_block(picker, signed_in, lang, cx))
         .child(list)
+        .children(session_notice(account, lang, cx))
         .child(footer(account, help_open, lang, cx))
+}
+
+/// After the server ended the session: "Your session expired." and "Sign in again" above the footer,
+/// until the next sign-in (Ruling 29). It holds no focus handle, so the keyboard stays where it was.
+fn session_notice(
+    account: &Entity<AccountService>,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Option<Div> {
+    if !account.read(cx).session_ended_by_server() {
+        return None;
+    }
+    Some(
+        div()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .gap(px(6.0))
+            .px(px(10.0))
+            .py(px(6.0))
+            .border_t_1()
+            .border_color(theme::line())
+            .child(
+                div()
+                    .text_size(theme::SMALL_SIZE)
+                    .text_color(theme::muted())
+                    .child(t(lang, Str::SessionExpired)),
+            )
+            .child(
+                div().flex().child(
+                    button(
+                        "sidebar-sign-in-again",
+                        t(lang, Str::SignInAgain),
+                        Kind::Secondary,
+                        false,
+                    )
+                    .on_click(cx.listener(
+                        |this, _: &ClickEvent, window, cx| {
+                            this.open_sign_in(GooglePurpose::SignIn, window, cx);
+                        },
+                    )),
+                ),
+            ),
+    )
 }
 
 fn brand(lang: Lang) -> Div {

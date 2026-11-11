@@ -17,16 +17,14 @@ use std::time::{Duration, Instant};
 
 use gpui::{Context, prelude::*};
 use shellx_model::account::{AccountAction, AccountEvent, AccountFlow, AccountState};
+use shellx_model::account_view::{AccountView, account_view};
 use shellx_model::core_api::{CoreCall, CoreErr, GooglePurpose, SignInMethod};
 use shellx_model::email_sign_in::EmailStep;
 use shellx_model::sidebar::MachineInfo;
 use shellx_model::update::{CHECK_INTERVAL_SECS, UpdateStatus};
 
 use super::update_banner::open_https;
-use crate::core_service::{
-    GOOGLE_SWITCH_MARKER, MachineFacts, run_account_action, run_google_check, run_version_check,
-    take_once,
-};
+use crate::core_service::{MachineFacts, run_account_action, run_google_check, run_version_check};
 use crate::os_info;
 
 /// What the one worker runs. `version.check` shares the worker with the
@@ -254,14 +252,15 @@ impl AccountService {
 
     /// Mac development build only (screenshots): "code" puts the flow on the code step with a made-up
     /// challenge for "you@example.com" (resend_in 60); "switch" goes on to `EmailCodeSubmitted("123456")`
-    /// and a 409 (`switch_from_signed_in_device`). It feeds the flow directly and drops the returned
-    /// actions, so no core call is made; any other value does nothing.
+    /// and a 409 (`switch_from_signed_in_device`); "expired" signs that code in, lists this PC, then
+    /// has the server refuse the session (the "Sign in again" notice). It feeds the flow directly and
+    /// drops the returned actions, so no core call is made; any other value does nothing.
     #[cfg(target_os = "macos")]
     pub fn dev_preview_email(&mut self, preview: &str, cx: &mut Context<Self>) {
         use shellx_model::core_api::EmailChallenge;
         let now = self.now_ms();
         let mut events = Vec::new();
-        if matches!(preview, "code" | "switch") {
+        if matches!(preview, "code" | "switch" | "expired") {
             events.push(AccountEvent::EmailCodeRequested {
                 email: "you@example.com".into(),
                 locale: "en".into(),
@@ -279,6 +278,27 @@ impl AccountService {
                 challenge_id: "preview".into(),
                 result: Err(CoreErr::new("switch_from_signed_in_device", "")),
             });
+        }
+        if preview == "expired" {
+            events.push(AccountEvent::EmailCodeSubmitted("123456".into()));
+            events.push(AccountEvent::EmailFinished {
+                challenge_id: "preview".into(),
+                result: Ok(shellx_model::core_api::GoogleSignIn {
+                    user_id: "preview".into(),
+                    device_id: "preview".into(),
+                    device_public_key_b64: String::new(),
+                    fingerprint: String::new(),
+                    email: "you@example.com".into(),
+                    auth_method: "email".into(),
+                }),
+            });
+            events.push(AccountEvent::ListResult(Ok(vec![
+                crate::shell_info::this_machine(None),
+            ])));
+            events.push(AccountEvent::ListResult(Err(CoreErr::new(
+                "unauthorized",
+                "",
+            ))));
         }
         if events.is_empty() {
             return;
@@ -335,16 +355,15 @@ impl AccountService {
         self.flow.removing_sign_in_method()
     }
 
-    /// True once after the server ended the session (the window shows sign-in).
-    pub fn take_signed_out_by_server(&mut self) -> bool {
-        self.flow.take_signed_out_by_server()
+    /// The server ended the session: the sidebar and Settings show "Your session expired." with
+    /// "Sign in again" until the next sign-in. No dialog opens by itself (Ruling 29).
+    pub fn session_ended_by_server(&self) -> bool {
+        self.flow.session_ended_by_server()
     }
 
-    /// Once ever (a marker file in the native data dir): a password account is offered the switch to Google.
-    pub fn take_google_switch_offer(&mut self) -> bool {
-        self.flow.needs_google_switch()
-            && crate::paths::native_dir()
-                .is_ok_and(|dir| take_once(&dir.join(GOOGLE_SWITCH_MARKER)))
+    /// What Settings › Account draws.
+    pub fn view(&self) -> AccountView {
+        account_view(&self.flow)
     }
 
     /// The core said this build has a Google client (Ruling 28). False until it answered yes: the dialog

@@ -43,21 +43,6 @@ fn api_base_from(env: Option<String>) -> String {
     API_BASE.to_string()
 }
 
-/// Marker file (in the native data dir) recording that the one-time "switch to Google" offer was made.
-pub const GOOGLE_SWITCH_MARKER: &str = "google-switch-offered";
-
-/// True only for the call that creates `marker` (`create_new`).
-pub fn take_once(marker: &std::path::Path) -> bool {
-    if let Some(dir) = marker.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(marker)
-        .is_ok()
-}
-
 /// Facts about this PC sent with `config.set` and `machines.register`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MachineFacts {
@@ -579,14 +564,6 @@ mod tests {
         let down = FakeCore::new();
         down.on("version.check", Err(CoreErr::new("network", "down")));
         assert_eq!(run_version_check(&down), UpdateStatus::Unknown);
-    }
-
-    #[test]
-    fn take_once_is_true_only_the_first_time() {
-        let tmp = tempfile::tempdir().unwrap();
-        let marker = tmp.path().join(GOOGLE_SWITCH_MARKER);
-        assert!(take_once(&marker));
-        assert!(!take_once(&marker));
     }
 
     /// `config.set` with the fake API's Google overrides, like the plan's dev config.

@@ -115,6 +115,7 @@ impl SettingsPanel {
 
     fn account_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
         let account = self.account.read(cx);
+        let view = account.view();
         let signed_in = matches!(account.state(), AccountState::LoggedIn { .. });
         let who = if signed_in {
             account
@@ -182,22 +183,17 @@ impl SettingsPanel {
                     .text_color(theme::hsla(palette::ERROR))
                     .child(m)
             }))
-            .when(!signed_in, |s| {
-                s.child(
-                    div().flex().child(
-                        button(
-                            "settings-sign-in",
-                            t(lang, Str::SignInEllipsis),
-                            Kind::Primary,
-                            false,
-                        )
-                        .on_click(cx.listener(
-                            |_, _: &ClickEvent, _, cx| {
-                                cx.emit(SettingsEvent::SignInRequested);
-                            },
-                        )),
+            .when(view.session_expired, |s| {
+                s.child(Self::muted(t(lang, Str::SessionExpired)))
+            })
+            .when_some(view.sign_in, |s, label| {
+                s.child(div().flex().child(
+                    button("settings-sign-in", t(lang, label), Kind::Primary, false).on_click(
+                        cx.listener(|_, _: &ClickEvent, _, cx| {
+                            cx.emit(SettingsEvent::SignInRequested);
+                        }),
                     ),
-                )
+                ))
             })
             .when(signed_in, |s| {
                 s.child(
