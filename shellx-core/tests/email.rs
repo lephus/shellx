@@ -243,6 +243,14 @@ fn a_password_account_email_answers_switch_and_spends_the_code() {
     assert_eq!(finish(&core, &b["challenge_id"], &code).unwrap_err().code, "switch_from_signed_in_device");
     assert_eq!(finish(&core, &b["challenge_id"], &code).unwrap_err().code, "code_expired");
     assert_eq!(session_json(&dir)["auth_method"], "password");
+    // A session exists, so a stored token is there to leak: neither call may send it.
+    for path in [CODE_PATH, VERIFY_PATH] {
+        let sent = support::requests_to(&fake, path);
+        assert!(!sent.is_empty(), "{path}");
+        for r in sent {
+            assert_eq!(support::header(&r, "Authorization"), None, "{path}");
+        }
+    }
 }
 
 #[test]
