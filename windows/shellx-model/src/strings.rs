@@ -1047,6 +1047,8 @@ mod tests {
                     &["switch_from_signed_in_device"],
                     Str::SwitchFromSignedInDevice,
                 ),
+                // Review M2: the server refused the session.
+                (&["unauthorized", "http_401"], Str::SessionExpired),
                 (
                     &[
                         "bad_response",

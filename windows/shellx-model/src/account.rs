@@ -2234,14 +2234,43 @@ mod tests {
         f.on(AccountEvent::ListResult(Err(net())), 10);
         assert!(matches!(f.state(), AccountState::Error(e) if e.code == "network"));
         assert!(f.can_sign_out());
-        // a list the server refused: the core forgot the session
+        // a list the server refused: the core forgot the session, and the notice asks to sign in
+        // again (review M2)
         f.on(AccountEvent::Tick(15_010), 15_010);
         f.on(
             AccountEvent::ListResult(Err(CoreErr::new("unauthorized", ""))),
             15_011,
         );
-        assert!(matches!(f.state(), AccountState::Error(_)));
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(f.session_ended_by_server());
         assert!(!f.can_sign_out());
+    }
+
+    /// Review M2: a stored session the server refuses at start asks to sign in again at once, not
+    /// after "ShellX is having a problem. Try again later." and a 15 s retry.
+    #[test]
+    fn a_session_refused_at_start_asks_to_sign_in_again() {
+        for code in ["unauthorized", "http_401"] {
+            let mut f = AccountFlow::new();
+            f.on(AccountEvent::Started, 0);
+            let acts = f.on(AccountEvent::ListResult(Err(CoreErr::new(code, ""))), 1);
+            assert_eq!(f.state(), &AccountState::LoggedOut, "{code}");
+            assert!(f.session_ended_by_server(), "{code}");
+            assert!(!f.can_sign_out(), "{code}");
+            assert_eq!(acts, vec![], "{code}: no retry");
+            assert!(
+                f.on(AccountEvent::Tick(15_001), 15_001).is_empty(),
+                "{code}"
+            );
+            // A right sign-in clears the notice.
+            f.on(send(), 16_000);
+            f.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), 16_000);
+            f.on(submit("123456"), 16_100);
+            f.on(email_finished("c1", Ok(done())), 16_200);
+            f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 16_300);
+            assert!(matches!(f.state(), AccountState::LoggedIn { .. }), "{code}");
+            assert!(!f.session_ended_by_server(), "{code}");
+        }
     }
 
     #[test]
