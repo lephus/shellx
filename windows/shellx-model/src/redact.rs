@@ -298,6 +298,26 @@ mod tests {
         );
         let padded = format!("{}+/s=", "+/v7".repeat(10));
         assert_eq!(redact(&padded), "<token>");
+        // a 44-character standard base64 value, in the same places
+        const B44: &str = "Zm9vYmFyYmF6+/Zm9vYmFyYmF6Zm9vYmFyYmF6Zm9vA=";
+        assert_eq!(B44.len(), 44);
+        assert_eq!(redact(B44), "<token>");
+        assert_eq!(redact(&format!("sig={B44}&x=1")), "sig=<token>&x=1");
+        assert_eq!(
+            redact(&format!(r#"{{"secret":"{B44}"}}"#)),
+            r#"{"secret":"<token>"}"#
+        );
+        // a 43-character base64url value alone, in a URL query and after Bearer
+        assert_eq!(redact(T43), "<token>");
+        assert_eq!(
+            redact(&format!("/cb?state={T43}&x=1")),
+            "/cb?state=<token>&x=1"
+        );
+        // a token that sits in a path segment is still hidden, its neighbours are not
+        assert_eq!(
+            redact(&format!("/v2/links/{T43}/open")),
+            "/v2/links/<token>/open"
+        );
     }
 
     #[test]
@@ -313,6 +333,17 @@ mod tests {
             "pid 123456 started",
             "1234567 code",
             "prepare_something re_x",
+            // request paths and crash locations keep their ids and file names
+            "/v2/machines/0e7a1c2b-3d4e-4f50-8a9b-0c1d2e3f4a5b/heartbeat: server answered 404 not_found",
+            "network: /v2/shares/0e7a1c2b-3d4e-4f50-8a9b-0c1d2e3f4a5b/host-ticket: timed out",
+            "https://relay.shellx.pro/v2/machines/0e7a1c2b-3d4e-4f50-8a9b-0c1d2e3f4a5b",
+            "panicked at /Users/x/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gpui-0.2.2/src/platform/windows/directx_renderer.rs:1557:5",
+            "windows/vendor/gpui-0.2.2/src/platform/windows/directx_renderer.rs:1557:5",
+            "/home/u/.local/share/shellx/2026-11-12.log",
+            "0e7a1c2b-3d4e-4f50-8a9b-0c1d2e3f4a5b",
+            "gpui-0.2.2",
+            "driver 31.0.101.2125",
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709da39a3ee5e6b4b0d3255bfef",
         ] {
             assert_eq!(redact(text), text);
         }
