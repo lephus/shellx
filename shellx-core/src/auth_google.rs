@@ -348,7 +348,6 @@ fn run_flow(agent: &ureq::Agent, cfg: &Config, store: &StateStore, flow: &Flow, 
     }
 
     let old = crate::auth::load_session(store).ok().flatten();
-    let previous_user = old.as_ref().map(|s| s.user_id.clone());
     let public = crate::auth::device_public(store)?;
     let public_b64 = URL_SAFE_NO_PAD.encode(public);
     let resp: GoogleAuthResponse = match flow.purpose {
@@ -396,6 +395,8 @@ fn run_flow(agent: &ureq::Agent, cfg: &Config, store: &StateStore, flow: &Flow, 
     }
     {
         let _g = auth_lock.lock().unwrap_or_else(|p| p.into_inner());
+        // Read under the lock: a sign-in that finished during the request must decide whether `machine.json` goes.
+        let previous_user = crate::auth::load_session(store).ok().flatten().map(|s| s.user_id.clone());
         let session = SessionFile {
             token: resp.token.clone(),
             user_id: resp.user_id.clone(),

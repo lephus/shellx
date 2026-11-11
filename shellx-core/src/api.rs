@@ -46,7 +46,7 @@ pub struct SessionFile {
     pub token: String,
     pub user_id: String,
     pub device_id: String,
-    /// "password" | "google"; absent in files written before Google sign-in (read as password).
+    /// "password" | "google" | "email"; absent in files written before Google sign-in (read as password).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth_method: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -113,6 +113,47 @@ impl fmt::Debug for GoogleAuthResponse {
             .field("email", &"<redacted>")
             .finish()
     }
+}
+
+/// `POST /v1/auth/email/code` body. Not `Debug` (holds the address).
+#[derive(Serialize)]
+pub struct EmailCodeRequest<'a> {
+    pub email: &'a str,
+    pub locale: &'a str,
+}
+
+fn default_email_expires_in() -> u64 {
+    600
+}
+
+fn default_email_resend_in() -> u64 {
+    60
+}
+
+/// 202 of `/v1/auth/email/code`. `Debug` shows `expires_in` and `resend_in` only.
+#[derive(Deserialize)]
+pub struct EmailCodeResponse {
+    pub challenge_id: String,
+    #[serde(default = "default_email_expires_in")]
+    pub expires_in: u64,
+    #[serde(default = "default_email_resend_in")]
+    pub resend_in: u64,
+    #[serde(default)]
+    pub email: String,
+}
+
+impl fmt::Debug for EmailCodeResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EmailCodeResponse").field("expires_in", &self.expires_in).field("resend_in", &self.resend_in).finish_non_exhaustive()
+    }
+}
+
+/// `POST /v1/auth/email/verify` body. Not `Debug` (holds the code). Its 200 is `GoogleAuthResponse`.
+#[derive(Serialize)]
+pub struct EmailVerifyRequest<'a> {
+    pub challenge_id: &'a str,
+    pub code: &'a str,
+    pub device: LoginDevice<'a>,
 }
 
 /// Google's token endpoint answer (other fields ignored). `Debug` redacts.

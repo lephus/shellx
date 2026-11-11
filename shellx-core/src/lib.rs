@@ -6,6 +6,7 @@
 pub mod account;
 pub mod api;
 pub mod auth;
+pub mod auth_email;
 pub mod auth_google;
 pub mod config;
 pub mod envelope;
@@ -40,6 +41,8 @@ pub const KNOWN_METHODS: &[&str] = &[
     "auth.google.begin",
     "auth.google.finish",
     "auth.google.cancel",
+    "auth.email.begin",
+    "auth.email.finish",
     "machines.register",
     "machines.list",
     "machines.heartbeat",
@@ -166,6 +169,14 @@ impl Core {
                 r
             }
             "auth.google.cancel" => auth_google::cancel(&self.google_flows, params),
+            "auth.email.begin" => auth_email::begin(self.agent(), cfg, params),
+            "auth.email.finish" => {
+                let r = auth_email::finish(self.agent(), cfg, store, params, &self.auth_lock);
+                if r.is_ok() {
+                    self.forget_shown_fingerprints();
+                }
+                r
+            }
             "machines.register" => machines::register(self.agent(), cfg, store, params),
             "machines.list" => machines::list(self.agent(), cfg, store),
             "machines.heartbeat" => machines::heartbeat(self.agent(), cfg, store),
