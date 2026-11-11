@@ -992,6 +992,8 @@ Rules the clients rely on:
 - The code is a string of 6 digits and keeps its leading zeros (`"004217"`). It lives 600 s and takes 5 guesses: wrong
   guesses 1 to 4 answer 401 `invalid_code` and the challenge stays; the 5th wrong guess answers 410 `code_expired`. On
   410 the client goes back to asking for a new code. `/verify` shares the 10 per IP per minute login limit.
+- A relay restart (every deploy) voids every live code: its challenge answers 410 `code_expired` like an expired one
+  (the relay keeps the codes' HMAC key in memory only, so a copy of its database cannot be used to find a code).
 - `/verify` creates the account on first use, or signs in to the account that has this address: one made by email code,
   or one made with Google for the same address, which then lists both sign-ins. The session's `auth_method` is `email`.
 - `/verify` 409 `switch_from_signed_in_device`: the address belongs to an account a code cannot open (its password still

@@ -43,11 +43,12 @@ CREATE INDEX tokens_device_id ON tokens (device_id);
 CREATE INDEX tokens_identity_id ON tokens (identity_id);
 
 -- One row per pending email code (POST /v1/auth/email/code). Neither the challenge id nor the code is
--- stored: only their SHA-256. A row goes when the code is used, expired, guessed wrong 5 times or replaced.
+-- stored: only their HMAC-SHA-256 under a key the relay makes at each start and keeps in memory (never in
+-- this database). A row goes when the code is used, expired, guessed wrong 5 times or replaced.
 CREATE TABLE email_codes (
   id             TEXT PRIMARY KEY,                 -- UUIDv4, also the Idempotency-Key sent to Resend
-  challenge_hash BLOB NOT NULL UNIQUE,             -- sha256(challenge_id)
-  code_hash      BLOB NOT NULL,                    -- sha256(challenge_id || ':' || code)
+  challenge_hash BLOB NOT NULL UNIQUE,             -- hmac_sha256(key, challenge_id)
+  code_hash      BLOB NOT NULL,                    -- hmac_sha256(key, challenge_id || ':' || code)
   email          TEXT NOT NULL,                    -- normalized; lives at most 10 minutes
   attempts       INTEGER NOT NULL DEFAULT 0,
   created_at     INTEGER NOT NULL,

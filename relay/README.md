@@ -278,8 +278,11 @@ most 60 s ahead; the nonce was issued by the relay and is unused (Google and tes
 raw nonce, Apple the `sha256_hex` of it); `email_verified` is true.
 
 **Email code** (spec 2026-11-10): `email/code` mails a 6-digit code (from the CSPRNG, leading zeros kept)
-and answers with a challenge id. The relay stores neither: only `sha256(challenge_id)` and
-`sha256(challenge_id + ":" + code)`, compared in constant time. A code lives 600 s and takes 5 guesses:
+and answers with a challenge id. The relay stores neither: only HMAC-SHA-256 of `challenge_id` and of
+`challenge_id + ":" + code`, compared in constant time, under a 32-byte key made at random when the relay
+starts and kept in its memory only (no setting, nothing on disk, never logged), so a copy of the database
+cannot be used to find a code. A restart (every deploy) therefore voids the live codes: they answer 410 and
+the user asks for a new one. A code lives 600 s and takes 5 guesses:
 wrong guesses 1 to 4 answer 401 `invalid_code`, the fifth 410 `code_expired` and the challenge is gone; a
 guess is counted before it is compared. Only the newest code of an address is valid; a used, replaced or
 expired challenge answers 410. `email/code` answers the same 202 and sends the same mail whether or not
