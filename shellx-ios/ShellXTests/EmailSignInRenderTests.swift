@@ -302,20 +302,32 @@ final class EmailSignInRenderTests: XCTestCase {
             model.setCode("123456")
             _ = await WorkspaceRig.eventually { model.error == .codeExpired }
         }
+        // A slow run (screenshots) can take a second of the real clock between the send and here.
+        let failedRelay = FakeRelayAccount()
+        await failedRelay.setEmailChallenge(.success(EmailChallenge(challengeID: "c", expiresIn: 600, resendIn: 0, email: "phu@example.com")))
+        let failed = try await render("signin-code-step-resend-failed", relay: failedRelay) { model in
+            await self.atCode(model)
+            await failedRelay.setError(RelayAPIError.http(status: 502, code: "email_send_failed"), for: .requestEmailCode)
+            await model.resend()
+        }
+        XCTAssertEqual(failed.model.error, .emailSendFailed)
+        XCTAssertFalse(failed.model.codeIsLive, "the relay dropped the code it could not mail")
         XCTAssertEqual(code.model.step, .code)
-        XCTAssertEqual(code.model.resendIn, 60)
+        XCTAssertTrue((1...60).contains(code.model.resendIn), "Resend is locked: \(code.model.resendIn)")
         XCTAssertEqual(resend.model.resendIn, 0)
         XCTAssertEqual(wrong.model.error, .invalidCode)
         XCTAssertEqual(expired.model.error, .codeExpired)
         XCTAssertFalse(expired.model.codeIsLive)
         for (index, style) in Self.styles.enumerated() {
-            for drawn in [code, resend, wrong, expired] {
+            for drawn in [code, resend, wrong, expired, failed] {
                 _ = try field(drawn.bitmaps[index], style)
                 XCTAssertNil(drawn.bitmaps[index].googleButtonTop(), "no Google or Apple button in the code step")
                 XCTAssertNotNil(try sendBand(drawn.bitmaps[index], on: false, style), "Verify, off without six digits")
             }
             XCTAssertNotEqual(first.images[index].pngData(), code.images[index].pngData())
-            for (other, what) in [(resend, "Resend without its countdown"), (wrong, "a wrong code"), (expired, "a dead code")] {
+            for (other, what) in [
+                (resend, "Resend without its countdown"), (wrong, "a wrong code"), (expired, "a dead code"), (failed, "a Resend not mailed"),
+            ] {
                 XCTAssertNotEqual(other.images[index].pngData(), code.images[index].pngData(), what)
             }
         }
