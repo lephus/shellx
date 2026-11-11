@@ -22,6 +22,12 @@ export interface RateLimiters {
   shareCreate: RateLimiter;
   /** Anonymous share viewer ticket, keyed by client IP: 30 per window. */
   shareTicket: RateLimiter;
+  /** `POST /v1/auth/email/code`, keyed by client IP: 10 per window, counted before the body is read. */
+  emailCodeIp: RateLimiter;
+  /** `POST /v1/auth/email/code`, keyed by the normalized address: 3 per window. */
+  emailCodeEmail: RateLimiter;
+  /** `POST /v1/auth/email/code`, keyed by the normalized address: 10 per hour; asked only after `emailCodeEmail` allowed the call. */
+  emailCodeEmailHour: RateLimiter;
 }
 
 /** Spec §5.2: 60-second window; login 10/IP and 5/email; nonce 30/IP. */
@@ -41,6 +47,11 @@ export const PAIRING_CREATES_PER_DEVICE = 10;
 export const SHARE_CREATES_PER_DEVICE = 10;
 export const SHARE_TICKETS_PER_IP = 30;
 export const NOTIFICATIONS_WINDOW_MS = 60 * 60_000;
+/** Email sign-in codes (spec 2026-11-10 §4): 10 per IP and 3 per address per window, and 10 per address per hour. */
+export const EMAIL_CODES_PER_IP = 10;
+export const EMAIL_CODES_PER_EMAIL = 3;
+export const EMAIL_CODES_PER_EMAIL_HOUR = 10;
+export const EMAIL_CODES_HOUR_WINDOW_MS = 3_600_000;
 
 export interface SlidingWindowOptions {
   /** Allowed calls per key within any window of `windowMs`. */
@@ -111,7 +122,10 @@ const allowAll: RateLimiter = { limit: async () => true };
 /** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all of them off. */
 export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, now: () => number = Date.now): RateLimiters {
   if (!config.rateLimitsEnabled) {
-    return { loginIp: allowAll, loginEmail: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll, ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll };
+    return {
+      loginIp: allowAll, loginEmail: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll, ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll,
+      emailCodeIp: allowAll, emailCodeEmail: allowAll, emailCodeEmailHour: allowAll,
+    };
   }
   return {
     loginIp: new SlidingWindowLimiter({ limit: LOGIN_PER_IP, now }),
@@ -123,5 +137,8 @@ export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, no
     pairingCreate: new SlidingWindowLimiter({ limit: PAIRING_CREATES_PER_DEVICE, now }),
     shareCreate: new SlidingWindowLimiter({ limit: SHARE_CREATES_PER_DEVICE, now }),
     shareTicket: new SlidingWindowLimiter({ limit: SHARE_TICKETS_PER_IP, now }),
+    emailCodeIp: new SlidingWindowLimiter({ limit: EMAIL_CODES_PER_IP, now }),
+    emailCodeEmail: new SlidingWindowLimiter({ limit: EMAIL_CODES_PER_EMAIL, now }),
+    emailCodeEmailHour: new SlidingWindowLimiter({ limit: EMAIL_CODES_PER_EMAIL_HOUR, windowMs: EMAIL_CODES_HOUR_WINDOW_MS, now }),
   };
 }

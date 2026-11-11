@@ -45,12 +45,14 @@ export const TEST_CONFIG: Config = {
   appleClientIds: ["com.shellx.prod", "com.shellx.dev"],
   passwordLogin: true,
   testIdp: null,
+  emailSignIn: null,
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
   loginIp: allowAll, loginEmail: allowAll, nonceIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
   ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll,
+  emailCodeIp: allowAll, emailCodeEmail: allowAll, emailCodeEmailHour: allowAll,
 };
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */

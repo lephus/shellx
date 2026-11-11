@@ -189,9 +189,11 @@ async function startApi(secretFile, relayPort, dir) {
     relayV2Url: `ws://127.0.0.1:${relayPort}/v1/relay`,
     shareAllowedOrigin: ORIGIN,
     googleClientIds: [], appleClientIds: ['com.shellx.prod', 'com.shellx.dev'], passwordLogin: true, testIdp: null,
+    emailSignIn: null,
   };
   const limiters = Object.fromEntries(
-    ['loginIp', 'loginEmail', 'nonceIp', 'upgradeIp', 'notifyAgent', 'ticketMint', 'pairingCreate', 'shareCreate', 'shareTicket']
+    ['loginIp', 'loginEmail', 'nonceIp', 'upgradeIp', 'notifyAgent', 'ticketMint', 'pairingCreate', 'shareCreate', 'shareTicket',
+      'emailCodeIp', 'emailCodeEmail', 'emailCodeEmailHour']
       .map((k) => [k, allow]));
   const relay = await startRelay(
     {
