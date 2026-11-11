@@ -7,6 +7,7 @@ import com.shellx.core.platform.KeyValueStore
 import com.shellx.core.platform.rethrowIfCancelled
 import com.shellx.core.platform.runDetached
 import com.shellx.link.account.AccountSignIn
+import com.shellx.link.account.EmailChallenge
 import com.shellx.link.account.RelayApiException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,8 +15,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Owns the account state of the app (AppCoordinator.swift, Google only): which screen to show, how to get in and out,
- * and the [MachineHub] of the signed-in account (made on sign-in, stopped and dropped on sign-out or a 401).
+ * Owns the account state of the app (AppCoordinator.swift; sign-in is Google's or an emailed code's): which screen to
+ * show, how to get in and out, and the [MachineHub] of the signed-in account (made on sign-in, stopped and dropped on
+ * sign-out or a 401).
  *
  * Main-confined. Every action runs in [scope] through runDetached, and the caller only waits: cancelling the caller
  * (Back, a configuration change, a cleared viewModelScope) never leaves a sign-in, sign-out or deletion half done. A
@@ -24,9 +26,10 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * A sign-in, sign-out or deletion runs once at a time (review 3a m-2): a call while the same action is still running
  * (its screen went, and the next screen's tap came before the relay answered) waits for that run and gets its result,
- * so there is never a second Google prompt, a second relay sign-in, or a device token left signed in.
+ * so there is never a second Google prompt, a second relay sign-in, or a device token left signed in. Google and the
+ * emailed code share the sign-in's slot, and both deletions share the deletion's.
  *
- * Nothing here logs a token, a key or an email; log lines carry event names only.
+ * Nothing here logs a token, a key, a code, a challenge or an email; log lines carry event names only.
  */
 class AppCoordinator(
     private val vault: AccountVault,
@@ -101,6 +104,40 @@ class AppCoordinator(
     }
 
     /**
+     * Continue with email, step 1: asks the relay to mail a 6-digit sign-in code to [email], written in [locale] ("en"
+     * or "vi"). Refuses with [SignInException.LocalWipePending] before any relay call while a local wipe is owed. Runs
+     * detached; a second call is a second request (the relay keeps only the newest code). Throws [SignInException].
+     */
+    suspend fun requestEmailCode(email: String, locale: String): EmailChallenge = scope.runDetached {
+        if (!retryPendingWipe()) throw SignInException.LocalWipePending()
+        try {
+            relay.requestEmailCode(email, locale)
+        } catch (e: Exception) {
+            rethrowIfCancelled(e)
+            throw SignInException.ofEmail(e)
+        }
+    }
+
+    /**
+     * Step 2, the mailed code: the relay's verify with the phone key, then what a Google sign-in does once the relay
+     * answered, stored as an [AccountAuthMethod.EMAIL] session. Shares Google's one-at-a-time slot: a call while a
+     * sign-in runs joins it, so a double tap never spends a second try. Throws [SignInException].
+     */
+    suspend fun signInWithEmailCode(challengeId: String, code: String) {
+        signingIn.run(scope) {
+            if (!retryPendingWipe()) throw SignInException.LocalWipePending()
+            val key = phoneKey()
+            val signIn = try {
+                relay.signInWithEmailCode(challengeId, code, deviceName, key)
+            } catch (e: Exception) {
+                rethrowIfCancelled(e)
+                throw SignInException.ofEmail(e)
+            }
+            completeSignIn(signIn, AccountAuthMethod.EMAIL)
+        }
+    }
+
+    /**
      * Removes this phone from its Macs and the relay (best effort: each Mac's grant, this phone's push token, then
      * logout), then forgets everything local.
      */
@@ -157,16 +194,14 @@ class AppCoordinator(
     /**
      * S1 §6.8: signs in with Google again, deletes the account on the relay, then forgets everything local as
      * [signOut] does, without unpairing, push or logout calls (the account is gone). Throws [SignInException]; on a
-     * failure the session and the hub stay, unless the relay refused the stored token.
+     * failure the session and the hub stay, unless the relay refused the stored token. A session that signed in with
+     * an emailed code is refused with `Server("code_required")` before any call (Google's sheet never opens for it):
+     * its way is [requestAccountDeletionCode], then [deleteAccountWithEmailCode].
      */
     suspend fun deleteAccount() {
         deleting.run(scope) {
-            val stored = try {
-                vault.session()
-            } catch (e: Exception) {
-                rethrowIfCancelled(e)
-                null
-            } ?: throw SignInException.Server("signed_out")
+            val stored = storedSession() ?: throw SignInException.Server("signed_out")
+            if (stored.authMethod == AccountAuthMethod.EMAIL) throw SignInException.Server("code_required")
             val nonce: String
             val idToken: String
             try {
@@ -181,16 +216,43 @@ class AppCoordinator(
             try {
                 relay.deleteAccount(idToken, nonce, stored.token)
             } catch (e: Exception) {
-                throw endFailedAccountChange(e)
+                throw endFailedAccountChange(e, SignInException::of)
             }
+            endDeletedAccount()
+        }
+    }
+
+    /**
+     * Delete Account for a session that signed in with an emailed code, step 1: asks the relay to mail a code to the
+     * stored session's address, written in [locale]. `Server("signed_out")` without a session. Runs detached. Throws
+     * [SignInException].
+     */
+    suspend fun requestAccountDeletionCode(locale: String): EmailChallenge = scope.runDetached {
+        val stored = storedSession() ?: throw SignInException.Server("signed_out")
+        try {
+            relay.requestEmailCode(stored.email, locale)
+        } catch (e: Exception) {
+            rethrowIfCancelled(e)
+            throw SignInException.ofEmail(e)
+        }
+    }
+
+    /**
+     * Step 2: deletes the account on the relay with the mailed code, then everything [deleteAccount] does after its
+     * relay call. Shares its one-at-a-time slot. Throws [SignInException]; on a failure the session and the hub stay,
+     * unless the relay refused the stored token.
+     */
+    suspend fun deleteAccountWithEmailCode(challengeId: String, code: String) {
+        deleting.run(scope) {
+            val stored = storedSession() ?: throw SignInException.Server("signed_out")
+            accountChangeInProgress = true
+            unauthorizedDuringChange = false
             try {
-                stopHub()
-                forgetLocalData()
-                _phase.value = AppPhase.SignedOut(false)
-            } finally {
-                accountChangeInProgress = false
-                unauthorizedDuringChange = false
+                relay.deleteAccountWithEmailCode(challengeId, code, stored.token)
+            } catch (e: Exception) {
+                throw endFailedAccountChange(e, SignInException::ofEmail)
             }
+            endDeletedAccount()
         }
     }
 
@@ -215,6 +277,14 @@ class AppCoordinator(
         } else {
             _phase.value = AppPhase.SignedOut(false)
         }
+    }
+
+    /** The stored session; null when there is none or the store cannot be read. */
+    private suspend fun storedSession(): StoredSession? = try {
+        vault.session()
+    } catch (e: Exception) {
+        rethrowIfCancelled(e)
+        null
     }
 
     private suspend fun phoneKey(): ByteArray = try {
@@ -266,11 +336,24 @@ class AppCoordinator(
         _phase.value = AppPhase.SignedOut(true)
     }
 
+    /** The relay deleted the account: the hub stops and everything local goes, as after a sign-out. */
+    private suspend fun endDeletedAccount() {
+        try {
+            stopHub()
+            forgetLocalData()
+            _phase.value = AppPhase.SignedOut(false)
+        } finally {
+            accountChangeInProgress = false
+            unauthorizedDuringChange = false
+        }
+    }
+
     /**
      * A deletion failed on the relay: the session and the hub stay, unless the stored token itself was refused (or a
-     * 401 raced the call), which signs out as expired. Returns what the caller throws.
+     * 401 raced the call), which signs out as expired. Returns what the caller throws: [map] of [error]
+     * ([SignInException.of] for Google's deletion, [SignInException.ofEmail] for the code's).
      */
-    private suspend fun endFailedAccountChange(error: Exception): SignInException {
+    private suspend fun endFailedAccountChange(error: Exception, map: (Throwable) -> SignInException): SignInException {
         accountChangeInProgress = false
         val sawUnauthorized = unauthorizedDuringChange
         unauthorizedDuringChange = false
@@ -280,7 +363,7 @@ class AppCoordinator(
             return SignInException.Server("unauthorized")
         }
         if (sawUnauthorized) expire()
-        return SignInException.of(error)
+        return map(error)
     }
 
     /**
