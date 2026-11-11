@@ -844,6 +844,22 @@ mod tests {
     }
 
     #[test]
+    fn google_available_reads_the_core_answer() {
+        let f = fake_with("auth.google.available", json!({"available": true}));
+        assert_eq!(google_available(&f), Ok(true));
+        assert_eq!(f.calls(), vec![("auth.google.available".into(), json!({}))]);
+        let f = fake_with("auth.google.available", json!({"available": false}));
+        assert_eq!(google_available(&f), Ok(false));
+        // An older core without the method.
+        assert_eq!(
+            google_available(&FakeCore::new()).unwrap_err().code,
+            "unknown_method"
+        );
+        let f = fake_with("auth.google.available", json!({}));
+        assert_eq!(google_available(&f).unwrap_err().code, "bad_response");
+    }
+
+    #[test]
     fn email_values_hide_addresses_and_challenges_in_debug() {
         let c = EmailChallenge {
             challenge_id: "CH-SECRET".into(),
