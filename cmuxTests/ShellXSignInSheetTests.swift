@@ -144,15 +144,32 @@ import Testing
         }
     }
 
+    /// Each state lays out at the sheet's width with the field it should show: the first screen one email field (off
+    /// only while Google waits), the code step one code field (off only for a dead code), done none. The sheet pins
+    /// its width, so the fields and one height carry the weight: with "phu@ẽ" typed and then a Google failure the
+    /// sheet is exactly as tall as with only the Google failure, so only one failure line is on screen (D3).
     @Test func everyStateLaysOutAtTheSheetWidth() async {
-        var states: [String] = []
+        var heights: [String: CGFloat] = [:]
         await visitEveryState { name, sheet in
-            states.append(name)
             let size = size(sheet)
+            heights[name] = size.height
             #expect(abs(size.width - 340) <= 1, "\(name): width \(size.width)")
             #expect(size.height > 0, "\(name): height \(size.height)")
+            let fields = Self.laidOutFields(of: sheet)
+            if name.hasPrefix("first-screen") {
+                #expect(fields.map(\.contentType) == [.emailAddress], "\(name): \(fields.map(\.contentType))")
+                #expect(fields.first?.isEnabled == (name != "first-screen-google-waiting"), "\(name): the email field")
+            } else if name.hasPrefix("code-step") {
+                #expect(fields.map(\.contentType) == [.oneTimeCode], "\(name): \(fields.map(\.contentType))")
+                #expect(fields.first?.isEnabled == (name != "code-step-dead-code"), "\(name): the code field")
+            } else {
+                #expect(fields.isEmpty, "\(name): \(fields.count) fields")
+            }
         }
-        #expect(states.count == 8)
+        #expect(heights.count == 8)
+        let googleFailed = heights["first-screen-google-failed"] ?? 0
+        let bothTyped = heights["first-screen-invalid-email-then-google-failed"] ?? -1
+        #expect(abs(bothTyped - googleFailed) < 0.5, "one failure line: \(bothTyped) against \(googleFailed)")
     }
 
     @Test func theSwitchSheetHasNoEmailPath() {
