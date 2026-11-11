@@ -147,7 +147,19 @@ public final class EmailSignInModel {
         do {
             keep(try await request(sentTo))
         } catch let failure {
-            error = Self.signInError(failure)
+            let failure = Self.signInError(failure)
+            error = failure
+            switch failure {
+            case .emailSendFailed, .providerUnavailable:
+                // The relay replaces the earlier code before it mails the new one and drops the new one when the mail
+                // cannot go; without email sign-in no code is coming either. Nothing is live: as after a 410, only a
+                // new code helps, and Resend stays unlocked.
+                code = ""
+                challengeID = nil
+            default:
+                // Refused before anything changed (429), or no answer: the code already mailed still works.
+                break
+            }
             step = .code
         }
     }
