@@ -29,7 +29,7 @@ describe("migration 0010", () => {
       const counts = () => ["users", "devices", "tokens", "machines", "phone_pairings"].map((t) => db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t}`)!.n);
       const before = counts();
 
-      expect(migrate(db)).toEqual(["0010_identities.sql"]);
+      expect(migrate(db)).toEqual(["0010_identities.sql", "0011_email_sign_in.sql"]);
 
       expect(counts()).toEqual(before);
       expect(db.get("SELECT auth_method, identity_id FROM tokens")).toEqual({ auth_method: "password", identity_id: null });
