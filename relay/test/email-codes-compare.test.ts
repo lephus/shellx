@@ -17,11 +17,12 @@ import { db } from "./helpers.js";
 
 it("compares code hashes with timingSafeEqual: once per guess at a live challenge, right or wrong, on two 32-byte digests", async () => {
   const T0 = 1_800_000_000_000;
-  const { challengeId } = (await issueEmailCode(db(), "ann.lee@example.com", "048213", T0))!;
-  await redeemEmailCode(db(), "n".repeat(43), "048213", T0); // unknown challenge: nothing to compare
+  const KEY = new Uint8Array(32).fill(7);
+  const { challengeId } = (await issueEmailCode(db(), "ann.lee@example.com", "048213", T0, KEY))!;
+  await redeemEmailCode(db(), "n".repeat(43), "048213", T0, KEY); // unknown challenge: nothing to compare
   expect(compared.calls).toEqual([]);
-  expect(await redeemEmailCode(db(), challengeId, "048214", T0)).toEqual({ ok: false, reason: "invalid_code" }); // last digit off
-  expect(await redeemEmailCode(db(), challengeId, "948213", T0)).toEqual({ ok: false, reason: "invalid_code" }); // first digit off
-  expect(await redeemEmailCode(db(), challengeId, "048213", T0)).toEqual({ ok: true, email: "ann.lee@example.com" });
+  expect(await redeemEmailCode(db(), challengeId, "048214", T0, KEY)).toEqual({ ok: false, reason: "invalid_code" }); // last digit off
+  expect(await redeemEmailCode(db(), challengeId, "948213", T0, KEY)).toEqual({ ok: false, reason: "invalid_code" }); // first digit off
+  expect(await redeemEmailCode(db(), challengeId, "048213", T0, KEY)).toEqual({ ok: true, email: "ann.lee@example.com" });
   expect(compared.calls).toEqual([[32, 32], [32, 32], [32, 32]]);
 });

@@ -100,6 +100,32 @@ describe("POST /v1/auth/email/verify", () => {
     expect((await verify(app, fresh.challengeId, CODE)).status).toBe(200);
   });
 
+  it("answers 410 code_expired to a challenge issued before a restart (every relay start makes a new key), counting no guess; the usual rules hold after it", async () => {
+    const mail = new FakeEmailGateway();
+    const before = makeApp({ email: mail, emailCode: () => CODE });
+    const after = makeApp({ email: mail, emailCode: () => CODE }); // the same database, started again
+    const old = await requestEmailCode(before, mail, "ann@example.com");
+    for (let n = 1; n <= 6; n++) {
+      const res = await verify(after, old.challengeId, CODE);
+      expect(res.status).toBe(410);
+      expect(await errorCode(res)).toBe("code_expired");
+    }
+    expect(db().get("SELECT attempts FROM email_codes")).toEqual({ attempts: 0 });
+    expect(count("users")).toBe(0);
+    // Only the key differs: under its own key the same challenge and code still sign in.
+    expect((await verify(before, old.challengeId, CODE)).status).toBe(200);
+
+    const fresh = await requestEmailCode(after, mail, "bob@example.com");
+    const wrong = await verify(after, fresh.challengeId, "004218");
+    expect([wrong.status, await errorCode(wrong)]).toEqual([401, "invalid_code"]);
+    expect(db().get("SELECT attempts FROM email_codes")).toEqual({ attempts: 1 });
+    const elsewhere = await verify(before, fresh.challengeId, CODE);
+    expect([elsewhere.status, await errorCode(elsewhere)]).toEqual([410, "code_expired"]);
+    expect(db().get("SELECT attempts FROM email_codes")).toEqual({ attempts: 1 });
+    expect((await verify(after, fresh.challengeId, CODE)).status).toBe(200);
+    expect([count("users"), count("email_codes")]).toEqual([2, 0]);
+  });
+
   it("signs in at most once when one challenge is verified concurrently, and compares at most five concurrent guesses", async () => {
     const { mail, app } = setup();
     const right = await requestEmailCode(app, mail, "ann@example.com");

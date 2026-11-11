@@ -1,33 +1,55 @@
+import { createHash, createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRateLimiters } from "../src/auth/rate-limit.js";
-import { hashToken } from "../src/auth/tokens.js";
 import { FakeEmailGateway } from "./fake-email.js";
-import { call, CountingLimiter, db, errorCode, googleSession, makeApp, requestEmailCode, type TestApp, unlimited } from "./helpers.js";
+import { call, CountingLimiter, db, deviceBody, errorCode, googleSession, makeApp, requestEmailCode, type TestApp, unlimited } from "./helpers.js";
 
 const T0 = 1_800_000_000_000;
+/** The relay's challenge key (random per process in production; injected here to check the stored values). */
+const KEY = new Uint8Array(32).fill(7);
+const hmac = (value: string) => createHmac("sha256", KEY).update(value, "utf8").digest();
+const sha256 = (value: string) => createHash("sha256").update(value, "utf8").digest();
 const ask = (app: TestApp, email: unknown, extra: Record<string, unknown> = {}, ip?: string) =>
   call(app, "POST", "/v1/auth/email/code", { ip, body: { email, ...extra } });
 const codes = () => db().get<{ n: number }>("SELECT COUNT(*) AS n FROM email_codes")!.n;
 afterEach(() => vi.restoreAllMocks());
 
 describe("POST /v1/auth/email/code", () => {
-  it("answers 202 with a challenge for 600 s, mails the code once, and stores neither the code nor the challenge id", async () => {
+  it("answers 202 with a challenge for 600 s, mails the code once, and stores neither the code nor the challenge id, only HMACs under the relay's key", async () => {
     const mail = new FakeEmailGateway();
-    const app = makeApp({ email: mail, now: () => T0, emailCode: () => "004217" });
+    const app = makeApp({ email: mail, now: () => T0, emailCode: () => "004217", emailCodeKey: KEY });
     const res = await ask(app, "  Ann.Lee@Example.COM ");
     expect(res.status).toBe(202);
     const body = await res.json<{ challenge_id: string }>();
     expect(body).toEqual({ challenge_id: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/), expires_in: 600, resend_in: 60, email: "ann.lee@example.com" });
     const row = db().get<{ id: string }>("SELECT * FROM email_codes")!;
     expect(row).toEqual({
-      id: expect.stringMatching(/^[0-9a-f-]{36}$/), challenge_hash: Buffer.from(await hashToken(body.challenge_id)),
-      code_hash: Buffer.from(await hashToken(`${body.challenge_id}:004217`)), email: "ann.lee@example.com", attempts: 0, created_at: T0, expires_at: T0 + 600_000,
+      id: expect.stringMatching(/^[0-9a-f-]{36}$/), challenge_hash: hmac(body.challenge_id),
+      code_hash: hmac(`${body.challenge_id}:004217`), email: "ann.lee@example.com", attempts: 0, created_at: T0, expires_at: T0 + 600_000,
     });
     expect(mail.sent).toEqual([{
       to: "ann.lee@example.com", subject: "Your ShellX sign-in code is 004217", idempotencyKey: row.id,
       text: expect.stringContaining("004217"), html: expect.stringContaining("004217"),
     }]);
   });
+
+  it("leaves a reader of the database nothing to test codes against: with the challenge id /code handed out, none of the 10^6 codes matches code_hash (review I1)", async () => {
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail, now: () => T0 }); // the relay's own key, as in production
+    const { challengeId, code } = await requestEmailCode(app, mail, "victim@example.com");
+    const row = db().get<{ challenge_hash: Buffer; code_hash: Buffer }>("SELECT challenge_hash, code_hash FROM email_codes")!;
+    // The reviewer's probe: every six-digit code, hashed with the requester's own challenge id.
+    const matches: string[] = [];
+    for (let n = 0; n < 1_000_000; n++) {
+      const guess = String(n).padStart(6, "0");
+      if (sha256(`${challengeId}:${guess}`).equals(row.code_hash)) matches.push(guess);
+    }
+    expect(matches).toEqual([]);
+    expect(row.challenge_hash.equals(sha256(challengeId))).toBe(false);
+    // The challenge itself is sound: the mailed code signs in.
+    const res = await call(app, "POST", "/v1/auth/email/verify", { body: { challenge_id: challengeId, code, device: deviceBody("mobile") } });
+    expect(res.status).toBe(200);
+  }, 60_000);
 
   it("answers the same 202 whether or not the address has an account, and touches no account", async () => {
     const mail = new FakeEmailGateway();
@@ -71,10 +93,10 @@ describe("POST /v1/auth/email/code", () => {
 
   it("keeps only the newest challenge of an address, also when two requests race", async () => {
     const mail = new FakeEmailGateway();
-    const app = makeApp({ email: mail, now: () => T0 });
+    const app = makeApp({ email: mail, now: () => T0, emailCodeKey: KEY });
     const first = await requestEmailCode(app, mail, "ann.lee@example.com");
     const second = await requestEmailCode(app, mail, "ANN.LEE@example.com");
-    expect(db().all("SELECT challenge_hash FROM email_codes")).toEqual([{ challenge_hash: Buffer.from(await hashToken(second.challengeId)) }]);
+    expect(db().all("SELECT challenge_hash FROM email_codes")).toEqual([{ challenge_hash: hmac(second.challengeId) }]);
     expect(first.challengeId).not.toBe(second.challengeId);
     const raced = await Promise.all([ask(app, "bob@example.com"), ask(app, "bob@example.com"), ask(app, "bob@example.com")]);
     expect(raced.map((r) => r.status)).toEqual([202, 202, 202]);

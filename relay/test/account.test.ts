@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { passwords, type PasswordHasher } from "../src/auth/password.js";
+import type { RateLimiter } from "../src/auth/rate-limit.js";
 import type { HubRegistry } from "../src/hub/registry.js";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
@@ -515,6 +516,36 @@ describe("DELETE /v1/account with an email code (spec 2026-11-10 §4)", () => {
       expect([res.status, await errorCode(res)]).toEqual([401, "reauth_required"]);
     }
     expect([users(s.userId), codes()]).toEqual([1, 0]);
+  });
+
+  it("compares the code's address with the account's address as it is after the redeem: a code for the address /google/link just replaced deletes nothing", async () => {
+    const mail = new FakeEmailGateway();
+    // The per-address limiter is the route's first await after it read the account: /google/link runs there.
+    let duringLimit: (() => Promise<void>) | null = null;
+    const loginEmail: RateLimiter = {
+      limit: async () => {
+        const hook = duringLimit;
+        duringLimit = null;
+        if (hook !== null) await hook();
+        return true;
+      },
+    };
+    const app = makeApp({ email: mail, emailCode: () => CODE, limiters: { ...unlimited, loginEmail } });
+    const s = await emailSession(app, mail, { email: "ann@example.com" });
+    const other = await emailSession(app, mail, { email: "ann@example.com" });
+    expect(other.userId).toBe(s.userId);
+    const c = await requestEmailCode(app, mail, "ann@example.com");
+    let linked = 0;
+    duringLimit = async () => {
+      linked = (await call(app, "POST", "/v1/auth/google/link", { token: other.token, body: await googleIdToken(app, { email: "ann.new@example.com" }) })).status;
+    };
+    const res = await del(app, s.token, { challenge_id: c.challengeId, code: CODE });
+    expect(linked).toBe(200);
+    expect(res.status).toBe(401);
+    expect(await errorCode(res)).toBe("reauth_required");
+    expect(users(s.userId)).toBe(1);
+    expect(db().get("SELECT email FROM users WHERE id = ?", s.userId)).toEqual({ email: "ann.new@example.com" });
+    expect(codes()).toBe(0); // the right code was spent
   });
 
   it("shares the 5 per account email per minute budget; a refused call spends no guess", async () => {
