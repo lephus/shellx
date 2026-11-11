@@ -221,6 +221,178 @@ pub fn custom_launch(
     })
 }
 
+/// PowerShell: wrap the profile's `prompt` so the working directory (OSC 7) is written at
+/// every prompt. The wrapper calls the original FIRST, so a theme (oh-my-posh, starship)
+/// still reads the real `$?` of the user's last command, and writes OSC 7 after it. Without a
+/// `prompt` function the fallback writes OSC 7 and returns the stock `PS <path>> `. The
+/// profile still loads (`-Command` runs after it).
+pub const POWERSHELL_PROMPT_HOOK: &str = r#"if ($function:prompt) { $__shellxPrompt = $function:prompt; function global:prompt { $p = & $__shellxPrompt; $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; $p } } else { function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; "PS $($l.Path)> " } }"#;
+
+/// The user's choice in Settings, stored as small JSON:
+/// `{"kind":"auto"}`, `{"kind":"known","shell":"pwsh"}`, `{"kind":"custom","command_line":"..."}`.
+/// A stored value that does not parse means `Auto` (the caller's `unwrap_or_default`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ShellChoice {
+    #[default]
+    Auto,
+    Known {
+        shell: ShellKind,
+    },
+    Custom {
+        command_line: String,
+    },
+}
+
+/// What to start, and what to start instead when that fails to launch (once).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LaunchPlan {
+    pub first: ShellLaunch,
+    pub fallback: Option<ShellLaunch>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ShellError {
+    /// Auto found no shell at all.
+    NoShellFound,
+    /// The custom command line in Settings does not name a program.
+    Custom(CustomShellError),
+    /// `SHELLX_SHELL` does not name a program.
+    Override(CustomShellError),
+}
+
+fn base(value: &Option<String>) -> Option<&str> {
+    value
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(|v| v.trim_end_matches('\\'))
+}
+
+fn powershell(kind: ShellKind, program: String) -> ShellLaunch {
+    ShellLaunch {
+        kind: Some(kind),
+        program,
+        args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK]
+            .map(String::from)
+            .to_vec(),
+        osc7_hook: true,
+    }
+}
+
+fn plain(kind: ShellKind, program: String, args: &[&str]) -> ShellLaunch {
+    ShellLaunch {
+        kind: Some(kind),
+        program,
+        args: args.iter().map(|a| a.to_string()).collect(),
+        osc7_hook: false,
+    }
+}
+
+/// The installed shells in Auto order: PowerShell 7 (PATH first, then Program Files), Windows
+/// PowerShell, Command Prompt (`%ComSpec%`, else System32), Git Bash (`--login -i`), WSL.
+pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<ShellLaunch> {
+    let system_root = base(&probe.system_root).unwrap_or(r"C:\Windows");
+    let program_files = base(&probe.program_files);
+    let mut found = Vec::new();
+
+    let pwsh = resolve_program("pwsh.exe", probe, exists).or_else(|| {
+        let p = format!(r"{}\PowerShell\7\pwsh.exe", program_files?);
+        exists(&p).then_some(p)
+    });
+    if let Some(p) = pwsh {
+        found.push(powershell(ShellKind::Pwsh, p));
+    }
+
+    let winps = format!(r"{system_root}\System32\WindowsPowerShell\v1.0\powershell.exe");
+    if exists(&winps) {
+        found.push(powershell(ShellKind::WindowsPowerShell, winps));
+    }
+
+    let comspec = probe
+        .comspec
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| !c.is_empty() && exists(c))
+        .map(String::from);
+    let cmd = comspec.or_else(|| {
+        let p = format!(r"{system_root}\System32\cmd.exe");
+        exists(&p).then_some(p)
+    });
+    if let Some(p) = cmd {
+        found.push(plain(ShellKind::Cmd, p, &[]));
+    }
+
+    let git_candidates = [
+        base(&probe.git_install_path).map(|g| format!(r"{g}\bin\bash.exe")),
+        program_files.map(|f| format!(r"{f}\Git\bin\bash.exe")),
+    ];
+    if let Some(p) = git_candidates.into_iter().flatten().find(|p| exists(p)) {
+        found.push(plain(ShellKind::GitBash, p, &["--login", "-i"]));
+    }
+
+    let wsl = format!(r"{system_root}\System32\wsl.exe");
+    if exists(&wsl) {
+        found.push(plain(ShellKind::Wsl, wsl, &[]));
+    }
+    found
+}
+
+fn auto_plan(found: &[ShellLaunch]) -> Result<LaunchPlan, ShellError> {
+    let first = found.first().ok_or(ShellError::NoShellFound)?.clone();
+    Ok(LaunchPlan {
+        first,
+        fallback: found.get(1).cloned(),
+    })
+}
+
+/// What to start for the user's `choice` and the `SHELLX_SHELL` override (`env_override`,
+/// which wins when it is not blank). `found` is `find_shells`. The fallback is the next Auto
+/// shell, once; a chosen shell that is no longer installed gives the Auto plan. A whole
+/// override value that names an existing file is that program with no arguments (the old
+/// behaviour, for paths with spaces); otherwise it is a command line.
+pub fn launch_plan(
+    choice: &ShellChoice,
+    env_override: Option<&str>,
+    found: &[ShellLaunch],
+    probe: &ShellProbe,
+    exists: &dyn Fn(&str) -> bool,
+) -> Result<LaunchPlan, ShellError> {
+    if let Some(value) = env_override.map(str::trim).filter(|v| !v.is_empty()) {
+        let first = if exists(value) {
+            ShellLaunch {
+                kind: None,
+                program: value.to_string(),
+                args: Vec::new(),
+                osc7_hook: false,
+            }
+        } else {
+            custom_launch(value, probe, exists).map_err(ShellError::Override)?
+        };
+        return Ok(LaunchPlan {
+            first,
+            fallback: found.first().cloned(),
+        });
+    }
+    match choice {
+        ShellChoice::Auto => auto_plan(found),
+        ShellChoice::Known { shell } => match found.iter().find(|l| l.kind == Some(*shell)) {
+            Some(first) => Ok(LaunchPlan {
+                first: first.clone(),
+                fallback: found.iter().find(|l| l.kind != Some(*shell)).cloned(),
+            }),
+            None => auto_plan(found),
+        },
+        ShellChoice::Custom { command_line } => {
+            let first = custom_launch(command_line, probe, exists).map_err(ShellError::Custom)?;
+            Ok(LaunchPlan {
+                first,
+                fallback: found.first().cloned(),
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -350,5 +522,303 @@ mod tests {
             custom_launch(r#"bash "x"#, &probe, &ex),
             Err(CustomShellError::UnclosedQuote)
         );
+    }
+
+    // The probe of a typical machine; `exists` compares strings exactly (Windows ignores case).
+    fn probe() -> ShellProbe {
+        ShellProbe {
+            system_root: Some(r"C:\Windows".into()),
+            program_files: Some(r"C:\Program Files".into()),
+            comspec: Some(r"C:\Windows\system32\cmd.exe".into()),
+            path: r"C:\Windows\System32;C:\Users\Phú\AppData\Local\Microsoft\WindowsApps".into(),
+            git_install_path: Some(r"D:\Tools\Git".into()),
+        }
+    }
+    const PWSH: &str = r"C:\Program Files\PowerShell\7\pwsh.exe";
+    const WINPS: &str = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+    const CMD: &str = r"C:\Windows\system32\cmd.exe";
+    const BASH: &str = r"D:\Tools\Git\bin\bash.exe";
+    const WSL: &str = r"C:\Windows\System32\wsl.exe";
+    const ALL: [&str; 5] = [PWSH, WINPS, CMD, BASH, WSL];
+    const APPS_PWSH: &str = r"C:\Users\Phú\AppData\Local\Microsoft\WindowsApps\pwsh.exe";
+
+    fn ps_args() -> Vec<String> {
+        vec![
+            "-NoLogo".into(),
+            "-NoExit".into(),
+            "-Command".into(),
+            POWERSHELL_PROMPT_HOOK.into(),
+        ]
+    }
+    fn kinds(found: &[ShellLaunch]) -> Vec<Option<ShellKind>> {
+        found.iter().map(|l| l.kind).collect()
+    }
+    fn auto_plan(set: &[&str]) -> Result<LaunchPlan, ShellError> {
+        let ex = exists_in(set);
+        let p = probe();
+        let found = find_shells(&p, &ex);
+        launch_plan(&ShellChoice::Auto, None, &found, &p, &ex)
+    }
+
+    #[test]
+    fn every_installed_shell_is_found_in_order() {
+        let ex = exists_in(&ALL);
+        let found = find_shells(&probe(), &ex);
+        assert_eq!(
+            found,
+            vec![
+                ShellLaunch {
+                    kind: Some(ShellKind::Pwsh),
+                    program: PWSH.into(),
+                    args: ps_args(),
+                    osc7_hook: true
+                },
+                ShellLaunch {
+                    kind: Some(ShellKind::WindowsPowerShell),
+                    program: WINPS.into(),
+                    args: ps_args(),
+                    osc7_hook: true
+                },
+                ShellLaunch {
+                    kind: Some(ShellKind::Cmd),
+                    program: CMD.into(),
+                    args: vec![],
+                    osc7_hook: false
+                },
+                ShellLaunch {
+                    kind: Some(ShellKind::GitBash),
+                    program: BASH.into(),
+                    args: vec!["--login".into(), "-i".into()],
+                    osc7_hook: false
+                },
+                ShellLaunch {
+                    kind: Some(ShellKind::Wsl),
+                    program: WSL.into(),
+                    args: vec![],
+                    osc7_hook: false
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn pwsh_on_path_wins() {
+        let mut set = ALL.to_vec();
+        set.push(APPS_PWSH);
+        let ex = exists_in(&set);
+        let found = find_shells(&probe(), &ex);
+        assert_eq!(found[0].kind, Some(ShellKind::Pwsh));
+        assert_eq!(found[0].program, APPS_PWSH);
+    }
+
+    #[test]
+    fn a_plain_windows_finds_powershell_and_cmd() {
+        let ex = exists_in(&[WINPS, CMD]);
+        assert_eq!(
+            kinds(&find_shells(&probe(), &ex)),
+            [Some(ShellKind::WindowsPowerShell), Some(ShellKind::Cmd)]
+        );
+        // no %ComSpec%: System32\cmd.exe is used
+        let no_comspec = ShellProbe {
+            comspec: None,
+            ..probe()
+        };
+        let ex = exists_in(&[r"C:\Windows\System32\cmd.exe"]);
+        let found = find_shells(&no_comspec, &ex);
+        assert_eq!(kinds(&found), [Some(ShellKind::Cmd)]);
+        assert_eq!(found[0].program, r"C:\Windows\System32\cmd.exe");
+        // no %SystemRoot%: C:\Windows; a trailing backslash is not doubled
+        let bare = ShellProbe {
+            system_root: Some(r"C:\Windows\".into()),
+            comspec: None,
+            ..ShellProbe::default()
+        };
+        let ex = exists_in(&[r"C:\Windows\System32\cmd.exe"]);
+        assert_eq!(
+            find_shells(&bare, &ex)[0].program,
+            r"C:\Windows\System32\cmd.exe"
+        );
+        let none = ShellProbe::default();
+        assert_eq!(
+            find_shells(&none, &ex)[0].program,
+            r"C:\Windows\System32\cmd.exe"
+        );
+    }
+
+    #[test]
+    fn git_bash_falls_back_to_program_files() {
+        let p = ShellProbe {
+            git_install_path: None,
+            ..probe()
+        };
+        let ex = exists_in(&[r"C:\Program Files\Git\bin\bash.exe"]);
+        let found = find_shells(&p, &ex);
+        assert_eq!(kinds(&found), [Some(ShellKind::GitBash)]);
+        assert_eq!(found[0].program, r"C:\Program Files\Git\bin\bash.exe");
+    }
+
+    #[test]
+    fn auto_prefers_pwsh_and_falls_back_once() {
+        let plan = auto_plan(&ALL).unwrap();
+        assert_eq!(plan.first.kind, Some(ShellKind::Pwsh));
+        assert_eq!(
+            plan.fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+
+        let plan = auto_plan(&[WINPS, CMD]).unwrap();
+        assert_eq!(plan.first.kind, Some(ShellKind::WindowsPowerShell));
+        assert_eq!(plan.fallback.unwrap().kind, Some(ShellKind::Cmd));
+
+        let plan = auto_plan(&[CMD]).unwrap();
+        assert_eq!(plan.first.kind, Some(ShellKind::Cmd));
+        assert_eq!(plan.fallback, None);
+
+        assert_eq!(auto_plan(&[]), Err(ShellError::NoShellFound));
+    }
+
+    #[test]
+    fn a_chosen_shell_falls_back_to_auto() {
+        let ex = exists_in(&ALL);
+        let p = probe();
+        let found = find_shells(&p, &ex);
+        let plan = |choice: &ShellChoice| launch_plan(choice, None, &found, &p, &ex);
+
+        let git = plan(&ShellChoice::Known {
+            shell: ShellKind::GitBash,
+        })
+        .unwrap();
+        assert_eq!(git.first.kind, Some(ShellKind::GitBash));
+        assert_eq!(git.fallback.unwrap().kind, Some(ShellKind::Pwsh));
+
+        let pwsh = plan(&ShellChoice::Known {
+            shell: ShellKind::Pwsh,
+        })
+        .unwrap();
+        assert_eq!(pwsh.first.kind, Some(ShellKind::Pwsh));
+        assert_eq!(
+            pwsh.fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+
+        // Git Bash was chosen and is gone: the Auto plan
+        let ex2 = exists_in(&[PWSH, WINPS, CMD]);
+        let found2 = find_shells(&p, &ex2);
+        let gone = launch_plan(
+            &ShellChoice::Known {
+                shell: ShellKind::GitBash,
+            },
+            None,
+            &found2,
+            &p,
+            &ex2,
+        )
+        .unwrap();
+        assert_eq!(
+            gone,
+            launch_plan(&ShellChoice::Auto, None, &found2, &p, &ex2).unwrap()
+        );
+
+        // a custom command line, then Auto's first
+        let wsl_path = ShellProbe {
+            path: r"C:\Windows\System32".into(),
+            ..probe()
+        };
+        let custom = launch_plan(
+            &ShellChoice::Custom {
+                command_line: "wsl.exe -d Ubuntu".into(),
+            },
+            None,
+            &found,
+            &wsl_path,
+            &ex,
+        )
+        .unwrap();
+        assert_eq!(custom.first.program, WSL);
+        assert_eq!(custom.first.args, ["-d", "Ubuntu"]);
+        assert_eq!(custom.first.kind, None);
+        assert_eq!(custom.fallback.unwrap().kind, Some(ShellKind::Pwsh));
+
+        assert_eq!(
+            plan(&ShellChoice::Custom {
+                command_line: "nope.exe".into()
+            }),
+            Err(ShellError::Custom(CustomShellError::NotFound(
+                "nope.exe".into()
+            )))
+        );
+    }
+
+    #[test]
+    fn shellx_shell_keeps_old_values_working() {
+        const GIT_BASH: &str = r"C:\Program Files\Git\bin\bash.exe";
+        let mut set = ALL.to_vec();
+        set.extend([GIT_BASH, APPS_PWSH]);
+        let ex = exists_in(&set);
+        let p = probe();
+        let found = find_shells(&p, &ex);
+        let choice = ShellChoice::Known {
+            shell: ShellKind::Pwsh,
+        };
+        let plan = |value: &str| launch_plan(&choice, Some(value), &found, &p, &ex);
+
+        // unquoted, with spaces, and a file: that program with no arguments
+        let old = plan(GIT_BASH).unwrap();
+        assert_eq!(old.first.program, GIT_BASH);
+        assert!(old.first.args.is_empty());
+        assert_eq!(old.first.kind, None);
+        assert_eq!(old.fallback.as_ref().unwrap().kind, Some(ShellKind::Pwsh));
+        // quoted with an argument
+        let quoted = plan(&format!(r#""{GIT_BASH}" -l"#)).unwrap();
+        assert_eq!(quoted.first.program, GIT_BASH);
+        assert_eq!(quoted.first.args, ["-l"]);
+        // a bare name on PATH: the first PATH entry that has it
+        let bare = plan("pwsh").unwrap();
+        assert_eq!(bare.first.program, APPS_PWSH);
+        // blank: ignored, the choice applies
+        let blank = plan("   ").unwrap();
+        assert_eq!(blank.first.kind, Some(ShellKind::Pwsh));
+        // unknown: an error that names the override
+        assert_eq!(
+            plan("nope.exe"),
+            Err(ShellError::Override(CustomShellError::NotFound(
+                "nope.exe".into()
+            )))
+        );
+    }
+
+    #[test]
+    fn the_choice_is_stored_as_small_json() {
+        let cases = [
+            (ShellChoice::Auto, r#"{"kind":"auto"}"#),
+            (
+                ShellChoice::Known {
+                    shell: ShellKind::GitBash,
+                },
+                r#"{"kind":"known","shell":"git_bash"}"#,
+            ),
+            (
+                ShellChoice::Known {
+                    shell: ShellKind::WindowsPowerShell,
+                },
+                r#"{"kind":"known","shell":"windows_powershell"}"#,
+            ),
+            (
+                ShellChoice::Custom {
+                    command_line: "wsl.exe".into(),
+                },
+                r#"{"kind":"custom","command_line":"wsl.exe"}"#,
+            ),
+        ];
+        for (choice, json) in cases {
+            assert_eq!(serde_json::to_string(&choice).unwrap(), json);
+            assert_eq!(serde_json::from_str::<ShellChoice>(json).unwrap(), choice);
+        }
+        for kind in ["pwsh", "cmd", "wsl"] {
+            let json = format!(r#"{{"kind":"known","shell":"{kind}"}}"#);
+            assert!(serde_json::from_str::<ShellChoice>(&json).is_ok(), "{kind}");
+        }
+        assert!(serde_json::from_str::<ShellChoice>(r#"{"kind":"bash"}"#).is_err());
+        assert!(serde_json::from_str::<ShellChoice>(r#"{"kind":"known","shell":"zsh"}"#).is_err());
     }
 }
