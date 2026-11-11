@@ -84,6 +84,45 @@ class SignInProgress(initialError: SignInException?) : ViewModel() {
 }
 
 /**
+ * What the sign-in screen shows in a window [of] a given size (the room inside the system bars, in dp): the logo's
+ * side, whether the subtitle and the three steps have room, and whether the logo and the words stand beside the
+ * buttons (a phone in landscape, a tablet) or above them.
+ */
+data class SignInLayout(val logoDp: Int, val subtitle: Boolean, val guide: Boolean, val sideBySide: Boolean) {
+    companion object {
+        /** Under this height, and in landscape, the logo is the small one. */
+        const val COMPACT_HEIGHT_DP = 600
+
+        /** From this height the subtitle shows under the taglines; under it the taglines stand in for it. */
+        const val SUBTITLE_MIN_HEIGHT_DP = 700
+
+        /** Under this height (a phone in landscape) the three steps are left out. */
+        const val GUIDE_MIN_HEIGHT_DP = 400
+
+        /** A landscape window at least this wide has two columns; a narrower one (a split screen) keeps one. */
+        const val SIDE_BY_SIDE_MIN_WIDTH_DP = 600
+
+        fun of(widthDp: Float, heightDp: Float): SignInLayout =
+            SignInLayout(logoDp = SignInLogo.SIZE_DP, subtitle = true, guide = true, sideBySide = false)
+    }
+}
+
+/** The sign-in screen's intro as a whole: the logo, the typed taglines and the three steps share one clock. */
+object SignInIntro {
+    /** When the logo and the steps are all in place: from here only the cursors, the glow and the taglines move. */
+    const val SETTLED_MS = 0L
+
+    /** After [SETTLED_MS] the clock moves at most 30 times a second, at any display rate. */
+    const val FRAME_MS = 33L
+
+    /** Whether the intro moves: not when the system's animations are off ("Remove animations", a render, a UI test). */
+    fun animates(animatorsEnabled: Boolean): Boolean = true
+
+    /** The clock's reading for [ms] once the intro has settled: the last whole [FRAME_MS]. */
+    fun tick(ms: Long): Long = ms
+}
+
+/**
  * Sign in with Google (`SignInView.swift`, Google only): the logo, the title and the words, "Session expired" after a
  * 401, the failure in a polite live region, Continue with Google, and "Try without an account". [signIn] is
  * `AppCoordinator.signInWithGoogle` (it throws [SignInException]); [startDemo] null hides the demo button. Both
