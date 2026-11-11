@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shellx.app.R
@@ -60,11 +61,16 @@ class EmailStepCalls(
 
 /** What the two fields ask of the keyboard and of the autofill service. */
 object EmailStepFields {
+    /**
+     * The email keyboard, in English: autocorrect off does not stop a composing layout such as Vietnamese Telex, which
+     * turns "example" into "ẽample"; the hint asks the keyboard for an English layout (Gboard switches to one it has).
+     */
     val EMAIL_KEYBOARD = KeyboardOptions(
         capitalization = KeyboardCapitalization.None,
         autoCorrectEnabled = false,
         keyboardType = KeyboardType.Email,
         imeAction = ImeAction.Send,
+        hintLocales = LocaleList("en"),
     )
 
     val CODE_KEYBOARD = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)

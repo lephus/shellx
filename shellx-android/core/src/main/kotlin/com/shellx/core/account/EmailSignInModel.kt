@@ -295,11 +295,13 @@ class EmailSignInModel(
         private const val MAX_RESEND_SECONDS = 600
 
         /**
-         * Whether Send is worth a tap; the relay does the real check. [text] trimmed has an '@' that is not first, and
-         * after it a '.' that is neither right behind the '@' nor last.
+         * Whether Send is worth a tap; the relay does the real check. [text] trimmed is ASCII only (the relay takes
+         * nothing else, and a Vietnamese Telex keyboard turns "example" into "ẽample"), has an '@' that is not first,
+         * and after it a '.' that is neither right behind the '@' nor last.
          */
         fun looksLikeEmail(text: String): Boolean {
             val trimmed = text.trim()
+            if (trimmed.any { it.code > 0x7F }) return false
             val at = trimmed.indexOf('@')
             if (at < 1) return false
             val dot = trimmed.indexOf('.', at + 2)
