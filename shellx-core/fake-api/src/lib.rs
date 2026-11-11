@@ -167,6 +167,9 @@ struct TokenInfo {
     device_id: String,
     /// "password" | "google" | "email"
     auth_method: String,
+    /// The sign-in (identity) this token came through: Google or email; None for a password login.
+    /// Removing the identity revokes the token.
+    identity_id: Option<String>,
 }
 
 #[derive(Clone)]
@@ -1438,15 +1441,23 @@ fn login(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
     let device_id = st.devices.entry((user_id.clone(), key)).or_insert_with(random_id).clone();
     // One live token per device.
     st.password_users.insert(user_id.clone());
-    let token = issue_token(st, &user_id, &device_id, "password");
+    let token = issue_token(st, &user_id, &device_id, "password", None);
     Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token}))
 }
 
 /// One live token per device; the newest is `last_token`.
-fn issue_token(st: &mut State, user_id: &str, device_id: &str, auth_method: &str) -> String {
+fn issue_token(st: &mut State, user_id: &str, device_id: &str, auth_method: &str, identity_id: Option<&str>) -> String {
     st.tokens.retain(|_, t| t.device_id != device_id);
     let token = random_b64url(32);
-    st.tokens.insert(token.clone(), TokenInfo { user_id: user_id.to_string(), device_id: device_id.to_string(), auth_method: auth_method.to_string() });
+    st.tokens.insert(
+        token.clone(),
+        TokenInfo {
+            user_id: user_id.to_string(),
+            device_id: device_id.to_string(),
+            auth_method: auth_method.to_string(),
+            identity_id: identity_id.map(str::to_string),
+        },
+    );
     st.last_token = Some(token.clone());
     token
 }
@@ -1604,24 +1615,24 @@ fn google_sign_in(rec: &Recorded, _opts: &FakeOptions, st: &mut State) -> Reply 
         Ok(v) => v,
         Err(r) => return r,
     };
-    let by_identity = st.identities.iter().find(|i| i.provider == "google" && i.subject == subject).map(|i| i.user_id.clone());
-    let user_id = if let Some(u) = by_identity {
-        u
+    let by_identity = st.identities.iter().find(|i| i.provider == "google" && i.subject == subject).map(|i| (i.user_id.clone(), i.id.clone()));
+    let (user_id, identity_id) = if let Some(found) = by_identity {
+        found
     } else if let Some(u) = st.users.get(&email).cloned() {
         if st.password_users.contains(&u) {
             return Reply::error(409, "switch_from_signed_in_device", "Switch to Google from a signed-in device");
         }
-        add_identity(st, &u, "google", &subject, &email, false, None);
-        u
+        let identity = add_identity(st, &u, "google", &subject, &email, false, None);
+        (u, identity)
     } else {
         let u = random_id();
         st.users.insert(email.clone(), u.clone());
-        add_identity(st, &u, "google", &subject, &email, false, None);
-        u
+        let identity = add_identity(st, &u, "google", &subject, &email, false, None);
+        (u, identity)
     };
     let key = rec.body["device"]["public_key"].as_str().unwrap_or_default().to_string();
     let device_id = st.devices.entry((user_id.clone(), key)).or_insert_with(random_id).clone();
-    let token = issue_token(st, &user_id, &device_id, "google");
+    let token = issue_token(st, &user_id, &device_id, "google", Some(&identity_id));
     let account_email = st.users.iter().find(|(_, u)| **u == user_id).map(|(e, _)| e.clone()).unwrap_or(email);
     Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token, "email": account_email}))
 }
@@ -1633,10 +1644,10 @@ fn google_link(rec: &Recorded, _opts: &FakeOptions, st: &mut State) -> Reply {
         Ok(v) => v,
         Err(r) => return r,
     };
-    let existing = st.identities.iter().find(|i| i.provider == "google" && i.subject == subject).map(|i| i.user_id.clone());
-    match existing {
-        Some(u) if u != who.user_id => return Reply::error(409, "identity_in_use", "This Google account is linked to another ShellX account"),
-        Some(_) => {}
+    let existing = st.identities.iter().find(|i| i.provider == "google" && i.subject == subject).map(|i| (i.user_id.clone(), i.id.clone()));
+    let identity_id = match existing {
+        Some((u, _)) if u != who.user_id => return Reply::error(409, "identity_in_use", "This Google account is linked to another ShellX account"),
+        Some((_, id)) => id,
         None => {
             if st.identities.iter().any(|i| i.provider == "google" && i.user_id == who.user_id) {
                 return Reply::error(409, "identity_in_use", "This account already uses another Google account");
@@ -1644,16 +1655,23 @@ fn google_link(rec: &Recorded, _opts: &FakeOptions, st: &mut State) -> Reply {
             if st.users.get(&email).is_some_and(|u| *u != who.user_id) {
                 return Reply::error(409, "email_in_use", "Another account already uses this email");
             }
-            add_identity(st, &who.user_id, "google", &subject, &email, false, None);
+            let identity = add_identity(st, &who.user_id, "google", &subject, &email, false, None);
             let old_email = st.users.iter().find(|(_, u)| **u == who.user_id).map(|(e, _)| e.clone());
             if let Some(oe) = old_email {
+                // A link to another address drops the account's email sign-ins, and their tokens with them.
+                if oe != email {
+                    let gone: Vec<String> = st.identities.iter().filter(|i| i.user_id == who.user_id && i.provider == "email").map(|i| i.id.clone()).collect();
+                    st.identities.retain(|i| !gone.contains(&i.id));
+                    st.tokens.retain(|_, t| t.identity_id.as_ref().is_none_or(|id| !gone.contains(id)));
+                }
                 st.users.remove(&oe);
             }
             st.users.insert(email.clone(), who.user_id.clone());
+            identity
         }
-    }
+    };
     st.tokens.remove(&old);
-    let token = issue_token(st, &who.user_id, &who.device_id, "google");
+    let token = issue_token(st, &who.user_id, &who.device_id, "google", Some(&identity_id));
     let account_email = st.users.iter().find(|(_, u)| **u == who.user_id).map(|(e, _)| e.clone()).unwrap_or(email);
     Reply::json(200, json!({"user_id": who.user_id, "device_id": who.device_id, "token": token, "email": account_email}))
 }
@@ -1683,24 +1701,40 @@ fn remove_identity(rec: &Recorded, id: &str, st: &mut State) -> Reply {
     let Some(ident) = st.identities.iter().find(|i| i.id == id && i.user_id == who.user_id).cloned() else {
         return Reply::error(404, "identity_not_found", "Identity not found");
     };
-    if ident.provider == "google" && st.identities.iter().filter(|i| i.user_id == who.user_id && i.provider == "google").count() == 1 {
-        return Reply::error(409, "last_google_identity", "A Google sign-in is required");
+    // The account keeps one of its Google (or test) and email sign-ins; Apple IDs never count and are always removable.
+    let counts = |provider: &str| matches!(provider, "google" | "test" | "email");
+    if counts(&ident.provider) && st.identities.iter().filter(|i| i.user_id == who.user_id && counts(&i.provider)).count() == 1 {
+        return Reply::error(409, "last_google_identity", "A Google or email sign-in is required");
     }
     st.identities.retain(|i| i.id != id);
+    st.tokens.retain(|_, t| t.identity_id.as_deref() != Some(id));
     Reply::empty(204)
 }
 
 fn delete_account(rec: &Recorded, st: &mut State) -> Reply {
     let Some(who) = caller(rec, st) else { return unauthorized() };
-    if rec.body["id_token"].as_str().is_none() {
-        return Reply::error(401, "reauth_required", "Sign in with Google again to delete the account");
-    }
-    let (_, subject) = match verify_google(rec, st) {
-        Ok(v) => v,
-        Err(r) => return r,
-    };
-    if !st.identities.iter().any(|i| i.provider == "google" && i.subject == subject && i.user_id == who.user_id) {
-        return Reply::error(401, "invalid_credentials", "Google sign-in could not be verified");
+    let reauth = || Reply::error(401, "reauth_required", "Sign in again to delete the account");
+    // Tried in the relay's order: a Google id_token, then a mailed code.
+    if rec.body["id_token"].as_str().is_some() {
+        let (_, subject) = match verify_google(rec, st) {
+            Ok(v) => v,
+            Err(r) => return r,
+        };
+        if !st.identities.iter().any(|i| i.provider == "google" && i.subject == subject && i.user_id == who.user_id) {
+            return Reply::error(401, "invalid_credentials", "Google sign-in could not be verified");
+        }
+    } else if rec.body["challenge_id"].is_string() {
+        // The challenge rules of /verify apply; a right code for another address is spent and refused.
+        let email = match redeem_email_code(&rec.body["challenge_id"], &rec.body["code"], st) {
+            Ok(e) => e,
+            Err(r) => return r,
+        };
+        let own = st.users.iter().find(|(_, u)| **u == who.user_id).map(|(e, _)| e.clone());
+        if own.as_deref() != Some(email.as_str()) {
+            return reauth();
+        }
+    } else {
+        return reauth();
     }
     let uid = who.user_id;
     st.users.retain(|_, u| *u != uid);
@@ -1826,9 +1860,9 @@ fn email_verify(rec: &Recorded, st: &mut State) -> Reply {
     };
     // The code is spent. Now the account (`matchAccount` and the branches of the handler).
     let switch = || Reply::error(409, "switch_from_signed_in_device", "Switch to email sign-in from a signed-in device");
-    let by_identity = st.identities.iter().find(|i| i.provider == "email" && i.subject == email).map(|i| i.user_id.clone());
-    let user_id = if let Some(u) = by_identity {
-        u
+    let by_identity = st.identities.iter().find(|i| i.provider == "email" && i.subject == email).map(|i| (i.user_id.clone(), i.id.clone()));
+    let (user_id, identity_id) = if let Some(found) = by_identity {
+        found
     } else if let Some(u) = st.users.get(&email).cloned() {
         if st.password_users.contains(&u) {
             return switch();
@@ -1841,17 +1875,17 @@ fn email_verify(rec: &Recorded, st: &mut State) -> Reply {
             // Nobody verified this address: the code claims the account and every earlier session goes.
             st.tokens.retain(|_, t| t.user_id != u);
         }
-        add_identity(st, &u, "email", &email, &email, false, None);
-        u
+        let identity = add_identity(st, &u, "email", &email, &email, false, None);
+        (u, identity)
     } else {
         let u = random_id();
         st.users.insert(email.clone(), u.clone());
-        add_identity(st, &u, "email", &email, &email, false, None);
-        u
+        let identity = add_identity(st, &u, "email", &email, &email, false, None);
+        (u, identity)
     };
     let key = device["public_key"].as_str().unwrap_or_default().to_string();
     let device_id = st.devices.entry((user_id.clone(), key)).or_insert_with(random_id).clone();
-    let token = issue_token(st, &user_id, &device_id, "email");
+    let token = issue_token(st, &user_id, &device_id, "email", Some(&identity_id));
     let account_email = st.users.iter().find(|(_, u)| **u == user_id).map(|(e, _)| e.clone()).unwrap_or(email);
     Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token, "email": account_email}))
 }
