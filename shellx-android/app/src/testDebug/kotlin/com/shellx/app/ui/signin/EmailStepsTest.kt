@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.autofill.contentHints
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -25,6 +24,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
+import com.shellx.app.testing.autofillHints
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.core.account.EmailSignInState
 import com.shellx.core.account.EmailSignInState.Step
@@ -78,7 +78,7 @@ class EmailStepsTest {
         rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
 
     private fun contentHints(tag: String): Set<String> =
-        rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.ContentType].contentHints.toSet()
+        autofillHints(rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.ContentType])
 
     @Test
     fun theEmailStepSendsOnlyWhatLooksLikeAnEmail() {

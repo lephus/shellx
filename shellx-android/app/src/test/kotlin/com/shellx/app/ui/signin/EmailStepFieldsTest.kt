@@ -1,9 +1,9 @@
 package com.shellx.app.ui.signin
 
-import androidx.compose.ui.autofill.contentHints
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import com.shellx.app.testing.autofillHints
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -20,7 +20,7 @@ class EmailStepFieldsTest {
         assertEquals(ImeAction.Done, EmailStepFields.CODE_KEYBOARD.imeAction)
         assertEquals(false, EmailStepFields.CODE_KEYBOARD.autoCorrectEnabled)
 
-        assertEquals(setOf("username", "emailAddress"), EmailStepFields.EMAIL_CONTENT.contentHints.toSet())
-        assertEquals(setOf("smsOTPCode", "emailOTPCode"), EmailStepFields.CODE_CONTENT.contentHints.toSet())
+        assertEquals(setOf("username", "emailAddress"), autofillHints(EmailStepFields.EMAIL_CONTENT))
+        assertEquals(setOf("smsOTPCode", "emailOTPCode"), autofillHints(EmailStepFields.CODE_CONTENT))
     }
 }
