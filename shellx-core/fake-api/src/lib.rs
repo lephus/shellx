@@ -351,6 +351,8 @@ struct Machine {
     slot: String,
     link_slot: String,
     last_heartbeat: Option<u64>,
+    /// `can_host` of the list item, verbatim (`set_machine_can_host`); `None`: no key, as the relay today.
+    can_host: Option<Value>,
 }
 
 struct Shared {
@@ -518,6 +520,15 @@ impl FakeApi {
     pub fn set_machine_key_b64(&self, machine_id: &str, key_b64: &str) {
         if let Some(m) = self.shared.lock().machines.get_mut(machine_id) {
             m.noise_public_key_b64 = key_b64.to_string();
+        }
+    }
+
+    /// Make `GET /v2/machines` items of `machine_id` carry `"can_host": value`, verbatim (a relay that knows
+    /// which Macs accept connections from other desktops, Part 2; or one that sends an odd value). Test hook;
+    /// never set, the item has no such key, as today's relay.
+    pub fn set_machine_can_host(&self, machine_id: &str, value: Value) {
+        if let Some(m) = self.shared.lock().machines.get_mut(machine_id) {
+            m.can_host = Some(value);
         }
     }
 
@@ -918,6 +929,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
     let slot = st.machines.get(&id).map(|m| m.slot.clone()).unwrap_or_else(|| random_b64url(16));
     let link_slot = st.machines.get(&id).map(|m| m.link_slot.clone()).unwrap_or_else(|| random_b64url(16));
     let last = st.machines.get(&id).and_then(|m| m.last_heartbeat);
+    let can_host = st.machines.get(&id).and_then(|m| m.can_host.clone());
     st.machines.insert(
         id.clone(),
         Machine {
@@ -929,6 +941,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
             slot: slot.clone(),
             link_slot: link_slot.clone(),
             last_heartbeat: last,
+            can_host,
         },
     );
     Reply::json(status, json!({"machine_id": id, "slot": slot, "link_slot": link_slot}))
@@ -953,6 +966,9 @@ fn list_machines(rec: &Recorded, st: &State) -> Reply {
             });
             if st.list_machine_keys {
                 item["noise_public_key_b64"] = json!(m.noise_public_key_b64);
+            }
+            if let Some(v) = &m.can_host {
+                item["can_host"] = v.clone();
             }
             item
         })

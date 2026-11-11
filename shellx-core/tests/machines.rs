@@ -195,6 +195,32 @@ fn list_never_falls_back_to_the_server_fingerprint() {
     assert_eq!(m["fingerprint"], Value::Null, "an undecodable key has no fingerprint (D1: computed locally only)");
 }
 
+fn listed_can_host(core: &Core) -> Value {
+    core.call("machines.list", json!({})).unwrap()["machines"][0]["can_host"].clone()
+}
+
+#[test]
+fn list_forwards_can_host_and_defaults_to_false() {
+    let (core, fake, _dir) = support::logged_in();
+    let id = core.call("machines.register", reg_params()).unwrap()["machine_id"].as_str().unwrap().to_string();
+    assert_eq!(listed_can_host(&core), json!(false), "the relay sends no can_host today");
+    fake.set_machine_can_host(&id, json!(true));
+    assert_eq!(listed_can_host(&core), json!(true));
+    fake.set_machine_can_host(&id, json!(false));
+    assert_eq!(listed_can_host(&core), json!(false));
+}
+
+#[test]
+fn list_survives_odd_can_host_values() {
+    let (core, fake, _dir) = support::logged_in();
+    let id = core.call("machines.register", reg_params()).unwrap()["machine_id"].as_str().unwrap().to_string();
+    for odd in [json!(null), json!("true"), json!(1), json!({})] {
+        fake.set_machine_can_host(&id, odd.clone());
+        let r = core.call("machines.list", json!({})).unwrap_or_else(|e| panic!("{odd}: {e:?}"));
+        assert_eq!(r["machines"][0]["can_host"], json!(false), "{odd}");
+    }
+}
+
 #[test]
 fn heartbeat_refuses_a_machine_id_that_is_not_path_safe() {
     let (core, fake, dir) = support::logged_in();
