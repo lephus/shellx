@@ -224,11 +224,35 @@ fn redact_tokens(text: &str) -> String {
     out
 }
 
-fn mentions_code(window: &[char]) -> bool {
-    let lower: String = window.iter().collect::<String>().to_lowercase();
-    ["code", "otp", "mã", "ma\u{303}"]
-        .iter()
-        .any(|word| lower.contains(word))
+/// The words that make a nearby six-digit number a code: `code`, `otp`, Vietnamese `mã`
+/// (composed or with a combining tilde), compared without regard to case.
+const CODE_WORDS: [&[char]; 4] = [
+    &['c', 'o', 'd', 'e'],
+    &['o', 't', 'p'],
+    &['m', '\u{e3}'],
+    &['m', 'a', '\u{303}'],
+];
+
+fn lower(c: char) -> char {
+    c.to_lowercase().next().unwrap_or(c)
+}
+
+/// Whether `text[from..to]` holds one of the code words as a whole word: the characters
+/// right before and after it (even outside the window) are not letters, so `encoder`,
+/// `decode`, `Unicode` and `barcode` do not count, while `error_code` and `code=` do.
+fn mentions_code(text: &[char], from: usize, to: usize) -> bool {
+    (from..to).any(|a| {
+        CODE_WORDS.iter().any(|word| {
+            let b = a + word.len();
+            b <= to
+                && text[a..b]
+                    .iter()
+                    .zip(word.iter())
+                    .all(|(c, w)| lower(*c) == *w)
+                && (a == 0 || !text[a - 1].is_alphabetic())
+                && text.get(b).is_none_or(|c| !c.is_alphabetic())
+        })
+    })
 }
 
 const CODE_MARKER: [char; 6] = ['<', 'c', 'o', 'd', 'e', '>'];
@@ -274,7 +298,7 @@ fn redact_codes(text: &str) -> String {
             while after < chars.len() && after - j < CODE_CONTEXT_CHARS && !is_break(chars[after]) {
                 after += 1;
             }
-            if mentions_code(&masked[before..i]) || mentions_code(&masked[j..after]) {
+            if mentions_code(&masked, before, i) || mentions_code(&masked, j, after) {
                 out.push_str("<code>");
                 i = j;
                 continue;
