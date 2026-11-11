@@ -102,6 +102,38 @@ final class EmailSignInModelTests: XCTestCase {
         XCTAssertEqual(second, [])
     }
 
+    func testAnAddressWithALetterOutsideASCIIIsRefusedAndTheFieldSaysWhy() async {
+        // A Vietnamese keyboard (Telex) turns "ex" into "ẽ" even in an email field; the relay takes ASCII addresses
+        // only, so the phone refuses them first. The last one has a full-width "ｅ".
+        for text in ["phu@ẽample.com", "phú@example.com", "phu@example.cóm", "phu@\u{FF45}xample.com"] {
+            XCTAssertFalse(EmailSignInModel.looksLikeEmail(text), text)
+        }
+        XCTAssertTrue(EmailSignInModel.looksLikeEmail("phu@example.com\u{00A0}"), "a no-break space at the end is trimmed")
+
+        let rig = await signedOut()
+        let model = rig.coordinator.emailSignIn
+        model.begin()
+        model.email = "phu@ẽample.com"
+        XCTAssertFalse(model.canSend)
+        XCTAssertNil(model.error, "nothing failed")
+        XCTAssertEqual(model.emailFieldError, .invalidEmail, "the field says why Send code is off")
+        await model.sendCode()
+        XCTAssertEqual(model.step, .email)
+        let calls = await rig.relay.calls
+        XCTAssertEqual(calls, [], "nothing goes to the relay")
+
+        model.email = "phu@exam"
+        XCTAssertFalse(model.canSend)
+        XCTAssertNil(model.emailFieldError, "an address still being typed is not wrong")
+        model.email = "phu@example.com"
+        XCTAssertTrue(model.canSend)
+        XCTAssertNil(model.emailFieldError)
+
+        await rig.relay.setError(http(400, "disposable_email"), for: .requestEmailCode)
+        await model.sendCode()
+        XCTAssertEqual(model.emailFieldError, .disposableEmail, "the relay's answer shows there too")
+    }
+
     func testASendFailureStaysOnTheEmailStepAndTheSameTapRetries() async {
         let rig = await signedOut()
         let model = rig.coordinator.emailSignIn
