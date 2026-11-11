@@ -22,6 +22,7 @@ import com.shellx.app.ui.signin.SignInGuide
 import com.shellx.app.ui.signin.SignInLogo
 import com.shellx.app.ui.signin.TypedTagline
 import kotlin.math.abs
+import kotlin.math.hypot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -215,6 +216,34 @@ class SignInIntroRenderTest {
                 }
             }
             assertTrue("$name: the glow is there, around the square ($lit px)", lit > 20_000)
+        }
+    }
+
+    /**
+     * A logo an odd number of pixels wide: 63 dp is 189 px here, as the 72 dp logo is at 420 dpi. Its glow's box
+     * (1.5 times the side) then ends half way through a pixel, and nothing of the ring may stay along that edge:
+     * outside the glow's disc there is the page alone.
+     */
+    @Test
+    fun theGlowEndsAtItsRimWhenTheLogoIsAnOddNumberOfPixelsWide() {
+        val moment = SignInLogo.INTRO_MS + 2_000
+        val shots = assertRenders("signin-logo-glow-odd") { Page { SignInLogo(63.dp, pose = { SignInLogo.pose(moment) }) } }
+        // The logo's middle is 24 + 31.5 dp (166.5 px) from the page's corner, and the disc 0.75 of 189 px round it.
+        val middle = 166.5f
+        val rim = 0.75f * 189
+        for (shot in shots) {
+            val page = shot.pixel(shot.width - 1, 0)
+            var ring = 0
+            var past = 0
+            for (y in 0 until 400) {
+                for (x in 0 until 400) {
+                    if (shot.pixel(x, y) == page) continue
+                    val out = hypot(x + 0.5f - middle, y + 0.5f - middle)
+                    if (out > rim + 2) past++ else if (x !in 72 until 261 || y !in 72 until 261) ring++
+                }
+            }
+            assertTrue("${shot.file.name}: the glow is there, around the square ($ring px)", ring > 10_000)
+            assertEquals("${shot.file.name}: pixels of the glow more than 2 px past its rim", 0, past)
         }
     }
 
