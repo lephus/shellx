@@ -278,4 +278,36 @@ import Testing
         #expect(second.submits == 1)
         #expect(first.submits == 0)
     }
+
+    /// SwiftUI sets `isEnabled` on a hosted control from its environment after `updateNSView`, and again whenever
+    /// that environment is applied. A field the sheet keeps off (Google waiting, a dead code) must stay off anyway:
+    /// made off, turned on, turned off again, and under an environment that changes.
+    @Test func aFieldTheSheetTurnsOffStaysOff() async throws {
+        let events = Events()
+        func field(isEnabled: Bool) -> SignInTextField {
+            SignInTextField(
+                text: "", placeholder: "6-digit code", contentType: .oneTimeCode, font: .systemFont(ofSize: 13),
+                isEnabled: isEnabled, focusRequest: 0,
+                onChange: { events.changes.append($0) }, onSubmit: { events.submits += 1 }, onCancel: { events.cancels += 1 }
+            )
+        }
+        let harness = host(field(isEnabled: false))
+        defer { harness.window.orderOut(nil) }
+        for _ in 0..<5 { await turn() }
+        let made = try #require(harness.field)
+        #expect(!made.isEnabled, "a field made off is on")
+
+        harness.hosting.rootView = field(isEnabled: true)
+        await pump { made.isEnabled }
+        #expect(made.isEnabled, "a field turned on stayed off")
+
+        harness.hosting.rootView = field(isEnabled: false)
+        for _ in 0..<5 { await turn() }
+        #expect(!made.isEnabled, "a field turned off is on")
+
+        harness.window.appearance = NSAppearance(named: .darkAqua)
+        harness.hosting.layoutSubtreeIfNeeded()
+        for _ in 0..<5 { await turn() }
+        #expect(!made.isEnabled, "a field kept off is on after its environment changed")
+    }
 }
