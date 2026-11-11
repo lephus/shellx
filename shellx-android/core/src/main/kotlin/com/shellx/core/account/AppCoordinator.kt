@@ -96,7 +96,7 @@ class AppCoordinator(
                 rethrowIfCancelled(e)
                 throw SignInException.of(e)
             }
-            completeSignIn(signIn)
+            completeSignIn(signIn, AccountAuthMethod.GOOGLE)
         }
     }
 
@@ -210,7 +210,7 @@ class AppCoordinator(
             return
         }
         if (session != null) {
-            _phase.value = AppPhase.SignedIn(session.email)
+            _phase.value = AppPhase.SignedIn(session.email, session.authMethod)
             startHub()
         } else {
             _phase.value = AppPhase.SignedOut(false)
@@ -225,7 +225,8 @@ class AppCoordinator(
         throw SignInException.Server("keychain")
     }
 
-    private suspend fun completeSignIn(signIn: AccountSignIn) {
+    /** Stores the session the relay handed out for a sign-in by [method], and shows the signed-in app. */
+    private suspend fun completeSignIn(signIn: AccountSignIn, method: AccountAuthMethod) {
         val account = signIn.session
         // Another account's Macs and history must not survive into this one. Every wiper runs first; the owner changes
         // only when all succeeded, so a retry wipes again.
@@ -240,13 +241,13 @@ class AppCoordinator(
         if (otherAccount && !runWipers()) throw SignInException.LocalWipePending()
         try {
             if (otherAccount) vault.setMachines(emptyList(), account.userId)
-            vault.setSession(StoredSession(account.userId, account.deviceId, account.token, signIn.email))
+            vault.setSession(StoredSession(account.userId, account.deviceId, account.token, signIn.email, method))
         } catch (e: Exception) {
             rethrowIfCancelled(e)
             CoreLog.log("sign_in_store_failed")
             throw SignInException.Server("keychain")
         }
-        _phase.value = AppPhase.SignedIn(signIn.email)
+        _phase.value = AppPhase.SignedIn(signIn.email, method)
         startHub()
     }
 

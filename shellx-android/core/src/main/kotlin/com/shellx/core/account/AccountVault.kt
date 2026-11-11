@@ -22,7 +22,9 @@ import kotlinx.serialization.json.put
  *
  * Every operation holds one Mutex and runs the store call in `withContext(io)`, never on the caller's dispatcher
  * (S3 §4: no Keystore work on the main thread). The stored formats use the iPhone's key names:
- * - the session is `{"userID","deviceID","token","email"}`;
+ * - the session is `{"userID","deviceID","token","email","auth_method"}`; `auth_method` is `"google"` or `"email"`
+ *   ([AccountAuthMethod.wire]), a session stored before it existed has none and is a Google session, and a session with
+ *   any other value is unreadable;
  * - the Macs are `{"version":1,"owner":"<id>","machines":[{"machineID","name","linkSlot","hostKey":"<base64>"}]}`,
  *   the host key in standard padded base64;
  * - the phone key is its 32 raw private bytes.
@@ -99,12 +101,18 @@ class AccountVault(private val store: SecretStore, private val io: CoroutineDisp
             put("deviceID", session.deviceId)
             put("token", session.token)
             put("email", session.email)
+            put("auth_method", session.authMethod.wire)
         }.toString().encodeToByteArray()
 
-        /** Any parsing failure means "unreadable": null. */
+        /** Any parsing failure means "unreadable": null. So does a sign-in method this build does not know. */
         fun decodeSession(data: ByteArray): StoredSession? = try {
             val json = Json.parseToJsonElement(data.decodeToString()).jsonObject
-            StoredSession(json.string("userID"), json.string("deviceID"), json.string("token"), json.string("email"))
+            val method = if ("auth_method" in json) {
+                AccountAuthMethod.ofWire(json.string("auth_method")) ?: throw IllegalArgumentException("auth_method")
+            } else {
+                AccountAuthMethod.GOOGLE
+            }
+            StoredSession(json.string("userID"), json.string("deviceID"), json.string("token"), json.string("email"), method)
         } catch (_: IllegalArgumentException) {
             null
         }
