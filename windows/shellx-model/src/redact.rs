@@ -445,6 +445,68 @@ mod tests {
     }
 
     #[test]
+    fn a_token_without_a_digit_is_still_hidden() {
+        // 43 base64url characters, mixed case with `-` and `_`, no digit
+        const NO_DIGIT: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz-_aBcDeFgHiJkLmNo";
+        assert_eq!(NO_DIGIT.len(), 43);
+        assert!(!NO_DIGIT.chars().any(|c| c.is_ascii_digit()));
+        assert_eq!(redact(NO_DIGIT), "<token>");
+        assert_eq!(
+            redact(&format!("Authorization: Bearer {NO_DIGIT}")),
+            "Authorization: Bearer <token>"
+        );
+        assert_eq!(
+            redact(&format!(r#"{{"token":"{NO_DIGIT}"}}"#)),
+            r#"{"token":"<token>"}"#
+        );
+        assert_eq!(
+            redact(&format!("/cb?state={NO_DIGIT}&x=1")),
+            "/cb?state=<token>&x=1"
+        );
+        // a standard base64 value without a digit: it has `+` and mixed case
+        let b64 = "AbCdEfGhIjKlMnOpQrSt+UvWxYzaBcDeFgHiJkLm/No=";
+        assert_eq!(redact(b64), "<token>");
+        // names stay readable: no digit and not mixed case enough
+        for text in [
+            "ERROR_GRAPHICS_OPM_PROTECTED_OUTPUT_DOES_NOT_HAVE_COPP_SEMANTICS",
+            "some_very_long_snake_case_identifier_name_here",
+            "CreateSwapChainForCompositionSurfaceHandle",
+            "failed in CreateSwapChainForCompositionSurfaceHandle: 0x887A0005",
+        ] {
+            assert_eq!(redact(text), text);
+        }
+    }
+
+    #[test]
+    fn camel_case_and_plural_code_words_count() {
+        for text in [
+            "signInCode: 123456",
+            "emailCode=123456",
+            r#"{"otpCode":"123456"}"#,
+            "codes: 123456",
+            "OTPs 123456",
+            "otps 123456",
+            "Mãs 123456",
+        ] {
+            assert!(!redact(text).contains("123456"), "{text}");
+        }
+        for text in [
+            "encoder 654321 frames",
+            "decode 123456",
+            "Unicode 123456",
+            "barcode 123456",
+            "codesign 123456",
+            "decodes 123456",
+            "Unicodes 123456",
+            "barcodes 123456",
+            "codec 123456",
+            "hotplugs 123456",
+        ] {
+            assert_eq!(redact(text), text, "{text}");
+        }
+    }
+
+    #[test]
     fn redaction_is_idempotent_and_total() {
         let samples = [
             "signed in as phu.le+test@gmail.com via email",
