@@ -296,6 +296,16 @@ pub fn google_cancel(core: &dyn CoreCall, flow_id: &str) -> Result<(), CoreErr> 
         .map(|_| ())
 }
 
+/// `auth.google.available`: whether this build can sign in with Google (it has a Google client id and
+/// secret). Local, no request.
+pub fn google_available(core: &dyn CoreCall) -> Result<bool, CoreErr> {
+    #[derive(Deserialize)]
+    struct Resp {
+        available: bool,
+    }
+    typed::<Resp>(core, "auth.google.available", json!({})).map(|r| r.available)
+}
+
 pub fn session_info(core: &dyn CoreCall) -> Result<SessionInfo, CoreErr> {
     typed(core, "auth.session", json!({}))
 }

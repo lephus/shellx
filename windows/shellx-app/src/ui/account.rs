@@ -21,7 +21,8 @@ use shellx_model::update::{CHECK_INTERVAL_SECS, UpdateStatus};
 
 use super::update_banner::open_https;
 use crate::core_service::{
-    GOOGLE_SWITCH_MARKER, MachineFacts, run_account_action, run_version_check, take_once,
+    GOOGLE_SWITCH_MARKER, MachineFacts, run_account_action, run_google_check, run_version_check,
+    take_once,
 };
 use crate::os_info;
 
@@ -30,11 +31,15 @@ use crate::os_info;
 enum Job {
     Account(AccountAction),
     VersionCheck,
+    /// `auth.google.available` (local).
+    GoogleCheck,
 }
 
 enum Done {
     Account(AccountEvent),
     Version(UpdateStatus),
+    /// `None`: the core could not answer.
+    Google(Option<bool>),
 }
 
 pub struct AccountService {
@@ -50,6 +55,10 @@ pub struct AccountService {
     checking: bool,
     /// A check has finished since the app started.
     checked: bool,
+    /// The core's answer to `auth.google.available`; `None` until it answered.
+    google: Option<bool>,
+    /// A `Job::GoogleCheck` is queued and has not answered.
+    google_checking: bool,
 }
 
 impl AccountService {
@@ -65,6 +74,7 @@ impl AccountService {
                         run_account_action(core.as_ref(), &facts, action).map(Done::Account)
                     }
                     Job::VersionCheck => Some(Done::Version(run_version_check(core.as_ref()))),
+                    Job::GoogleCheck => Some(Done::Google(run_google_check(core.as_ref()))),
                 };
                 if let Some(done) = done
                     && result_tx.send(done).await.is_err()
@@ -79,6 +89,7 @@ impl AccountService {
                 let applied = this.update(cx, |svc, cx| match done {
                     Done::Account(event) => svc.apply(event, cx),
                     Done::Version(status) => svc.apply_update(status, cx),
+                    Done::Google(answer) => svc.apply_google(answer, cx),
                 });
                 if applied.is_err() {
                     return;
@@ -110,8 +121,12 @@ impl AccountService {
             update: UpdateStatus::Unknown,
             checking: false,
             checked: false,
+            google: None,
+            google_checking: false,
         };
         svc.apply(AccountEvent::Started, cx);
+        // Queued behind the first account call, so `config.set` has gone out.
+        svc.check_google(cx);
         // Startup check: queued behind the first account call, so
         // `config.set` has already gone out.
         svc.check_update(cx);
@@ -211,6 +226,35 @@ impl AccountService {
         self.flow.needs_google_switch()
             && crate::paths::native_dir()
                 .is_ok_and(|dir| take_once(&dir.join(GOOGLE_SWITCH_MARKER)))
+    }
+
+    /// The core said this build has a Google client (Ruling 28). False until it answered yes: the dialog
+    /// and Settings draw nothing Google-related meanwhile.
+    #[allow(
+        dead_code,
+        reason = "read by the sign-in dialog and Settings › Account (plan B Tasks 5 and 7)"
+    )]
+    pub fn google_available(&self) -> bool {
+        self.google == Some(true)
+    }
+
+    /// Asks the core whether this build has a Google client, when the answer is unknown (no answer yet,
+    /// or the last call failed) and no check is queued. `new` calls it once; the dialog calls it on open.
+    pub fn check_google(&mut self, cx: &mut Context<Self>) {
+        if self.google.is_some() || self.google_checking {
+            return;
+        }
+        self.google_checking = true;
+        let _ = self.jobs.try_send(Job::GoogleCheck);
+        cx.notify();
+    }
+
+    fn apply_google(&mut self, answer: Option<bool>, cx: &mut Context<Self>) {
+        if answer.is_some() {
+            self.google = answer;
+        }
+        self.google_checking = false;
+        cx.notify();
     }
 
     pub fn update_status(&self) -> &UpdateStatus {

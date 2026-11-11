@@ -41,6 +41,7 @@ pub const KNOWN_METHODS: &[&str] = &[
     "auth.google.begin",
     "auth.google.finish",
     "auth.google.cancel",
+    "auth.google.available",
     "auth.email.begin",
     "auth.email.finish",
     "machines.register",
@@ -111,6 +112,10 @@ impl Core {
         let cfg = self
             .config()
             .ok_or_else(|| CoreError::new("not_configured", "config.set has not been called"))?;
+        if method == "auth.google.available" {
+            // Local and read-only: the answer depends on the config alone, so no state dir is opened.
+            return Ok(auth_google::available(&cfg));
+        }
         if method == "version.check" {
             // Public endpoint: the bearer is sent only if a readable session exists;
             // a missing or broken state dir must not block update checks.

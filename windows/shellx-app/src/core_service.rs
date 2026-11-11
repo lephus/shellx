@@ -212,6 +212,12 @@ pub fn run_version_check(core: &dyn CoreCall) -> shellx_model::update::UpdateSta
     shellx_model::update::from_result(shellx_model::core_api::version_check(core))
 }
 
+/// `auth.google.available` (after `config.set`): `Some(answer)`, or `None` when the core could not answer
+/// (asked again later; Google stays hidden meanwhile). Local: no request.
+pub fn run_google_check(core: &dyn CoreCall) -> Option<bool> {
+    shellx_model::core_api::google_available(core).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
