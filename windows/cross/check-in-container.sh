@@ -22,10 +22,11 @@ export CARGO_TARGET_DIR=/cache/target ZIG_LOCAL_CACHE_DIR=/cache/zig-local
 profile_args=()
 ok_line="== windows check: OK"
 case "${SHELLX_WINCHECK_PROFILE:-dev}" in
-  dev) ;;
+  dev) export SHELLX_WINCHECK_PROFILE=dev ;;
   release)
     [[ -x "$here/fxc-standin.sh" ]] || { echo "release check: $here/fxc-standin.sh is missing" >&2; exit 1; }
-    export CARGO_TARGET_DIR=/cache/target-release GPUI_FXC_PATH="$here/fxc-standin.sh"
+    # fxc-standin.sh refuses to run without SHELLX_WINCHECK_PROFILE=release; only this mode sets it.
+    export CARGO_TARGET_DIR=/cache/target-release GPUI_FXC_PATH="$here/fxc-standin.sh" SHELLX_WINCHECK_PROFILE=release
     profile_args=(--release)
     ok_line="== windows check: OK (release profile, stand-in shader compiler)" ;;
   *) echo "SHELLX_WINCHECK_PROFILE must be dev or release: '$SHELLX_WINCHECK_PROFILE'" >&2; exit 1 ;;

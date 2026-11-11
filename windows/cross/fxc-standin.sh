@@ -8,7 +8,13 @@
 # gpui's build script reads, `const BYTE <name>[] = { 68, 88, 66, 67 };` (the 4-byte "DXBC"
 # tag, no shader). No real shader is compiled, so nothing built with it may ever be run or
 # shipped; the --release mode is `cargo check` and builds no exe, which keeps that true.
+# It refuses to run unless check-in-container.sh set SHELLX_WINCHECK_PROFILE=release.
 set -euo pipefail
+if [[ "${SHELLX_WINCHECK_PROFILE:-}" != release ]]; then
+  echo "fxc-standin: refusing: only check-windows-build.sh --release may use this stand-in" \
+    "(it compiles no shader; SHELLX_WINCHECK_PROFILE=release is not set)" >&2
+  exit 1
+fi
 header="" name=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
