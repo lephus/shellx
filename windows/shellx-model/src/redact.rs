@@ -150,22 +150,41 @@ fn redact_keys(text: &str) -> String {
     out
 }
 
-fn is_token_char(c: char) -> bool {
-    c.is_ascii_alphanumeric() || matches!(c, '_' | '+' | '/' | '-')
+/// Characters of a token in the URL-safe alphabet (and of the pieces of a path).
+fn is_url_safe_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
+/// Characters of a standard base64 value (without the `=` padding).
+fn is_base64_char(c: char) -> bool {
+    is_url_safe_char(c) || c == '+' || c == '/'
+}
+
+/// A URL-safe token: at least 32 characters with a letter and a digit, and not only hex
+/// digits and dashes (machine ids, commit ids and checksums stay readable).
+fn is_url_safe_token(run: &[char]) -> bool {
+    run.len() >= TOKEN_MIN_CHARS
+        && run.iter().any(char::is_ascii_alphabetic)
+        && run.iter().any(char::is_ascii_digit)
+        && !run.iter().all(|c| c.is_ascii_hexdigit() || *c == '-')
+}
+
+/// `/` never joins a token, so a path or URL is judged piece by piece. Two kinds of secret
+/// are hidden: (a) a URL-safe run (`[A-Za-z0-9_-]`, 43 characters for the relay's tokens)
+/// that `is_url_safe_token`; (b) a standard base64 run (`[A-Za-z0-9+/_-]`, then any `=`
+/// padding) of at least 32 characters with a digit that contains `+` or ends with `=`.
 fn redact_tokens(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
     while i < chars.len() {
-        if !is_token_char(chars[i]) {
+        if !is_base64_char(chars[i]) {
             out.push(chars[i]);
             i += 1;
             continue;
         }
         let mut j = i;
-        while j < chars.len() && is_token_char(chars[j]) {
+        while j < chars.len() && is_base64_char(chars[j]) {
             j += 1;
         }
         let mut k = j;
@@ -173,12 +192,32 @@ fn redact_tokens(text: &str) -> String {
             k += 1;
         }
         let run = &chars[i..j];
-        let hex_only = run.iter().all(|c| c.is_ascii_hexdigit() || *c == '-');
-        let plain_path = run.contains(&'/') && !run.iter().any(char::is_ascii_digit);
-        if run.len() >= TOKEN_MIN_CHARS && !hex_only && !plain_path {
+        let standard_base64 = run.len() >= TOKEN_MIN_CHARS
+            && run.iter().any(char::is_ascii_digit)
+            && (run.contains(&'+') || k > j);
+        if standard_base64 {
             out.push_str("<token>");
         } else {
-            out.extend(&chars[i..k]);
+            // judge each piece between `+` and `/` on its own
+            let mut p = i;
+            while p < j {
+                if !is_url_safe_char(chars[p]) {
+                    out.push(chars[p]);
+                    p += 1;
+                    continue;
+                }
+                let mut q = p;
+                while q < j && is_url_safe_char(chars[q]) {
+                    q += 1;
+                }
+                if is_url_safe_token(&chars[p..q]) {
+                    out.push_str("<token>");
+                } else {
+                    out.extend(&chars[p..q]);
+                }
+                p = q;
+            }
+            out.extend(&chars[j..k]);
         }
         i = k;
     }
