@@ -19,6 +19,69 @@ pub struct MachineInfo {
     pub fingerprint: String,
     #[serde(default)]
     pub is_this_machine: bool,
+    /// The relay says this machine accepts connections from Windows PCs (Part 2). Only JSON `true` is
+    /// true: the relay sends no such key today, and any other value reads false.
+    #[serde(default, deserialize_with = "true_only")]
+    pub can_host: bool,
+}
+
+fn true_only<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
+    Ok(matches!(
+        serde_json::Value::deserialize(d)?,
+        serde_json::Value::Bool(true)
+    ))
+}
+
+/// Which Macs the rows and the "+" picker offer "Request access" to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OfferRule {
+    /// Only Macs the relay says can host (`can_host`): today none.
+    RelayCanHost,
+    /// Every Mac (`SHELLX_OFFER_ALL_MACS=1`), to try Part 2 with a test Mac build.
+    AnyMac,
+}
+
+/// `SHELLX_OFFER_ALL_MACS`: only `1` (trimmed) offers every Mac.
+pub fn offer_rule_from_env(value: Option<&str>) -> OfferRule {
+    if value.map(str::trim) == Some("1") {
+        OfferRule::AnyMac
+    } else {
+        OfferRule::RelayCanHost
+    }
+}
+
+/// Whether this PC may ask `m` for access: another machine, a Mac, and one the relay says can host
+/// (any Mac under `AnyMac`). A Windows PC never answers a request (R4 Major 5).
+pub fn can_offer_access(m: &MachineInfo, rule: OfferRule) -> bool {
+    !m.is_this_machine && m.platform == "macos" && (m.can_host || rule == OfferRule::AnyMac)
+}
+
+/// The "+" picker's machines: those `can_offer_access` allows that have no link (granted or pending) yet.
+pub fn request_targets<'a>(
+    machines: &'a [MachineInfo],
+    has_link: &dyn Fn(&str) -> bool,
+    rule: OfferRule,
+) -> Vec<&'a MachineInfo> {
+    machines
+        .iter()
+        .filter(|m| can_offer_access(m, rule) && !has_link(&m.machine_id))
+        .collect()
+}
+
+/// The sentences the "+" picker and an empty machine list show: no Mac besides this machine → why none
+/// can be reached and what to do; some Mac but none offered → why; otherwise none.
+pub fn request_panel_notes(machines: &[MachineInfo], rule: OfferRule) -> &'static [Str] {
+    let mut macs = machines
+        .iter()
+        .filter(|m| !m.is_this_machine && m.platform == "macos")
+        .peekable();
+    if macs.peek().is_none() {
+        &[Str::MacCannotHostYet, Str::SignInOnYourMac]
+    } else if !macs.any(|m| can_offer_access(m, rule)) {
+        &[Str::MacCannotHostYet]
+    } else {
+        &[]
+    }
 }
 
 fn null_as_zero<'de, D: serde::Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
@@ -68,11 +131,31 @@ pub struct MachineGroup {
     pub sessions_visible: bool,
 }
 
+/// `build_groups_with` under the relay's rule (`OfferRule::RelayCanHost`).
 pub fn build_groups(
     machines: &[MachineInfo],
     access: &dyn Fn(&str) -> Access,
     utc_offset_secs: i32,
     lang: Lang,
+) -> Vec<MachineGroup> {
+    build_groups_with(
+        machines,
+        access,
+        utc_offset_secs,
+        lang,
+        OfferRule::RelayCanHost,
+    )
+}
+
+/// Sidebar groups: this machine first, then online before offline, by name. An online machine with no
+/// access gets `RequestAccess` only when `can_offer_access`; a granted one stays `Open`, a pending one
+/// `ShowCode`.
+pub fn build_groups_with(
+    machines: &[MachineInfo],
+    access: &dyn Fn(&str) -> Access,
+    utc_offset_secs: i32,
+    lang: Lang,
+    rule: OfferRule,
 ) -> Vec<MachineGroup> {
     let icon = |m: &MachineInfo| match m.platform.as_str() {
         "macos" => MachineIcon::Laptop,
@@ -103,7 +186,10 @@ pub fn build_groups(
             match access(&m.machine_id) {
                 Access::Granted => (RowAction::Open, true, None),
                 Access::Pending { code } => (RowAction::ShowCode(code), false, None),
-                Access::None => (RowAction::RequestAccess, false, None),
+                Access::None if can_offer_access(m, rule) => {
+                    (RowAction::RequestAccess, false, None)
+                }
+                Access::None => (RowAction::None, false, None),
             }
         } else {
             (
@@ -149,6 +235,7 @@ mod tests {
             last_seen_unix: seen,
             fingerprint: "fp".into(),
             is_this_machine: me,
+            can_host: false,
         }
     }
 
@@ -216,13 +303,19 @@ mod tests {
         assert_eq!(g[2].icon, MachineIcon::Desktop);
     }
 
+    fn host(mut m: MachineInfo) -> MachineInfo {
+        m.can_host = true;
+        m
+    }
+
     #[test]
     fn action_per_access_state() {
+        // Macs the relay says can host: the access state alone decides.
         let ms = vec![
-            m("g", "a", "macos", true, 0, false),
-            m("p", "b", "macos", true, 0, false),
-            m("n", "c", "macos", true, 0, false),
-            m("o", "d", "macos", false, 5, false),
+            host(m("g", "a", "macos", true, 0, false)),
+            host(m("p", "b", "macos", true, 0, false)),
+            host(m("n", "c", "macos", true, 0, false)),
+            host(m("o", "d", "macos", false, 5, false)),
         ];
         let acc = |id: &str| match id {
             "g" | "o" => Access::Granted,
@@ -282,5 +375,152 @@ mod tests {
         )
         .unwrap();
         assert_eq!(kept.fingerprint, "ab12");
+    }
+
+    fn action_of(groups: &[MachineGroup], id: &str) -> RowAction {
+        groups
+            .iter()
+            .find(|g| g.machine_id == id)
+            .unwrap()
+            .action
+            .clone()
+    }
+
+    #[test]
+    fn only_macs_the_relay_says_can_host_get_request_access() {
+        let ms = vec![
+            m("me", "PC", "windows", true, 0, true),
+            host(m("mac-host", "a", "macos", true, 0, false)),
+            m("mac-plain", "b", "macos", true, 0, false),
+            host(m("pc-host", "c", "windows", true, 0, false)),
+            host(m("mac-offline", "d", "macos", false, 0, false)),
+            m("mac-granted", "e", "macos", true, 0, false),
+            m("mac-pending", "f", "macos", true, 0, false),
+        ];
+        let acc = |id: &str| match id {
+            "mac-granted" => Access::Granted,
+            "mac-pending" => Access::Pending {
+                code: "123456".into(),
+            },
+            _ => Access::None,
+        };
+        let g = build_groups(&ms, &acc, 0, Lang::Vi);
+        assert_eq!(action_of(&g, "mac-host"), RowAction::RequestAccess);
+        assert_eq!(action_of(&g, "mac-plain"), RowAction::None);
+        assert_eq!(action_of(&g, "pc-host"), RowAction::None);
+        assert_eq!(action_of(&g, "mac-offline"), RowAction::None);
+        assert_eq!(action_of(&g, "mac-granted"), RowAction::Open);
+        assert_eq!(
+            action_of(&g, "mac-pending"),
+            RowAction::ShowCode("123456".into())
+        );
+        assert_eq!(action_of(&g, "me"), RowAction::None);
+        // build_groups is build_groups_with the relay's rule
+        assert_eq!(
+            build_groups_with(&ms, &acc, 0, Lang::Vi, OfferRule::RelayCanHost),
+            g
+        );
+    }
+
+    #[test]
+    fn any_mac_rule_offers_every_online_mac_but_never_a_pc() {
+        let ms = vec![
+            m("me", "PC", "windows", true, 0, true),
+            m("mac-plain", "b", "macos", true, 0, false),
+            host(m("pc-host", "c", "windows", true, 0, false)),
+            m("pc", "d", "windows", true, 0, false),
+            m("mac-offline", "e", "macos", false, 0, false),
+        ];
+        let g = build_groups_with(&ms, &none, 0, Lang::Vi, OfferRule::AnyMac);
+        assert_eq!(action_of(&g, "mac-plain"), RowAction::RequestAccess);
+        assert_eq!(action_of(&g, "pc-host"), RowAction::None);
+        assert_eq!(action_of(&g, "pc"), RowAction::None);
+        assert_eq!(action_of(&g, "mac-offline"), RowAction::None);
+        assert_eq!(action_of(&g, "me"), RowAction::None);
+    }
+
+    #[test]
+    fn offer_rule_reads_the_environment_value() {
+        for v in [
+            None,
+            Some(""),
+            Some("0"),
+            Some("true"),
+            Some("yes"),
+            Some("11"),
+        ] {
+            assert_eq!(offer_rule_from_env(v), OfferRule::RelayCanHost, "{v:?}");
+        }
+        for v in [Some("1"), Some(" 1 "), Some("1\n")] {
+            assert_eq!(offer_rule_from_env(v), OfferRule::AnyMac, "{v:?}");
+        }
+    }
+
+    #[test]
+    fn request_targets_skip_this_machine_linked_and_unofferable() {
+        let ms = vec![
+            host(m("me", "PC", "macos", true, 0, true)),
+            host(m("m1", "a", "macos", true, 0, false)),
+            host(m("m2", "b", "macos", true, 0, false)),
+            m("m3", "c", "macos", true, 0, false),
+            host(m("p1", "d", "windows", true, 0, false)),
+            host(m("m4", "e", "macos", false, 0, false)),
+        ];
+        let linked = |id: &str| id == "m2";
+        let ids = |v: Vec<&MachineInfo>| v.iter().map(|m| m.machine_id.clone()).collect::<Vec<_>>();
+        assert_eq!(
+            ids(request_targets(&ms, &linked, OfferRule::RelayCanHost)),
+            ["m1", "m4"]
+        );
+        assert_eq!(
+            ids(request_targets(&ms, &linked, OfferRule::AnyMac)),
+            ["m1", "m3", "m4"]
+        );
+        assert!(can_offer_access(&ms[1], OfferRule::RelayCanHost));
+        assert!(!can_offer_access(&ms[0], OfferRule::AnyMac), "this machine");
+        assert!(!can_offer_access(&ms[4], OfferRule::AnyMac), "a PC");
+    }
+
+    #[test]
+    fn request_panel_notes_tell_the_truth() {
+        use OfferRule::{AnyMac, RelayCanHost};
+        let me = m("me", "PC", "windows", true, 0, true);
+        let pc = host(m("pc", "Bếp-PC", "windows", true, 0, false));
+        let mac = m("mac", "MacBook", "macos", true, 0, false);
+        let both = [Str::MacCannotHostYet, Str::SignInOnYourMac];
+        assert_eq!(request_panel_notes(&[me.clone()], RelayCanHost), both);
+        assert_eq!(request_panel_notes(&[], RelayCanHost), both);
+        assert_eq!(
+            request_panel_notes(&[me.clone(), pc.clone()], RelayCanHost),
+            both
+        );
+        assert_eq!(
+            request_panel_notes(&[me.clone(), pc.clone(), mac.clone()], RelayCanHost),
+            [Str::MacCannotHostYet]
+        );
+        assert!(request_panel_notes(&[me.clone(), host(mac.clone())], RelayCanHost).is_empty());
+        assert!(request_panel_notes(&[me.clone(), mac.clone()], AnyMac).is_empty());
+        assert_eq!(request_panel_notes(&[me], AnyMac), both);
+    }
+
+    #[test]
+    fn can_host_reads_true_only_for_json_true() {
+        let item = |extra: &str| -> MachineInfo {
+            serde_json::from_str(&format!(
+                r#"{{"machine_id":"m","name":"n","platform":"macos","online":true,"fingerprint":null{extra}}}"#
+            ))
+            .unwrap_or_else(|e| panic!("{extra}: {e}"))
+        };
+        for extra in [
+            "",
+            r#","can_host":false"#,
+            r#","can_host":null"#,
+            r#","can_host":"true""#,
+            r#","can_host":1"#,
+            r#","can_host":{}"#,
+        ] {
+            assert!(!item(extra).can_host, "{extra}");
+        }
+        assert!(item(r#","can_host":true"#).can_host);
     }
 }

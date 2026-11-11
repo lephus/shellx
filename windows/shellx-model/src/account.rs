@@ -733,6 +733,7 @@ mod tests {
             last_seen_unix: 0,
             fingerprint: "f".into(),
             is_this_machine: this,
+            can_host: false,
         }
     }
 

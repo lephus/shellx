@@ -206,6 +206,8 @@ mod tests {
     use shellx_fake_api::{FakeApi, FakeOptions};
     use shellx_model::account::{AccountFlow, AccountState};
     use shellx_model::core_api::FakeCore;
+    use shellx_model::sidebar::{Access, RowAction, build_groups};
+    use shellx_model::strings::Lang;
     use std::collections::VecDeque;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -506,6 +508,14 @@ mod tests {
             ("MacBook", "macos", true)
         );
         assert_eq!(other.fingerprint, "");
+        // The relay sent no can_host: the Mac is listed but not offered (no Mac build answers a PC yet).
+        assert!(!other.can_host);
+        let groups = build_groups(flow.machines(), &|_| Access::None, 0, Lang::Vi);
+        let mac_row = groups
+            .iter()
+            .find(|g| g.machine_id == other.machine_id)
+            .unwrap();
+        assert_eq!(mac_row.action, RowAction::None);
         api.stop();
     }
 

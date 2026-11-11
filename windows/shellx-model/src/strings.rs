@@ -156,6 +156,10 @@ pub enum Str {
     HiddenEmail,
     RemoveMethod,
     DeleteAccount,
+    /// The "+" picker and the empty machine list: why no Mac is offered (spec §4.5).
+    MacCannotHostYet,
+    /// Under `MacCannotHostYet` when the account has no Mac at all.
+    SignInOnYourMac,
 }
 
 impl Str {
@@ -269,6 +273,8 @@ impl Str {
         Str::HiddenEmail,
         Str::RemoveMethod,
         Str::DeleteAccount,
+        Str::MacCannotHostYet,
+        Str::SignInOnYourMac,
     ];
 }
 
@@ -393,6 +399,12 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::HiddenEmail => "Email ẩn",
             Str::RemoveMethod => "Gỡ",
             Str::DeleteAccount => "Xóa tài khoản…",
+            Str::MacCannotHostYet => {
+                "ShellX cho Mac hiện chưa nhận kết nối từ máy tính Windows. Terminal trên máy này vẫn dùng bình thường."
+            }
+            Str::SignInOnYourMac => {
+                "Đăng nhập ShellX trên Mac bằng cùng tài khoản để thấy Mac ở đây."
+            }
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -512,6 +524,12 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::HiddenEmail => "Hidden email",
             Str::RemoveMethod => "Remove",
             Str::DeleteAccount => "Delete Account…",
+            Str::MacCannotHostYet => {
+                "ShellX for Mac doesn't accept connections from Windows PCs yet. Terminals on this PC work as usual."
+            }
+            Str::SignInOnYourMac => {
+                "Sign in to ShellX on your Mac with the same account to see it here."
+            }
         },
     }
 }
@@ -661,7 +679,27 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 109);
+        assert_eq!(Str::ALL.len(), 111);
+    }
+
+    #[test]
+    fn machine_list_sentences_say_why_no_mac_is_offered() {
+        let pairs = [
+            (
+                Str::MacCannotHostYet,
+                "ShellX cho Mac hiện chưa nhận kết nối từ máy tính Windows. Terminal trên máy này vẫn dùng bình thường.",
+                "ShellX for Mac doesn't accept connections from Windows PCs yet. Terminals on this PC work as usual.",
+            ),
+            (
+                Str::SignInOnYourMac,
+                "Đăng nhập ShellX trên Mac bằng cùng tài khoản để thấy Mac ở đây.",
+                "Sign in to ShellX on your Mac with the same account to see it here.",
+            ),
+        ];
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
     }
 
     #[test]
