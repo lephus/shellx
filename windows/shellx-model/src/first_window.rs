@@ -6,13 +6,37 @@ pub const PREFERRED: (f32, f32) = (1200.0, 760.0);
 /// Below this size the window opens maximized instead.
 pub const MINIMUM: (f32, f32) = (720.0, 420.0);
 
-/// The work area (`MONITORINFO.rcWork`) of the monitor the window opens on.
+/// The area the window may use, in logical pixels, in the frame the caller's window API
+/// expects.
+///
+/// GPUI 0.2.2 opens a window with `SetWindowPlacement`, whose rectangle is in *workspace*
+/// coordinates: (0, 0) is the top-left corner of the primary monitor's work area, not of the
+/// screen. So the values passed here for the primary monitor start at (0, 0) whatever side
+/// the taskbar is on (`primary_workspace`); passing `rcWork` in screen coordinates would push
+/// the window down by the height of a top taskbar or right by the width of a left one.
+/// `first_window` itself only works inside the frame it is given.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WorkArea {
     pub x: f32,
     pub y: f32,
     pub width: f32,
     pub height: f32,
+}
+
+impl WorkArea {
+    /// The primary monitor's work area in workspace coordinates: the origin is (0, 0) and the
+    /// size is the work area's physical pixels (`rcWork.right - left`, `bottom - top`)
+    /// divided by the monitor's scale (1.5 for 150 %). A scale that is not finite or not above
+    /// zero counts as 1.0.
+    pub fn primary_workspace(width_px: f32, height_px: f32, scale: f32) -> WorkArea {
+        let _ = scale;
+        WorkArea {
+            x: 0.0,
+            y: 0.0,
+            width: width_px,
+            height: height_px,
+        }
+    }
 }
 
 /// Where and how large the first window opens.
@@ -30,7 +54,9 @@ fn valid_extent(v: f32) -> bool {
 }
 
 /// Shrinks 1200x760 to the work area, centres it with floored offsets, and asks for a
-/// maximized window when the shrunk size is below 720x420 or the work area is unusable.
+/// maximized window when the shrunk size is below 720x420 or the work area is unusable. The
+/// result is in the same frame as `wa` (for GPUI on Windows: workspace coordinates, see
+/// `WorkArea`) and in logical pixels.
 pub fn first_window(wa: WorkArea) -> FirstWindow {
     if !valid_extent(wa.width) || !valid_extent(wa.height) {
         return FirstWindow {
@@ -174,5 +200,86 @@ mod tests {
         }
         let r = first_window(wa(f32::NAN, f32::INFINITY, 0.0, 0.0));
         assert_eq!((r.x, r.y, r.maximized), (0.0, 0.0, true));
+    }
+
+    // `MONITORINFO.rcWork` (screen coordinates: left, top, right, bottom) of the primary monitor.
+    fn workspace(left: f32, top: f32, right: f32, bottom: f32, scale: f32) -> WorkArea {
+        WorkArea::primary_workspace(right - left, bottom - top, scale)
+    }
+
+    #[test]
+    fn the_taskbar_side_does_not_move_the_window_in_workspace_coordinates() {
+        // 1920x1080 @150 %, a 48 px taskbar at the bottom, on top, and on the left (the work
+        // area is then 1872 wide). The origin of rcWork differs, the workspace frame does not.
+        let bottom = first_window(workspace(0.0, 0.0, 1920.0, 1032.0, 1.5));
+        let top = first_window(workspace(0.0, 48.0, 1920.0, 1080.0, 1.5));
+        let left = first_window(workspace(48.0, 0.0, 1920.0, 1080.0, 1.5));
+        assert_eq!(bottom, fw(40.0, 0.0, 1200.0, 688.0, false));
+        assert_eq!(top, bottom);
+        assert_eq!(left, fw(24.0, 0.0, 1200.0, 720.0, false));
+        // R1's screen: 1920x1080 @150 %, work area 1920x1008 -> 1280x672
+        assert_eq!(
+            workspace(0.0, 0.0, 1920.0, 1008.0, 1.5),
+            wa(0.0, 0.0, 1280.0, 672.0)
+        );
+        assert_eq!(
+            first_window(workspace(0.0, 0.0, 1920.0, 1008.0, 1.5)),
+            fw(40.0, 0.0, 1200.0, 672.0, false)
+        );
+        // the same screen with the taskbar on top
+        assert_eq!(
+            first_window(workspace(0.0, 72.0, 1920.0, 1080.0, 1.5)),
+            fw(40.0, 0.0, 1200.0, 672.0, false)
+        );
+    }
+
+    #[test]
+    fn a_workspace_window_never_has_a_negative_origin() {
+        for scale in [
+            1.0,
+            1.25,
+            1.5,
+            1.75,
+            2.0,
+            2.5,
+            3.0,
+            0.0,
+            -1.0,
+            f32::NAN,
+            f32::INFINITY,
+        ] {
+            for (w, h) in [
+                (1920.0, 1032.0),
+                (1366.0, 720.0),
+                (1280.0, 400.0),
+                (800.0, 560.0),
+                (640.0, 440.0),
+                (0.0, 0.0),
+                (-10.0, 500.0),
+                (f32::NAN, 700.0),
+            ] {
+                let r = first_window(WorkArea::primary_workspace(w, h, scale));
+                assert!(r.x >= 0.0 && r.y >= 0.0, "{w}x{h} @{scale}: {r:?}");
+                assert!(
+                    r.x.is_finite() && r.y.is_finite(),
+                    "{w}x{h} @{scale}: {r:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_bad_scale_counts_as_one() {
+        for scale in [0.0, -2.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(
+                WorkArea::primary_workspace(1280.0, 720.0, scale),
+                wa(0.0, 0.0, 1280.0, 720.0),
+                "{scale}"
+            );
+        }
+        assert_eq!(
+            WorkArea::primary_workspace(2160.0, 1344.0, 2.0),
+            wa(0.0, 0.0, 1080.0, 672.0)
+        );
     }
 }
