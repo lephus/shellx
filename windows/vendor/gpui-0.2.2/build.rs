@@ -1,3 +1,4 @@
+// Modified by ShellX: compile the HLSL shaders for a Windows target on any build host (cross builds). See windows/vendor/README.md.
 #![allow(clippy::disallowed_methods, reason = "build scripts are exempt")]
 #![cfg_attr(any(not(target_os = "macos"), feature = "macos-blade"), allow(unused))]
 
@@ -22,7 +23,6 @@ fn main() {
             macos::build();
         }
         Ok("windows") => {
-            #[cfg(target_os = "windows")]
             windows::build();
         }
         _ => (),
@@ -245,7 +245,6 @@ mod macos {
     }
 }
 
-#[cfg(target_os = "windows")]
 mod windows {
     use std::{
         fs,

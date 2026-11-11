@@ -28,8 +28,8 @@
 # Differences from the CI build (.github/workflows/shellx-windows.yml, windows-2025):
 # - clang-cl/lld-link 18 + llvm-rc against the MSVC CRT and Windows SDK that cargo-xwin
 #   downloads (xwin), not cl.exe/link.exe/rc.exe from Visual Studio.
-# - gpui 0.2.2's build.rs only compiles its HLSL on a Windows host; the container patches
-#   it (windows/cross/patch-gpui-build-rs.py) and runs the SDK's fxc.exe under wine.
+# - The vendored gpui 0.2.2 (windows/vendor, patch (d)) compiles its HLSL for a Windows
+#   target on any build host; the container runs the SDK's fxc.exe under wine.
 # - Tests: shellx-model and the installer unittests run on the Linux host (as the CI model
 #   job). The Windows-target tests, the --smoke/--version runs and the install/uninstall
 #   smoke of the CI app/installer jobs do NOT run here; smoke the installer on a Windows PC.

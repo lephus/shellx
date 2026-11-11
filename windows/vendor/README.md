@@ -31,3 +31,4 @@ leave it alone).
 
 | Patch | Files | Reason | Commit |
 | --- | --- | --- | --- |
+| (d) | `build.rs` | The shader step was gated on the build host (`#[cfg(target_os = "windows")]`), so a cross build on Linux never compiled the HLSL and the release build failed at `include!(…/shaders_bytes.rs)`; the two host gates are removed, the match on `CARGO_CFG_TARGET_OS` already selects the target. Replaces the cross-build container's script that edited the registry copy. | `vendor(windows): gpui patch (d)` |

@@ -33,7 +33,6 @@ step() { echo; echo "== $*"; }
 
 step "fetch crates (locked)"
 cargo fetch --locked
-python3 -I /opt/winbuild/patch-gpui-build-rs.py
 
 step "test shellx-model (Linux host, as the CI model job)"
 cargo test --locked -p shellx-model
