@@ -26,12 +26,16 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
+import com.shellx.app.testing.ManualClock
 import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXTheme
+import com.shellx.core.account.AccountAuthMethod
+import com.shellx.core.account.EmailCodeActions
 import com.shellx.core.account.SignInException
 import com.shellx.core.diagnostics.LatencyLog
 import com.shellx.core.platform.MemoryKeyValueStore
@@ -42,6 +46,7 @@ import com.shellx.core.voice.VoiceCapabilityCache
 import com.shellx.core.voice.VoiceLanguage
 import com.shellx.core.voice.VoicePermissionChecking
 import com.shellx.core.voice.VoiceService
+import com.shellx.link.account.EmailChallenge
 import kotlin.time.TestTimeSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -89,7 +94,10 @@ internal fun settingsVoiceService(scope: CoroutineScope, language: VoiceLanguage
     )
 }
 
-/** Settings: its sections in the contract order, Sign out and Delete Account…, the demo, Appearance and Licenses. */
+/**
+ * Settings: its sections in the contract order, Sign out and Delete Account… (with Google's fresh sign-in, or with a
+ * mailed code for an account that signed in with one), the demo, Appearance and Licenses.
+ */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "w400dp-h2000dp")
 class SettingsScreenTest {
@@ -106,7 +114,36 @@ class SettingsScreenTest {
         voiceScope.cancel()
     }
 
-    private fun account(signOut: suspend () -> Unit = {}, delete: suspend () -> Unit = {}) = AccountActions(
+    /** The deletion codes asked for and the deletions sent with one, in order. */
+    private val requests = mutableListOf<Pair<String, String>>()
+    private val verifies = mutableListOf<Pair<String, String>>()
+
+    /** What the next code request and the next deletion by code throw, one each; then they succeed. */
+    private val requestFailures = ArrayDeque<SignInException>()
+    private val verifyFailures = ArrayDeque<SignInException>()
+
+    /** While set, a deletion by code waits for it. */
+    private var heldVerify: CompletableDeferred<Unit>? = null
+
+    /** Deletion by a mailed code, as the test scripts the relay: the challenge is "c1". */
+    private val emailDeletion = EmailCodeActions(
+        requestCode = { address, locale ->
+            requests += address to locale
+            requestFailures.removeFirstOrNull()?.let { throw it }
+            EmailChallenge("c1", 600, 60, "phu@example.com")
+        },
+        verify = { challengeId, code ->
+            verifies += challengeId to code
+            heldVerify?.await()
+            verifyFailures.removeFirstOrNull()?.let { throw it }
+        },
+    )
+
+    private fun account(
+        signOut: suspend () -> Unit = {},
+        delete: suspend () -> Unit = {},
+        emailDeletion: EmailCodeActions? = null,
+    ) = AccountActions(
         signOut = {
             signOuts++
             signOut()
@@ -115,17 +152,39 @@ class SettingsScreenTest {
             deletes++
             delete()
         },
+        emailDeletion = emailDeletion,
     )
 
     @Composable
-    private fun Screen(account: AccountActions? = account(), email: String = "phu@example.com", voice: VoiceService? = null) {
+    private fun Screen(
+        account: AccountActions? = account(),
+        email: String = "phu@example.com",
+        voice: VoiceService? = null,
+        authMethod: AccountAuthMethod = AccountAuthMethod.GOOGLE,
+    ) {
         ShellXTheme {
             SettingsScreen(
                 email = email, account = account, appearance = AppAppearance.SYSTEM, onAppearance = { appearances += it },
-                voice = voice, version = "1.0.0 (100)", openMachines = {}, back = {},
+                voice = voice, version = "1.0.0 (100)", openMachines = {}, back = {}, authMethod = authMethod, clock = ManualClock(),
             )
         }
     }
+
+    /** Settings of an account that signed in with an emailed code. */
+    @Composable
+    private fun EmailScreen() = Screen(account = account(emailDeletion = emailDeletion), authMethod = AccountAuthMethod.EMAIL)
+
+    /** From Settings to the deletion's code step: Delete Account…, then Delete Account on the question. */
+    private fun reachTheDeletionCode() {
+        rule.onNodeWithTag("settings.delete").performClick()
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("delete.code.field").assertIsDisplayed()
+    }
+
+    /** What a field shows: its editable text. */
+    private fun fieldText(tag: String): String =
+        rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
 
     private fun string(id: Int) = context.getString(id)
 
@@ -267,6 +326,139 @@ class SettingsScreenTest {
         rule.waitForIdle()
         rule.onNodeWithTag("delete.working").assertIsDisplayed()
         assertEquals(1, deletes)
+    }
+
+    // An account that signed in with an emailed code.
+
+    @Test
+    fun anEmailSessionsRowIsLabelledEmailCode() {
+        var method by mutableStateOf(AccountAuthMethod.EMAIL)
+        var account by mutableStateOf<AccountActions?>(account(emailDeletion = emailDeletion))
+        rule.setContent { Screen(account = account, authMethod = method) }
+        val row = { label: String -> hasText(label) and hasText("phu@example.com") and hasAnyAncestor(hasTestTag("settings.list")) }
+
+        rule.onNode(row("Email code")).assertIsDisplayed()
+
+        method = AccountAuthMethod.GOOGLE
+        rule.waitForIdle()
+        rule.onNode(row("Email")).assertIsDisplayed()
+        rule.onNodeWithText("Email code").assertDoesNotExist()
+
+        // The demo's account is nobody's.
+        account = null
+        rule.waitForIdle()
+        rule.onNode(row("Email")).assertIsDisplayed()
+    }
+
+    /** Review Focus 8: the sixth digit never deletes by itself. */
+    @Test
+    fun deletingAnEmailAccountAsksForACodeAndNeedsATap() {
+        rule.setContent { EmailScreen() }
+
+        rule.onNodeWithTag("settings.delete").performClick()
+        rule.onNodeWithText(string(R.string.settings_account_delete_message)).assertIsDisplayed()
+        assertEquals("nothing is mailed before the question is answered", emptyList<Pair<String, String>>(), requests)
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+
+        assertEquals(listOf("phu@example.com" to "en"), requests)
+        rule.onNodeWithTag("delete.code.intro").assertTextEquals(string(R.string.settings_account_delete_code_intro))
+        // In the card: the e-mail row behind the dialog shows the address too.
+        rule.onNode(hasText("phu@example.com") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        rule.onNodeWithTag("delete.code.resend").assertTextEquals("Resend code in 60 s").assertIsNotEnabled()
+        rule.onNodeWithTag("delete.confirm").assertIsNotEnabled()
+
+        rule.onNodeWithTag("delete.code.field").performTextInput("654 321")
+        rule.waitForIdle()
+        assertEquals("654321", fieldText("delete.code.field"))
+        assertEquals("six digits wait for the tap", emptyList<Pair<String, String>>(), verifies)
+
+        rule.onNodeWithTag("delete.confirm").assertIsEnabled().performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("c1" to "654321"), verifies)
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+        rule.onNodeWithTag("delete.confirm").assertIsNotEnabled()
+        assertEquals("Google's path is never taken", 0, deletes)
+        assertEquals(1, requests.size)
+    }
+
+    @Test
+    fun aWrongDeletionCodeSaysSoAndKeepsTheCard() {
+        verifyFailures += SignInException.InvalidCode()
+        rule.setContent { EmailScreen() }
+        reachTheDeletionCode()
+        rule.onNodeWithTag("delete.code.field").performTextInput("654321")
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("delete.error").assertTextEquals(string(R.string.signin_error_invalid_code))
+        assertEquals("", fieldText("delete.code.field"))
+        rule.onNodeWithTag("delete.confirm").assertIsNotEnabled()
+        rule.onNodeWithTag("delete.cancel").assertIsEnabled()
+
+        // The right code then deletes.
+        rule.onNodeWithTag("delete.code.field").performTextInput("123456")
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("c1" to "654321", "c1" to "123456"), verifies)
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+    }
+
+    @Test
+    fun aCodeThatCannotBeSentSaysSoOnTheQuestion() {
+        requestFailures += SignInException.EmailSendFailed()
+        rule.setContent { EmailScreen() }
+        rule.onNodeWithTag("settings.delete").performClick()
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("delete.error").assertTextEquals(string(R.string.signin_error_email_send_failed))
+        rule.onNodeWithTag("delete.code.field").assertDoesNotExist()
+        rule.onNodeWithText(string(R.string.settings_account_delete_message)).assertIsDisplayed()
+        rule.onNodeWithTag("delete.confirm").assertIsEnabled()
+
+        // Cancel closes the question; opening it again starts afresh.
+        rule.onNodeWithTag("delete.cancel").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("delete.confirm").assertDoesNotExist()
+        rule.onNodeWithTag("settings.delete").performClick()
+        rule.onNodeWithTag("delete.error").assertDoesNotExist()
+    }
+
+    @Test
+    fun theCodeCardStaysWhileItDeletes() {
+        heldVerify = CompletableDeferred()
+        rule.setContent { EmailScreen() }
+        reachTheDeletionCode()
+        rule.onNodeWithTag("delete.code.field").performTextInput("654321")
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+
+        rule.onNodeWithTag("delete.cancel").assertIsNotEnabled().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+        assertEquals(1, verifies.size)
+
+        heldVerify?.complete(Unit)
+        rule.waitForIdle()
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
+        assertEquals(1, verifies.size)
+    }
+
+    @Test
+    fun aGoogleSessionStillConfirmsWithGoogle() {
+        val gate = CompletableDeferred<Unit>()
+        rule.setContent { Screen(account = account(delete = { gate.await() }, emailDeletion = emailDeletion)) }
+
+        rule.onNodeWithTag("settings.delete").performClick()
+        rule.onNodeWithTag("delete.confirm").performClick()
+        rule.waitForIdle()
+
+        assertEquals(1, deletes)
+        assertEquals(emptyList<Pair<String, String>>(), requests)
+        rule.onNodeWithTag("delete.code.field").assertDoesNotExist()
+        rule.onNodeWithTag("delete.working").assertIsDisplayed()
     }
 
     @Test

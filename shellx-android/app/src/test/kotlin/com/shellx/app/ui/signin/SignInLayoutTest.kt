@@ -8,29 +8,56 @@ import org.junit.Test
 /** What the sign-in screen shows for a window's size, and its intro's clock. */
 class SignInLayoutTest {
     @Test
-    fun aPhoneInPortraitHasTheBigLogoTheSubtitleAndTheSteps() {
-        // The Pixel 3 is 393 × 785 dp; about 713 dp are left between its status and navigation bars.
-        for (height in listOf(713f, 737f, 785f, 852f)) {
+    fun aPhoneInPortraitHasTheBigLogoAndTheSteps() {
+        // The Pixel 3 is 393 × 785 dp; about 713 dp are left between its status and navigation bars. Under the email
+        // field, Send code, "or", Google and the demo link the subtitle no longer fits there: the taglines stand in.
+        for (height in listOf(713f, 737f, 759f)) {
+            assertEquals(
+                "393 × $height",
+                SignInLayout(logoDp = 96, subtitle = false, guide = true, sideBySide = false),
+                SignInLayout.of(393f, height),
+            )
+        }
+        for (height in listOf(760f, 785f, 852f)) {
             assertEquals(
                 "393 × $height",
                 SignInLayout(logoDp = 96, subtitle = true, guide = true, sideBySide = false),
                 SignInLayout.of(393f, height),
             )
         }
+        assertFalse(SignInLayout.of(393f, 759.5f).subtitle)
+        assertTrue(SignInLayout.of(393f, 705f).guide)
+        assertFalse(SignInLayout.of(393f, 704.5f).guide)
     }
 
     @Test
-    fun aShorterPhoneLeavesTheSubtitleToTheTaglines() {
-        assertEquals(SignInLayout(logoDp = 96, subtitle = false, guide = true, sideBySide = false), SignInLayout.of(360f, 640f))
-        assertTrue(SignInLayout.of(393f, 700f).subtitle)
-        assertFalse(SignInLayout.of(393f, 699.5f).subtitle)
+    fun aShorterPhoneLeavesTheStepsOutAndKeepsTheBigLogo() {
+        assertEquals(SignInLayout(logoDp = 96, subtitle = false, guide = false, sideBySide = false), SignInLayout.of(360f, 640f))
+        assertEquals(SignInLayout(logoDp = 96, subtitle = false, guide = false, sideBySide = false), SignInLayout.of(360f, 592f))
     }
 
     @Test
-    fun aWindowUnder600DpTallHasTheSmallLogo() {
-        assertEquals(SignInLayout(logoDp = 72, subtitle = false, guide = true, sideBySide = false), SignInLayout.of(360f, 592f))
-        assertEquals(96, SignInLayout.of(360f, 600f).logoDp)
-        assertEquals(72, SignInLayout.of(360f, 599.5f).logoDp)
+    fun aWindowUnder560DpTallHasTheSmallLogo() {
+        assertEquals(SignInLayout(logoDp = 72, subtitle = false, guide = false, sideBySide = false), SignInLayout.of(360f, 540f))
+        assertEquals(96, SignInLayout.of(360f, 560f).logoDp)
+        assertEquals(72, SignInLayout.of(360f, 559.5f).logoDp)
+    }
+
+    @Test
+    fun whileTheIntroIsFoldedOnlyTheSmallLogoAndTheTitleStay() {
+        for ((width, height) in listOf(393f to 713f, 393f to 852f, 737f to 369f, 1280f to 752f)) {
+            assertEquals(
+                "$width × $height",
+                SignInLayout(
+                    logoDp = 72, subtitle = false, guide = false, sideBySide = SignInLayout.of(width, height).sideBySide,
+                    tagline = false,
+                ),
+                SignInLayout.of(width, height, folded = true),
+            )
+        }
+        assertTrue("the whole intro keeps its taglines", SignInLayout.of(393f, 713f).tagline)
+        assertFalse(SignInLayout.of(393f, 713f, folded = true).sideBySide)
+        assertTrue(SignInLayout.of(737f, 369f, folded = true).sideBySide)
     }
 
     @Test
@@ -43,8 +70,9 @@ class SignInLayoutTest {
                 SignInLayout.of(width, height),
             )
         }
-        assertTrue(SignInLayout.of(900f, 400f).guide)
-        assertFalse(SignInLayout.of(900f, 399.5f).guide)
+        // Beside the steps the field and the buttons need 470 dp of height.
+        assertTrue(SignInLayout.of(900f, 470f).guide)
+        assertFalse(SignInLayout.of(900f, 469.5f).guide)
     }
 
     @Test

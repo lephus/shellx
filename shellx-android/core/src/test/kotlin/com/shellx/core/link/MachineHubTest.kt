@@ -15,6 +15,7 @@ import com.shellx.core.testing.hubRig
 import com.shellx.core.testing.listing
 import com.shellx.core.testing.pendingItem
 import com.shellx.link.account.AccountSignIn
+import com.shellx.link.account.EmailChallenge
 import com.shellx.link.account.PairedMachine
 import com.shellx.link.account.PairedMachineListing
 import com.shellx.link.account.RelayApiException
@@ -364,6 +365,14 @@ private class GatedGrantsRelay(private val base: FakeRelayAccount, private val g
         base.signInWithGoogle(idToken, nonce, deviceName, clientKey)
 
     override suspend fun deleteAccount(idToken: String, nonce: String, token: String) = base.deleteAccount(idToken, nonce, token)
+
+    override suspend fun requestEmailCode(email: String, locale: String): EmailChallenge = base.requestEmailCode(email, locale)
+
+    override suspend fun signInWithEmailCode(challengeId: String, code: String, deviceName: String, clientKey: ByteArray): AccountSignIn =
+        base.signInWithEmailCode(challengeId, code, deviceName, clientKey)
+
+    override suspend fun deleteAccountWithEmailCode(challengeId: String, code: String, token: String) =
+        base.deleteAccountWithEmailCode(challengeId, code, token)
 
     override suspend fun logout(token: String) = base.logout(token)
 

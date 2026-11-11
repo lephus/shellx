@@ -9,10 +9,12 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
@@ -23,6 +25,8 @@ import com.shellx.app.ui.ShellXApp
 import com.shellx.app.ui.nav.WorkRoutes
 import com.shellx.app.ui.theme.AppAppearance
 import com.shellx.app.ui.theme.ShellXAppTheme
+import com.shellx.core.account.AccountAuthMethod
+import com.shellx.core.account.AccountVault
 import com.shellx.core.demo.DemoEnvironment
 import com.shellx.core.demo.FakeMac
 import com.shellx.link.core.LinkTerminal
@@ -31,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -105,6 +110,26 @@ class ShellXAppSmokeTest {
 
         waitForText("shellx-ios")
         assertEquals(1, t.relay.calls.count { it == "pair" })
+    }
+
+    /** The first screen's email field: an address, Send code, the mailed code pasted with a space (Review Focus 1). */
+    @Test
+    fun signInWithAnEmailCodeAndSeeTheFirstMacScreen() {
+        val t = start(macWithAWorkspace())
+
+        waitUntil { rule.onAllNodesWithTag("signin.email.field").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("signin.email.field").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("Phu@Example.com")
+        tap("Send code")
+        waitUntil { rule.onAllNodesWithTag("signin.email.code").fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("signin.email.code").performTextInput("123 456")
+        waitForText("Pair a Mac")
+
+        assertTrue(t.relay.calls.toString(), "email:code:Phu@Example.com:en" in t.relay.calls)
+        assertTrue(t.relay.calls.toString(), "email:verify:challenge-1:123456" in t.relay.calls)
+        assertTrue("Google is never asked: ${t.relay.calls}", t.relay.calls.none { it.startsWith("google:") })
+        val session = runBlocking { AccountVault(t.secrets, Dispatchers.IO).session() }
+        assertEquals(AccountAuthMethod.EMAIL, session?.authMethod)
     }
 
     @Test

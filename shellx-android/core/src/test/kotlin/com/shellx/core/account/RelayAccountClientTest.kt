@@ -2,6 +2,7 @@ package com.shellx.core.account
 
 import com.shellx.link.account.AccountSession
 import com.shellx.link.account.AccountSignIn
+import com.shellx.link.account.EmailChallenge
 import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
@@ -23,7 +24,9 @@ class RelayAccountClientTest {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when ("${request.method} ${request.url.encodedPath}") {
                 "POST /v1/auth/nonce" -> json(201, """{"nonce":"n1","expires_in":600}""")
-                "POST /v1/auth/google" -> json(200, """{"user_id":"u1","device_id":"d1","token":"t1","email":"a@b.c"}""")
+                "POST /v1/auth/google", "POST /v1/auth/email/verify" ->
+                    json(200, """{"user_id":"u1","device_id":"d1","token":"t1","email":"a@b.c"}""")
+                "POST /v1/auth/email/code" -> json(202, """{"challenge_id":"c1","expires_in":600,"resend_in":60,"email":"a@b.c"}""")
                 "GET /v2/phone-grants" -> json(200, """{"grants":[]}""")
                 else -> MockResponse.Builder().code(204).build()
             }
@@ -41,8 +44,11 @@ class RelayAccountClientTest {
             relay.unsetPushToken("t1")
             relay.logout("t1")
             relay.deleteAccount("id2", "n2", "t1")
+            assertEquals(EmailChallenge("c1", 600, 60, "a@b.c"), relay.requestEmailCode("a@b.c", "en"))
+            val emailSignIn = relay.signInWithEmailCode("c1", "123456", "Pixel", ByteArray(32))
+            relay.deleteAccountWithEmailCode("c1", "123456", "t1")
 
-            val seen = List(8) {
+            val seen = List(11) {
                 val request = assertNotNull(server.takeRequest(5, TimeUnit.SECONDS))
                 "${request.method} ${request.url.encodedPath}"
             }
@@ -50,11 +56,12 @@ class RelayAccountClientTest {
                 listOf(
                     "POST /v1/auth/nonce", "POST /v1/auth/google", "GET /v2/phone-grants", "DELETE /v2/phone-grants/g1",
                     "PUT /v1/devices/me/push-token", "DELETE /v1/devices/me/push-token", "POST /v1/auth/logout",
-                    "DELETE /v1/account",
+                    "DELETE /v1/account", "POST /v1/auth/email/code", "POST /v1/auth/email/verify", "DELETE /v1/account",
                 ),
                 seen,
             )
             assertEquals(AccountSignIn(AccountSession("u1", "d1", "t1"), "a@b.c"), signIn)
+            assertEquals(signIn, emailSignIn)
         } finally {
             server.close()
             okHttp.dispatcher.executorService.shutdown()

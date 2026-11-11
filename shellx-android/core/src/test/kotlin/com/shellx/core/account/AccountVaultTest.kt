@@ -55,6 +55,53 @@ class AccountVaultTest {
         assertNull(cleared)
     } }
 
+    private val sessionBeforeAuthMethods = """{"userID":"u1","deviceID":"d1","token":"t","email":"a@b.c"}"""
+
+    @Test fun aSessionStoredBeforeAuthMethodsIsAGoogleSession() { runTest {
+        val store = InMemorySecretStore()
+        store.write(sessionBeforeAuthMethods.encodeToByteArray(), SecretItem.SESSION)
+        val session = AccountVault(store, StandardTestDispatcher(testScheduler)).session()
+        assertEquals(StoredSession("u1", "d1", "t", "a@b.c", AccountAuthMethod.GOOGLE), session)
+        assertEquals(AccountAuthMethod.GOOGLE, StoredSession("u1", "d1", "t", "a@b.c").authMethod)
+    } }
+
+    @Test fun theAuthMethodIsStoredUnderTheIPhonesKey() { runTest {
+        val store = InMemorySecretStore()
+        val vault = AccountVault(store, StandardTestDispatcher(testScheduler))
+        val session = StoredSession("u1", "d1", "t", "a@b.c", AccountAuthMethod.EMAIL)
+        vault.setSession(session)
+
+        val raw = assertNotNull(store.read(SecretItem.SESSION))
+        val json = Json.parseToJsonElement(raw.decodeToString()).jsonObject
+        assertEquals("email", json["auth_method"]?.jsonPrimitive?.content)
+        assertEquals(true, json["auth_method"]?.jsonPrimitive?.isString)
+        assertEquals("u1", json["userID"]?.jsonPrimitive?.content)
+        assertEquals("d1", json["deviceID"]?.jsonPrimitive?.content)
+        assertEquals("t", json["token"]?.jsonPrimitive?.content)
+        assertEquals("a@b.c", json["email"]?.jsonPrimitive?.content)
+        assertEquals(listOf("userID", "deviceID", "token", "email", "auth_method"), json.keys.toList())
+        val stored = vault.session()
+        assertEquals(session, stored)
+
+        // A Google session says so too.
+        vault.setSession(StoredSession("u1", "d1", "t", "a@b.c"))
+        val google = Json.parseToJsonElement(assertNotNull(store.read(SecretItem.SESSION)).decodeToString()).jsonObject
+        assertEquals("google", google["auth_method"]?.jsonPrimitive?.content)
+        assertEquals(listOf("google", "email"), AccountAuthMethod.entries.map { it.wire })
+        assertEquals(AccountAuthMethod.EMAIL, AccountAuthMethod.ofWire("email"))
+        assertNull(AccountAuthMethod.ofWire("apple"))
+    } }
+
+    @Test fun anUnknownAuthMethodIsUnreadable() { runTest {
+        for (method in listOf("\"passkey\"", "7", "null")) {
+            val store = InMemorySecretStore()
+            val raw = sessionBeforeAuthMethods.dropLast(1) + ""","auth_method":$method}"""
+            store.write(raw.encodeToByteArray(), SecretItem.SESSION)
+            val session = AccountVault(store, StandardTestDispatcher(testScheduler)).session()
+            assertNull(session, raw.substringAfter("auth_method"))
+        }
+    } }
+
     @Test fun machinesRoundTripWithOwner() { runTest {
         val store = InMemorySecretStore()
         val vault = AccountVault(store, StandardTestDispatcher(testScheduler))
