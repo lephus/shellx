@@ -128,7 +128,6 @@ pub fn finish(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Va
         .ok_or_else(|| CoreError::invalid_params("code is required and must be a string"))?;
     // Not six digits: refused here, so a typo never burns one of the five guesses.
     let code = Zeroizing::new(clean_code(raw_code).ok_or_else(|| CoreError::new("invalid_code", "the code is not six digits"))?);
-    let previous_user = crate::auth::load_session(store).ok().flatten().map(|s| s.user_id.clone());
     let public = crate::auth::device_public(store)?;
     let public_b64 = URL_SAFE_NO_PAD.encode(public);
     let name = crate::auth::device_name(cfg);
@@ -149,6 +148,8 @@ pub fn finish(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Va
     {
         // Never held during a request.
         let _g = auth_lock.lock().unwrap_or_else(|p| p.into_inner());
+        // Read under the lock: a sign-in that finished during the request must decide whether `machine.json` goes.
+        let previous_user = crate::auth::load_session(store).ok().flatten().map(|s| s.user_id.clone());
         let session = SessionFile {
             token: resp.token.clone(),
             user_id: resp.user_id.clone(),
