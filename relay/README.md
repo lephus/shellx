@@ -52,6 +52,7 @@ stops the relay with one line on stderr and exit status 1.
 | `APPLE_CLIENT_IDS` | `com.shellx.prod,com.shellx.dev` | Allowed `aud` values (bundle ids) of Apple identity tokens; an empty list stops the relay |
 | `APPLE_TEAM_ID`, `APPLE_SIWA_KEY_ID`, `APPLE_SIWA_KEY_PATH` | unset | The Sign in with Apple key (`.p8`) used to exchange authorization codes and revoke refresh tokens. Any missing, unreadable or not an EC P-256 key → `apple_siwa_disabled`; Apple sign-in itself keeps working |
 | `PASSWORD_LOGIN` | `on` | `off` answers 410 `password_sign_in_removed` to login and password change (logged once as `password_login_off`); anything but `on`/`off` stops the relay |
+| `RESEND_API_KEY`, `EMAIL_FROM` | unset | Sign-in with an email code (see "Sign-in" below): the Resend API key (a secret) and the sender, an address or `Name <address>`, e.g. `ShellX <sign-in@shellx.pro>`. Both set → on, logged once as `email_sign_in_enabled`; both unset → off, logged as `email_sign_in_disabled`, and `POST /v1/auth/email/code` answers 503 `email_sign_in_disabled`. Exactly one of them, or an `EMAIL_FROM` that is neither form, stops the relay (no message contains the key). For local development export both in the shell; never put the key into `dev.env` (it is committed) |
 | `TEST_IDP_ISSUER`, `TEST_IDP_JWKS_PATH` | unset | **Test relays only, never production.** A test identity provider: tokens of this issuer with `aud` `shellx-test-idp`, signed with a key of the JWKS file, are accepted as provider `test`. Both or neither; the issuer must not be a Google or Apple issuer; logs `test_idp_enabled`. Helper: `relay/scripts/test-idp.ts` |
 | `FCM_ENDPOINT`, `FCM_TOKEN_ENDPOINT` | Google | **Tests only:** base URL of the FCM API and the OAuth token URL, e.g. a fake FCM server. Honoured only for loopback `http(s)://127.0.0.1`/`localhost`/`[::1]` URLs, ignored otherwise |
 
@@ -60,7 +61,9 @@ file-name order, one transaction per file. There are no down-migrations: fix a m
 file. `0001_init.sql` is the original schema; `0002_hub_state.sql` holds the hub's
 `pairing_removed` tombstones; `0003_push_tokens.sql` holds the phones' FCM tokens; `0004_admin.sql`
 adds `devices.app_version` and the admin's `app_settings`; `0010_identities.sql` adds the sign-in tables
-(`identities`, `auth_nonces`, `apple_links`, `tokens.auth_method`) and makes `users.password_hash` nullable.
+(`identities`, `auth_nonces`, `apple_links`, `tokens.auth_method`) and makes `users.password_hash` nullable;
+`0011_email_sign_in.sql` adds `email_codes` (the pending email codes) and lets `identities.provider` and
+`tokens.auth_method` be `email`.
 
 ## Behaviour worth knowing
 
@@ -95,7 +98,9 @@ adds `devices.app_version` and the admin's `app_settings`; `0010_identities.sql`
   `device_id`) and retries with backoff; the 16 connected ones are untouched. A device that is
   already connected can always reconnect: its new socket replaces the old one.
 - **Rate limits:** in memory, 60-second sliding window: login 10/IP and 5/email, nonce 30/IP
-  (Google and Apple sign-in and Apple link requests share login 10/IP), WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
+  (Google and Apple sign-in, Apple link requests and `POST /v1/auth/email/verify` share login 10/IP),
+  email codes (`POST /v1/auth/email/code`) 10/IP, and per address 3 per minute and 10 per hour (every
+  spelling of an address is one key: `trim` + lower case), WebSocket upgrades 60/IP (every attempt, counted before its token is checked; over the limit the
   upgrade is refused with HTTP 429 and clients retry with backoff). The IP is `X-Real-IP` when the
   TCP peer is a private or loopback address (nginx-proxy), otherwise the peer address; an IPv6
   address counts as its /64. IPs and e-mail addresses are never logged.
@@ -246,10 +251,11 @@ no admin path answers on any other.
   http://admin.localhost:8787 (Chrome and Firefox resolve `*.localhost` to 127.0.0.1 and accept the
   Secure cookie there).
 
-## Sign-in (Google and Apple)
+## Sign-in (Google, Apple and email code)
 
-Accounts are created by signing in with Google (desktop, Android, iPhone) or Apple (iPhone). Registration
-is closed: `POST /v1/auth/register` always answers 410 `registration_closed`.
+Accounts are created by signing in with Google (desktop, Android, iPhone), with a code mailed to an
+address (the relay needs `RESEND_API_KEY` and `EMAIL_FROM`) or with Apple (iPhone). Registration is
+closed: `POST /v1/auth/register` always answers 410 `registration_closed`.
 
 | Route | Auth | Body | Success | Errors |
 |---|---|---|---|---|
@@ -259,7 +265,9 @@ is closed: `POST /v1/auth/register` always answers 410 `registration_closed`.
 | `POST /v1/auth/apple` | none | `{identity_token, authorization_code, nonce, device}` (mobile / ios) | 200 `{user_id, device_id, token, email}` or 202 `{status: "link_required", link_token, expires_in}` | 401, 400, 429 |
 | `POST /v1/auth/apple/link` | none | `{link_token, machine_id, client_key_b64, proof_b64}` | 201 `{pairing_id}` | 400, 401, 404 `machine_not_found`, 429 |
 | `POST /v1/auth/apple/link/status` | none | `{link_token, pairing_id}` | 200 `{status}` or `{status: "approved", session, machine}` | 401, 404 `pairing_not_found` |
-| `DELETE /v1/account` | bearer | `{id_token, nonce}` (`iat` at most 300 s), or `{password}` while `PASSWORD_LOGIN=on` and the account has one | 204 | 401 `reauth_required` / `invalid_credentials`, 429 |
+| `POST /v1/auth/email/code` | none | `{email, locale?}` (`locale` `"en"` or `"vi"`; anything else is English) | 202 `{challenge_id, expires_in, resend_in, email}` (43-char base64url, 600, 60, the address trimmed and lower-cased) | 400 `invalid_email`, 400 `disposable_email`, 429, 503 `email_sign_in_disabled`, 502 `email_send_failed` |
+| `POST /v1/auth/email/verify` | none | `{challenge_id, code, device}` (`code`: a string of 6 digits; `device` as for Google) | 200 `{user_id, device_id, token, email}` | 401 `invalid_code`, 410 `code_expired`, 409 `switch_from_signed_in_device`, 400 `invalid_device`, 429 |
+| `DELETE /v1/account` | bearer | `{id_token, nonce}` (`iat` at most 300 s), or `{challenge_id, code}` (a code mailed to the account's own address), or `{password}` while `PASSWORD_LOGIN=on` and the account has one | 204 | 401 `reauth_required` / `invalid_credentials` / `invalid_code`, 410 `code_expired`, 429 |
 | `GET /v1/account/identities` | bearer | none | 200 `{identities: [...]}` | 401 |
 | `DELETE /v1/account/identities/:identity_id` | bearer | none | 204 | 404 `identity_not_found`, 409 `last_google_identity` |
 
@@ -268,6 +276,18 @@ the provider's JWKS (jose, cached); `iss` is the provider's issuer; `aud` is in 
 `exp` has not passed (60 s tolerance); `iat` at most 600 s old (300 s for account deletion) and at
 most 60 s ahead; the nonce was issued by the relay and is unused (Google and test tokens carry the
 raw nonce, Apple the `sha256_hex` of it); `email_verified` is true.
+
+**Email code** (spec 2026-11-10): `email/code` mails a 6-digit code (from the CSPRNG, leading zeros kept)
+and answers with a challenge id. The relay stores neither: only `sha256(challenge_id)` and
+`sha256(challenge_id + ":" + code)`, compared in constant time. A code lives 600 s and takes 5 guesses:
+wrong guesses 1 to 4 answer 401 `invalid_code`, the fifth 410 `code_expired` and the challenge is gone; a
+guess is counted before it is compared. Only the newest code of an address is valid; a used, replaced or
+expired challenge answers 410. `email/code` answers the same 202 and sends the same mail whether or not
+the address has an account, and reads no account. `resend_in` is advice for the client's button; the
+relay enforces only the rate limits. The mail (English, or Vietnamese for `locale: "vi"`) is text and
+minimal HTML with no link and no image. A mail Resend does not accept (anything but 2xx, or no answer in
+10 s) answers 502 and removes its challenge; the relay never retries. Logs carry events only
+(`email_code_sent`, `email_code_refused`, `email_send_failed`), never an address, a code or a challenge id.
 
 **Account rules** (S1 §6.3): an identity `(provider, subject)` signs in to its account whatever its
 email says now. Otherwise the account with the same email (`trim` + lower case) decides: while
@@ -279,8 +299,21 @@ passwordless account. Apple never links or creates by email: an Apple ID with no
 `link_required` whatever account its email matches, and a Mac's Allow attaches it to the Mac's account
 (S1 §6.4).
 
-**Switch in place** (`google/link`): a signed-in device adds Google to its account; the account's email
-becomes Google's, the password and the other devices stay, and only this device gets a `google` token.
+An email code follows the same steps, with `provider` `email` and the address as its subject (Gmail dots
+and `+tag` are never folded, and an address that only an identity carries never matches). `email/verify`
+spends the code first, then resolves the account: an email sign-in for the address signs in; a password
+that still works (`PASSWORD_LOGIN=on`) answers 409 `switch_from_signed_in_device`; an account made with
+Google for the same address gets the email sign-in added and keeps everything else (it then lists both);
+an account with no Google sign-in was never verified: with an Apple ID attached it answers 409 and
+nothing changes, with no sign-in at all the code claims it, removing its password and every earlier
+session (their live sockets are closed with 4002); no match creates a passwordless account. In the other
+direction, Google signs in to an account made by email code for the same address and is added to it. An
+account has at most one email sign-in.
+
+**Switch in place** (`google/link`): a signed-in device adds Google to its account, also to one that so
+far has only an email sign-in; the account's email becomes Google's, the password and the other devices
+stay, and only this device gets a `google` token. When the email changes, the account's email sign-in
+(for the address that went) is removed and the devices that signed in with it are signed out.
 
 **Apple link:** an Apple ID that matches no account (or only an account that still has a password)
 gets 202 `link_required` and a 10-minute link token. The iPhone sends it to `apple/link` with a Mac's
@@ -290,11 +323,14 @@ iPhone with a grant. `apple/link/status` hands the approved session out exactly 
 recovered by signing in with Apple again.
 
 **Identities:** removing an Apple ID signs out the devices that signed in with it, asks Apple to revoke
-its refresh token and keeps the Mac, the Google devices and the phone grant. The Google sign-in cannot
-be removed.
+its refresh token and keeps the Mac, the Google devices and the phone grant. Of the Google and email
+sign-ins one must remain: removing either signs out the devices that used it, and removing the last of
+them answers 409 `last_google_identity` (the code keeps its name for old apps).
 
-**Deletion** needs a fresh Google or Apple token of one of the account's own sign-ins. The stored Apple
-refresh tokens are revoked after the delete; a failure is logged and never blocks it.
+**Deletion** needs a fresh Google or Apple token of one of the account's own sign-ins, or a code mailed
+to the account's own address (`{challenge_id, code}`; wrong guesses count as on `email/verify`, and a
+code that went to another address is spent and answers 401 `reauth_required`). The stored Apple refresh
+tokens are revoked after the delete; a failure is logged and never blocks it.
 
 **Test identity provider:** `relay/scripts/test-idp.ts` (`createTestIssuer`, `testIdTokenClaims`) makes
 tokens with `aud` `shellx-test-idp` for a relay started with `TEST_IDP_ISSUER` / `TEST_IDP_JWKS_PATH`.
@@ -308,7 +344,7 @@ docker compose exec relay npm run -s password-cutover            # dry run: coun
 docker compose exec relay npm run -s password-cutover -- --yes   # remove every password and password session
 ```
 
-It refuses unless the relay runs with `PASSWORD_LOGIN=off`. Google, Apple and test sessions stay.
+It refuses unless the relay runs with `PASSWORD_LOGIN=off`. Google, Apple, email-code and test sessions stay.
 
 ## Smoke token
 
