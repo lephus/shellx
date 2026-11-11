@@ -15,6 +15,7 @@ import { Db } from "../src/db/db.js";
 import { migrate } from "../src/db/migrate.js";
 import { HubRegistry } from "../src/hub/registry.js";
 import type { HubSocket } from "../src/hub/user-hub.js";
+import type { FakeEmailGateway } from "./fake-email.js";
 import { appleClaims, fakeApple, fakeGoogle, fakeTestIdp, googleClaims, testClaims, testIdTokens } from "./fake-idp.js";
 import { type ListenOptions, startRelay, type RunningRelay } from "../src/relay.js";
 
@@ -365,6 +366,18 @@ export async function googleSession(app: TestApp, options: GoogleSignInOptions =
   if (res.status !== 200) throw new Error(`google sign-in failed: ${res.status} ${await res.text()}`);
   const body = await res.json<{ user_id: string; device_id: string; token: string; email: string }>();
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey, sub, email: body.email };
+}
+
+// ---- Email-code sign-in (the fake gateway of fake-email.ts) ---------------------------------------
+
+/** POST /v1/auth/email/code; throws unless 202. `code` is read from the mail the fake gateway recorded. */
+export async function requestEmailCode(
+  app: TestApp, mail: FakeEmailGateway, email: string, options: { locale?: string; ip?: string } = {},
+): Promise<{ challengeId: string; code: string; email: string }> {
+  const res = await call(app, "POST", "/v1/auth/email/code", { ip: options.ip, body: { email, locale: options.locale } });
+  if (res.status !== 202) throw new Error(`email code request failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ challenge_id: string; email: string }>();
+  return { challengeId: body.challenge_id, code: mail.codeFor(body.email), email: body.email };
 }
 
 // ---- Apple sign-in ------------------------------------------------------------------------------

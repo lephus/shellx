@@ -14,7 +14,7 @@ import { GOING_AWAY } from "../src/hub/user-hub.js";
 import { pairingRemovedEvent } from "../src/protocol/frames.js";
 import type { RunningRelay } from "../src/relay.js";
 import {
-  call, connect, db, deviceBody, hex, loginDesktop, loginDevice, makeApp, newPairingId, onCleanup, pair, PASSWORD, randomEmail,
+  call, connect, db, deviceBody, errorCode, hex, loginDesktop, loginDevice, makeApp, newPairingId, onCleanup, pair, PASSWORD, randomEmail,
   registerAccount, registerMachine, tempDir, type TestApp, waitFor,
 } from "./helpers.js";
 
@@ -475,5 +475,35 @@ describe("test identity provider (TEST_IDP_ISSUER, TEST_IDP_JWKS_PATH)", () => {
 
     const broken = await startServer({ ...env, TEST_IDP_JWKS_PATH: join(tempDir(), "missing.json") }).exit;
     expect([broken.code, broken.stderr]).toEqual([1, "relay: TEST_IDP_JWKS_PATH is not a readable JWKS file\n"]);
+  });
+});
+
+describe("email sign-in configuration (RESEND_API_KEY, EMAIL_FROM)", () => {
+  it("is off without the two variables (503), on with both, and half of the pair stops the relay; the key is never printed", async () => {
+    const KEY = "placeholder-not-a-real-key";
+    const env = { ...VERSION_ENV, HOST: "127.0.0.1", PORT: "0", DB_PATH: join(tempDir(), "relay.db") };
+    const off = startServer(env);
+    onCleanup(() => off.child.kill("SIGKILL"));
+    const port = await waitForListening(off.output);
+    expect(off.output()).toContain('"event":"email_sign_in_disabled"');
+    const res = await call(remote(port), "POST", "/v1/auth/email/code", { body: { email: "ann@example.com" } });
+    expect([res.status, await errorCode(res)]).toEqual([503, "email_sign_in_disabled"]);
+    off.child.kill("SIGTERM");
+    expect((await off.exit).code).toBe(0);
+
+    // This process holds a real ResendClient: nothing may call POST /v1/auth/email/code on it.
+    const on = startServer({ ...env, RESEND_API_KEY: KEY, EMAIL_FROM: "ShellX <sign-in@shellx.pro>" });
+    onCleanup(() => on.child.kill("SIGKILL"));
+    await waitForListening(on.output);
+    expect(on.output()).toContain('"event":"email_sign_in_enabled"');
+    on.child.kill("SIGTERM");
+    const stopped = await on.exit;
+    expect(stopped.code).toBe(0);
+    expect(stopped.stdout + stopped.stderr).not.toContain(KEY);
+
+    for (const half of [{ RESEND_API_KEY: KEY }, { EMAIL_FROM: "ShellX <sign-in@shellx.pro>" }] as Record<string, string>[]) {
+      const broken = await startServer({ ...env, ...half }).exit;
+      expect([broken.code, broken.stderr]).toEqual([1, "relay: RESEND_API_KEY and EMAIL_FROM must be set together\n"]);
+    }
   });
 });
