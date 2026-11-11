@@ -380,6 +380,36 @@ export async function requestEmailCode(
   return { challengeId: body.challenge_id, code: mail.codeFor(body.email), email: body.email };
 }
 
+export interface EmailSignInOptions {
+  email?: string;
+  kind?: "desktop" | "mobile";
+  publicKey?: string;
+  headers?: Record<string, string>;
+  ip?: string;
+}
+
+/** Asks for a code and verifies it with a new device. */
+export async function signInEmail(app: TestApp, mail: FakeEmailGateway, options: EmailSignInOptions = {}): Promise<TestResponse> {
+  const { challengeId, code } = await requestEmailCode(app, mail, options.email ?? randomEmail(), { ip: options.ip });
+  return call(app, "POST", "/v1/auth/email/verify", {
+    ip: options.ip, headers: options.headers,
+    body: { challenge_id: challengeId, code, device: deviceBody(options.kind ?? "desktop", { public_key: options.publicKey ?? randomPublicKey() }) },
+  });
+}
+
+export interface EmailSession extends Session {
+  email: string;
+}
+
+/** Signs in with an email code; throws unless 200. */
+export async function emailSession(app: TestApp, mail: FakeEmailGateway, options: EmailSignInOptions = {}): Promise<EmailSession> {
+  const publicKey = options.publicKey ?? randomPublicKey();
+  const res = await signInEmail(app, mail, { ...options, publicKey });
+  if (res.status !== 200) throw new Error(`email sign-in failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ user_id: string; device_id: string; token: string; email: string }>();
+  return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey, email: body.email };
+}
+
 // ---- Apple sign-in ------------------------------------------------------------------------------
 
 export interface AppleSignInOptions {
