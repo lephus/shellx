@@ -200,6 +200,71 @@ final class EmailSignInModelTests: XCTestCase {
         XCTAssertEqual(sent, ["challenge-2 654321"], "the new challenge replaced the old one")
     }
 
+    func testAResendTheRelayCouldNotMailLeavesNoCodeToVerify() async {
+        // The relay replaces the address's earlier code before it mails a new one, and drops the new one when the mail
+        // cannot go (502), or answers before anything changed when it has no email sign-in (503, or 404 from an old
+        // relay, where no code was mailed either way): after these no code is live. A refusal for speed (429) or no
+        // answer at all keeps the code already mailed.
+        let rig = await atCode()
+        let model = rig.coordinator.emailSignIn
+        func unlock() async {
+            if !model.codeIsLive {
+                await rig.relay.setError(nil, for: .requestEmailCode)
+                await model.resend()
+                XCTAssertTrue(model.codeIsLive)
+            }
+            rig.clock.advance(by: .seconds(60))
+            let unlocked = await eventually { model.canResend }
+            XCTAssertTrue(unlocked)
+            model.setCode("12")
+        }
+
+        let kept: [(any Error, SignInError)] = [(http(429, "rate_limited"), .rateLimited), (URLError(.notConnectedToInternet), .network)]
+        for (relayError, expected) in kept {
+            await unlock()
+            await rig.relay.setError(relayError, for: .requestEmailCode)
+            await model.resend()
+            XCTAssertEqual(model.error, expected, "\(relayError)")
+            XCTAssertEqual(model.step, .code, "\(relayError)")
+            XCTAssertTrue(model.codeIsLive, "\(relayError): the code already mailed still works")
+            XCTAssertEqual(model.code, "12", "\(relayError)")
+            XCTAssertTrue(model.canResend, "\(relayError)")
+        }
+
+        let dropped: [(any Error, SignInError)] = [
+            (http(502, "email_send_failed"), .emailSendFailed), (http(503, "email_sign_in_disabled"), .providerUnavailable),
+            (http(404, "not_found"), .providerUnavailable),
+        ]
+        for (relayError, expected) in dropped {
+            await unlock()
+            await rig.relay.setError(relayError, for: .requestEmailCode)
+            await model.resend()
+            XCTAssertEqual(model.error, expected, "\(relayError)")
+            XCTAssertEqual(model.step, .code, "\(relayError): the code step stays, with its sentence")
+            XCTAssertEqual(model.sentTo, "phu@example.com", "\(relayError)")
+            XCTAssertFalse(model.codeIsLive, "\(relayError): no code is live, as after a 410")
+            XCTAssertEqual(model.code, "", "\(relayError)")
+            XCTAssertFalse(model.canVerify, "\(relayError)")
+            XCTAssertTrue(model.canResend, "\(relayError): Resend stays unlocked")
+            XCTAssertEqual(model.resendIn, 0, "\(relayError)")
+            model.setCode("123456")
+            XCTAssertEqual(model.code, "", "\(relayError): the dead field takes nothing")
+        }
+        let none = await verifies(rig)
+        XCTAssertEqual(none, [], "no code was ever checked")
+
+        await rig.relay.setError(nil, for: .requestEmailCode)
+        await model.resend()
+        XCTAssertTrue(model.codeIsLive)
+        XCTAssertNil(model.error)
+        model.setCode("654321")
+        let done = await eventually { model.step == .done }
+        XCTAssertTrue(done)
+        let sent = await verifies(rig)
+        XCTAssertEqual(sent.count, 1)
+        XCTAssertTrue(sent.first?.hasSuffix(" 654321") ?? false)
+    }
+
     func testAPastedCodeIsCutToItsSixDigits() async {
         XCTAssertEqual(
             ["123 456", " 12-34 56\n", "1234567", "١٢٣٤٥٦", "abc", "Your ShellX sign-in code is 123456"].map(EmailSignInModel.digits),
