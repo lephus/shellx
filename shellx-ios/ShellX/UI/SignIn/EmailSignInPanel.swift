@@ -23,8 +23,7 @@ struct EmailEntryRows: View {
                 }),
                 placeholder: String(localized: "signin.email.field"), focusRequest: focusRequest, submit: send
             )
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity)
             .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 12))
             .disabled(!enabled)
 

@@ -22,8 +22,7 @@ struct EmailCodeField: View {
             OneTimeCodeTextField(
                 model: model, code: model.code, placeholder: String(localized: label), id: id, focusRequest: focusRequest
             )
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity)
             .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 12))
             .disabled(!model.codeIsLive)
             .onChange(of: model.codeIsLive) { _, live in
@@ -46,7 +45,8 @@ struct EmailCodeField: View {
 
 /// The UIKit field under `EmailCodeField`. Each edit goes to the model and what the model kept is written back in
 /// the same call, so no edit can slip between a write-back and the next keystroke (a SwiftUI text binding lost one
-/// that way). Number pad, one-time-code content type (iOS offers the code from Mail), monospaced digits, centred.
+/// that way). Number pad, one-time-code content type (iOS offers the code from Mail), monospaced digits, centred; it
+/// fills its 50-point box (`BoxedTextField`), so a tap anywhere in the box reaches it.
 struct OneTimeCodeTextField: UIViewRepresentable {
     let model: EmailSignInModel
     /// `model.code`, read by the parent so that a change from the model (a wrong code empties it) updates the field.
@@ -58,8 +58,8 @@ struct OneTimeCodeTextField: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
-    func makeUIView(context: Context) -> UITextField {
-        let field = UITextField()
+    func makeUIView(context: Context) -> BoxedTextField {
+        let field = BoxedTextField()
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
         field.keyboardType = .numberPad
         field.textContentType = .oneTimeCode
@@ -72,7 +72,7 @@ struct OneTimeCodeTextField: UIViewRepresentable {
         return field
     }
 
-    func updateUIView(_ field: UITextField, context: Context) {
+    func updateUIView(_ field: BoxedTextField, context: Context) {
         context.coordinator.model = model
         if field.text != code { field.text = code }
         field.placeholder = placeholder
@@ -89,9 +89,9 @@ struct OneTimeCodeTextField: UIViewRepresentable {
         }
     }
 
-    /// As wide as offered, as high as one line of its font.
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView field: UITextField, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? field.intrinsicContentSize.width, height: field.intrinsicContentSize.height)
+    /// The whole box: as wide as offered, at least 50 points high.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView field: BoxedTextField, context: Context) -> CGSize? {
+        field.boxSize(width: proposal.width)
     }
 
     @MainActor

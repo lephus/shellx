@@ -53,9 +53,9 @@ struct EmailAddressField: UIViewRepresentable {
         }
     }
 
-    /// As wide as offered, as high as one line of its font: a long address scrolls inside the field and never widens it.
+    /// The whole box: as wide as offered, at least 50 points high (a long address scrolls inside and never widens it).
     func sizeThatFits(_ proposal: ProposedViewSize, uiView field: EmailAddressTextField, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? field.intrinsicContentSize.width, height: field.intrinsicContentSize.height)
+        field.boxSize(width: proposal.width)
     }
 
     @MainActor
@@ -77,9 +77,29 @@ struct EmailAddressField: UIViewRepresentable {
     }
 }
 
+/// A text field that fills the box drawn around it: its text keeps 16 points from the box's sides, and a tap anywhere
+/// in the box (near its edges, in its margins) reaches the field, not only one on its line of text. Nothing takes the
+/// keyboard on arrival, so the box is what the user aims at.
+class BoxedTextField: UITextField {
+    /// The room between the box's sides and the text.
+    static let inset: CGFloat = 16
+    /// The box is never lower than this; at large text sizes it grows with the font.
+    static let minHeight: CGFloat = 50
+
+    override func textRect(forBounds bounds: CGRect) -> CGRect { bounds.insetBy(dx: Self.inset, dy: 0) }
+    override func editingRect(forBounds bounds: CGRect) -> CGRect { bounds.insetBy(dx: Self.inset, dy: 0) }
+    override func placeholderRect(forBounds bounds: CGRect) -> CGRect { bounds.insetBy(dx: Self.inset, dy: 0) }
+
+    /// The box for an offered `width`: that width, one line of the font high and at least `minHeight`.
+    func boxSize(width: CGFloat?) -> CGSize {
+        let intrinsic = intrinsicContentSize
+        return CGSize(width: width ?? intrinsic.width + 2 * Self.inset, height: max(Self.minHeight, intrinsic.height))
+    }
+}
+
 /// A text field that asks iOS for an English keyboard when the user has one; otherwise the system chooses, as for any
 /// field. The user can still switch keyboards while typing.
-final class EmailAddressTextField: UITextField {
+final class EmailAddressTextField: BoxedTextField {
     override var textInputMode: UITextInputMode? {
         let modes = UITextInputMode.activeInputModes
         return EmailKeyboard.preferred(among: modes.map(\.primaryLanguage)).map { modes[$0] } ?? super.textInputMode
