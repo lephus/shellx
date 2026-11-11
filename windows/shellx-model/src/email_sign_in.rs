@@ -106,13 +106,14 @@ pub enum SignInScreen {
 }
 
 /// The dialog's screen. `step`: the shown email run's step. `has_sent_to`: a code was already sent in this
-/// run. `google_waiting`: a Google flow runs. `code_submitted`: this dialog submitted a code since it
-/// opened. `logging_in`: `AccountState::LoggingIn`.
+/// run. `google_waiting`: a Google flow runs. `logging_in`: `AccountState::LoggingIn`. With no step and no
+/// Google wait, `logging_in` means a sign-in the dialog has no step for (a Google success while this PC
+/// registers, a code a closed dialog still checks): the flow takes no new attempt then, so the screen is
+/// `SigningIn`, never a first screen that looks live (review chunk 1 M4).
 pub fn sign_in_screen(
     step: Option<EmailStep>,
     has_sent_to: bool,
     google_waiting: bool,
-    code_submitted: bool,
     logging_in: bool,
 ) -> SignInScreen {
     match step {
@@ -131,7 +132,7 @@ pub fn sign_in_screen(
             sending: false,
             google_waiting: true,
         },
-        None if code_submitted && logging_in => SignInScreen::SigningIn,
+        None if logging_in => SignInScreen::SigningIn,
         None => SignInScreen::Start {
             sending: false,
             google_waiting: false,

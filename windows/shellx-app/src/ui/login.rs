@@ -112,8 +112,6 @@ pub struct SignInDialog {
     buttons: Buttons,
     /// The digits this dialog last submitted, so one paste (or a click in the field) submits once.
     last_auto: Option<String>,
-    /// This dialog submitted a code since it opened ("Signing in…" while the PC registers).
-    code_submitted: bool,
     /// The account's `email_code_epoch()` the code field matches.
     code_epoch_seen: u64,
     /// The email field's text when the dialog last looked: tells an edit from a click or a cursor move.
@@ -212,7 +210,6 @@ impl SignInDialog {
             code_field,
             buttons,
             last_auto: None,
-            code_submitted: false,
             code_epoch_seen: 0,
             email_text_seen: String::new(),
             shown: SignInScreen::Start {
@@ -306,7 +303,6 @@ impl SignInDialog {
     fn reset(&mut self, cx: &mut Context<Self>) {
         self.started = false;
         self.last_auto = None;
-        self.code_submitted = false;
         self.email_text_seen.clear();
         self.code_epoch_seen = self.account.read(cx).email_code_epoch();
         for field in [&self.email_field, &self.code_field] {
@@ -323,7 +319,6 @@ impl SignInDialog {
             account.email_step(),
             account.email_sent_to().is_some(),
             account.google_in_flight().is_some(),
-            self.code_submitted,
             account.signing_in(),
         )
     }
@@ -364,7 +359,7 @@ impl SignInDialog {
                     && account.accepts_login()
                     && !email.composing()
                     && email_looks_valid(email.text());
-                c.google_button = google && !sending && !google_waiting;
+                c.google_button = google && !sending && !google_waiting && account.accepts_login();
             }
             SignInScreen::Code { busy } => {
                 let idle = !busy && !code.composing();
@@ -550,7 +545,6 @@ impl SignInDialog {
 
     fn submit_code(&mut self, digits: String, cx: &mut Context<Self>) {
         self.last_auto = Some(digits.clone());
-        self.code_submitted = true;
         self.account
             .update(cx, |account, cx| account.email_submit_code(digits, cx));
     }
