@@ -34,6 +34,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.shellx.app.R
 import com.shellx.app.screenshots.ShellXSnapshots
 import com.shellx.app.testing.ManualClock
@@ -50,7 +51,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 /**
  * Continue with Google: one sign-in at a time, the failures in words, and "Try without an account"; the intro around
@@ -59,7 +62,15 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class SignInViewTest {
-    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    /**
+     * A phone's window is in touch mode, and Robolectric's is not: outside it Android hands the focus a field gave up
+     * straight back to the window's first focusable, which on an email step is that field. Set before the window is made.
+     */
+    @get:Rule(order = 0) val touchMode = object : ExternalResource() {
+        override fun before() = InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
+    }
+
+    @get:Rule(order = 1) val rule = createAndroidComposeRule<ComponentActivity>()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     private val clock = ManualClock()
@@ -266,6 +277,7 @@ class SignInViewTest {
     }
 
     @Test
+    @Config(qualifiers = WITH_THE_STEPS)
     fun withAnimationsOffTheFirstTaglineAndTheStepsAreThereAtOnce() {
         ShellXSnapshots.withoutAnimations {
             rule.mainClock.autoAdvance = false
@@ -368,6 +380,7 @@ class SignInViewTest {
     }
 
     @Test
+    @Config(qualifiers = WITH_THE_STEPS)
     fun theThreeStepsAreNumberedAndReadAsOneEach() {
         show(signIn = {})
 
@@ -645,6 +658,7 @@ class SignInViewTest {
         rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
         rule.onNodeWithTag("signin.email.field").assertIsFocused()
 
+        assertTrue("the window is in touch mode, as on a phone", rule.activity.window.decorView.isInTouchMode)
         rule.onNodeWithTag("signin.logo").performClick()
         rule.waitUntil(5_000) { hides == 1 }
         rule.onNodeWithTag("signin.email.field").assertIsNotFocused()
@@ -661,6 +675,14 @@ class SignInViewTest {
     }
 
     @Test
+    fun aShortWindowLeavesTheStepsOut() {
+        // Robolectric's own window is 320 × 470 dp: under 660 dp of height the buttons need the steps' room.
+        show()
+        rule.onNodeWithTag("signin.guide.1").assertDoesNotExist()
+        for (tag in listOf("signin.google", "signin.or", "signin.email", "signin.demo")) rule.onNodeWithTag(tag).assertExists()
+    }
+
+    @Test
     fun tryWithoutAnAccountStartsTheDemo() {
         var demos = 0
         var offersDemo by mutableStateOf(true)
@@ -674,5 +696,10 @@ class SignInViewTest {
         offersDemo = false
         rule.waitForIdle()
         rule.onNodeWithTag("signin.demo").assertDoesNotExist()
+    }
+
+    private companion object {
+        /** The Pixel 3's window between its bars: tall enough (660 dp) for the three steps above the buttons. */
+        const val WITH_THE_STEPS = "w393dp-h713dp"
     }
 }
