@@ -234,6 +234,12 @@ impl AccountService {
         self.flow.email_error()
     }
 
+    /// The address for the code step's "We sent a 6-digit code to …" line, while that code can still
+    /// be verified.
+    pub fn email_code_sent_to(&self) -> Option<&str> {
+        self.flow.email_code_sent_to()
+    }
+
     pub fn email_can_verify(&self) -> bool {
         self.flow.email_can_verify()
     }

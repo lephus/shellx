@@ -810,13 +810,15 @@ impl SignInDialog {
                 }
             }
             SignInScreen::Code { .. } => {
-                let address = account.email_sent_to().unwrap_or_default();
-                items.push(
-                    div()
-                        .text_color(theme::text_hi())
-                        .child(sent_code_to(lang, address))
-                        .into_any_element(),
-                );
+                // Only while that code can still be verified (review chunk 1 M5).
+                if let Some(address) = account.email_code_sent_to() {
+                    items.push(
+                        div()
+                            .text_color(theme::text_hi())
+                            .child(sent_code_to(lang, address))
+                            .into_any_element(),
+                    );
+                }
                 items.push(self.code_field.clone().into_any_element());
                 items.extend(
                     account

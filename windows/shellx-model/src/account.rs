@@ -511,6 +511,15 @@ impl AccountFlow {
         self.shown_email_run().and_then(|r| r.sent_to.as_deref())
     }
 
+    /// Where the code that can still be verified went: the code step's "We sent a 6-digit code to …"
+    /// line. `None` once the relay lost the challenge (a failed Resend, an expired code), so that line
+    /// never sits above the failure that says so (review chunk 1 M5).
+    pub fn email_code_sent_to(&self) -> Option<&str> {
+        self.shown_email_run()
+            .filter(|r| r.challenge.is_some())
+            .and_then(|r| r.sent_to.as_deref())
+    }
+
     /// The run's last failure (worded by `strings::email_error`).
     pub fn email_error(&self) -> Option<&CoreErr> {
         self.shown_email_run().and_then(|r| r.error.as_ref())
