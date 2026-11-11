@@ -505,7 +505,10 @@ mod tests {
         let pc = host(m("pc", "Bếp-PC", "windows", true, 0, false));
         let mac = m("mac", "MacBook", "macos", true, 0, false);
         let both = [Str::MacCannotHostYet, Str::SignInOnYourMac];
-        assert_eq!(request_panel_notes(&[me.clone()], RelayCanHost), both);
+        assert_eq!(
+            request_panel_notes(std::slice::from_ref(&me), RelayCanHost),
+            both
+        );
         assert_eq!(request_panel_notes(&[], RelayCanHost), both);
         assert_eq!(
             request_panel_notes(&[me.clone(), pc.clone()], RelayCanHost),
