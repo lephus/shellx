@@ -20,9 +20,11 @@
 //! `POST /v2/phone-pairings/<id>/approve|deny`, `GET /v2/phone-grants`, `DELETE /v2/phone-grants/<id>`.
 //! Phone requests are created with `FakeApi::add_phone_pairing` (no phone-side routes here).
 //!
-//! Machines: registering again with the same (user, key) updates the same machine.
-//! `online` = heartbeat within 90 s. `GET /v2/machines` items carry the relay's six keys and no key
-//! (`set_list_machine_keys` adds `noise_public_key_b64`). Tickets follow the ledger "Ticket format"
+//! Machines: registering again with the same (user, key) updates the same machine (200; a new one is 201).
+//! Register refuses what the relay refuses, and the answers have the relay's shapes and statuses
+//! (`relay/contract/desktop-api.json`, checked by `tests/relay_contract.rs` of shellx-core); a heartbeat is
+//! 204 with no body. `online` = heartbeat within 90 s. `GET /v2/machines` items carry the relay's six keys and
+//! no key (`set_list_machine_keys` adds `noise_public_key_b64`). Tickets follow the ledger "Ticket format"
 //! (cmux-relay v2) and are signed with `FakeOptions::hmac_secret`; `connect` is
 //! allowed for the caller's own machine (D3) or a granted target, else 403
 //! `not_granted`.
@@ -59,6 +61,8 @@ use tiny_http::{Header, Request, Response, Server};
 /// Device kinds `/v1/auth/login` accepts (v1 kinds + `desktop`, K1).
 const DEVICE_KINDS: &[&str] = &["agent", "mobile", "desktop"];
 const DEVICE_PLATFORMS: &[&str] = &["macos", "windows", "ios", "android"];
+/// Platforms `POST /v2/machines` accepts (`relay/src/v2/machines.ts` `PLATFORMS`).
+const MACHINE_PLATFORMS: &[&str] = &["macos", "windows"];
 const MAX_BODY_BYTES: u64 = 64 * 1024;
 /// A mailed code lives ten minutes (`EMAIL_CODE_TTL_MS` of the relay).
 pub const EMAIL_CODE_TTL_SECS: u64 = 600;
@@ -835,19 +839,73 @@ fn key_fingerprint(key_b64: &str) -> String {
     Sha256::digest(raw)[..8].iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// JavaScript's `String.prototype.trim`: WhiteSpace and LineTerminator code points (the relay trims names so).
+fn js_trim(s: &str) -> &str {
+    s.trim_matches(|c: char| {
+        matches!(c, '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}')
+            || matches!(c, '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}')
+    })
+}
+
+/// `.`-separated runs of ASCII digits: the first of 1..=`head` digits, then a count in `more` of runs of
+/// 1..=`rest` digits. `relay/src/v2/machines.ts`: `os_version` /^\d{1,4}(\.\d{1,6}){0,3}$/ is
+/// `(4, 6, 0..=3)`, `app_version` /^\d{1,6}\.\d{1,6}\.\d{1,6}$/ is `(6, 6, 2..=2)`.
+fn digit_runs(s: &str, head: usize, rest: usize, more: std::ops::RangeInclusive<usize>) -> bool {
+    let run = |p: &str, max: usize| (1..=max).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_digit());
+    let mut parts = s.split('.');
+    let first = parts.next().unwrap_or_default();
+    let tail: Vec<&str> = parts.collect();
+    run(first, head) && more.contains(&tail.len()) && tail.iter().all(|p| run(p, rest))
+}
+
+/// The relay's `decodeB64` (`relay/src/v2/encoding.ts`): the standard or the URL alphabet (never both), at
+/// most two `=` at the end, decoded as Node's `Buffer.from` does (bits short of a byte are dropped).
+fn relay_b64_decode(s: &str) -> Option<Vec<u8>> {
+    let data = s.trim_end_matches('=');
+    if s.len() - data.len() > 2 || (data.contains(['+', '/']) && data.contains(['-', '_'])) {
+        return None;
+    }
+    let (mut acc, mut bits, mut out) = (0u32, 0u32, Vec::with_capacity(data.len() * 3 / 4));
+    for c in data.bytes() {
+        let v = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' | b'-' => 62,
+            b'/' | b'_' => 63,
+            _ => return None,
+        };
+        acc = (acc << 6) | u32::from(v);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    Some(out)
+}
+
+/// `POST /v2/machines` with the relay's rules (`relay/src/v2/machines.ts` `parseMachine`): a name of 1-100 UTF-16
+/// units after trimming, platform `macos` or `windows`, the version patterns, a 32-byte key in either base64
+/// alphabet. 201 for a new machine, 200 for the same machine again. The key is kept as base64url.
 fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
     let Some(who) = caller(rec, st) else { return unauthorized() };
     if !rec.body.is_object() || raw.is_empty() {
         return Reply::error(400, "bad_request", "Malformed request body");
     }
     let b = &rec.body;
-    let text = |k: &str, max: usize| b[k].as_str().map(str::trim).filter(|v| (1..=max).contains(&v.chars().count()));
-    let key = b["noise_public_key_b64"].as_str().filter(|k| URL_SAFE_NO_PAD.decode(k).is_ok_and(|r| r.len() == 32));
-    let platform = b["platform"].as_str().filter(|p| DEVICE_PLATFORMS.contains(p));
+    let name = b["name"].as_str().map(js_trim).filter(|n| (1..=100).contains(&n.encode_utf16().count()));
+    let platform = b["platform"].as_str().filter(|p| MACHINE_PLATFORMS.contains(p));
+    let os_ok = b["os_version"].as_str().is_some_and(|v| digit_runs(v, 4, 6, 0..=3));
+    let app_ok = b["app_version"].as_str().is_some_and(|v| digit_runs(v, 6, 6, 2..=2));
+    let key = b["noise_public_key_b64"]
+        .as_str()
+        .and_then(relay_b64_decode)
+        .filter(|k| k.len() == 32)
+        .map(|k| URL_SAFE_NO_PAD.encode(k));
     // The versions are checked, not kept: the list never shows them (as the relay's).
-    let (Some(name), Some(platform), Some(_), Some(_), Some(key)) =
-        (text("name", 100), platform, text("os_version", 100), text("app_version", 100), key)
-    else {
+    let (Some(name), Some(platform), true, true, Some(key)) = (name, platform, os_ok, app_ok, key) else {
         return Reply::error(400, "invalid_machine", "Machine information is not valid");
     };
     let existing = st
@@ -855,6 +913,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
         .iter()
         .find(|(_, m)| m.user_id == who.user_id && m.noise_public_key_b64 == key)
         .map(|(id, _)| id.clone());
+    let status = if existing.is_some() { 200 } else { 201 };
     let id = existing.unwrap_or_else(random_id);
     let slot = st.machines.get(&id).map(|m| m.slot.clone()).unwrap_or_else(|| random_b64url(16));
     let link_slot = st.machines.get(&id).map(|m| m.link_slot.clone()).unwrap_or_else(|| random_b64url(16));
@@ -872,7 +931,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
             last_heartbeat: last,
         },
     );
-    Reply::json(200, json!({"machine_id": id, "slot": slot, "link_slot": link_slot}))
+    Reply::json(status, json!({"machine_id": id, "slot": slot, "link_slot": link_slot}))
 }
 
 fn list_machines(rec: &Recorded, st: &State) -> Reply {
@@ -906,7 +965,7 @@ fn heartbeat(rec: &Recorded, id: &str, st: &mut State) -> Reply {
     match st.machines.get_mut(id) {
         Some(m) if m.user_id == who.user_id => {
             m.last_heartbeat = Some(now_unix());
-            Reply::json(200, json!({}))
+            Reply::empty(204)
         }
         _ => Reply::error(404, "machine_not_found", "Machine not found"),
     }
@@ -1925,6 +1984,39 @@ pub fn browse(url: &str) -> Result<(u16, String), String> {
         }
     }
     Ok((status, body))
+}
+
+/// Test client: one HTTP/1.1 request to a loopback URL (`Connection: close`) with an optional bearer and
+/// JSON body; returns the status and the body text. Refuses other hosts and chunked answers.
+pub fn fetch(method: &str, url: &str, bearer: Option<&str>, body: Option<&Value>) -> Result<(u16, String), String> {
+    use std::io::Write;
+    let rest = url.strip_prefix("http://127.0.0.1:").ok_or_else(|| "fetch: only http://127.0.0.1: URLs".to_string())?;
+    let (port, path) = rest.split_once('/').map(|(p, r)| (p, format!("/{r}"))).unwrap_or((rest, "/".to_string()));
+    let mut s = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).map_err(|e| e.to_string())?;
+    let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+    let payload = body.map(Value::to_string).unwrap_or_default();
+    let mut head = format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n");
+    if let Some(t) = bearer {
+        head.push_str(&format!("Authorization: Bearer {t}\r\n"));
+    }
+    if body.is_some() {
+        head.push_str(&format!("Content-Type: application/json\r\nContent-Length: {}\r\n", payload.len()));
+    }
+    head.push_str("\r\n");
+    s.write_all(head.as_bytes()).and_then(|()| s.write_all(payload.as_bytes())).map_err(|e| e.to_string())?;
+    let mut raw = Vec::new();
+    s.read_to_end(&mut raw).map_err(|e| e.to_string())?;
+    let resp = String::from_utf8(raw).map_err(|_| "fetch: the answer is not UTF-8".to_string())?;
+    let status: u16 = resp.get(9..12).and_then(|c| c.parse().ok()).ok_or_else(|| "fetch: bad status line".to_string())?;
+    let (head, text) = resp.split_once("\r\n\r\n").unwrap_or((&resp, ""));
+    let chunked = head.lines().any(|l| {
+        l.split_once(':')
+            .is_some_and(|(k, v)| k.trim().eq_ignore_ascii_case("transfer-encoding") && v.to_ascii_lowercase().contains("chunked"))
+    });
+    if chunked {
+        return Err("fetch: chunked answers are not read".to_string());
+    }
+    Ok((status, text.to_string()))
 }
 
 #[cfg(test)]

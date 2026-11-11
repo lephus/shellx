@@ -38,9 +38,9 @@ fn setup(fake: &FakeApi) -> (String, String, String) {
         &fake.base_url,
         "/v2/machines",
         Some(&token),
-        &json!({"name":"m","platform":"macos","os_version":"1","app_version":"1","noise_public_key_b64":key}),
+        &json!({"name":"m","platform":"macos","os_version":"15.5","app_version":"2.0.0","noise_public_key_b64":key}),
     );
-    assert_eq!(st, 200, "{m}");
+    assert_eq!(st, 201, "{m}");
     (token, m["machine_id"].as_str().unwrap().to_string(), m["slot"].as_str().unwrap().to_string())
 }
 
