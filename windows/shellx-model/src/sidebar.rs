@@ -143,7 +143,9 @@ pub enum RowAction {
     ShowCode(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// `Debug` (hand-written) shows the title's length only: other machines' names never reach a log
+/// (review M1).
+#[derive(Clone, PartialEq, Eq)]
 pub struct MachineGroup {
     pub machine_id: String,
     pub title: String,
@@ -236,6 +238,25 @@ pub fn build_groups_with(
         });
     }
     out
+}
+
+impl std::fmt::Debug for MachineGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MachineGroup")
+            .field("machine_id", &self.machine_id)
+            .field(
+                "title",
+                &format_args!("<{} chars>", self.title.chars().count()),
+            )
+            .field("note", &self.note)
+            .field("icon", &self.icon)
+            .field("online", &self.online)
+            .field("dimmed", &self.dimmed)
+            .field("subtitle", &self.subtitle)
+            .field("action", &self.action)
+            .field("sessions_visible", &self.sessions_visible)
+            .finish()
+    }
 }
 
 fn offline_text(m: &MachineInfo, utc_offset_secs: i32, lang: Lang) -> String {
