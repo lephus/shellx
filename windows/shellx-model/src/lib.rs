@@ -2,16 +2,21 @@
 
 pub mod account;
 pub mod core_api;
+pub mod diagnose;
+pub mod first_window;
 pub mod google_button;
 pub mod history;
 pub mod keys;
 pub mod layout;
 pub mod links;
 pub mod modal;
+pub mod mouse;
 pub mod palette;
 pub mod paste;
+pub mod redact;
 pub mod remote_state;
 pub mod selection;
+pub mod shell;
 pub mod sidebar;
 pub mod strings;
 pub mod tabs;

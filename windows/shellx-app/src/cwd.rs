@@ -339,4 +339,21 @@ mod tests {
             Some("dev")
         );
     }
+
+    #[test]
+    fn percent_encoded_osc7_round_trips() {
+        for path in [
+            r"C:\Users\Phú\Tài liệu",
+            r"C:\",
+            r"\\srv\share\Dự án",
+            r"C:\a%b",
+            r"D:\100% done",
+        ] {
+            assert_eq!(
+                cwd_from_osc7(&shellx_model::shell::osc7_url("PC", path)),
+                Some(path.to_string()),
+                "{path}"
+            );
+        }
+    }
 }

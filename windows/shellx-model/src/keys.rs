@@ -91,6 +91,9 @@ fn app_binding(key: &str, ctrl: bool, alt: bool, shift: bool, ctx: &KeyCtx) -> O
         (true, false, false, "pageup") => Some(PrevTab),
         (false, true, true, "=" | "+") => Some(SplitRight),
         (false, true, true, "-" | "_") => Some(SplitDown),
+        // GPUI-Windows reports Alt+Shift+= as "+" and Alt+Shift+- as "_" with shift consumed.
+        (false, true, false, "+") => Some(SplitRight),
+        (false, true, false, "_") => Some(SplitDown),
         (false, true, false, "left") => Some(FocusPane(Dir::Left)),
         (false, true, false, "right") => Some(FocusPane(Dir::Right)),
         (false, true, false, "up") => Some(FocusPane(Dir::Up)),
@@ -101,8 +104,21 @@ fn app_binding(key: &str, ctrl: bool, alt: bool, shift: bool, ctx: &KeyCtx) -> O
     }
 }
 
+/// Alt+F4 and Alt+Space (Alt held alone) belong to Windows: close the window, open the
+/// system menu. The terminal must neither send them nor swallow them.
+pub fn is_window_system_key(k: &KeyIn) -> bool {
+    k.alt
+        && !k.ctrl
+        && !k.shift
+        && !k.win
+        && matches!(k.key.to_lowercase().as_str(), "f4" | "space")
+}
+
 pub fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
     if ctx.composing || k.win {
+        return KeyAction::Ignore;
+    }
+    if is_window_system_key(k) {
         return KeyAction::Ignore;
     }
     let key = k.key.to_lowercase();
@@ -246,6 +262,53 @@ mod tests {
             ..k("a")
         };
         assert_eq!(map_key(&w, &NO_SEL), KeyAction::Ignore);
+    }
+
+    #[test]
+    fn split_shortcuts_as_gpui_windows_reports_them() {
+        // GPUI-Windows reports Alt+Shift+= as "+" and Alt+Shift+- as "_", with shift consumed.
+        assert_eq!(map_key(&alt("+"), &NO_SEL), app(AppCommand::SplitRight));
+        assert_eq!(map_key(&alt("_"), &NO_SEL), app(AppCommand::SplitDown));
+        // the Mac shapes still split
+        assert_eq!(
+            map_key(&alt_shift("="), &NO_SEL),
+            app(AppCommand::SplitRight)
+        );
+        assert_eq!(
+            map_key(&alt_shift("-"), &NO_SEL),
+            app(AppCommand::SplitDown)
+        );
+        // unshifted Alt+= and Alt+- stay chords for the shell
+        assert_eq!(map_key(&alt("="), &NO_SEL), chord("alt+="));
+        assert_eq!(map_key(&alt("-"), &NO_SEL), chord("alt+-"));
+    }
+
+    #[test]
+    fn alt_f4_and_alt_space_go_to_windows() {
+        for key in ["f4", "space"] {
+            assert_eq!(map_key(&alt(key), &NO_SEL), KeyAction::Ignore, "{key}");
+            assert!(is_window_system_key(&alt(key)), "{key}");
+        }
+        assert_eq!(map_key(&alt_shift("f4"), &NO_SEL), chord("alt+shift+f4"));
+        assert_eq!(map_key(&k("f4"), &NO_SEL), chord("f4"));
+        assert_eq!(map_key(&ctrl("f4"), &NO_SEL), chord("ctrl+f4"));
+        assert!(!is_window_system_key(&alt_shift("f4")));
+        assert!(!is_window_system_key(&k("f4")));
+        assert!(!is_window_system_key(&ctrl("f4")));
+        // exactly Alt: with Ctrl or Win held they are not Windows' shortcuts
+        let ctrl_alt = KeyIn {
+            ctrl: true,
+            alt: true,
+            ..k("f4")
+        };
+        let alt_win = KeyIn {
+            win: true,
+            alt: true,
+            ..k("space")
+        };
+        assert!(!is_window_system_key(&ctrl_alt));
+        assert!(!is_window_system_key(&alt_win));
+        assert!(!is_window_system_key(&alt("a")));
     }
 
     #[test]
