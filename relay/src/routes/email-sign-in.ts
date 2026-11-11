@@ -21,8 +21,11 @@ import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
  */
 export const emailSignInRoutes = new Hono<AppEnv>();
 
-/** What `errorKind` returns: an error code or a class name, never a message. */
-const ERROR_KIND_RE = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+/**
+ * What `errorKind` returns: an error code or a class name, never a message. At most 40 characters, so
+ * nothing the length of a token or a challenge id (43) passes.
+ */
+const ERROR_KIND_RE = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
 
 /**
  * POST /v1/auth/email/code {email, locale?} — mails a code and answers 202 with the challenge to verify
