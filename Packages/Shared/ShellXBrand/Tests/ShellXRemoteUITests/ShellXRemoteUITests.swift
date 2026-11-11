@@ -33,6 +33,12 @@ private func rm(
 
 @Suite struct ShellXRemoteUITests {
     let mac = LocalMachineInfo(name: "MacBook Pro", isLaptop: true)
+    /// Short labels, so each mapping test can tell which label a code reads as.
+    private let labels = SignInErrorLabels(
+        credentials: "Google sign-in didn't work. Try again.", network: "Can't reach relay.shellx.pro",
+        timeout: "t", stateMismatch: "s", switchFromSignedInDevice: "sw", emailInUse: "e", identityInUse: "i", browser: "b",
+        invalidEmail: "ie", disposableEmail: "de", invalidCode: "ic", codeExpired: "ce", emailSendFailed: "sf",
+        unavailable: "un", rateLimited: "rl", server: "sv")
 
     @Test func remoteMachinesSitBetweenLocalAndSSH() {
         let s = SidebarMachineGrouping.sections(
@@ -207,9 +213,6 @@ private func rm(
     }
 
     @Test func signInErrorMapping() {
-        let labels = SignInErrorLabels(
-            credentials: "Google sign-in didn't work. Try again.", network: "Can't reach relay.shellx.pro",
-            timeout: "t", stateMismatch: "s", switchFromSignedInDevice: "sw", emailInUse: "e", identityInUse: "i", browser: "b")
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "invalid_credentials", message: "x"), labels: labels)
             == "Google sign-in didn't work. Try again.")
         #expect(SignInErrorMessage.text(for: ShellXCoreError(code: "network", message: "x"), labels: labels)
@@ -225,5 +228,33 @@ private func rm(
         #expect(SignInErrorMessage.text(forCode: "browser_unavailable", labels: labels) == "b")
         #expect(SignInErrorMessage.isCancellation(ShellXCoreError(code: "google_cancelled", message: "")))
         #expect(!SignInErrorMessage.isCancellation(ShellXCoreError(code: "network", message: "")))
+    }
+
+    @Test func emailSignInErrorMapping() {
+        let sentences = [
+            ("invalid_email", "ie"), ("disposable_email", "de"), ("invalid_code", "ic"), ("code_expired", "ce"),
+            ("email_send_failed", "sf"), ("email_sign_in_disabled", "un"), ("rate_limited", "rl"),
+            ("switch_from_signed_in_device", "sw"), ("network", "Can't reach relay.shellx.pro")
+        ]
+        for (code, text) in sentences {
+            #expect(SignInErrorMessage.emailText(forCode: code, labels: labels) == text, "\(code)")
+        }
+        let withoutTheirOwn = ["http_502", "http_503", "http_504", "server", "invalid_device", "invalid_params", "bad_response",
+                               "google_in_progress", "weird_code"]
+        for code in withoutTheirOwn {
+            #expect(SignInErrorMessage.emailText(forCode: code, labels: labels) == "sv", "\(code)")
+        }
+        #expect(SignInErrorMessage.emailText(for: ShellXCoreError(code: "code_expired", message: "x"), labels: labels) == "ce")
+        #expect(SignInErrorMessage.emailText(for: URLError(.notConnectedToInternet), labels: labels) == "Can't reach relay.shellx.pro")
+        #expect(SignInErrorLabels.english.unavailable == "This way of signing in isn't available in this build.")
+        #expect(SignInErrorLabels.english.server == "ShellX is having a problem. Try again later.")
+    }
+
+    @Test func emailSignInTextsFillTheirPlaceholders() {
+        let texts = EmailSignInTexts.english
+        #expect(texts.sentTo("foo@bar.com")
+            == "We sent a 6-digit code to foo@bar.com. If it isn't there in a minute, check your spam folder.")
+        #expect(texts.resendIn(seconds: 42) == "Resend code in 42 s")
+        #expect(texts.field == "Email address")
     }
 }
