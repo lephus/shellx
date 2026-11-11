@@ -267,4 +267,111 @@ final class EmailSignInRenderTests: XCTestCase {
         _ = try await render("signin-email-first-accessibility-type", on: Self.se, type: .accessibility2)
         _ = try await render("signin-email-se-keyboard-large-type", on: Self.seKeyboard(260), type: .xxxLarge, keyboardUp: true)
     }
+
+    // MARK: - The code step
+
+    /// The address typed and a code sent: the code step, "challenge-1", 60 seconds of lock.
+    private func atCode(_ model: EmailSignInModel) async {
+        model.email = "phu@example.com"
+        await model.sendCode()
+    }
+
+    private func relay(error: RelayAPIError, for function: FakeRelayAccount.Function) async -> FakeRelayAccount {
+        let relay = FakeRelayAccount()
+        await relay.setError(error, for: function)
+        return relay
+    }
+
+    func testTheCodeStepTakesThePlaceOfTheFieldAndTheButtons() async throws {
+        let first = try await render("signin-email-first")
+        let code = try await render("signin-code-step", atCode)
+        let unlocked = FakeRelayAccount()
+        await unlocked.setEmailChallenge(.success(EmailChallenge(challengeID: "c", expiresIn: 600, resendIn: 0, email: "phu@example.com")))
+        let resend = try await render("signin-code-step-resend", relay: unlocked, atCode)
+        let wrong = try await render(
+            "signin-code-step-error", relay: await relay(error: .http(status: 401, code: "invalid_code"), for: .signInWithEmailCode)
+        ) { model in
+            await self.atCode(model)
+            model.setCode("123456")
+            _ = await WorkspaceRig.eventually { model.error == .invalidCode }
+        }
+        let expired = try await render(
+            "signin-code-step-expired", relay: await relay(error: .http(status: 410, code: "code_expired"), for: .signInWithEmailCode)
+        ) { model in
+            await self.atCode(model)
+            model.setCode("123456")
+            _ = await WorkspaceRig.eventually { model.error == .codeExpired }
+        }
+        XCTAssertEqual(code.model.step, .code)
+        XCTAssertEqual(code.model.resendIn, 60)
+        XCTAssertEqual(resend.model.resendIn, 0)
+        XCTAssertEqual(wrong.model.error, .invalidCode)
+        XCTAssertEqual(expired.model.error, .codeExpired)
+        XCTAssertFalse(expired.model.codeIsLive)
+        for (index, style) in Self.styles.enumerated() {
+            for drawn in [code, resend, wrong, expired] {
+                _ = try field(drawn.bitmaps[index], style)
+                XCTAssertNil(drawn.bitmaps[index].googleButtonTop(), "no Google or Apple button in the code step")
+                XCTAssertNotNil(try sendBand(drawn.bitmaps[index], on: false, style), "Verify, off without six digits")
+            }
+            XCTAssertNotEqual(first.images[index].pngData(), code.images[index].pngData())
+            for (other, what) in [(resend, "Resend without its countdown"), (wrong, "a wrong code"), (expired, "a dead code")] {
+                XCTAssertNotEqual(other.images[index].pngData(), code.images[index].pngData(), what)
+            }
+        }
+        let logo = code.bitmaps[0].darkSquareSide()
+        XCTAssertGreaterThan(logo, 42, "the intro is folded: a 48-point logo and the title")
+        XCTAssertLessThan(logo, 52)
+    }
+
+    func testWithTheKeyboardUpOnASmallPhoneTheCodeFieldAndVerifyStayAboveIt() async throws {
+        let keyboard = try await render("signin-code-se-keyboard", on: Self.seKeyboard(260), keyboardUp: true, atCode)
+        let tall = try await render("signin-code-se-tall-keyboard", on: Self.seKeyboard(300), keyboardUp: true, atCode)
+        for (index, style) in Self.styles.enumerated() {
+            let shortField = try field(keyboard.bitmaps[index], style)
+            XCTAssertLessThanOrEqual(shortField.rows.upperBound + 12 + 50, 667 - 260, "the field and Verify are above a 260-point keyboard")
+            let tallField = try field(tall.bitmaps[index], style)
+            for drawn in [keyboard, tall] {
+                XCTAssertNil(drawn.bitmaps[index].googleButtonTop(), "the code step, not the first screen")
+            }
+            XCTAssertGreaterThan(tallField.columns.count, 300, "375 x 347 of room is wider than high: still one column")
+            XCTAssertLessThanOrEqual(tallField.rows.upperBound, 667 - 300, "the field is above a 300-point keyboard")
+        }
+    }
+
+    func testOnItsSideTheCodeStepIsBesideTheLogo() async throws {
+        let drawn = try await render("signin-code-landscape", on: Self.landscape, atCode)
+        for (bitmap, style) in zip(drawn.bitmaps, Self.styles) {
+            XCTAssertGreaterThan(try field(bitmap, style).columns.lowerBound, 852 / 2)
+            XCTAssertNil(bitmap.googleButtonTop(), "the code step, not the first screen")
+        }
+        let logo = drawn.bitmaps[0].darkSquareSide()
+        XCTAssertGreaterThan(logo, 42, "the logo stays, at 48 points")
+        XCTAssertLessThan(logo, 52)
+    }
+
+    func testALongEmailWrapsAndKeepsTheFieldOnTheScreen() async throws {
+        let address = String(repeating: "very.long.name.", count: 8) + "x@a-long-mail-domain.example.com"
+        XCTAssertEqual(address.count, 152)
+        let drawn = try await render("signin-code-long-email", on: Self.se) { model in
+            model.email = address
+            await model.sendCode()
+        }
+        XCTAssertEqual(drawn.model.sentTo, address)
+        for (bitmap, style) in zip(drawn.bitmaps, Self.styles) {
+            let field = try field(bitmap, style)
+            XCTAssertLessThanOrEqual(field.columns.count, 375 - 32, "nothing was pushed wider than the screen")
+            XCTAssertNil(bitmap.googleButtonTop(), "the code step, not the first screen")
+            XCTAssertLessThanOrEqual(field.rows.upperBound, 667, "the sentence wrapped; the field is on the first screen")
+        }
+    }
+
+    func testLargeTypeKeepsTheCodeFieldOnTheFirstScreen() async throws {
+        let large = try await render("signin-code-large-type", type: .xxxLarge, atCode)
+        for (bitmap, style) in zip(large.bitmaps, Self.styles) {
+            _ = try field(bitmap, style)
+            XCTAssertNil(bitmap.googleButtonTop(), "the code step, not the first screen")
+        }
+        _ = try await render("signin-code-accessibility-type", on: Self.se, type: .accessibility2, atCode)
+    }
 }
