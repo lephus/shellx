@@ -281,3 +281,8 @@ không (nếu app có sẵn); hợp đồng và hand-off khi hạ cánh.
 4. Các mặc định nhỏ (6 số, 10 phút, 5 lần, 60 s resend, 3/phút và 10/giờ mỗi email, email vi/en, xoá tài
    khoản bằng mã chỉ trên điện thoại, desktop giữ link privacy, không `/email/link` cho tài khoản mật khẩu
    cũ, identity email cũ bị xoá khi `/google/link` đổi email tài khoản, sửa trang privacy) — nói nếu muốn khác.
+
+**Trả lời của người dùng (2026-11-11):** (1) cả bốn app; (2) có, mã email vào cùng tài khoản đã tạo bằng Google với
+đúng email đó; (3) người gửi mặc định `ShellX <sign-in@shellx.pro>` (domain `shellx.pro` đã xác minh trong Resend;
+một địa chỉ `gmail.com` không dùng làm người gửi được vì Resend chỉ gửi từ domain đã xác minh); (4) giữ các mặc định
+nhỏ. Kế hoạch: `docs/superpowers/plans/2026-11-11-shellx-email-code-signin-{relay,android,ios,core-mac,windows}.md`.
