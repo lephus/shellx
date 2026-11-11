@@ -80,6 +80,13 @@ class EmailSignInModel(
     private var resendAtMs = 0L
     private var ticker: Job? = null
 
+    /**
+     * The expired challenge this model was restored from, while its email step still says "expired": [saved] hands it
+     * back as it was, so a window made a second time on the way back (the host replaces its restored page) says so too.
+     * Gone once the address changes, a code is asked for or the step is left.
+     */
+    private var expiredRestore: Saved? = null
+
     init {
         if (restored != null) {
             val id = restored.challengeId
@@ -92,7 +99,10 @@ class EmailSignInModel(
                     _state.value = EmailSignInState(Step.CODE, email = restored.email, resendInSeconds = resendIn())
                     startTicker()
                 }
-                else -> _state.value = EmailSignInState(Step.EMAIL, email = restored.email, error = SignInException.CodeExpired())
+                else -> {
+                    expiredRestore = restored
+                    _state.value = EmailSignInState(Step.EMAIL, email = restored.email, error = SignInException.CodeExpired())
+                }
             }
         }
     }
@@ -109,6 +119,7 @@ class EmailSignInModel(
         val current = _state.value
         val email = text.take(MAX_EMAIL_LENGTH)
         if (current.step != Step.EMAIL || email == current.email) return
+        expiredRestore = null
         _state.value = current.copy(email = email, error = null)
     }
 
@@ -116,6 +127,7 @@ class EmailSignInModel(
     fun send(locale: String) {
         val current = _state.value
         if (!current.canSend) return
+        expiredRestore = null
         _state.value = current.copy(step = Step.SENDING, error = null)
         scope.launch {
             try {
@@ -193,18 +205,25 @@ class EmailSignInModel(
             Step.IDLE, Step.DONE -> return false
             Step.SENDING, Step.VERIFYING -> Unit
             Step.CODE -> changeEmail()
-            Step.EMAIL -> _state.value = current.copy(step = Step.IDLE, error = null)
+            Step.EMAIL -> {
+                expiredRestore = null
+                _state.value = current.copy(step = Step.IDLE, error = null)
+            }
         }
         return true
     }
 
-    /** What a killed process needs; null in IDLE and DONE. A dead code, like the email step, saves the address only. */
+    /**
+     * What a killed process needs; null in IDLE and DONE. A dead code, like the email step, saves the address only; an
+     * email step that came from an expired restore saves what it was restored from.
+     */
     fun saved(): Saved? {
         val current = _state.value
         val id = challengeId
         return when (current.step) {
             Step.IDLE, Step.DONE -> null
-            Step.EMAIL, Step.SENDING -> Saved(current.email, null, 0, 0)
+            Step.EMAIL -> expiredRestore ?: Saved(current.email, null, 0, 0)
+            Step.SENDING -> Saved(current.email, null, 0, 0)
             Step.CODE, Step.VERIFYING ->
                 if (id == null || current.codeDead) Saved(current.email, null, 0, 0) else Saved(current.email, id, expiresAtMs, resendAtMs)
         }
