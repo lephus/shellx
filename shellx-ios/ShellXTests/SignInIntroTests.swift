@@ -255,4 +255,189 @@ final class SignInIntroTests: XCTestCase {
         XCTAssertFalse(zero.showsSubtitle)
         XCTAssertFalse(zero.sideBySide)
     }
+
+    // MARK: - The glow
+
+    func testTheGlowFadesInAfterTheChevronsThenBreathesEveryFourSeconds() {
+        XCTAssertEqual(SignInIntro.glowOpacity(at: 0), 0)
+        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.chevronSettle), 0, "no glow while the chevrons slide")
+        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end), 0.25, accuracy: 1e-9)
+        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 1), 0.35, accuracy: 1e-9)
+        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 2), 0.45, accuracy: 1e-9)
+        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 4), 0.25, accuracy: 1e-9, "one breath is 4 s")
+        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 4 * 500 + 2), 0.45, accuracy: 1e-6, "and it goes on")
+
+        var previous = 0.0
+        for step in 0...180 {
+            let t = Double(step) / 200
+            let opacity = SignInIntro.glowOpacity(at: t)
+            XCTAssertGreaterThanOrEqual(opacity, previous - 1e-9, "it only fades in until the intro is over (\(t) s)")
+            XCTAssertLessThanOrEqual(opacity, 0.25 + 1e-9)
+            previous = opacity
+        }
+        for step in 0...160 {
+            let opacity = SignInIntro.glowOpacity(at: SignInIntro.end + Double(step) / 20)
+            XCTAssertGreaterThanOrEqual(opacity, 0.25 - 1e-9)
+            XCTAssertLessThanOrEqual(opacity, 0.45 + 1e-9)
+        }
+    }
+
+    // MARK: - When each part is drawn again
+
+    func testTheLogoIsDrawnEveryFrameUntilTheIntroIsOverThenAtEachTurnOfTheBlink() throws {
+        let ticks = SignInLogoTicks()
+        XCTAssertEqual(ticks.next(after: -3), 0, "nothing moves before the start")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 0)), 1.0 / 60, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 0.895)), SignInIntro.end, accuracy: 1e-9, "the last frame is the end itself")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: SignInIntro.end)), SignInIntro.end + 0.53, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: SignInIntro.end + 0.53)), SignInIntro.end + 1.06, accuracy: 1e-9)
+
+        var time = -1.0
+        var frames = 0
+        while let next = ticks.next(after: time), next <= SignInIntro.end + 1e-9 {
+            XCTAssertGreaterThan(next, time)
+            time = next
+            frames += 1
+        }
+        XCTAssertEqual(frames, 55, "the start, then 54 frames of a sixtieth of a second up to 0.9 s")
+        var on = SignInIntro.underscoreOpacity(at: time)
+        XCTAssertEqual(on, 1)
+        for _ in 0..<8 {
+            let next = try XCTUnwrap(ticks.next(after: time))
+            XCTAssertEqual(next - time, CursorBlink.half, accuracy: 1e-6)
+            XCTAssertNotEqual(SignInIntro.underscoreOpacity(at: next), on, "each tick after the intro turns the underscore")
+            on = SignInIntro.underscoreOpacity(at: next)
+            time = next
+        }
+    }
+
+    func testTheCursorStaysOnWhileLettersComeAndGoAndBlinksWhileTheLineRests() {
+        let held = 0.028 * 5
+        XCTAssertTrue(schedule.cursorIsOn(at: -0.4), "before the first letter the cursor waits, on")
+        XCTAssertTrue(schedule.cursorIsOn(at: 0.05), "typing")
+        XCTAssertTrue(schedule.cursorIsOn(at: held + 0.1))
+        XCTAssertFalse(schedule.cursorIsOn(at: held + 0.6), "530 ms into the hold it is off")
+        XCTAssertTrue(schedule.cursorIsOn(at: held + 1.1), "and on again 530 ms later")
+        XCTAssertFalse(schedule.cursorIsOn(at: held + 1.7))
+        XCTAssertTrue(schedule.cursorIsOn(at: held + 2.4 + 0.02), "erasing")
+        XCTAssertTrue(schedule.cursorIsOn(at: held + 2.4 + 0.06 + 0.1), "the pause is shorter than half a blink")
+        XCTAssertTrue(TypewriterSchedule(lines: []).cursorIsOn(at: 3))
+    }
+
+    func testTheTypedLineIsDrawnAtEachLetterAndAtEachTurnOfTheBlinkWhileItRests() throws {
+        let ticks = TypewriterTicks(schedule: schedule)
+        let held = 0.028 * 5
+        XCTAssertEqual(ticks.next(after: -0.4), 0, "the first letter")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 0)), 0.028, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 0.028 * 4)), held, accuracy: 1e-9, "the hold begins")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: held)), held + 0.53, accuracy: 1e-9, "the cursor goes off")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: held + 0.53)), held + 1.06, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: held + 2.12)), held + 2.4, accuracy: 1e-9, "erasing comes before the next turn")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: held + 2.4)), held + 2.4 + 0.012, accuracy: 1e-9)
+        XCTAssertNil(TypewriterTicks(schedule: TypewriterSchedule(lines: [])).next(after: 0), "nothing to type: never drawn again")
+
+        // Every tick is later than the one before, and one of the three it is for really changes.
+        var time = -0.1
+        var count = 0
+        while time < schedule.cycle {
+            let next = try XCTUnwrap(ticks.next(after: time))
+            XCTAssertGreaterThan(next, time)
+            let before = schedule.frame(at: time)
+            let after = schedule.frame(at: next)
+            XCTAssertTrue(
+                before.text != after.text || before.phase != after.phase || before.line != after.line
+                    || schedule.cursorIsOn(at: time) != schedule.cursorIsOn(at: next),
+                "nothing changes at \(next) (after \(time))")
+            time = next
+            count += 1
+        }
+        // The start, 20 changes of text or phase in a cycle, and 4 turns of the cursor in each of the two holds.
+        XCTAssertEqual(count, 1 + 20 + 2 * 4)
+    }
+
+    func testAGuideRowFadesInAndComesUpOverAQuarterOfASecondThenStays() throws {
+        XCTAssertEqual(SignInGuideView.progress(row: 0, at: 0), 0)
+        XCTAssertEqual(SignInGuideView.progress(row: 0, at: SignInIntro.chevronSettle), 0)
+        XCTAssertEqual(SignInGuideView.progress(row: 0, at: SignInIntro.chevronSettle + 0.125), 0.75, accuracy: 1e-9, "it eases out")
+        XCTAssertEqual(SignInGuideView.progress(row: 0, at: SignInIntro.chevronSettle + 0.25), 1, accuracy: 1e-9)
+        XCTAssertEqual(SignInGuideView.progress(row: 2, at: 0.75), 0, "the third row starts at 0.76 s")
+        XCTAssertEqual(SignInGuideView.progress(row: 2, at: 5), 1)
+
+        let ticks = SignInGuideTicks()
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 0)), SignInIntro.chevronSettle, accuracy: 1e-9, "nothing to draw until the logo settles")
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 0.6)), 0.6 + 1.0 / 60, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(ticks.next(after: 1.0)), 1.01, accuracy: 1e-9, "the last frame is the third row in place")
+        XCTAssertNil(ticks.next(after: 1.01), "then the guide is never drawn again")
+    }
+
+    func testATimelineIsDrawnWhenItAppearsThenAtEachTickAndEndsWithThem() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let timeline = SignInIntroTimeline(start: start, ticks: SignInGuideTicks())
+
+        var entries = timeline.entries(from: start.addingTimeInterval(-2), mode: .normal)
+        XCTAssertEqual(entries.next(), start.addingTimeInterval(-2), "the moment it is asked for")
+        XCTAssertEqual(try XCTUnwrap(entries.next()).timeIntervalSince(start), 0.6, accuracy: 1e-6)
+        var last = start
+        var count = 2
+        while let date = entries.next() {
+            XCTAssertGreaterThan(date, last)
+            last = date
+            count += 1
+            if count > 100 { return XCTFail("the guide's timeline should end") }
+        }
+        XCTAssertEqual(last.timeIntervalSince(start), 1.01, accuracy: 1e-6)
+        XCTAssertEqual(count, 2 + 25, "0.41 s of frames after the first")
+
+        var late = timeline.entries(from: start.addingTimeInterval(30), mode: .normal)
+        XCTAssertEqual(late.next(), start.addingTimeInterval(30), "a guide already in place is drawn once")
+        XCTAssertNil(late.next())
+
+        // The blink never ends, and a tick keeps its place after hours on the screen.
+        var blink = SignInIntroTimeline(start: start, ticks: SignInLogoTicks()).entries(from: start.addingTimeInterval(7200), mode: .normal)
+        _ = blink.next()
+        let first = try XCTUnwrap(blink.next())
+        let second = try XCTUnwrap(blink.next())
+        XCTAssertEqual(second.timeIntervalSince(first), CursorBlink.half, accuracy: 1e-6)
+    }
+
+    // MARK: - The mark
+
+    func testTheMarkIsTheDrawingOfTheAppIcon() {
+        XCTAssertEqual(SignInLogoMark.prompt, [CGPoint(x: 128, y: 122), CGPoint(x: 222, y: 234), CGPoint(x: 128, y: 346)])
+        XCTAssertEqual(SignInLogoMark.phone, [CGPoint(x: 384, y: 122), CGPoint(x: 290, y: 234), CGPoint(x: 384, y: 346)])
+        XCTAssertEqual(SignInLogoMark.stroke, 54)
+        XCTAssertEqual(SignInLogoMark.cursor, CGRect(x: 300, y: 398, width: 84, height: 26))
+        XCTAssertEqual(SignInLogoMark.cornerRadius, 114)
+        XCTAssertEqual(SignInLogoMark.side, 512)
+        // A chevron's tip with half its stroke: the furthest it reaches into the square from its own edge.
+        let reach = (SignInLogoMark.prompt[1].x + SignInLogoMark.stroke / 2) / SignInLogoMark.side
+        XCTAssertGreaterThan(SignInIntro.chevronStart, Double(reach), "it starts wholly outside")
+        XCTAssertEqual(SignInLogoMark.side - SignInLogoMark.phone[1].x + SignInLogoMark.stroke / 2, SignInLogoMark.prompt[1].x + SignInLogoMark.stroke / 2)
+    }
+
+    func testAGradientRunsAcrossItsShapeAsInTheDrawing() {
+        // The drawing gives the mint gradient in the chevron's own box, corner to corner. The box is 94 by 224, so
+        // the colours do not run along its diagonal: the tip is three quarters of the way, the lower end half way.
+        let box = SignInLogoMark.box(of: SignInLogoMark.prompt)
+        XCTAssertEqual(box, CGRect(x: 128, y: 122, width: 94, height: 224))
+        let axis = SignInLogoMark.gradientAxis(in: box, from: .topLeading, to: .bottomTrailing)
+        func part(_ point: CGPoint) -> Double {
+            let (dx, dy) = (axis.end.x - axis.start.x, axis.end.y - axis.start.y)
+            return Double(((point.x - axis.start.x) * dx + (point.y - axis.start.y) * dy) / (dx * dx + dy * dy))
+        }
+        XCTAssertEqual(part(CGPoint(x: 128, y: 122)), 0, accuracy: 1e-9)
+        XCTAssertEqual(part(CGPoint(x: 222, y: 346)), 1, accuracy: 1e-9)
+        XCTAssertEqual(part(CGPoint(x: 222, y: 234)), 0.75, accuracy: 1e-9)
+        XCTAssertEqual(part(CGPoint(x: 128, y: 346)), 0.5, accuracy: 1e-9)
+
+        let mirrored = SignInLogoMark.gradientAxis(
+            in: SignInLogoMark.box(of: SignInLogoMark.phone), from: .topTrailing, to: .bottomLeading)
+        XCTAssertEqual(mirrored.start, CGPoint(x: 384, y: 122))
+        XCTAssertEqual(mirrored.end.x, SignInLogoMark.side - axis.end.x, accuracy: 1e-9, "the lilac chevron mirrors the mint one")
+        XCTAssertEqual(mirrored.end.y, axis.end.y, accuracy: 1e-9)
+
+        let square = SignInLogoMark.gradientAxis(in: CGRect(x: 10, y: 20, width: 30, height: 30), from: .topLeading, to: .bottomTrailing)
+        XCTAssertEqual(square.end.x, 40, accuracy: 1e-9, "in a square box it is the diagonal")
+        XCTAssertEqual(square.end.y, 50, accuracy: 1e-9)
+    }
 }
