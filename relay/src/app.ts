@@ -25,8 +25,11 @@ import { phoneGrantRoutes, phonePairingRoutes } from "./v2/phones.js";
 import type { ApnsGateway } from "./push/apns.js";
 import type { FcmDataGateway, PushGateway } from "./push/fcm.js";
 import type { AppleTokenGateway } from "./auth/apple-rest.js";
+import { type EmailCodeKey, generateEmailCode, newEmailCodeKey } from "./auth/email-codes.js";
 import { type IdTokenVerifier, loadIdTokenVerifier } from "./auth/id-token.js";
+import type { EmailGateway } from "./email/resend.js";
 import { appleLinkRoutes } from "./routes/apple-link.js";
+import { emailSignInRoutes } from "./routes/email-sign-in.js";
 import { identityRoutes } from "./routes/identities.js";
 import { signInRoutes } from "./routes/sign-in.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
@@ -63,6 +66,19 @@ export interface AppDeps {
   pairingCode?: () => string;
   /** The relay slot of a new share; defaults to 16 random bytes. Injectable for tests. */
   shareSlot?: () => string;
+  /**
+   * The mail gateway of the email-code sign-in (`ResendClient` in production, a fake in every test); null or
+   * absent when RESEND_API_KEY and EMAIL_FROM are not set: `POST /v1/auth/email/code` answers 503
+   * `email_sign_in_disabled`.
+   */
+  email?: EmailGateway | null;
+  /** The 6-digit code of a new email challenge; defaults to `generateEmailCode` (CSPRNG). Injectable for tests. */
+  emailCode?: () => string;
+  /**
+   * The HMAC key of email challenges; defaults to 32 random bytes made here, once per app and so once per
+   * relay process. Never stored, configured or logged: a restart voids every live challenge. Injectable for tests.
+   */
+  emailCodeKey?: EmailCodeKey;
 }
 
 export interface AppVariables {
@@ -79,6 +95,9 @@ export interface AppVariables {
   shareSlot: () => string;
   idTokens: IdTokenVerifier;
   appleTokens: AppleTokenGateway | null;
+  email: EmailGateway | null;
+  emailCode: () => string;
+  emailCodeKey: EmailCodeKey;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
 }
@@ -93,6 +112,7 @@ export type AppEnv = { Bindings: AppBindings; Variables: AppVariables };
 export function createApp(deps: AppDeps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const idTokens = deps.idTokens ?? loadIdTokenVerifier(deps.config);
+  const emailCodeKey = deps.emailCodeKey ?? newEmailCodeKey();
   const admin = createAdminApp({
     config: deps.config,
     db: deps.db,
@@ -123,6 +143,9 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("fcm", deps.fcm ?? null);
     c.set("pairingCode", deps.pairingCode ?? randomPairingCode);
     c.set("shareSlot", deps.shareSlot ?? newSlot);
+    c.set("email", deps.email ?? null);
+    c.set("emailCode", deps.emailCode ?? generateEmailCode);
+    c.set("emailCodeKey", emailCodeKey);
     await next();
   });
 
@@ -142,6 +165,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/auth", authRoutes);
   app.route("/v1/auth", signInRoutes);
   app.route("/v1/auth/apple/link", appleLinkRoutes);
+  app.route("/v1/auth/email", emailSignInRoutes);
   app.route("/v1/account", accountRoutes);
   app.route("/v1/account/identities", identityRoutes);
   app.route("/v1/devices", deviceRoutes);

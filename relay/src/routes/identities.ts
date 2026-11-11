@@ -19,7 +19,7 @@ interface IdentityListRow {
   created_at: number;
 }
 
-/** GET / — the Google sign-in and each Apple ID, with the iPhone that linked it. */
+/** GET / — the Google sign-in, the email-code sign-in and each Apple ID (with the iPhone that linked it). */
 identityRoutes.get("/", requireAuth, (c) => {
   const rows = c.get("db").all<IdentityListRow>(
     `SELECT i.id, i.provider, i.email, i.is_private_email, d.name AS linked_via_device_name, i.created_at
@@ -39,7 +39,11 @@ identityRoutes.get("/", requireAuth, (c) => {
   });
 });
 
-/** DELETE /:id — removes one sign-in; its tokens go with it. The Google sign-in cannot be removed. */
+/**
+ * DELETE /:id — removes one sign-in; its tokens go with it. An account keeps at least one of its Google
+ * (or test) and email-code sign-ins: the last of them answers 409 `last_google_identity` (the code keeps
+ * its name for old apps). Apple IDs do not count toward that, and removing one is never refused.
+ */
 identityRoutes.delete("/:id", requireAuth, async (c) => {
   const auth = c.get("auth");
   const db = c.get("db");
@@ -52,8 +56,8 @@ identityRoutes.delete("/:id", requireAuth, async (c) => {
         );
   if (row === undefined) throw Errors.identityNotFound();
   if (row.provider !== "apple") {
-    const primaries = db.get<{ n: number }>("SELECT COUNT(*) AS n FROM identities WHERE user_id = ? AND provider != 'apple'", auth.userId)!.n;
-    if (primaries <= 1) throw Errors.lastGoogleIdentity();
+    const remaining = db.get<{ n: number }>("SELECT COUNT(*) AS n FROM identities WHERE user_id = ? AND provider IN ('google', 'test', 'email')", auth.userId)!.n;
+    if (remaining <= 1) throw Errors.lastGoogleIdentity();
   }
   db.run("DELETE FROM identities WHERE id = ?", row.id);
   if (row.provider === "apple") await revokeAppleTokens(c.get("appleTokens"), [row]);

@@ -2,14 +2,16 @@ package com.shellx.app.ui.signin
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.CacheDrawScope
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.center
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
@@ -21,8 +23,10 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -95,16 +99,33 @@ object SignInLogo {
     const val BLINK_ON_MS = 530L
     const val BLINK_OFF_MS = 530L
 
-    /** The glow around the square after the intro: its opacity breathes between the two, once every [GLOW_PERIOD_MS]. */
-    const val GLOW_MIN = 0.25f
-    const val GLOW_MAX = 0.45f
+    /**
+     * The glow around the square after the intro: a ring of these colours round the square's middle, clockwise in
+     * this order and evenly spaced. The last is the first again, so the ring has no seam.
+     */
+    val GLOW_COLORS: List<Long> = listOf(0xFF4AF2A1, 0xFF60A5FA, 0xFFA78BFA, 0xFFF472B6, 0xFFFBBF24, 0xFF4AF2A1)
+
+    /** The ring of colours turns clockwise, once round every [GLOW_TURN_MS]. */
+    const val GLOW_TURN_MS = 6_000L
+
+    /**
+     * The glow's opacity breathes from the first to the second and back, once every [GLOW_PERIOD_MS]: on a dark page,
+     * and on a light one, where the same colours need less to show.
+     */
+    val GLOW_DARK: ClosedFloatingPointRange<Float> = 0.35f..0.60f
+    val GLOW_LIGHT: ClosedFloatingPointRange<Float> = 0.25f..0.45f
     const val GLOW_PERIOD_MS = 4_000L
 
     /** The glow comes up from nothing over this long, then breathes. */
     const val GLOW_FADE_IN_MS = 400L
 
-    /** The glow reaches a quarter of the square's side past its edge. */
+    /**
+     * The glow reaches a quarter of the square's side past the middle of each edge: a disc of [GLOW_RADIUS] round the
+     * square's middle, at full strength as far as the edge ([GLOW_FULL]) and fading to nothing at its rim.
+     */
     const val GLOW_REACH = VIEWPORT / 4
+    const val GLOW_FULL = VIEWPORT / 2
+    const val GLOW_RADIUS = GLOW_FULL + GLOW_REACH
 
     /**
      * How hard the slide springs back: the overshoot is 4/27 · b³ / (b + 1)², 2.7 % here, which brings the chevrons'
@@ -112,11 +133,24 @@ object SignInLogo {
      */
     private const val BACK = 0.85f
 
-    /** The logo at one moment: [slide] 0 (chevrons at the edges) to 1 (in place), [underscore] and [glow] opacities. */
-    data class Pose(val slide: Float, val underscore: Float, val glow: Float)
+    /**
+     * The logo at one moment: [slide] 0 (chevrons at the edges) to 1 (in place), the [underscore]'s opacity, and the
+     * glow: how much of it is there ([glow], 0 none to 1 all of it), where its breath stands ([breath], 0 its faintest
+     * to 1 its strongest) and how far its colours have turned ([turn], degrees clockwise).
+     */
+    data class Pose(val slide: Float, val underscore: Float, val glow: Float, val breath: Float, val turn: Float) {
+        /** The glow's opacity on a [dark] page or a light one. */
+        fun glowOpacity(dark: Boolean): Float {
+            val range = glowRange(dark)
+            return glow * (range.start + (range.endInclusive - range.start) * breath)
+        }
+    }
 
-    /** The logo as the launcher shows it: what a screen without motion draws. */
-    val REST = Pose(slide = 1f, underscore = 1f, glow = 0f)
+    /** The logo as the launcher shows it: what a screen without motion draws. No glow. */
+    val REST = Pose(slide = 1f, underscore = 1f, glow = 0f, breath = 0f, turn = 0f)
+
+    /** Between which opacities the glow breathes on a [dark] page or a light one. */
+    fun glowRange(dark: Boolean): ClosedFloatingPointRange<Float> = if (dark) GLOW_DARK else GLOW_LIGHT
 
     /** The slide's easing over 0…1: out fast, a little past 1 (at most [MAX_OVERSHOOT]), back to 1. */
     fun settle(t: Float): Float {
@@ -142,27 +176,34 @@ object SignInLogo {
         else -> 0f
     }
 
-    /** The opacity of the glow around the square at [ms]: none during the intro, then [GLOW_MIN] to [GLOW_MAX] and back. */
-    fun glow(ms: Long): Float {
+    /** How much of the glow around the square is there at [ms]: none during the intro, all [GLOW_FADE_IN_MS] later. */
+    fun glow(ms: Long): Float = ((ms - INTRO_MS).toFloat() / GLOW_FADE_IN_MS).coerceIn(0f, 1f)
+
+    /** Where the glow's breath stands at [ms]: 0 (its faintest) as the intro ends, 1 half a loop later, and back. */
+    fun breath(ms: Long): Float {
         if (ms <= INTRO_MS) return 0f
-        val since = ms - INTRO_MS
-        val turn = (since % GLOW_PERIOD_MS).toDouble() / GLOW_PERIOD_MS
-        val breath = (GLOW_MIN + GLOW_MAX) / 2 - (GLOW_MAX - GLOW_MIN) / 2 * cos(2 * PI * turn).toFloat()
-        return breath * (since.toFloat() / GLOW_FADE_IN_MS).coerceAtMost(1f)
+        val loop = ((ms - INTRO_MS) % GLOW_PERIOD_MS).toDouble() / GLOW_PERIOD_MS
+        return ((1 - cos(2 * PI * loop)) / 2).toFloat()
     }
 
+    /** How far the glow's colours have turned at [ms], in degrees clockwise: 0 as the intro ends, under 360 always. */
+    fun turn(ms: Long): Float = if (ms <= INTRO_MS) 0f else (ms - INTRO_MS) % GLOW_TURN_MS * 360f / GLOW_TURN_MS
+
     /** The logo at [ms] since the screen appeared. */
-    fun pose(ms: Long): Pose = Pose(slide(ms), underscore(ms), glow(ms))
+    fun pose(ms: Long): Pose = Pose(slide(ms), underscore(ms), glow(ms), breath(ms), turn(ms))
 }
 
 /**
  * The ShellX logo, [size] on a side, as [pose] says at each frame: the chevrons slide in from the square's edges, the
- * underscore blinks, a glow breathes around the square. [SignInLogo.REST] is the launcher's mark. A new pose redraws
- * the logo and recomposes nothing. TalkBack reads it as an image, "ShellX logo".
+ * underscore blinks, a glow of several colours turns and breathes around the square (stronger on a dark page).
+ * [SignInLogo.REST] is the launcher's mark. A new pose redraws the logo and recomposes nothing. TalkBack reads it as
+ * an image, "ShellX logo"; the glow is decoration and says nothing.
  */
 @Composable
 fun SignInLogo(size: Dp, pose: () -> SignInLogo.Pose, modifier: Modifier = Modifier) {
     val label = stringResource(R.string.signin_logo)
+    // The glow is seen against the page: the theme's background says which opacity it takes.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Spacer(
         modifier
             .size(size)
@@ -174,17 +215,19 @@ fun SignInLogo(size: Dp, pose: () -> SignInLogo.Pose, modifier: Modifier = Modif
             .drawWithCache {
                 val mark = LogoMark()
                 val unit = this.size.minDimension / SignInLogo.VIEWPORT
-                // The square and the glow's shape never change: each is drawn once into an image. The square is then
-                // drawn the way a vector drawable is, so its edge is the drawable's to the pixel, and a frame costs
-                // two images (the glow at its opacity, the square), the chevrons and the underscore.
+                // The square and the glow never change: each is drawn once into an image. The square is then drawn
+                // the way a vector drawable is, so its edge is the drawable's to the pixel, and a frame costs two
+                // images (the glow, turned as far as it has come and at its opacity, and the square), the chevrons
+                // and the underscore. The glow is a disc round the logo's middle: turning the image turns the colours.
                 val reach = SignInLogo.GLOW_REACH * unit
                 val square = image(this.size.minDimension) { scale(unit, pivot = Offset.Zero) { mark.square(this) } }
-                val halo = image(this.size.minDimension + 2 * reach) {
-                    translate(reach, reach) { scale(unit, pivot = Offset.Zero) { mark.halo(this) } }
-                }
+                val halo = image(this.size.minDimension + 2 * reach) { scale(unit, pivot = Offset.Zero) { mark.halo(this) } }
                 onDrawBehind {
                     val now = pose()
-                    if (now.glow > 0f && halo != null) drawImage(halo, topLeft = Offset(-reach, -reach), alpha = now.glow)
+                    val glow = now.glowOpacity(dark)
+                    if (glow > 0f && halo != null) {
+                        rotate(now.turn) { drawImage(halo, topLeft = Offset(-reach, -reach), alpha = glow) }
+                    }
                     if (square != null) drawImage(square)
                     scale(unit, pivot = Offset.Zero) { mark.glyphs(this, now) }
                 }
@@ -214,6 +257,31 @@ private class LogoMark {
         listOf(glowColor.copy(alpha = SignInLogo.INNER_GLOW_ALPHA), glowColor.copy(alpha = 0f)),
         center = SignInLogo.INNER_GLOW_CENTER,
         radius = SignInLogo.INNER_GLOW_RADIUS,
+    )
+    private val haloBox = Size(2 * SignInLogo.GLOW_RADIUS, 2 * SignInLogo.GLOW_RADIUS)
+
+    /**
+     * The halo's box and some way past it on every side. The image the halo is drawn into is whole pixels, and the box
+     * of a logo an odd number of pixels wide ends half way through one: the fade is drawn over this, so it covers
+     * that pixel whole. Ending at the box, it would cover half of it and leave a line of the ring's colour there.
+     */
+    private val haloCover = Rect(Offset.Zero, haloBox).inflate(HALO_SPILL)
+    private val haloRing = Brush.sweepGradient(SignInLogo.GLOW_COLORS.map { Color(it) }, center = haloBox.center)
+
+    /**
+     * How much of the ring shows at each distance from the middle: all of it under the square, then less and less,
+     * gently at both ends (a smooth step), to none at the rim.
+     */
+    private val haloFade = Brush.radialGradient(
+        colorStops = (
+            listOf(0f to Color.Black) + (0..HALO_STEPS).map { step ->
+                val out = step.toFloat() / HALO_STEPS
+                val at = (SignInLogo.GLOW_FULL + SignInLogo.GLOW_REACH * out) / SignInLogo.GLOW_RADIUS
+                at to Color.Black.copy(alpha = 1f - out * out * (3f - 2f * out))
+            }
+            ).toTypedArray(),
+        center = haloBox.center,
+        radius = SignInLogo.GLOW_RADIUS,
     )
     private val border = Color(SignInLogo.BORDER)
     private val borderLine = rounded(
@@ -277,29 +345,20 @@ private class LogoMark {
     }
 
     /**
-     * The glow around the square at full strength: solid at the square's edge and fading to nothing
-     * [SignInLogo.GLOW_REACH] out. Rounded squares one over another, each a little larger, so the glow keeps the
-     * square's shape (a blur would need API 31).
+     * The glow around the square at full strength, in a box of twice [SignInLogo.GLOW_RADIUS]: the ring of colours
+     * round the box's middle, of which the fade keeps what its opacity says (a blur would need API 31). Drawn into an
+     * image of its own: the fade takes away from what is under it, everywhere in the image and not only in the box.
      */
     fun halo(scope: DrawScope) = with(scope) {
-        var under = 0f
-        for (step in HALO_STEPS downTo 1) {
-            val part = (HALO_STEPS - step + 1f) / HALO_STEPS
-            val wanted = part * part
-            val out = SignInLogo.GLOW_REACH * step / HALO_STEPS
-            drawRoundRect(
-                glowColor,
-                topLeft = Offset(-out, -out),
-                size = Size(side.width + 2 * out, side.height + 2 * out),
-                cornerRadius = CornerRadius(SignInLogo.CORNER + out),
-                // Over what the larger squares already laid down, this one brings the ring up to `wanted`.
-                alpha = 1f - (1f - wanted) / (1f - under),
-            )
-            under = wanted
-        }
+        drawRect(haloRing, size = haloBox)
+        drawRect(haloFade, topLeft = haloCover.topLeft, size = haloCover.size, blendMode = BlendMode.DstIn)
     }
 
     private companion object {
-        const val HALO_STEPS = 24
+        /** The fade's curve is this many straight pieces. */
+        const val HALO_STEPS = 16
+
+        /** How far past the halo's box the fade is drawn, in the mark's units: more than a pixel at any size. */
+        const val HALO_SPILL = 64f
     }
 }

@@ -957,3 +957,56 @@ Rule for any later Android text surface that must keep Vietnamese composing: §2
 p95 < 16 ms), two-chip swiping, floods (`yes | head -100000`, base64 of 5 MB), vim / htop, ＋ without moving the Mac's selection,
 and home / back — all need a relay that answers sign-in (the production relay answers 404 to `/v1/auth/nonce` until 1D deploys 1A)
 plus plan 2B's Mac build. Record "Part B pending: needs a relay with 1A (and 1D's Android client) and the 2B Mac build" in the ledger.
+
+## 29. Additions from the email-code sign-in plan, relay part
+
+Spec S4 `docs/superpowers/specs/2026-11-10-shellx-email-code-sign-in-design.md`; plan
+`2026-11-11-shellx-email-code-signin-relay.md`. Owner: the relay; consumers: the Android, iPhone, shellx-core / Mac and
+Windows plans of S4. Amends §2: provider values gain `email`; `tokens.auth_method` gains `email`; `DELETE /v1/account`
+takes a third body.
+
+New `Errors` entries (name → status, code); `invalid_email` and `disposable_email` (both 400) existed:
+
+| Name | Status | Code |
+| --- | --- | --- |
+| `invalidCode` | 401 | `invalid_code` |
+| `codeExpired` | 410 | `code_expired` |
+| `emailSignInDisabled` | 503 | `email_sign_in_disabled` |
+| `emailSendFailed` | 502 | `email_send_failed` |
+
+Routes:
+
+| Route | Auth | Body | Success | Errors |
+| --- | --- | --- | --- | --- |
+| `POST /v1/auth/email/code` | none | `{email, locale?}` (`locale` `"en"` or `"vi"`; anything else is English) | 202 `{challenge_id, expires_in, resend_in, email}` (43-char base64url, 600, 60, the address trimmed and lower-cased) | 400 `invalid_email`, 400 `disposable_email`, 429 `rate_limited`, 503 `email_sign_in_disabled`, 502 `email_send_failed` |
+| `POST /v1/auth/email/verify` | none | `{challenge_id, code, device}` (`code`: a string of 6 digits; `device` as for `/v1/auth/google`, kind `desktop` or `mobile`) | 200 `{user_id, device_id, token, email}` | 401 `invalid_code`, 410 `code_expired`, 409 `switch_from_signed_in_device`, 400 `invalid_device`, 429 `rate_limited` |
+| `DELETE /v1/account` | bearer | `{challenge_id, code}` | 204 | 401 `invalid_code`, 410 `code_expired`, 401 `reauth_required`, 429 `rate_limited` |
+
+Rules the clients rely on:
+- A relay without this feature answers 404 `not_found` to both routes; a relay without Resend answers 503
+  `email_sign_in_disabled` to `/code`. Clients show the button always and treat both as "not available" (S4 §7).
+- `/code` answers the same 202 for every valid address, with or without an account. One live code per address: a new
+  request makes the earlier `challenge_id` answer 410, so the client always keeps the newest answer's `challenge_id`.
+- `resend_in` is the client's lock on its Resend button. The relay's own limits are 10 requests per IP per minute and,
+  per address, 3 per minute and 10 per hour; past them it answers 429 `rate_limited`.
+- The code is a string of 6 digits and keeps its leading zeros (`"004217"`). It lives 600 s and takes 5 guesses: wrong
+  guesses 1 to 4 answer 401 `invalid_code` and the challenge stays; the 5th wrong guess answers 410 `code_expired`. On
+  410 the client goes back to asking for a new code. `/verify` shares the 10 per IP per minute login limit.
+- A relay restart (every deploy) voids every live code: its challenge answers 410 `code_expired` like an expired one
+  (the relay keeps the codes' HMAC key in memory only, so a copy of its database cannot be used to find a code).
+- `/verify` creates the account on first use, or signs in to the account that has this address: one made by email code,
+  or one made with Google for the same address, which then lists both sign-ins. The session's `auth_method` is `email`.
+- `/verify` 409 `switch_from_signed_in_device`: the address belongs to an account a code cannot open (its password still
+  works, or its address was never verified and it has an Apple ID attached). The code is spent.
+- `GET /v1/account/identities` lists `provider: "email"` (`email` is the address, `is_private_email` false).
+  `DELETE /v1/account/identities/:identity_id` answers 409 `last_google_identity` for the account's last sign-in among
+  Google and email (the code keeps its name for old apps; it now means "keep at least one way to sign in"). Removing
+  the email sign-in signs out the devices that used it.
+- `POST /v1/auth/google/link` works on an account made by email code. When Google's address differs from the account's,
+  the account's email becomes Google's and the email sign-in is removed: devices signed in by code are signed out, and
+  the calling device gets its new `google` token in the answer.
+- Delete by code: the client asks `/code` for the account's own address and sends `{challenge_id, code}` with its
+  bearer. A code that went to another address answers 401 `reauth_required`; wrong guesses count as on `/verify`.
+- Env (through `deploy/docker-compose.yml`): `RESEND_API_KEY`, `EMAIL_FROM` (`ShellX <sign-in@shellx.pro>`); both or
+  neither. Start-up events: `email_sign_in_enabled`, `email_sign_in_disabled`.
+- Mail subjects: `Your ShellX sign-in code is 123456`, `Mã đăng nhập ShellX của bạn là 123456`; the mail has no link.

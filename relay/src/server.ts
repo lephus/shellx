@@ -6,6 +6,7 @@ import { createRateLimiters } from "./auth/rate-limit.js";
 import { ConfigError, loadConfig, type Config } from "./config.js";
 import { Db } from "./db/db.js";
 import { migrate } from "./db/migrate.js";
+import { ResendClient } from "./email/resend.js";
 import { HubRegistry } from "./hub/registry.js";
 import { errorKind, logMeta } from "./log.js";
 import { loadApns } from "./push/apns.js";
@@ -45,6 +46,11 @@ const siwa = loadAppleSiwa(process.env);
 if (siwa.gateway === null) logMeta("apple_siwa_disabled", { reason: siwa.reason });
 else logMeta("apple_siwa_enabled");
 
+// Sign-in with an email code is optional too: without RESEND_API_KEY and EMAIL_FROM (loadConfig refuses
+// half of the pair) POST /v1/auth/email/code answers 503. Neither line says anything about the key.
+const email = config.emailSignIn === null ? null : new ResendClient({ apiKey: config.emailSignIn.resendApiKey, from: config.emailSignIn.from });
+logMeta(email === null ? "email_sign_in_disabled" : "email_sign_in_enabled");
+
 let db: Db;
 try {
   db = Db.open(config.dbPath);
@@ -77,7 +83,7 @@ else logMeta("relay_v2_disabled", { reason: config.relayV2DisabledReason });
 
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
-  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, fcm: push.gateway, apns: apns.gateway, idTokens, appleTokens: siwa.gateway },
+  { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway, fcm: push.gateway, apns: apns.gateway, idTokens, appleTokens: siwa.gateway, email },
   { host: config.host, port: config.port },
 ).catch((err: unknown) => fail(`cannot listen on ${config.host}:${config.port} (${errorKind(err)})`));
 logMeta("relay_started", { port: relay.port });

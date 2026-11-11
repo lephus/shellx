@@ -39,8 +39,8 @@ Copied from S4 (translated; identifiers and values unchanged). Every task's requ
   ```
 
 - **Errors:** the shape stays `{"error":{"code","message"}}`; bodies are limited to 16 KiB (`jsonBodyLimit`) like the other sign-in routes.
-- **Challenge id:** 32 random bytes, base64url (43 characters, `generateToken()`); the database keeps only `sha256(challenge_id)`.
-- **Code:** 6 digits from `crypto.randomInt(0, 1_000_000)`, zero-padded; the database keeps only `sha256(challenge_id + ":" + code)`; hashes are compared with `timingSafeEqual`.
+- **Challenge id:** 32 random bytes, base64url (43 characters, `generateToken()`); the database keeps only `HMAC-SHA-256(key, challenge_id)` (fix round 1, review I1: the key is 32 random bytes made at each relay start, never stored or logged).
+- **Code:** 6 digits from `crypto.randomInt(0, 1_000_000)`, zero-padded; the database keeps only `HMAC-SHA-256(key, challenge_id + ":" + code)` under the same key; hashes are compared with `timingSafeEqual`.
 - **Lifetime:** 10 minutes (600 s); at most 5 guesses per code; only the newest code of an address is valid (asking for a new one deletes that address's older challenge); at most 50 000 live challenges (→ 429), like nonces.
 - **Limiters** (the existing `SlidingWindowLimiter`, added to `RateLimiters` and to the tests' `unlimited`): `emailCodeIp` 10 per minute per IP; `emailCodeEmail` 3 per minute **and** 10 per hour per email (two limiters, windows 60 s and 3 600 s); `/verify` uses the existing `loginIp` 10 per minute; `DELETE /v1/account` keeps `loginEmail` 5 per email (`relay/src/routes/account.ts`).
 - **Addresses:** checked by `checkEmail` (`relay/src/auth/email.ts`): bad syntax → `invalid_email`; a disposable domain → `disposable_email`, also when the account already exists. Matching is `normalizeEmail` only (trim + lowercase); Gmail dots and `+tag` are never folded (plan 1A).
@@ -78,7 +78,7 @@ Security is the point of this part. Each line names the condition, what must hap
 2. **Timing of the comparison.** The stored hash is compared with `timingSafeEqual` on two 32-byte digests, once per guess, for right and wrong codes alike; it is never compared in SQL or with `===`. Task 4 (`email-codes-compare.test.ts`).
 3. **More than five guesses, also in parallel.** A guess is counted before it is compared; the fifth wrong one deletes the challenge; nine parallel wrong guesses get exactly four 401. Tasks 4 and 6 (`counts every guess…`, `…compares at most five concurrent guesses`).
 4. **A used or expired challenge.** It never signs in again: after a success, at or after 600 s, after a newer code for that address, after a failed send, after a 409. Tasks 4, 5, 6.
-5. **Secrets at rest and in logs.** The row holds only the two SHA-256 values; no log line has the address, the code, the challenge id or the IP. Tasks 4, 5 and 8 (`stores only SHA-256…`, `logs events without…`, `signin-logs.test.ts`).
+5. **Secrets at rest and in logs.** The row holds only the two HMAC-SHA-256 values (keyed per relay process); no log line has the address, the code, the challenge id or the IP. Tasks 4, 5 and 8 (`stores only SHA-256…`, `logs events without…`, `signin-logs.test.ts`).
 6. **Another spelling of the same address.** The limiter keys, the stored `email`, the identity `subject` and the account match all use the one `checkEmail` result: `Ann.Lee@Example.com`, ` ann.lee@example.com ` and `ANN.LEE@EXAMPLE.COM` share one budget and one account. Tasks 5 and 6.
 7. **An account found by email that the code must not open.** A code attaches only to an account whose address Google verified (it has a Google sign-in), or to one with no sign-in left at all, and then only after its password and every earlier session are removed. A working password, or an Apple ID attached under a never-verified address, answers 409 and changes nothing. It never matches a dot or `+tag` variant, nor an address that only an identity row carries. Task 6 (the five tests from `links into the account created with Google…` to `refuses (409) an account whose address was never verified…`).
 8. **The same challenge verified twice at once.** Six parallel verifies with the right code: one 200, five 410; one user, one device, one token. Tasks 4 and 6.
@@ -96,7 +96,7 @@ Where S4 and the code disagree the plan follows the code; where S4 is silent the
 5. `/verify` checks the device first: 400 `invalid_device` spends no guess. A `code` that is not the right six-digit string (a number, 4 digits, a space) is a wrong guess: 401, counted. A missing, malformed or unknown `challenge_id` is 410.
 6. A challenge is dead at `now >= expires_at`, like a nonce. Expired rows are deleted on every `/code`, `/verify` and delete-by-code call (S4: only on `/code`), so an unused address does not sit in the table until the next request for a code.
 7. An unknown or missing `locale` means English; it is never a 400.
-8. On `/code` the 503 comes first, before the IP limiter and before the body is read. `/verify` and delete-by-code have no 503: with the feature off no challenge can be made, so they answer 410 (a challenge made in the 10 minutes before a restart that switched the feature off still works).
+8. On `/code` the 503 comes first, before the IP limiter and before the body is read. `/verify` and delete-by-code have no 503: with the feature off no challenge can be made, so they answer 410 (since fix round 1 no challenge outlives a restart: the key is new at each start, so every live code answers 410).
 9. Configuration lives in `Config.emailSignIn: {resendApiKey, from} | null`, checked in `loadConfig` (where `TEST_IDP_*` is checked). Added: `EMAIL_FROM` must be `address` or `Name <address>`, else `ConfigError` at start instead of a 502 on every request. No error message contains the key.
 10. `ResendClient` also sends `User-Agent: shellx-relay` (Resend's API reference: requests without a User-Agent get 403; read 2026-11-11) and sets `redirect: "error"`. Its timeout is a constructor option so the test does not wait 10 s. It never logs; the route logs `email_send_failed`.
 11. Log details S4 leaves open: `email_code_refused` reasons are `disabled`, `rate_limited_ip`, `invalid_email`, `disposable_email`, `rate_limited_email`, `too_many_live`; a refused `/verify` logs plan 1A's `sign_in_refused {provider: "email", reason}` with `invalid_code`, `code_expired`, `switch_required` or `other_sign_in`; start-up logs `email_sign_in_enabled` or `email_sign_in_disabled`; `/google/link` logs `identity_removed` when it drops the email sign-in.
@@ -326,8 +326,8 @@ CREATE INDEX tokens_identity_id ON tokens (identity_id);
 -- stored: only their SHA-256. A row goes when the code is used, expired, guessed wrong 5 times or replaced.
 CREATE TABLE email_codes (
   id             TEXT PRIMARY KEY,                 -- UUIDv4, also the Idempotency-Key sent to Resend
-  challenge_hash BLOB NOT NULL UNIQUE,             -- sha256(challenge_id)
-  code_hash      BLOB NOT NULL,                    -- sha256(challenge_id || ':' || code)
+  challenge_hash BLOB NOT NULL UNIQUE,             -- HMAC-SHA-256(key, challenge_id), key made at each start
+  code_hash      BLOB NOT NULL,                    -- HMAC-SHA-256(key, challenge_id || ':' || code)
   email          TEXT NOT NULL,                    -- normalized; lives at most 10 minutes
   attempts       INTEGER NOT NULL DEFAULT 0,
   created_at     INTEGER NOT NULL,

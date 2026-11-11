@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hashToken } from "../src/auth/tokens.js";
-import { call, db, deviceBody, errorCode, googleIdToken, googleSession, loginDevice, makeApp, registerAccount, type TestApp } from "./helpers.js";
+import { FakeEmailGateway } from "./fake-email.js";
+import { call, db, deviceBody, emailSession, errorCode, googleIdToken, googleSession, loginDevice, makeApp, registerAccount, type TestApp } from "./helpers.js";
 
 const link = (app: TestApp, token: string | undefined, body: Record<string, unknown>) => call(app, "POST", "/v1/auth/google/link", { token, body });
 
@@ -58,5 +59,26 @@ describe("POST /v1/auth/google/link (S1 §6.3b)", () => {
     const used = await googleIdToken(app);
     expect((await link(app, account.agent.token, used)).status).toBe(200);
     expect((await link(app, fresh.token, used)).status).toBe(401);
+  });
+
+  it("links Google to an account created with an email code; a different Google address becomes the account's and removes the email sign-in", async () => {
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail });
+    const providers = (userId: string) => db().all<{ provider: string }>("SELECT provider FROM identities WHERE user_id = ? ORDER BY provider", userId).map((r) => r.provider);
+    const same = await emailSession(app, mail, { email: "same@example.com" });
+    expect((await link(app, same.token, await googleIdToken(app, { email: "Same@Example.com" }))).status).toBe(200);
+    expect(providers(same.userId)).toEqual(["email", "google"]);
+
+    const phone = await emailSession(app, mail, { email: "old@example.com", kind: "mobile" });
+    const desk = await emailSession(app, mail, { email: "old@example.com", kind: "desktop" });
+    const moved = await link(app, desk.token, await googleIdToken(app, { email: "New@Example.org" }));
+    expect(moved.status).toBe(200);
+    const body = await moved.json<{ user_id: string; token: string; email: string }>();
+    expect([body.user_id, body.email]).toEqual([desk.userId, "new@example.org"]);
+    expect(providers(desk.userId)).toEqual(["google"]);
+    expect((await call(app, "GET", "/v1/devices", { token: phone.token })).status).toBe(401); // signed in with the address that went
+    expect((await call(app, "GET", "/v1/devices", { token: body.token })).status).toBe(200);
+    expect((await emailSession(app, mail, { email: "old@example.com" })).userId).not.toBe(desk.userId);
+    expect((await emailSession(app, mail, { email: "new@example.org" })).userId).toBe(desk.userId);
   });
 });

@@ -19,7 +19,7 @@ interface TokenRow {
   kind: DeviceKind;
 }
 
-export type AuthMethod = "password" | "google" | "apple" | "test";
+export type AuthMethod = "password" | "google" | "apple" | "email" | "test";
 
 export function insertToken(
   db: Db, tokenHash: ArrayBuffer, deviceId: string, now: number, authMethod: AuthMethod = "password", identityId: string | null = null,

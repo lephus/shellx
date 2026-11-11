@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { passwords, type PasswordHasher } from "../src/auth/password.js";
+import type { RateLimiter } from "../src/auth/rate-limit.js";
 import type { HubRegistry } from "../src/hub/registry.js";
 import { encodePresence, pairingRemovedEvent } from "../src/protocol/frames.js";
 import {
-  appleIdToken, call, connect, CountingLimiter, db, deviceBody, errorCode, FakeSocket, googleIdToken, googleSession, hex, hubs,
-  linkAppleIdByQr, loginDevice, makeApp, newPairingId, pair, registerAccount, registerMachine, type TestApp, type TestSocket, unlimited,
+  appleIdToken, call, connect, CountingLimiter, db, deviceBody, emailSession, errorCode, FakeSocket, googleIdToken, googleSession, hex, hubs,
+  linkAppleIdByQr, loginDevice, makeApp, newPairingId, pair, registerAccount, registerMachine, requestEmailCode, type TestApp, type TestSocket, unlimited,
 } from "./helpers.js";
+import { FakeEmailGateway } from "./fake-email.js";
 import { FakeAppleTokens } from "./fake-idp.js";
 
 const NEW_PASSWORD = "brand new password";
@@ -456,5 +458,106 @@ describe("DELETE /v1/account with a fresh sign-in (S1 §6.8)", () => {
     const app = makeApp();
     const s = await googleSession(app);
     for (const body of [{}, { password: "anything at all" }]) expect(await errorCode(await del(app, s.token, body))).toBe("reauth_required");
+  });
+});
+
+describe("DELETE /v1/account with an email code (spec 2026-11-10 §4)", () => {
+  const T0 = 1_800_000_000_000;
+  const CODE = "004217";
+  const del = (app: TestApp, token: string, body: Record<string, unknown>) => call(app, "DELETE", "/v1/account", { token, body });
+  const users = (userId: string) => db().get<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE id = ?", userId)!.n;
+  const codes = () => db().get<{ n: number }>("SELECT COUNT(*) AS n FROM email_codes")!.n;
+
+  it("deletes for a code sent to the account's own address, from an email session and from a Google session of that account", async () => {
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail, emailCode: () => CODE });
+    const s = await emailSession(app, mail, { email: "ann@example.com" });
+    const c = await requestEmailCode(app, mail, " ANN@example.com");
+    expect((await del(app, s.token, { challenge_id: c.challengeId, code: CODE })).status).toBe(204);
+    expect([users(s.userId), codes(), db().get<{ n: number }>("SELECT COUNT(*) AS n FROM identities")!.n]).toEqual([0, 0, 0]);
+    expect((await call(app, "GET", "/v1/devices", { token: s.token })).status).toBe(401);
+    expect((await emailSession(app, mail, { email: "ann@example.com" })).userId).not.toBe(s.userId); // the address is free again
+
+    const g = await googleSession(app, { email: "bob@example.com" });
+    const forGoogle = await requestEmailCode(app, mail, "bob@example.com");
+    expect((await del(app, g.token, { challenge_id: forGoogle.challengeId, code: CODE })).status).toBe(204);
+    expect(users(g.userId)).toBe(0);
+  });
+
+  it("answers 401 invalid_code to a wrong code and counts it, and 410 code_expired once the code is burnt, expired or unknown; nothing is deleted", async () => {
+    let now = T0;
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail, emailCode: () => CODE, now: () => now });
+    const s = await emailSession(app, mail, { email: "ann@example.com" });
+    const c = await requestEmailCode(app, mail, "ann@example.com");
+    for (let n = 1; n <= 4; n++) {
+      const wrong = await del(app, s.token, { challenge_id: c.challengeId, code: "004218" });
+      expect([wrong.status, await errorCode(wrong)]).toEqual([401, "invalid_code"]);
+      expect(db().get("SELECT attempts FROM email_codes")).toEqual({ attempts: n });
+    }
+    const fifth = await del(app, s.token, { challenge_id: c.challengeId, code: "004218" });
+    expect([fifth.status, await errorCode(fifth)]).toEqual([410, "code_expired"]);
+    const late = await requestEmailCode(app, mail, "ann@example.com");
+    now = T0 + 600_000;
+    for (const challengeId of [c.challengeId, late.challengeId, "n".repeat(43)]) {
+      const res = await del(app, s.token, { challenge_id: challengeId, code: CODE });
+      expect([res.status, await errorCode(res)]).toEqual([410, "code_expired"]);
+    }
+    expect(users(s.userId)).toBe(1);
+  });
+
+  it("answers 401 reauth_required to a code that went to another address (the code is spent) and to a code without a challenge id", async () => {
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail, emailCode: () => CODE });
+    const s = await emailSession(app, mail, { email: "ann@example.com" });
+    const other = await requestEmailCode(app, mail, "bob@example.com");
+    for (const body of [{ challenge_id: other.challengeId, code: CODE }, { code: CODE }]) {
+      const res = await del(app, s.token, body);
+      expect([res.status, await errorCode(res)]).toEqual([401, "reauth_required"]);
+    }
+    expect([users(s.userId), codes()]).toEqual([1, 0]);
+  });
+
+  it("compares the code's address with the account's address as it is after the redeem: a code for the address /google/link just replaced deletes nothing", async () => {
+    const mail = new FakeEmailGateway();
+    // The per-address limiter is the route's first await after it read the account: /google/link runs there.
+    let duringLimit: (() => Promise<void>) | null = null;
+    const loginEmail: RateLimiter = {
+      limit: async () => {
+        const hook = duringLimit;
+        duringLimit = null;
+        if (hook !== null) await hook();
+        return true;
+      },
+    };
+    const app = makeApp({ email: mail, emailCode: () => CODE, limiters: { ...unlimited, loginEmail } });
+    const s = await emailSession(app, mail, { email: "ann@example.com" });
+    const other = await emailSession(app, mail, { email: "ann@example.com" });
+    expect(other.userId).toBe(s.userId);
+    const c = await requestEmailCode(app, mail, "ann@example.com");
+    let linked = 0;
+    duringLimit = async () => {
+      linked = (await call(app, "POST", "/v1/auth/google/link", { token: other.token, body: await googleIdToken(app, { email: "ann.new@example.com" }) })).status;
+    };
+    const res = await del(app, s.token, { challenge_id: c.challengeId, code: CODE });
+    expect(linked).toBe(200);
+    expect(res.status).toBe(401);
+    expect(await errorCode(res)).toBe("reauth_required");
+    expect(users(s.userId)).toBe(1);
+    expect(db().get("SELECT email FROM users WHERE id = ?", s.userId)).toEqual({ email: "ann.new@example.com" });
+    expect(codes()).toBe(0); // the right code was spent
+  });
+
+  it("shares the 5 per account email per minute budget; a refused call spends no guess", async () => {
+    const loginEmail = new CountingLimiter(1);
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail, emailCode: () => CODE, limiters: { ...unlimited, loginEmail } });
+    const s = await emailSession(app, mail, { email: "ann@example.com" });
+    const c = await requestEmailCode(app, mail, "ann@example.com");
+    expect((await del(app, s.token, { challenge_id: c.challengeId, code: "004218" })).status).toBe(401);
+    expect((await del(app, s.token, { challenge_id: c.challengeId, code: CODE })).status).toBe(429);
+    expect(loginEmail.calls).toEqual(["ann@example.com", "ann@example.com"]);
+    expect(db().get("SELECT attempts FROM email_codes")).toEqual({ attempts: 1 });
+    expect(users(s.userId)).toBe(1);
   });
 });
