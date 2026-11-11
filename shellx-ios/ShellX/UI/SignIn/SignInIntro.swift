@@ -33,7 +33,7 @@ enum SignInIntroMotion: Equatable, Sendable {
 }
 
 /// The timing of the sign-in intro, in seconds after the screen appears: the two chevrons of the logo slide in
-/// and settle, the underscore appears and then blinks, and the glow behind the logo starts to breathe. The typed
+/// and settle, the underscore appears and then blinks, and the halo behind the logo comes up, turning. The typed
 /// tagline and the guide start when the chevrons have settled (`chevronSettle`).
 enum SignInIntro {
     /// When the chevrons are furthest past their place.
@@ -42,7 +42,7 @@ enum SignInIntro {
     static let chevronSettle: TimeInterval = 0.6
     /// When the underscore has fully appeared.
     static let underscoreShown: TimeInterval = 0.75
-    /// When the intro is over: the underscore starts to blink and the glow to breathe.
+    /// When the intro is over: the underscore starts to blink and the halo to breathe.
     static let end: TimeInterval = 0.9
     /// How far past their place the chevrons go, as a part of the way they came.
     static let overshoot = 0.04
@@ -51,10 +51,10 @@ enum SignInIntro {
     static let chevronStart = 0.55
     /// The time between two frames while something slides.
     static let frame: TimeInterval = 1.0 / 60
-    /// The glow's opacity at the ends of a breath, and how long a breath takes.
-    static let glowLow = 0.25
-    static let glowHigh = 0.45
-    static let glowBreath: TimeInterval = 4
+    /// Seconds for one turn of the halo's colours around the logo.
+    static let haloTurn: TimeInterval = 6
+    /// Seconds for one breath of the halo: from its weakest to its strongest and back.
+    static let haloBreath: TimeInterval = 4
     /// A moment that comes this much early still counts as on time: a `Date` keeps about a tenth of a microsecond,
     /// so the time since the start can fall just short of the tick it was scheduled for.
     static let tolerance: TimeInterval = 1e-6
@@ -92,32 +92,28 @@ enum SignInIntro {
         return CursorBlink.isOn(elapsed: time - end) ? 1 : 0
     }
 
-    /// Seconds for one turn of the halo's colours around the logo.
-    static let haloTurn: TimeInterval = 6
-
-    /// How far the halo's colours have turned at `time`, in degrees clockwise. Not built yet: the halo is one colour.
+    /// How far the halo's colours have turned at `time`, in degrees clockwise from where they are when the halo
+    /// comes up (when the chevrons have settled): one turn every `haloTurn` seconds, at one speed, for ever.
     static func haloAngle(at time: TimeInterval) -> Double {
-        0
+        let turns = (time - chevronSettle) / haloTurn
+        guard turns > 0 else { return 0 }
+        return turns.truncatingRemainder(dividingBy: 1) * 360
     }
 
-    /// The halo's opacity at the bottom and at the top of a breath, in the light or the dark appearance. Not built
-    /// yet: one range for both.
+    /// The halo's opacity at the bottom and at the top of a breath. On a dark screen it is stronger, so that it
+    /// reads as colour; on a light one weaker, so that it does not look like a smudge.
     static func haloRange(dark: Bool) -> (low: Double, high: Double) {
-        (glowLow, glowHigh)
+        dark ? (0.35, 0.60) : (0.25, 0.45)
     }
 
-    /// The halo's opacity at `time` in the light or the dark appearance. Not built yet: the glow's, in both.
+    /// The halo's opacity at `time` in the light or the dark appearance: nothing until the chevrons settle, a fade
+    /// in to the bottom of its range at `end`, then a breath to the top and back every `haloBreath` seconds.
     static func haloOpacity(at time: TimeInterval, dark: Bool) -> Double {
-        glowOpacity(at: time)
-    }
-
-    /// The opacity of the glow behind the logo at `time`: nothing until the chevrons settle, a fade in to `glowLow`
-    /// at `end`, then a breath to `glowHigh` and back every `glowBreath` seconds.
-    static func glowOpacity(at time: TimeInterval) -> Double {
+        let range = haloRange(dark: dark)
         if time <= chevronSettle { return 0 }
-        if time < end { return glowLow * (time - chevronSettle) / (end - chevronSettle) }
-        let phase = (time - end).truncatingRemainder(dividingBy: glowBreath) / glowBreath
-        return glowLow + (glowHigh - glowLow) * (1 - cos(2 * .pi * phase)) / 2
+        if time < end { return range.low * (time - chevronSettle) / (end - chevronSettle) }
+        let phase = (time - end).truncatingRemainder(dividingBy: haloBreath) / haloBreath
+        return range.low + (range.high - range.low) * (1 - cos(2 * .pi * phase)) / 2
     }
 }
 

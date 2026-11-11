@@ -6,8 +6,8 @@ import XCTest
 
 /// The sign-in screen with its intro, drawn: on a small phone, on its side and in large type; the logo at rest
 /// against the app's own logo; and the intro as it runs (before it starts, while a tagline is typed, after it has
-/// settled), where the buttons must be in place from the first frame, the cursor must follow the typed letters
-/// and the glow must fade out by itself.
+/// settled), where the buttons must be in place from the first frame, the cursor must follow the typed letters,
+/// and the halo must be a ring of colours that turns and stays in the room around the logo.
 ///
 /// A test run draws the intro still. A frame of the running intro is drawn for a given moment (`motion: .at(…)`),
 /// and the typed line for a given frame of the typewriter: no test here depends on when or how fast it runs. The
@@ -39,12 +39,12 @@ final class SignInRenderTests: XCTestCase {
         static let start: TimeInterval = 0
         /// The 14th letter of the first tagline has just been typed; the cursor is on, as always while typing.
         static let typing = TypedTaglineView.startDelay + 13.5 * 0.028
-        /// The underscore is on again after two blinks and the glow is near the top of its first breath.
+        /// The underscore is on again after two blinks and the halo is near the top of its first breath.
         static let glowing = SignInIntro.end + 4 * CursorBlink.half
-        /// The underscore is on again after four blinks and the glow near its weakest, at the start of its second breath.
+        /// The underscore is on again after four blinks and the halo near its weakest, at the start of its second breath.
         static let faint = SignInIntro.end + 8 * CursorBlink.half
-        /// The glow at the very top of its breath.
-        static let brightest = SignInIntro.end + SignInIntro.glowBreath / 2
+        /// The halo at the very top of its breath.
+        static let brightest = SignInIntro.end + SignInIntro.haloBreath / 2
         /// One second into the halo's first breath: half way up.
         static let halo = SignInIntro.end + 1
 
@@ -152,9 +152,8 @@ final class SignInRenderTests: XCTestCase {
 
     /// The pixels the mark lights up: the chevrons and the underscore, mint on the left, near white on the right.
     private static let bright: (Bitmap.Colour) -> Bool = { $0.brightest > 200 }
-    /// The pixels in the glow's mint, on the black stage: also the mint chevron, the underscore and the square's
-    /// inner light, which the still logo has too.
-    private static let mint: (Bitmap.Colour) -> Bool = { $0.g > 25 && $0.g > $0.r + 10 }
+    /// The pixels that are well lit on the black stage: the mark, and the halo where it is strong.
+    private static let lit: (Bitmap.Colour) -> Bool = { $0.brightest > 60 }
 
     func testTheChevronsAreOutsideTheSquareAtTheStartAndInPlaceOnceSettled() throws {
         let rest = try logo(.still, name: "signin-logo")
@@ -167,22 +166,24 @@ final class SignInRenderTests: XCTestCase {
             let mark = rest[index].count(where: Self.bright)
             XCTAssertGreaterThan(mark, 6000 * scale * scale, "at rest the chevrons are drawn")
             XCTAssertEqual(before[index].count(where: Self.bright), 0, "at the start the square is empty")
-            // On the black stage, what is lit is the 240-point square and, once it is there, the glow around it.
+            // On the black stage, what is lit is the 240-point square and, once it is there, the halo around it,
+            // a third wider.
             let square = try XCTUnwrap(before[index].litBox())
-            XCTAssertEqual(square.width, CGFloat(240 * scale), accuracy: CGFloat(2 * scale), "and there is no glow yet")
+            XCTAssertEqual(square.width, CGFloat(240 * scale), accuracy: CGFloat(2 * scale), "and there is no halo yet")
             XCTAssertEqual(square.height, CGFloat(240 * scale), accuracy: CGFloat(2 * scale))
-            XCTAssertGreaterThan(try XCTUnwrap(glowing[index].litBox()).width, CGFloat((240 + 40) * scale), "the glow reaches past the square")
-            for (settled, least) in [(glowing[index], 12000), (faint[index], 3000)] {
+            for settled in [glowing[index], faint[index]] {
                 XCTAssertEqual(
                     settled.count(where: Self.bright), mark, accuracy: 4 * scale * scale,
                     "settled, with the underscore on, the mark is the mark at rest")
-                XCTAssertGreaterThan(
-                    settled.count(where: Self.mint) - rest[index].count(where: Self.mint), least * scale * scale,
-                    "and a mint glow lies around the square, which the still logo does not have")
+                let halo = try XCTUnwrap(settled.litBox())
+                XCTAssertGreaterThan(halo.width, CGFloat((240 + 30) * scale), "and the halo lies around the square, which the still logo does not have")
+                XCTAssertLessThanOrEqual(halo.width, CGFloat(240 * scale) * SignInLogoMark.haloExtent + CGFloat(scale), "no wider than it is made")
+                XCTAssertEqual(halo.midX, square.midX, accuracy: CGFloat(2 * scale), "around the logo's centre")
+                XCTAssertEqual(halo.midY, square.midY, accuracy: CGFloat(2 * scale))
             }
             XCTAssertGreaterThan(
-                glowing[index].count(where: Self.mint), faint[index].count(where: Self.mint) + 6000 * scale * scale,
-                "the glow breathes: more of it near the top of a breath")
+                glowing[index].count(where: Self.lit), faint[index].count(where: Self.lit) + 800 * scale * scale,
+                "the halo breathes: more of it is strong near the top of a breath")
         }
     }
 
@@ -204,7 +205,8 @@ final class SignInRenderTests: XCTestCase {
             let points = [(x, y - reach), (x + reach, y), (x, y + reach), (x - reach, y)]
             let hues = try points.map { try XCTUnwrap(first[index].mean(x: $0.0, y: $0.1, radius: scale).hue, "the halo is coloured at \($0)") }
             let later = try points.map { try XCTUnwrap(second[index].mean(x: $0.0, y: $0.1, radius: scale).hue, "the halo is coloured at \($0)") }
-            // Hues more than 40 degrees from each other count as different colours.
+            // Hues more than 40 degrees from each other count as different colours. Measured: 305, 40, 157 and 230
+            // degrees (pink, amber, mint, blue), then 228, 305, 40 and 156 a quarter turn later.
             var different: [Double] = []
             for hue in hues where different.allSatisfy({ Bitmap.Colour.apart($0, hue) > 40 }) { different.append(hue) }
             XCTAssertGreaterThanOrEqual(different.count, 3, "at least three clearly different colours around the logo: hues \(hues)")
@@ -218,8 +220,9 @@ final class SignInRenderTests: XCTestCase {
             // At the top of a breath (the second frame is 2.5 s into it, the top is at 2 s), how lit the halo is.
             strength.append(points.map { second[index].mean(x: $0.0, y: $0.1, radius: scale).brightest }.reduce(0, +))
         }
+        // 0.56 against 0.42 at that moment: a third more (measured: 334 against 247).
         XCTAssertGreaterThan(
-            strength[1] * 10, strength[0] * 12, "in the dark appearance the halo is stronger than in the light one: \(strength)")
+            strength[1] * 100, strength[0] * 115, "in the dark appearance the halo is stronger than in the light one: \(strength)")
     }
 
     func testOnTheClockThePartsAreAsAtTheStartBeforeItAndAtRestLongAfter() throws {
@@ -243,8 +246,8 @@ final class SignInRenderTests: XCTestCase {
             XCTAssertGreaterThan(settled, mark * 9 / 10, "the chevrons are in place (the underscore may be off)")
             XCTAssertLessThanOrEqual(settled, mark + 4 * scale * scale, "and nothing else is lit")
             XCTAssertGreaterThan(
-                running[index].count(where: Self.mint) - rest[index].count(where: Self.mint), 3000 * scale * scale,
-                "with the glow around the square, at any point of its breath")
+                try XCTUnwrap(running[index].litBox()).width, CGFloat((240 + 30) * scale),
+                "with the halo around the square, at any point of its breath")
         }
 
         func steps(_ motion: SignInIntroMotion, start: Date = Date(), name: String) throws -> [Data?] {
@@ -564,41 +567,42 @@ final class SignInRenderTests: XCTestCase {
         if failures > 4 { XCTFail("\(failures) checks failed for \"\(line)\" (\(what))", file: file, line: lineNumber) }
     }
 
-    func testTheGlowIsNotCutWhereTheSafeAreaBegins() throws {
-        // The glow lies outside the logo, in the padding around it, and reaches a little further. It must fade out
-        // on its own: no step where the safe area begins (the island's side with the phone on its side, the status
-        // bar upright). Drawn at the top of a breath, where it is strongest.
-        let landscape = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .at(Moment.brightest)), name: "signin-landscape-settled", size: Self.landscape.size,
-            safeArea: Self.landscape.safeArea))
-        for bitmap in landscape {
-            let background = bitmap.at(x: 0, y: bitmap.height - 1)
-            // The row through the middle of the 72-point logo, which starts 16 points right of the safe area's edge.
-            let row = (24 + 36) * bitmap.scale
-            let edge = Int(Self.landscape.safeArea.leading)
-            func glow(_ x: Int) -> Int { bitmap.at(x: x * bitmap.scale, y: row).distance(to: background) }
-            // How far the pixel is from the background, of 255, in the light / the dark appearance: 27 / 45 beside
-            // the logo, 6 / 10 just inside the safe area's edge, 3 / 6 two points outside it, 1 / 1 twelve points
-            // outside.
-            XCTAssertGreaterThan(glow(edge + 14), 15, "the glow is there beside the logo")
-            XCTAssertGreaterThanOrEqual(glow(edge + 1), 4, "and still just inside the safe area's edge")
-            XCTAssertGreaterThanOrEqual(glow(edge - 2) * 3, glow(edge + 1), "it goes on past that edge: no step down to nothing")
-            XCTAssertLessThanOrEqual(glow(edge - 12), 3, "until it has faded out by itself")
-        }
-        let portrait = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .at(Moment.brightest)), name: "signin-intro-glow", size: Self.portrait.size, safeArea: Self.portrait.safeArea))
-        for bitmap in portrait {
-            let background = bitmap.at(x: 0, y: bitmap.height - 1)
-            // The column through the middle of the 96-point logo, which starts 24 points under the status bar.
-            let column = (16 + 48) * bitmap.scale
-            let edge = Int(Self.portrait.safeArea.top)
-            func glow(_ y: Int) -> Int { bitmap.at(x: column, y: y * bitmap.scale).distance(to: background) }
-            // Light / dark: 28 / 46 beside the logo, 7 / 12 six points inside the edge, 4 / 7 just inside it, 3 / 4
-            // two points outside, 1 / 1 twelve points outside.
-            XCTAssertGreaterThan(glow(edge + 22), 15)
-            XCTAssertGreaterThanOrEqual(glow(edge + 6), 4)
-            XCTAssertGreaterThanOrEqual(glow(edge - 2) * 3, glow(edge + 1))
-            XCTAssertLessThanOrEqual(glow(edge - 12), 3)
+    func testTheHaloStaysInTheRoomAroundTheLogo() throws {
+        // The halo is drawn outside the logo, in the padding around it. At the top of a breath, where it is
+        // strongest, and a quarter turn later: it shows beside the logo, and it is gone before the screen's edge,
+        // the status bar, the title under the logo and, with the phone on its side, the island's side.
+        for (moment, name) in [(Moment.brightest, "signin-halo"), (Moment.brightest + 1.5, "signin-halo-later")] {
+            let portrait = try bitmaps(SnapshotWriter().write(
+                signIn(motion: .at(moment)), name: name, size: Self.portrait.size, safeArea: Self.portrait.safeArea))
+            for bitmap in portrait {
+                let background = bitmap.at(x: 0, y: bitmap.height - 1)
+                func halo(_ x: Int, _ y: Int) -> Int { bitmap.mean(x: x * bitmap.scale, y: y * bitmap.scale, radius: 1).distance(to: background) }
+                // The 96-point logo is 16 points from the left edge and 24 under the status bar (59 points).
+                let (left, top) = (16, Int(Self.portrait.safeArea.top) + 24)
+                let (x, y) = (left + 48, top + 48)
+                // Measured, as the distance to the background of 255: 11 to 26 in the light appearance, 33 to 58 in the
+                // dark one, 5 points outside the logo; 0 or 1 at the four places where it must be gone.
+                for (beside, what) in [(halo(x, top - 5), "over"), (halo(left + 96 + 5, y), "right of"), (halo(x, top + 96 + 5), "under"), (halo(left - 5, y), "left of")] {
+                    XCTAssertGreaterThan(beside, 5, "the halo shows \(what) the logo")
+                }
+                XCTAssertLessThanOrEqual(halo(0, y), 2, "it is gone at the screen's edge")
+                XCTAssertLessThanOrEqual(halo(x, top - 23), 2, "under the status bar")
+                XCTAssertLessThanOrEqual(halo(x, top + 96 + 16), 2, "and where the title begins")
+                XCTAssertLessThanOrEqual(halo(left + 96 + 17, y), 2)
+            }
+            let landscape = try bitmaps(SnapshotWriter().write(
+                signIn(motion: .at(moment)), name: name.replacingOccurrences(of: "signin-", with: "signin-landscape-"),
+                size: Self.landscape.size, safeArea: Self.landscape.safeArea))
+            for bitmap in landscape {
+                let background = bitmap.at(x: 0, y: bitmap.height - 1)
+                func halo(_ x: Int, _ y: Int) -> Int { bitmap.mean(x: x * bitmap.scale, y: y * bitmap.scale, radius: 1).distance(to: background) }
+                // The 72-point logo is 16 points right of the safe area's edge and 24 from the top.
+                let (left, top) = (Int(Self.landscape.safeArea.leading) + 16, 24)
+                // Measured: 16 and 25 (light), 33 and 49 (dark) beside the logo; 0 at the edge and at the title.
+                XCTAssertGreaterThan(halo(left - 4, top + 36), 5, "the halo shows left of the logo")
+                XCTAssertLessThanOrEqual(halo(left - 15, top + 36), 2, "and is gone where the safe area begins")
+                XCTAssertLessThanOrEqual(halo(left + 36, top + 72 + 16), 2, "and where the title begins")
+            }
         }
     }
 }

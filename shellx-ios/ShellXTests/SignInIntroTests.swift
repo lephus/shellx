@@ -256,32 +256,6 @@ final class SignInIntroTests: XCTestCase {
         XCTAssertFalse(zero.sideBySide)
     }
 
-    // MARK: - The glow
-
-    func testTheGlowFadesInAfterTheChevronsThenBreathesEveryFourSeconds() {
-        XCTAssertEqual(SignInIntro.glowOpacity(at: 0), 0)
-        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.chevronSettle), 0, "no glow while the chevrons slide")
-        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end), 0.25, accuracy: 1e-9)
-        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 1), 0.35, accuracy: 1e-9)
-        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 2), 0.45, accuracy: 1e-9)
-        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 4), 0.25, accuracy: 1e-9, "one breath is 4 s")
-        XCTAssertEqual(SignInIntro.glowOpacity(at: SignInIntro.end + 4 * 500 + 2), 0.45, accuracy: 1e-6, "and it goes on")
-
-        var previous = 0.0
-        for step in 0...180 {
-            let t = Double(step) / 200
-            let opacity = SignInIntro.glowOpacity(at: t)
-            XCTAssertGreaterThanOrEqual(opacity, previous - 1e-9, "it only fades in until the intro is over (\(t) s)")
-            XCTAssertLessThanOrEqual(opacity, 0.25 + 1e-9)
-            previous = opacity
-        }
-        for step in 0...160 {
-            let opacity = SignInIntro.glowOpacity(at: SignInIntro.end + Double(step) / 20)
-            XCTAssertGreaterThanOrEqual(opacity, 0.25 - 1e-9)
-            XCTAssertLessThanOrEqual(opacity, 0.45 + 1e-9)
-        }
-    }
-
     // MARK: - The halo
 
     /// How far two angles are apart, in degrees, the short way round.
@@ -474,6 +448,25 @@ final class SignInIntroTests: XCTestCase {
         let reach = (SignInLogoMark.prompt[1].x + SignInLogoMark.stroke / 2) / SignInLogoMark.side
         XCTAssertGreaterThan(SignInIntro.chevronStart, Double(reach), "it starts wholly outside")
         XCTAssertEqual(SignInLogoMark.side - SignInLogoMark.phone[1].x + SignInLogoMark.stroke / 2, SignInLogoMark.prompt[1].x + SignInLogoMark.stroke / 2)
+    }
+
+    func testTheHaloHasTheBrandsFiveSoftColoursAndClosesOnTheFirst() {
+        XCTAssertEqual(SignInLogoMark.haloPalette, [0x4AF2A1, 0x60A5FA, 0xA78BFA, 0xF472B6, 0xFBBF24, 0x4AF2A1], "mint, blue, violet, pink, amber, mint")
+        XCTAssertEqual(SignInLogoMark.haloPalette.first, SignInLogoMark.haloPalette.last, "the turn closes without a seam")
+        XCTAssertEqual(SignInLogoMark.haloColors.count, SignInLogoMark.haloPalette.count)
+
+        XCTAssertLessThanOrEqual(SignInLogoMark.haloExtent, 1.35, "no wider than 1.35 times the logo")
+        XCTAssertGreaterThan(SignInLogoMark.haloExtent, 1.25)
+        // 16 points are free around a 96-point logo: beside it to the screen's edge, under it to the title.
+        XCTAssertLessThan((SignInLogoMark.haloExtent - 1) / 2 * 96, 16, "the halo ends inside the room around the logo")
+
+        // The colours turn in a square; the halo is cut from it. Its farthest point is on the square's diagonal: the
+        // corner of its shape (the logo's corner, a little larger) and the fade beyond. The inscribed circle of the
+        // square of colours must reach it, or a turn would cut the halo's corners.
+        let half = 0.5 + SignInLogoMark.haloSpread
+        let corner = SignInLogoMark.cornerRadius / SignInLogoMark.side + SignInLogoMark.haloSpread
+        let reach = (half - corner) * 2.squareRoot() + corner + 2.4 * SignInLogoMark.haloSoftness
+        XCTAssertGreaterThan(SignInLogoMark.haloField / 2, reach, "the turning colours cover the halo to its corners")
     }
 
     func testAGradientRunsAcrossItsShapeAsInTheDrawing() {

@@ -5,8 +5,9 @@ import SwiftUI
 ///
 /// Animated, once each time the screen appears (`SignInIntro`): the two chevrons slide in from the left and the
 /// right edge and settle with a small overshoot, the underscore appears and then blinks like a terminal's cursor,
-/// and a soft glow behind the square starts to breathe. Still (Reduce Motion, tests, screenshots): the mark at
-/// rest, the same as the `Logo` asset and the app icon, with no glow and no blink.
+/// and a soft halo comes up behind the square: a ring of the brand's five soft colours that turns around the logo
+/// once every six seconds and breathes. Still (Reduce Motion, tests, screenshots): the mark at rest, the same as
+/// the `Logo` asset and the app icon, with no halo and no blink.
 ///
 /// Everything is a function of the time since `start`, read from a `TimelineView`: nothing runs once the view
 /// has left the screen.
@@ -16,6 +17,8 @@ struct SignInLogoView: View {
     let motion: SignInIntroMotion
     /// When the intro began.
     let start: Date
+
+    @Environment(\.colorScheme) private var colorScheme
 
     init(size: CGFloat, motion: SignInIntroMotion, start: Date = Date()) {
         self.size = size
@@ -27,16 +30,17 @@ struct SignInLogoView: View {
         ZStack {
             switch motion {
             case .animated:
-                // The glow breathes slowly: 30 frames a second are plenty, and only its opacity changes.
+                // The halo turns and breathes slowly: 30 frames a second are plenty, and a frame only changes its
+                // rotation and its opacity.
                 TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                    glow.opacity(SignInIntro.glowOpacity(at: context.date.timeIntervalSince(start)))
+                    halo(at: context.date.timeIntervalSince(start))
                 }
                 TimelineView(SignInIntroTimeline(start: start, ticks: SignInLogoTicks())) { context in
                     let time = context.date.timeIntervalSince(start)
                     mark(chevron: SignInIntro.chevronOffset(at: time), underscore: SignInIntro.underscoreOpacity(at: time))
                 }
             case let .at(time):
-                glow.opacity(SignInIntro.glowOpacity(at: time))
+                halo(at: time)
                 mark(chevron: SignInIntro.chevronOffset(at: time), underscore: SignInIntro.underscoreOpacity(at: time))
             case .still:
                 mark(chevron: 0, underscore: 1)
@@ -56,12 +60,24 @@ struct SignInLogoView: View {
         RoundedRectangle(cornerRadius: SignInLogoMark.cornerRadius * unit, style: .circular)
     }
 
-    /// The glow behind the square: the square in mint, blurred. It is drawn outside the logo's frame and takes no
-    /// room.
-    private var glow: some View {
-        square
-            .fill(SignInLogoMark.glow)
-            .blur(radius: size * 0.16)
+    /// The halo behind the square at `time`: the five colours around the logo's centre, turned as far as they have
+    /// come, seen through the square's own shape, a little larger and blurred, at the opacity of its breath. So the
+    /// halo is a soft ring that follows the square's outline, full at its edge and gone a sixth of its side further
+    /// out. The colours are one layer that only turns; the shape they are seen through stands still. The halo is
+    /// drawn outside the logo's frame and takes no room.
+    private func halo(at time: TimeInterval) -> some View {
+        let spread = size * SignInLogoMark.haloSpread
+        let field = size * SignInLogoMark.haloField
+        return AngularGradient(colors: SignInLogoMark.haloColors, center: .center)
+            .frame(width: field, height: field)
+            .rotationEffect(.degrees(SignInIntro.haloAngle(at: time)))
+            .mask {
+                RoundedRectangle(cornerRadius: SignInLogoMark.cornerRadius * unit + spread, style: .circular)
+                    .fill(Color.black)
+                    .frame(width: size + 2 * spread, height: size + 2 * spread)
+                    .blur(radius: size * SignInLogoMark.haloSoftness)
+            }
+            .opacity(SignInIntro.haloOpacity(at: time, dark: colorScheme == .dark))
             .allowsHitTesting(false)
     }
 
@@ -128,6 +144,23 @@ enum SignInLogoMark {
     static let mint = [color(0x7DF7BE), color(0x2FD98A)]
     static let lilac = [color(0xFFFFFF), color(0xCFC8EE)]
     static let glow = color(0x4AF2A1)
+
+    /// The halo's colours around the logo, `0xRRGGBB`: the brand's soft tones, mint, blue, violet, pink and amber,
+    /// and mint again so that the turn has no seam.
+    static let haloPalette: [UInt32] = [0x4AF2A1, 0x60A5FA, 0xA78BFA, 0xF472B6, 0xFBBF24, 0x4AF2A1]
+    static let haloColors = haloPalette.map(color)
+    /// How far the halo's shape reaches past the square's edge before it starts to fade, as a part of the logo's
+    /// side: at the edge itself the halo is nearly at full strength.
+    static let haloSpread: CGFloat = 0.04
+    /// How softly the halo fades: the blur of its shape, as a part of the logo's side.
+    static let haloSoftness: CGFloat = 0.052
+    /// The halo's width across, as a part of the logo's side: the shape and its fade, which is gone 2.4 times the
+    /// blur further out. It ends just inside the 16 points that are free around a 96-point logo, so it never reaches
+    /// the title under it or the screen's edge.
+    static let haloExtent: CGFloat = 1 + 2 * (haloSpread + 2.4 * haloSoftness)
+    /// The side of the square of turning colours the halo is cut from, as a part of the logo's side: large enough
+    /// to cover the halo out to its corners however far it has turned.
+    static let haloField: CGFloat = 1.75
 
     static let promptGradient = gradient(mint, over: prompt, from: .topLeading, to: .bottomTrailing)
     static let phoneGradient = gradient(lilac, over: phone, from: .topTrailing, to: .bottomLeading)
