@@ -134,6 +134,32 @@ final class EmailSignInModelTests: XCTestCase {
         XCTAssertEqual(model.emailFieldError, .disposableEmail, "the relay's answer shows there too")
     }
 
+    func testChangingTheAddressTakesAwayTheLastFailure() async {
+        // Offline, a send fails; back online the user fixes the address and a Vietnamese keyboard turns "ex" into "ẽ":
+        // the field says why Send code is off, not the old failure.
+        let rig = await signedOut()
+        let model = rig.coordinator.emailSignIn
+        model.begin()
+        model.email = "phu@example.com"
+        await rig.relay.setError(URLError(.notConnectedToInternet), for: .requestEmailCode)
+        await model.sendCode()
+        XCTAssertEqual(model.emailFieldError, .network)
+        model.email = "phu@ẽxample.com"
+        XCTAssertNil(model.error)
+        XCTAssertEqual(model.emailFieldError, .invalidEmail)
+
+        // A refusal stays while the address is the same, and goes when it really changes.
+        await rig.relay.setError(http(400, "disposable_email"), for: .requestEmailCode)
+        model.email = "phu@mailinator.com"
+        await model.sendCode()
+        XCTAssertEqual(model.emailFieldError, .disposableEmail)
+        model.email = "phu@mailinator.com"
+        XCTAssertEqual(model.error, .disposableEmail, "the same text again changes nothing")
+        model.email = "phu@example.org"
+        XCTAssertNil(model.emailFieldError, "another, valid address: no failure under the field")
+        XCTAssertTrue(model.canSend)
+    }
+
     func testASendFailureStaysOnTheEmailStepAndTheSameTapRetries() async {
         let rig = await signedOut()
         let model = rig.coordinator.emailSignIn
