@@ -167,7 +167,7 @@ fun SignInView(
         busy = busy,
         continueWithGoogle = { progress.run(signIn) },
         startDemo = startDemo,
-        introMs = rememberIntroClock(),
+        introMs = rememberSignInIntroClock(),
         modifier = modifier,
     )
 }
@@ -179,7 +179,7 @@ fun SignInView(
  * rotation or a theme change carries it on where it was instead of playing the intro again.
  */
 @Composable
-private fun rememberIntroClock(): (() -> Long)? {
+internal fun rememberSignInIntroClock(): (() -> Long)? {
     var motion by remember { mutableStateOf(SignInIntro.animates(ValueAnimator.areAnimatorsEnabled())) }
     // "Remove animations" may have changed while the app was away.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -230,7 +230,8 @@ internal fun SignInContent(
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         val layout = SignInLayout.of(maxWidth.value, maxHeight.value)
-        val room = maxHeight
+        // The window's height: the content is at least as tall, so it can stand in the middle or at the bottom.
+        val room = if (constraints.hasBoundedHeight) maxHeight else 0.dp
         if (layout.sideBySide) {
             Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
                 Row(

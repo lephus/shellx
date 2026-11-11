@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.AnnotatedString
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
@@ -32,6 +33,7 @@ import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.core.account.SignInException
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -203,6 +205,80 @@ class SignInViewTest {
             rule.mainClock.advanceTimeBy(20_000)
             assertEquals("no typewriter: it stays", first, typed())
             assertEquals(first, taglineLine().text)
+        }
+    }
+
+    @Test
+    fun theClockCountsFromTheFirstFrameAndStopsWhenTheScreenLeaves() {
+        rule.mainClock.autoAdvance = false
+        var clock: (() -> Long)? = null
+        var shown by mutableStateOf(true)
+        rule.setContent { if (shown) clock = rememberSignInIntroClock() }
+
+        rule.mainClock.advanceTimeBy(500)
+        val early = clock!!()
+        assertTrue("about 500 ms after the first frame: $early", early in 440L..512L)
+
+        // Once the intro has settled the clock moves at most 30 times a second, at any frame rate.
+        rule.mainClock.advanceTimeBy(1_500)
+        val readings = mutableSetOf<Long>()
+        repeat(60) {
+            rule.mainClock.advanceTimeByFrame()
+            readings += clock!!()
+        }
+        assertTrue("${readings.size} readings in 60 frames", readings.size in 25..31)
+        assertTrue(readings.all { it % SignInIntro.FRAME_MS == 0L })
+
+        shown = false
+        rule.mainClock.advanceTimeByFrame()
+        val last = clock!!()
+        rule.mainClock.advanceTimeBy(5_000)
+        assertEquals("nothing runs once the screen has left", last, clock!!())
+    }
+
+    @Test
+    fun withAnimationsOffThereIsNoClock() {
+        ShellXSnapshots.withoutAnimations {
+            var clock: (() -> Long)? = { 0L }
+            rule.setContent { clock = rememberSignInIntroClock() }
+            rule.waitForIdle()
+            assertNull(clock)
+        }
+    }
+
+    @Test
+    fun aRotationCarriesTheIntroOnInsteadOfPlayingItAgain() {
+        rule.mainClock.autoAdvance = false
+        val screen: @Composable () -> Unit = {
+            ShellXTheme { SignInView(expired = false, signIn = {}, startDemo = {}) }
+        }
+        rule.setContent(screen)
+        val first = context.getString(R.string.signin_tagline_1)
+        rule.mainClock.advanceTimeBy(TypedTagline.START_MS + first.length * TypedTagline.TYPE_MS + 500)
+        assertEquals(first, typed())
+
+        rule.activityRule.scenario.recreate()
+        rule.activityRule.scenario.onActivity { it.setContent(content = screen) }
+        rule.mainClock.advanceTimeByFrame()
+
+        assertEquals("the tagline is still typed: the intro did not start over", first, typed())
+    }
+
+    @Test
+    fun animationsTurnedOffWhileTheAppWasAwayStopTheIntroOnReturn() {
+        rule.mainClock.autoAdvance = false
+        show(signIn = {})
+        val first = context.getString(R.string.signin_tagline_1)
+        rule.mainClock.advanceTimeBy(TypedTagline.START_MS + 5 * TypedTagline.TYPE_MS)
+        assertTrue("typing: \"${typed()}\"", typed().length < first.length)
+
+        rule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        ShellXSnapshots.withoutAnimations {
+            rule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            rule.mainClock.advanceTimeByFrame()
+            assertEquals("the first tagline, whole", first, typed())
+            rule.mainClock.advanceTimeBy(10_000)
+            assertEquals("and still", first, typed())
         }
     }
 

@@ -87,7 +87,11 @@ class SignInIntroRenderTest {
             val worst = distances.max()
             val differing = distances.count { it > 0 }
             assertTrue("${shot.file.name}: the logo is drawn", inside(shot, 432).count(::bright) > 5_000)
-            assertEquals("${shot.file.name}: the drawn logo is the drawable, pixel for pixel (worst distance $worst)", 0, differing)
+            assertEquals(
+                "${shot.file.name}: the drawn logo is the drawable, pixel for pixel (worst distance $worst)",
+                0,
+                differing,
+            )
         }
     }
 
@@ -96,7 +100,8 @@ class SignInIntroRenderTest {
         val start = assertRenders("signin-logo-start") { Page { SignInLogo(96.dp, pose = { SignInLogo.pose(0) }) } }
         val rest = assertRenders("signin-logo-rest") { Page { SignInLogo(96.dp, pose = { SignInLogo.REST }) } }
         for ((first, last) in start.zip(rest)) {
-            assertEquals("${first.file.name}: an empty square, no chevron and no underscore yet", 0, inside(first, 72).count(::bright))
+            val atStart = inside(first, 72).count(::bright)
+            assertEquals("${first.file.name}: an empty square, no chevron and no underscore yet", 0, atStart)
             assertTrue("${last.file.name}: both chevrons and the underscore", inside(last, 72).count(::bright) > 5_000)
         }
     }

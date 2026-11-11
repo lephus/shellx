@@ -96,7 +96,8 @@ class SignInFitTest {
     fun thePixel3ShowsTheWholeScreenWithoutAScroll() {
         show()
         assertThePortraitScreenFits()
-        assertDp("the buttons stand at the bottom", 24.dp, rule.onRoot().getUnclippedBoundsInRoot().bottom - bounds("signin.demo").bottom)
+        val window = rule.onRoot().getUnclippedBoundsInRoot()
+        assertDp("the room under the buttons, which stand at the bottom,", 24.dp, window.bottom - bounds("signin.demo").bottom)
     }
 
     @Test
