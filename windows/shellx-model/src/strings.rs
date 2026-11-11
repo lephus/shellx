@@ -711,7 +711,142 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 114);
+        assert_eq!(Str::ALL.len(), 127);
+    }
+
+    #[test]
+    fn the_first_sign_in_line() {
+        assert_eq!(
+            t(Lang::En, Str::FirstSignInCreatesAccount),
+            "No account yet? Your first sign-in creates one."
+        );
+        assert_eq!(
+            t(Lang::Vi, Str::FirstSignInCreatesAccount),
+            "Chưa có tài khoản? Lần đăng nhập đầu tiên sẽ tạo tài khoản cho bạn."
+        );
+    }
+
+    /// D5: every email string is the phone catalog's (`shellx-ios/ShellX/Localizable.xcstrings`).
+    #[test]
+    fn email_strings_match_the_phone_catalog() {
+        let pairs = [
+            (Str::OrDivider, "hoặc", "or"),
+            (Str::SendCode, "Gửi mã", "Send code"),
+            (Str::CodePlaceholder, "Mã 6 chữ số", "6-digit code"),
+            (Str::VerifyCode, "Xác nhận", "Verify"),
+            (Str::ResendCode, "Gửi lại mã", "Resend code"),
+            (Str::UseDifferentEmail, "Dùng email khác", "Use a different email"),
+            (
+                Str::InvalidEmail,
+                "Địa chỉ email này chưa đúng.",
+                "That doesn't look like an email address.",
+            ),
+            (
+                Str::DisposableEmail,
+                "Không dùng được địa chỉ email tạm thời. Hãy dùng địa chỉ khác.",
+                "Temporary email addresses can't be used. Try another address.",
+            ),
+            (
+                Str::InvalidCode,
+                "Mã chưa đúng. Xem lại email rồi thử lại.",
+                "That code isn't right. Check the email and try again.",
+            ),
+            (
+                Str::CodeExpired,
+                "Mã này không còn dùng được. Hãy gửi mã mới.",
+                "That code no longer works. Send a new one.",
+            ),
+            (
+                Str::EmailSendFailed,
+                "Chưa gửi được email. Thử lại sau giây lát.",
+                "Couldn't send the email. Try again in a moment.",
+            ),
+            (
+                Str::SignInUnavailable,
+                "Bản này chưa dùng được cách đăng nhập này.",
+                "This way of signing in isn't available in this build.",
+            ),
+            (Str::RateLimited, "Thử lại sau ít phút.", "Try again in a few minutes."),
+            (
+                Str::ServerProblem,
+                "ShellX đang gặp sự cố. Thử lại sau.",
+                "ShellX is having a problem. Try again later.",
+            ),
+            (Str::EmailCodeMethod, "Mã qua email", "Email code"),
+        ];
+        assert_eq!(pairs.len(), 15);
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            sent_code_to(Lang::En, "foo@bar.com"),
+            "We sent a 6-digit code to foo@bar.com. If it isn't there in a minute, check your spam folder."
+        );
+        assert_eq!(
+            sent_code_to(Lang::Vi, "foo@bar.com"),
+            "Đã gửi mã 6 chữ số tới foo@bar.com. Nếu sau một phút chưa thấy, hãy xem cả thư rác."
+        );
+        assert_eq!(resend_code_in(Lang::En, 42), "Resend code in 42 s");
+        assert_eq!(resend_code_in(Lang::Vi, 60), "Gửi lại mã sau 60 giây");
+        assert_eq!((Lang::Vi.locale(), Lang::En.locale()), ("vi", "en"));
+    }
+
+    #[test]
+    fn email_error_maps_codes() {
+        for lang in [Lang::Vi, Lang::En] {
+            let own = [
+                ("invalid_email", Str::InvalidEmail),
+                ("disposable_email", Str::DisposableEmail),
+                ("invalid_code", Str::InvalidCode),
+                ("code_expired", Str::CodeExpired),
+                ("email_send_failed", Str::EmailSendFailed),
+                ("email_sign_in_disabled", Str::SignInUnavailable),
+                ("rate_limited", Str::RateLimited),
+                ("network", Str::RelayUnreachable),
+                (
+                    "switch_from_signed_in_device",
+                    Str::SwitchFromSignedInDevice,
+                ),
+            ];
+            for (code, key) in own {
+                assert_eq!(email_error(lang, code), t(lang, key), "{lang:?} {code}");
+            }
+            for code in [
+                "http_502",
+                "http_503",
+                "http_504",
+                "server",
+                "invalid_device",
+                "invalid_params",
+                "bad_request",
+                "internal_error",
+                "payload_too_large",
+                "not_configured",
+                "io",
+                "crypto",
+                "unknown_method",
+                "",
+            ] {
+                assert_eq!(
+                    email_error(lang, code),
+                    t(lang, Str::ServerProblem),
+                    "{lang:?} {code:?}"
+                );
+            }
+            for code in own.iter().map(|(c, _)| *c).chain(["http_502", "invalid_device", "io"]) {
+                let out = email_error(lang, code);
+                assert!(!out.contains("http_") && !out.contains('_'), "{code}: {out}");
+            }
+        }
+    }
+
+    #[test]
+    fn sign_in_method_labels_follow_the_provider() {
+        assert_eq!(sign_in_method_label("apple"), Str::AppleId);
+        assert_eq!(sign_in_method_label("email"), Str::EmailCodeMethod);
+        assert_eq!(sign_in_method_label("google"), Str::GoogleAccount);
+        assert_eq!(sign_in_method_label("test"), Str::GoogleAccount);
     }
 
     #[test]
@@ -880,7 +1015,7 @@ mod tests {
         assert_eq!(t(Lang::Vi, Str::SignInTitle), "Đăng nhập ShellX");
         assert_eq!(t(Lang::En, Str::SignInTitle), "Sign in to ShellX");
         assert_eq!(t(Lang::Vi, Str::EmailAddress), "Địa chỉ email");
-        assert_eq!(t(Lang::En, Str::EmailAddress), "Email");
+        assert_eq!(t(Lang::En, Str::EmailAddress), "Email address");
         assert_eq!(t(Lang::Vi, Str::SignInEllipsis), "Đăng nhập…");
         assert_eq!(t(Lang::En, Str::SignInEllipsis), "Sign In…");
         assert_eq!(

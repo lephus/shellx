@@ -742,4 +742,68 @@ mod tests {
         };
         assert!(!format!("{s:?}").contains("g@x"));
     }
+
+    #[test]
+    fn email_calls_send_their_params_and_parse() {
+        let f = FakeCore::new();
+        f.on(
+            "auth.email.begin",
+            Ok(json!({"challenge_id":"c1","expires_in":600,"resend_in":60,"email":"foo@bar.com"})),
+        );
+        f.on(
+            "auth.email.finish",
+            Ok(json!({"user_id":"u","device_id":"d","device_public_key_b64":"AAA","fingerprint":"ff",
+                      "email":"foo@bar.com","auth_method":"email"})),
+        );
+        f.on(
+            "account.identities.list",
+            Ok(json!({"identities":[{"identity_id":"e1","provider":"email","email":"foo@bar.com"}]})),
+        );
+        let c = email_begin(&f, "Foo@Bar.com", "vi").unwrap();
+        assert_eq!(
+            c,
+            EmailChallenge {
+                challenge_id: "c1".into(),
+                email: "foo@bar.com".into(),
+                expires_in: 600,
+                resend_in: 60,
+            }
+        );
+        let done = email_finish(&f, "c1", "004217").unwrap();
+        assert_eq!(
+            (done.email.as_str(), done.auth_method.as_str()),
+            ("foo@bar.com", "email")
+        );
+        let methods = list_sign_in_methods(&f).unwrap();
+        assert!(methods[0].is_email() && !methods[0].is_apple());
+        let calls = f.calls();
+        assert_eq!(
+            calls[0],
+            (
+                "auth.email.begin".into(),
+                json!({"email":"Foo@Bar.com","locale":"vi"})
+            )
+        );
+        assert_eq!(
+            calls[1],
+            (
+                "auth.email.finish".into(),
+                json!({"challenge_id":"c1","code":"004217"})
+            )
+        );
+    }
+
+    #[test]
+    fn email_values_hide_addresses_and_challenges_in_debug() {
+        let c = EmailChallenge {
+            challenge_id: "CH-SECRET".into(),
+            email: "foo@bar.com".into(),
+            expires_in: 600,
+            resend_in: 60,
+        };
+        let shown = format!("{c:?} {c:#?}");
+        assert!(!shown.contains("CH-SECRET"), "{shown}");
+        assert!(!shown.contains("foo@bar.com"), "{shown}");
+        assert!(shown.contains("600") && shown.contains("60"), "{shown}");
+    }
 }

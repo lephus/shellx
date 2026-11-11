@@ -3,6 +3,7 @@
 pub mod account;
 pub mod core_api;
 pub mod diagnose;
+pub mod email_sign_in;
 pub mod first_window;
 pub mod google_button;
 pub mod history;
