@@ -248,6 +248,72 @@ import Testing
     #expect(calls == 1)
 }
 
+// MARK: - Email code sign-in
+
+@MainActor @Test func emailCodeRequestConfiguresTheCoreAndChangesNoSession() async throws {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let account = ShellXAccount(service: rig.service)
+    let challenge = try await account.requestEmailCode(email: "Foo@Bar.com", locale: "vi")
+    #expect(challenge.email == "foo@bar.com")
+    #expect(rig.core.methods == ["config.set", "auth.email.begin"])
+    #expect(rig.core.lastParams("auth.email.begin") == ["email": .string("Foo@Bar.com"), "locale": .string("vi")])
+    #expect(account.identity == nil)
+}
+
+@MainActor @Test func emailCodeSignsInAndSavesTheEmailIdentity() async throws {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let account = ShellXAccount(service: rig.service)
+    let challenge = try await account.requestEmailCode(email: "Foo@Bar.com", locale: "vi")
+    let identity = try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "004217")
+    #expect(identity.email == "foo@bar.com")
+    #expect(identity.authMethod == "email")
+    #expect(identity.usesPassword == false)
+    #expect(identity.signedInAt != nil)
+    #expect(account.identity == identity)
+    #expect(ShellXAccount(service: rig.service).identity == account.identity)
+    // Only the account: no host, bridge or remote session starts.
+    #expect(rig.launcher.calls.isEmpty)
+    #expect(!rig.service.isSignedIn)
+}
+
+@MainActor @Test func emailCodeSignInWithTheGateOnStartsTheSession() async throws {
+    let rig = ServiceRig(signedIn: false)
+    let account = ShellXAccount(service: rig.service)
+    let challenge = try await account.requestEmailCode(email: "Foo@Bar.com", locale: "en")
+    try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "004217")
+    #expect(rig.service.isSignedIn)
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+}
+
+@MainActor @Test func aWrongEmailCodeKeepsSignedOutAndCanBeRetried() async throws {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let account = ShellXAccount(service: rig.service)
+    let challenge = try await account.requestEmailCode(email: "Foo@Bar.com", locale: "en")
+    let thrown = await errorCode { _ = try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "000000") }
+    #expect(thrown == "invalid_code")
+    #expect(account.identity == nil)
+    #expect(ShellXAccount(service: rig.service).identity == nil)
+    try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "004217")
+    #expect(account.identity?.authMethod == "email")
+}
+
+@MainActor @Test func emailCodeSignInIsRefusedWhileGoogleWaits() async {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let account = googleAccount(rig, Opened())
+    rig.core.holdNext.with { $0 = "auth.google.finish" }
+    rig.core.failures.with { $0["auth.google.finish"] = ["google_cancelled"] }
+    let task = Task { await errorCode { _ = try await account.signInWithGoogle(purpose: .signIn) } }
+    #expect(await until { rig.core.isHoldingCall })
+    #expect(account.googleStep == .waiting(.signIn))
+    let thrown = await errorCode { _ = try await account.signInWithEmailCode(challengeID: "ch-1", code: "004217") }
+    #expect(thrown == "google_in_progress")
+    #expect(rig.core.count("auth.email.finish") == 0)
+    await account.cancelGoogleSignIn()
+    rig.core.releaseHeldCall()
+    #expect(await task.value == "google_cancelled")
+    #expect(account.identity == nil)
+}
+
 @MainActor @Test func cancelBeforeBeginAnswersEndsTheFlowWithoutOpeningTheBrowser() async {
     let rig = ServiceRig(gate: false, signedIn: false)
     let opened = Opened()
