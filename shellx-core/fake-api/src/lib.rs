@@ -26,6 +26,14 @@
 //! allowed for the caller's own machine (D3) or a granted target, else 403
 //! `not_granted`.
 //!
+//! Email code sign-in (desktop plan A): `POST /v1/auth/email/code` and `POST /v1/auth/email/verify`, answered in the
+//! relay's order and with its rules (`relay/src/routes/email-sign-in.ts`): one live code per address, five guesses, 600 s,
+//! the relay's address check, a 409 that spends the code, a failed mail that drops the live code. There is no mail: the
+//! code is read with `FakeApi::email_code`. Hooks: `set_next_email_code`, `expire_email_codes`, `fail_next_mail`,
+//! `fail_next` (a scripted answer for one path that changes no state), `add_user`. `FakeOptions::email_sign_in = false`
+//! is a relay without Resend (503) and `FakeOptions::email_routes = false` a relay from before the feature (404).
+//! Rate limits are not counted.
+//!
 //! Pairings follow the L4 rules (w2-server plan Task 4): `from_machine_id` must be
 //! the caller's own machine (the one registered by its device), code = 6 random
 //! digits unique among the target's live pending requests, `requester_fingerprint`
@@ -51,6 +59,12 @@ use tiny_http::{Header, Request, Response, Server};
 const DEVICE_KINDS: &[&str] = &["agent", "mobile", "desktop"];
 const DEVICE_PLATFORMS: &[&str] = &["macos", "windows", "ios", "android"];
 const MAX_BODY_BYTES: u64 = 64 * 1024;
+/// A mailed code lives ten minutes (`EMAIL_CODE_TTL_MS` of the relay).
+pub const EMAIL_CODE_TTL_SECS: u64 = 600;
+/// `resend_in` of the 202: advice for the client's Resend button.
+pub const EMAIL_RESEND_SECS: u64 = 60;
+/// Guesses a challenge takes; the fifth wrong one kills it.
+pub const EMAIL_CODE_MAX_ATTEMPTS: u32 = 5;
 /// Pending pairings expire after 5 minutes (L4 `PAIRING_TTL_MS`).
 pub const PAIRING_TTL_SECS: u64 = 300;
 /// L4 `SEALED_INVITE_MAX_BYTES` (decoded).
@@ -72,6 +86,11 @@ pub struct FakeOptions {
     /// The account the fake Google signs in (changeable with `set_google_account`).
     pub google_email: String,
     pub google_subject: String,
+    /// false: `POST /v1/auth/email/code` answers 503 `email_sign_in_disabled` before reading the body (a relay
+    /// without Resend). Fixed for the fake's life.
+    pub email_sign_in: bool,
+    /// false: neither email route exists; both answer 404 `not_found` (a relay from before the feature).
+    pub email_routes: bool,
 }
 
 /// Redacts the password and the HMAC secret.
@@ -86,6 +105,8 @@ impl std::fmt::Debug for FakeOptions {
             .field("version_body", &self.version_body)
             .field("google_client_id", &self.google_client_id)
             .field("google_client_secret", &"<redacted>")
+            .field("email_sign_in", &self.email_sign_in)
+            .field("email_routes", &self.email_routes)
             .finish()
     }
 }
@@ -118,6 +139,8 @@ impl Default for FakeOptions {
             google_client_secret: "fake-desktop-secret".to_string(),
             google_email: "google-user@shellx.test".to_string(),
             google_subject: "fake-google-sub-1".to_string(),
+            email_sign_in: true,
+            email_routes: true,
         }
     }
 }
@@ -142,7 +165,7 @@ pub struct Recorded {
 struct TokenInfo {
     user_id: String,
     device_id: String,
-    /// "password" | "google"
+    /// "password" | "google" | "email"
     auth_method: String,
 }
 
@@ -157,6 +180,16 @@ struct Identity {
     linked_via_device_name: Option<String>,
     created_at: u64,
     seq: u64,
+}
+
+/// One pending email code (the relay's `email_codes` row).
+struct EmailChallenge {
+    email: String,
+    code: String,
+    /// "vi" or "en".
+    locale: String,
+    attempts: u32,
+    expires_at: u64,
 }
 
 struct GoogleCode {
@@ -213,6 +246,14 @@ struct State {
     id_tokens: HashMap<String, IdToken>,
     identities: Vec<Identity>,
     identity_seq: u64,
+    /// challenge_id → pending email code.
+    email_challenges: HashMap<String, EmailChallenge>,
+    /// `set_next_email_code`: used once by the next challenge stored.
+    next_email_code: Option<String>,
+    /// `fail_next_mail`: the next `/code` that reaches the mail fails.
+    fail_next_mail: bool,
+    /// path → scripted answers `(status, error code or empty)`, oldest first.
+    scripted: HashMap<String, std::collections::VecDeque<(u16, String)>>,
 }
 
 #[derive(Clone)]
@@ -382,7 +423,53 @@ impl FakeApi {
         self.shared.lock().users.values().any(|u| u == user_id)
     }
 
-    /// `"password"` or `"google"` for a live token. Test helper.
+    /// The live code mailed to `email` (trimmed and lowercased first); None when the address has no live challenge.
+    /// Test helper (there is no mailbox).
+    pub fn email_code(&self, email: &str) -> Option<String> {
+        let (key, now) = (email.trim().to_lowercase(), now_unix());
+        self.shared.lock().email_challenges.values().find(|c| c.email == key && c.expires_at > now).map(|c| c.code.clone())
+    }
+
+    /// That mail's language: "vi" when the request's `locale` was exactly "vi", else "en". Test helper.
+    pub fn email_locale(&self, email: &str) -> Option<String> {
+        let (key, now) = (email.trim().to_lowercase(), now_unix());
+        self.shared.lock().email_challenges.values().find(|c| c.email == key && c.expires_at > now).map(|c| c.locale.clone())
+    }
+
+    /// The next challenge stored uses `code` (six ASCII digits) instead of a random one; once. Test hook.
+    pub fn set_next_email_code(&self, code: &str) {
+        assert!(code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit()), "set_next_email_code: six ASCII digits");
+        self.shared.lock().next_email_code = Some(code.to_string());
+    }
+
+    /// Every live email challenge answers 410 from now on, no guess counted: expiry, and the stand-in for a relay
+    /// restart or deploy. Test hook.
+    pub fn expire_email_codes(&self) {
+        for c in self.shared.lock().email_challenges.values_mut() {
+            c.expires_at = 0;
+        }
+    }
+
+    /// The next `/code` that reaches the mail fails as the relay's does: the address's older challenge is gone, the
+    /// new one is discarded, the answer is 502 `email_send_failed`. Test hook.
+    pub fn fail_next_mail(&self) {
+        self.shared.lock().fail_next_mail = true;
+    }
+
+    /// The next request to `path` is answered `status` with `{"error":{"code": code}}`, or with no body when `code`
+    /// is empty; the route does not run, so no challenge changes (the relay's 429s change none). Calls for one path
+    /// queue up. Test hook.
+    pub fn fail_next(&self, path: &str, status: u16, code: &str) {
+        self.shared.lock().scripted.entry(path.to_string()).or_default().push_back((status, code.to_string()));
+    }
+
+    /// A user with this address, no password and no sign-in (an account whose address nobody verified); its id.
+    /// An address that already has a user answers that user's id. Test hook.
+    pub fn add_user(&self, email: &str) -> String {
+        self.shared.lock().users.entry(email.trim().to_lowercase()).or_insert_with(random_id).clone()
+    }
+
+    /// `"password"`, `"google"` or `"email"` for a live token. Test helper.
     pub fn token_auth_method(&self, token: &str) -> Option<String> {
         self.shared.lock().tokens.get(token).map(|t| t.auth_method.clone())
     }
@@ -651,6 +738,11 @@ fn bearer(rec: &Recorded) -> Option<&str> {
 }
 
 fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Reply {
+    if let Some(q) = st.scripted.get_mut(rec.path.as_str()) {
+        if let Some((status, code)) = q.pop_front() {
+            return if code.is_empty() { Reply::empty(status) } else { Reply::error(status, &code, "Scripted by the test") };
+        }
+    }
     match (rec.method.as_str(), rec.path.as_str()) {
         ("GET", "/v1/version") => Reply::json(200, opts.version_body.clone()),
         ("POST", "/v1/auth/login") => login(rec, raw, opts, st),
@@ -659,6 +751,8 @@ fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
         ("POST", "/fake-google/token") => fake_google_token(rec, opts, st),
         ("POST", "/v1/auth/google") => google_sign_in(rec, opts, st),
         ("POST", "/v1/auth/google/link") => google_link(rec, opts, st),
+        ("POST", "/v1/auth/email/code") if opts.email_routes => email_code_request(rec, opts, st),
+        ("POST", "/v1/auth/email/verify") if opts.email_routes => email_verify(rec, st),
         ("GET", "/v1/account/identities") => list_identities(rec, st),
         ("DELETE", p) if p.starts_with("/v1/account/identities/") => remove_identity(rec, &p["/v1/account/identities/".len()..], st),
         ("DELETE", "/v1/account") => delete_account(rec, st),
@@ -1313,10 +1407,12 @@ fn delete_phone_grant(rec: &Recorded, id: &str, st: &mut State) -> Reply {
     Reply::empty(204)
 }
 
-/// `{kind, name, platform, public_key}` per v1 `parseDevice` (+ kind `desktop`).
+/// `{kind, name, platform, public_key}` per v1 `parseDevice` (+ kind `desktop`, which must be on `macos` or
+/// `windows`: `relay/src/auth/device.ts:27`).
 fn device_ok(d: &Value) -> bool {
     let kind_ok = d["kind"].as_str().is_some_and(|k| DEVICE_KINDS.contains(&k));
-    let platform_ok = d["platform"].as_str().is_some_and(|p| DEVICE_PLATFORMS.contains(&p));
+    let desktop_ok = d["kind"] != "desktop" || matches!(d["platform"].as_str(), Some("macos" | "windows"));
+    let platform_ok = d["platform"].as_str().is_some_and(|p| DEVICE_PLATFORMS.contains(&p)) && desktop_ok;
     let name_ok = d["name"].as_str().is_some_and(|n| (1..=100).contains(&n.trim().chars().count()));
     let key_ok = d["public_key"]
         .as_str()
@@ -1612,6 +1708,152 @@ fn delete_account(rec: &Recorded, st: &mut State) -> Reply {
     st.tokens.retain(|_, t| t.user_id != uid);
     st.password_users.remove(&uid);
     Reply::empty(204)
+}
+
+/// The relay's address rule (`relay/src/auth/email.ts:5-19`) on an already trimmed, lowercased address: an ASCII
+/// dot-atom local part, LDH labels, an alphabetic TLD of 2-63 letters, at most 254 characters, the last "@" at
+/// index 1-64.
+fn email_valid(e: &str) -> bool {
+    if !e.is_ascii() || e.len() > 254 {
+        return false;
+    }
+    let Some(at) = e.rfind('@') else { return false };
+    if !(1..=64).contains(&at) || e.matches('@').count() != 1 {
+        return false;
+    }
+    let (local, domain) = (&e[..at], &e[at + 1..]);
+    let atom = |c: u8| c.is_ascii_lowercase() || c.is_ascii_digit() || b"!#$%&'*+/=?^_`{|}~-".contains(&c);
+    if !local.split('.').all(|part| !part.is_empty() && part.bytes().all(atom)) {
+        return false;
+    }
+    let labels: Vec<&str> = domain.split('.').collect();
+    if labels.len() < 2 {
+        return false;
+    }
+    let (tld, mids) = labels.split_last().expect("two labels");
+    let ldh = |l: &str| {
+        let b = l.as_bytes();
+        (1..=63).contains(&b.len())
+            && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'-')
+            && b[0] != b'-'
+            && b[b.len() - 1] != b'-'
+    };
+    mids.iter().all(|l| ldh(l)) && (2..=63).contains(&tld.len()) && tld.bytes().all(|c| c.is_ascii_lowercase())
+}
+
+/// The fake's stand-in for the relay's disposable list: `mailinator.com` and its subdomains.
+fn email_disposable(e: &str) -> bool {
+    let domain = &e[e.rfind('@').map_or(0, |i| i + 1)..];
+    domain == "mailinator.com" || domain.ends_with(".mailinator.com")
+}
+
+/// `POST /v1/auth/email/code`, in the relay's order (no rate limit is counted).
+fn email_code_request(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
+    if !opts.email_sign_in {
+        return Reply::error(503, "email_sign_in_disabled", "Email sign-in is not available");
+    }
+    if !rec.body.is_object() {
+        return Reply::error(400, "bad_request", "Malformed request body");
+    }
+    let email = rec.body["email"].as_str().map(|e| e.trim().to_lowercase()).filter(|e| email_valid(e));
+    let Some(email) = email else { return Reply::error(400, "invalid_email", "Email address is not valid") };
+    if email_disposable(&email) {
+        return Reply::error(400, "disposable_email", "Temporary email addresses cannot be used");
+    }
+    let locale = if rec.body["locale"] == "vi" { "vi" } else { "en" };
+    // The address's older challenge goes first, then the new one is stored (the relay's `issueEmailCode`).
+    st.email_challenges.retain(|_, c| c.email != email);
+    if std::mem::take(&mut st.fail_next_mail) {
+        // The mail failed: the new challenge is discarded too, so the address has no live code at all.
+        return Reply::error(502, "email_send_failed", "Could not send the email");
+    }
+    let code = st.next_email_code.take().unwrap_or_else(random_code);
+    let challenge_id = random_b64url(32);
+    st.email_challenges.insert(
+        challenge_id.clone(),
+        EmailChallenge { email: email.clone(), code, locale: locale.to_string(), attempts: 0, expires_at: now_unix() + EMAIL_CODE_TTL_SECS },
+    );
+    Reply::json(202, json!({"challenge_id": challenge_id, "expires_in": EMAIL_CODE_TTL_SECS, "resend_in": EMAIL_RESEND_SECS, "email": email}))
+}
+
+fn code_expired() -> Reply {
+    Reply::error(410, "code_expired", "This code no longer works")
+}
+
+/// One guess at a challenge, as the relay's `redeemEmailCode`: `Ok(email)` for the right code (the challenge is
+/// gone), `Err` with the answer otherwise.
+fn redeem_email_code(challenge_id: &Value, code: &Value, st: &mut State) -> Result<String, Reply> {
+    let id = challenge_id
+        .as_str()
+        .filter(|s| s.len() == 43 && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'))
+        .ok_or_else(code_expired)?;
+    let live = st.email_challenges.get(id).map(|c| c.expires_at > now_unix());
+    match live {
+        None => return Err(code_expired()),
+        Some(false) => {
+            st.email_challenges.remove(id);
+            return Err(code_expired());
+        }
+        Some(true) => {}
+    }
+    let c = st.email_challenges.get_mut(id).expect("checked above");
+    c.attempts += 1;
+    let right = code.as_str() == Some(c.code.as_str());
+    let (attempts, email) = (c.attempts, c.email.clone());
+    if right {
+        st.email_challenges.remove(id);
+        return Ok(email);
+    }
+    if attempts >= EMAIL_CODE_MAX_ATTEMPTS {
+        st.email_challenges.remove(id);
+        return Err(code_expired());
+    }
+    Err(Reply::error(401, "invalid_code", "That code is not right"))
+}
+
+/// `POST /v1/auth/email/verify`, in the relay's order.
+fn email_verify(rec: &Recorded, st: &mut State) -> Reply {
+    if !rec.body.is_object() {
+        return Reply::error(400, "bad_request", "Malformed request body");
+    }
+    let device = &rec.body["device"];
+    if !device_ok(device) || device["kind"] == "agent" {
+        return Reply::error(400, "invalid_device", "Device information is not valid");
+    }
+    let email = match redeem_email_code(&rec.body["challenge_id"], &rec.body["code"], st) {
+        Ok(e) => e,
+        Err(r) => return r,
+    };
+    // The code is spent. Now the account (`matchAccount` and the branches of the handler).
+    let switch = || Reply::error(409, "switch_from_signed_in_device", "Switch to email sign-in from a signed-in device");
+    let by_identity = st.identities.iter().find(|i| i.provider == "email" && i.subject == email).map(|i| i.user_id.clone());
+    let user_id = if let Some(u) = by_identity {
+        u
+    } else if let Some(u) = st.users.get(&email).cloned() {
+        if st.password_users.contains(&u) {
+            return switch();
+        }
+        let has_primary = st.identities.iter().any(|i| i.user_id == u && (i.provider == "google" || i.provider == "test"));
+        if !has_primary {
+            if st.identities.iter().any(|i| i.user_id == u) {
+                return switch();
+            }
+            // Nobody verified this address: the code claims the account and every earlier session goes.
+            st.tokens.retain(|_, t| t.user_id != u);
+        }
+        add_identity(st, &u, "email", &email, &email, false, None);
+        u
+    } else {
+        let u = random_id();
+        st.users.insert(email.clone(), u.clone());
+        add_identity(st, &u, "email", &email, &email, false, None);
+        u
+    };
+    let key = device["public_key"].as_str().unwrap_or_default().to_string();
+    let device_id = st.devices.entry((user_id.clone(), key)).or_insert_with(random_id).clone();
+    let token = issue_token(st, &user_id, &device_id, "email");
+    let account_email = st.users.iter().find(|(_, u)| **u == user_id).map(|(e, _)| e.clone()).unwrap_or(email);
+    Reply::json(200, json!({"user_id": user_id, "device_id": device_id, "token": token, "email": account_email}))
 }
 
 /// Test browser: GET `url` (loopback only), follow one 3xx `Location` (loopback only).
