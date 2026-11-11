@@ -536,6 +536,21 @@ mod tests {
         assert_eq!(f.calls()[0], ("machines.list".into(), json!({})));
     }
 
+    /// The core's `machines.list` output for the body `relay/test/v2-machines.test.ts:108-111` pins
+    /// (the core never shows the relay's own fingerprint, so it is null).
+    #[test]
+    fn list_machines_accepts_the_cores_output_for_the_relays_list() {
+        let f = fake_with(
+            "machines.list",
+            json!({"machines":[{"is_this_machine":false,"machine_id":"m1","name":"Mac-Studio",
+                "platform":"macos","online":false,"last_seen_unix":0,"fingerprint":null}]}),
+        );
+        let ms = list_machines(&f).unwrap();
+        assert_eq!(ms.len(), 1);
+        assert_eq!(ms[0].fingerprint, "");
+        assert_eq!(ms[0].name, "Mac-Studio");
+    }
+
     #[test]
     fn tickets_and_pairing_calls() {
         let f = FakeCore::new();

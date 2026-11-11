@@ -252,4 +252,24 @@ mod tests {
         let g = build_groups(&v, &|_| Access::None, 0, Lang::Vi);
         assert_eq!(g[0].subtitle.as_deref(), Some("ngoại tuyến"));
     }
+
+    /// R4 Blocker 1: the core sends `"fingerprint": null` for every machine of the real relay's list.
+    #[test]
+    fn null_absent_or_odd_fingerprint_reads_as_empty() {
+        let v: Vec<MachineInfo> = serde_json::from_str(
+            r#"[{"machine_id":"a","name":"n","platform":"macos","online":true,"last_seen_unix":1,"fingerprint":null},
+                {"machine_id":"b","name":"n","platform":"macos","online":true,"last_seen_unix":1},
+                {"machine_id":"c","name":"n","platform":"macos","online":true,"last_seen_unix":1,"fingerprint":42}]"#,
+        )
+        .unwrap();
+        assert_eq!(v.len(), 3);
+        for m in &v {
+            assert_eq!(m.fingerprint, "", "{}", m.machine_id);
+        }
+        let kept: MachineInfo = serde_json::from_str(
+            r#"{"machine_id":"d","name":"n","platform":"macos","online":true,"fingerprint":"ab12"}"#,
+        )
+        .unwrap();
+        assert_eq!(kept.fingerprint, "ab12");
+    }
 }
