@@ -5,7 +5,8 @@ import XCTest
 @testable import ShellXAppCore
 
 /// A signed-out AppCoordinator over memory, a FakeRelayAccount and a FakeIdentityProvider. Its hubs reach `macs`
-/// and report a refused token to the coordinator.
+/// and report a refused token to the coordinator. The app shows Vietnamese (`emailLocale` "vi"), and the Resend lock
+/// of the email sign-in runs on `clock`.
 @MainActor
 struct CoordinatorRig {
     let store: InMemorySecretStore
@@ -14,6 +15,7 @@ struct CoordinatorRig {
     let identity: FakeIdentityProvider
     let wiper: CountingWiper
     let pendingDefaults: UserDefaults
+    let clock: ManualClock
     let coordinator: AppCoordinator
 
     static func make(
@@ -27,9 +29,10 @@ struct CoordinatorRig {
         let wiper = CountingWiper()
         let defaults = UserDefaults(suiteName: "CoordinatorRig-\(UUID().uuidString)")!
         let box = CoordinatorBox()
+        let clock = ManualClock()
         let coordinator = AppCoordinator(
             vault: vault, relay: relay, identity: identity, deviceName: "Phu's iPhone", wipers: extraWipers + [wiper],
-            pendingWipeDefaults: pendingDefaults,
+            pendingWipeDefaults: pendingDefaults, emailLocale: "vi", clock: clock,
             makeHub: {
                 MachineHub(
                     vault: vault, relay: relay, connector: FakeMacFleet(macs, phoneKey: { try await vault.phoneKey() }),
@@ -40,7 +43,7 @@ struct CoordinatorRig {
         test.addTeardownBlock { await coordinator.hub?.stopAll() }
         return CoordinatorRig(
             store: store, vault: vault, relay: relay, identity: identity, wiper: wiper, pendingDefaults: pendingDefaults,
-            coordinator: coordinator)
+            clock: clock, coordinator: coordinator)
     }
 }
 
