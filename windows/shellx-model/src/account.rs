@@ -3152,6 +3152,50 @@ mod tests {
         );
     }
 
+    /// Review chunk 1 M4: the dialog's first screen is drawn only while the flow takes a new attempt.
+    /// While a sign-in it has no step for runs (a Google success while this PC registers, a code the
+    /// closed dialog still checks), the screen is "Signing in…".
+    #[test]
+    fn the_dialog_never_offers_an_attempt_the_flow_would_refuse() {
+        use crate::email_sign_in::{SignInScreen, sign_in_screen};
+        let screen = |f: &AccountFlow| {
+            sign_in_screen(
+                f.email_step(),
+                f.email_sent_to().is_some(),
+                f.google_in_flight().is_some(),
+                *f.state() == AccountState::LoggingIn,
+            )
+        };
+        let offers_start = |f: &AccountFlow| {
+            matches!(
+                screen(f),
+                SignInScreen::Start {
+                    sending: false,
+                    google_waiting: false
+                }
+            )
+        };
+        // A Google success: this PC registers.
+        let mut f = logged_out();
+        assert!(offers_start(&f) && f.accepts_login());
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "g1"), 3);
+        f.on(finished("g1", Ok(google_done("g@x", "google"))), 4);
+        assert!(!f.accepts_login());
+        assert_eq!(screen(&f), SignInScreen::SigningIn);
+        // The dialog reopened while a closed dialog's code is checked.
+        let mut g = logged_out();
+        to_code(&mut g, 1_000);
+        g.on(submit("123456"), 2_000);
+        g.on(AccountEvent::EmailCancelled, 2_100);
+        assert_eq!(g.email_step(), None);
+        assert!(!g.accepts_login());
+        assert_eq!(screen(&g), SignInScreen::SigningIn);
+        // Its answer: refused, the first screen is live again.
+        g.on(email_finished("c1", Err(err("invalid_code"))), 2_200);
+        assert!(offers_start(&g) && g.accepts_login());
+    }
+
     /// Review I1: no session to go back to (a failed Google attempt left an error without one), so a refused
     /// code ends signed out, and nothing retries.
     #[test]

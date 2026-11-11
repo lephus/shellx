@@ -337,39 +337,35 @@ mod tests {
             google_waiting,
         };
         assert_eq!(
-            sign_in_screen(None, false, false, false, false),
+            sign_in_screen(None, false, false, false),
             start(false, false)
         );
+        assert_eq!(sign_in_screen(None, false, true, true), start(false, true));
+        // A sign-in under way that the dialog has no step for (review chunk 1 M4): a Google success
+        // while this PC registers, a code checked after the dialog closed. The flow takes no new
+        // attempt then, so no live first screen is drawn.
         assert_eq!(
-            sign_in_screen(None, false, true, false, true),
-            start(false, true)
-        );
-        assert_eq!(
-            sign_in_screen(None, false, false, true, true),
+            sign_in_screen(None, false, false, true),
             SignInScreen::SigningIn
         );
         assert_eq!(
-            sign_in_screen(None, false, false, false, true),
+            sign_in_screen(Some(Email), false, false, false),
             start(false, false)
         );
         assert_eq!(
-            sign_in_screen(Some(Email), false, false, false, false),
-            start(false, false)
-        );
-        assert_eq!(
-            sign_in_screen(Some(Sending), false, false, false, false),
+            sign_in_screen(Some(Sending), false, false, false),
             start(true, false)
         );
         assert_eq!(
-            sign_in_screen(Some(Sending), true, false, false, false),
+            sign_in_screen(Some(Sending), true, false, false),
             SignInScreen::Code { busy: true }
         );
         assert_eq!(
-            sign_in_screen(Some(Code), true, false, false, false),
+            sign_in_screen(Some(Code), true, false, false),
             SignInScreen::Code { busy: false }
         );
         assert_eq!(
-            sign_in_screen(Some(Verifying), true, false, false, false),
+            sign_in_screen(Some(Verifying), true, false, true),
             SignInScreen::Code { busy: true }
         );
     }
