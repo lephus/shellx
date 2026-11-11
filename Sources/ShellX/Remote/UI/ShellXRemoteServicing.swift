@@ -30,6 +30,10 @@ protocol ShellXRemoteServicing: AnyObject {
     func signInWithGoogle() async throws -> String
     /// Ends the Google flow that `signInWithGoogle()` waits on.
     func cancelGoogleSignIn() async
+    /// Mails a sign-in code to `email`. Throws `ShellXCoreError`.
+    func requestEmailCode(email: String, locale: String) async throws -> EmailCodeChallenge
+    /// Verifies the code and signs in; returns the account email. Throws `ShellXCoreError`.
+    func signInWithEmailCode(challengeID: String, code: String) async throws -> String
     func signOut() async
     /// Called when a workspace closes so the service stops tracking it.
     func forgetRemoteWorkspace(_ id: UUID)

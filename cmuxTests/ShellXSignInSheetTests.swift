@@ -262,9 +262,14 @@ import Testing
         #expect(await Self.pump { Self.keyboardField(of: window) != nil }, "the code field has no keyboard")
         let editor = try #require(window.firstResponder as? NSTextView)
         let field = try #require(Self.fields(in: hosting).first)
-        for typed in ["1", "2", "a"] {
+        // One key per host turn, as a person types, so SwiftUI has drawn "12" before the letter comes.
+        for typed in ["1", "2"] {
             editor.insertText(typed, replacementRange: NSRange(location: NSNotFound, length: 0))
+            await Self.turns(5)
         }
+        #expect(field.stringValue == "12")
+        editor.insertText("a", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(field.stringValue == "12a")
         #expect(email.code == "12")
         #expect(await Self.pump { field.stringValue == "12" }, "the code field shows \(field.stringValue)")
         editor.insertText("3", replacementRange: NSRange(location: NSNotFound, length: 0))
