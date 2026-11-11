@@ -2784,7 +2784,9 @@ mod tests {
     fn use_a_different_email_returns_to_the_first_screen() {
         let mut f = logged_out();
         to_code(&mut f, 1_000);
+        let epoch = f.email_code_epoch();
         assert!(f.on(AccountEvent::EmailChangeRequested, 2_000).is_empty());
+        assert_eq!(f.email_code_epoch(), epoch + 1, "the code field empties");
         assert_eq!(f.email_step(), Some(EmailStep::Email));
         assert_eq!(f.email_sent_to(), None);
         assert_eq!(f.email_error(), None);
@@ -3109,6 +3111,45 @@ mod tests {
                 "{code}"
             );
         }
+    }
+
+    /// Review chunk 1 M2 (Ruling 5): a list that signs the flow in drops the email run, so no code is
+    /// checked while LoggedIn, and a late answer of a dropped code request never lands in a later run.
+    #[test]
+    fn a_list_that_signs_in_drops_a_run_and_ignores_its_late_challenge() {
+        // A run on the code step: a list that signs in drops it, and a submit then does nothing.
+        let mut f = error_with_a_session();
+        to_code(&mut f, 1_000);
+        f.on(AccountEvent::Tick(15_004), 15_004);
+        f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 15_005);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert_eq!(f.email_step(), None);
+        assert!(f.on(submit("123456"), 15_006).is_empty());
+
+        // A run still sending: its answer is owed. After a sign-out a new run starts, and the old answer
+        // that arrives then is not taken for the new one.
+        let mut g = error_with_a_session();
+        assert_eq!(g.on(send(), 5), vec![begin_call()]);
+        g.on(AccountEvent::Tick(15_004), 15_004);
+        g.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 15_005);
+        assert_eq!(g.email_step(), None);
+        g.on(AccountEvent::LogoutRequested, 15_100);
+        g.on(AccountEvent::LogoutResult(Ok(())), 15_200);
+        assert_eq!(g.on(send(), 15_300), vec![begin_call()]);
+        assert!(
+            g.on(AccountEvent::EmailBegun(Ok(challenge("old"))), 15_400)
+                .is_empty()
+        );
+        assert_eq!(
+            g.email_step(),
+            Some(EmailStep::Sending),
+            "the late answer was owed"
+        );
+        g.on(AccountEvent::EmailBegun(Ok(challenge("c2"))), 15_500);
+        assert_eq!(
+            g.on(submit("123456"), 15_600),
+            vec![finish_call("c2", "123456")]
+        );
     }
 
     /// Review I1: no session to go back to (a failed Google attempt left an error without one), so a refused
