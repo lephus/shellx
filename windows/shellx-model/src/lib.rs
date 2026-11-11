@@ -12,6 +12,7 @@ pub mod modal;
 pub mod mouse;
 pub mod palette;
 pub mod paste;
+pub mod redact;
 pub mod remote_state;
 pub mod selection;
 pub mod shell;
