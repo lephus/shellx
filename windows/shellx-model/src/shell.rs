@@ -163,18 +163,23 @@ fn file_name(path: &str) -> &str {
     path.rsplit(['\\', '/']).next().unwrap_or(path)
 }
 
-/// `X:\...`, `X:/...` or `\\server\...`. An empty, `.`, relative or drive-relative (`C:x`) path
-/// is not: the process would resolve it against whatever folder ShellX was started from.
+fn is_separator(c: char) -> bool {
+    c == '\\' || c == '/'
+}
+
+/// `X:\...`, `X:/...` or `\\server\...` (two separators, then a server name). An empty, `.`,
+/// relative, drive-relative (`C:x`) or bare `\\` path is not: the process would resolve it
+/// against whatever folder ShellX was started from.
 fn is_absolute(path: &str) -> bool {
     let c: Vec<char> = path.chars().take(3).collect();
-    let drive =
-        c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && matches!(c[2], '\\' | '/');
-    let unc = c.len() >= 2 && c[0] == '\\' && c[1] == '\\';
+    let drive = c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && is_separator(c[2]);
+    let unc = c.len() == 3 && is_separator(c[0]) && is_separator(c[1]) && !is_separator(c[2]);
     drive || unc
 }
 
-/// Finds the file `program` names. A name with `\`, `/` or `:` is checked as given, then
-/// with `.exe` added when it has no extension; any other name is looked up in each
+/// Finds the file `program` names. A name with `\`, `/` or `:` must be an absolute path (a
+/// relative one gives `None`); it is checked as given, then with `.exe` added when it has no
+/// extension; any other name is looked up in each
 /// `;`-separated `PATH` entry (quotes stripped), plain then `.exe`. Entries that are not
 /// absolute (empty, `.`, relative) are skipped, so a program in ShellX's working folder is
 /// never chosen. The first existing file wins.
@@ -187,6 +192,10 @@ pub fn resolve_program(
         return None;
     }
     if program.contains(['\\', '/', ':']) {
+        // a path must be absolute: a relative one would be looked for in ShellX's folder
+        if !is_absolute(program) {
+            return None;
+        }
         if exists(program) {
             return Some(program.to_string());
         }
@@ -215,17 +224,19 @@ pub fn resolve_program(
 
 /// A custom shell typed as a command line: its program must exist (the Settings field
 /// calls this on every edit). The result has no kind and no prompt hook. A whole line that
-/// is a path to a file (spaces allowed, `.exe` optional) is that program with no arguments.
+/// is an absolute path to a file (spaces allowed, `.exe` optional) is that program with no
+/// arguments. The program of a parsed line is a bare name or an absolute path, never a
+/// relative path.
 pub fn custom_launch(
     line: &str,
     probe: &ShellProbe,
     exists: &dyn Fn(&str) -> bool,
 ) -> Result<ShellLaunch, CustomShellError> {
     // An unquoted path with spaces that names a file (with or without `.exe`) is that program
-    // with no arguments. Only a value that looks like a path can be one: a bare name is
-    // looked up on PATH, never in the current folder.
+    // with no arguments. Only an absolute path can be one: a bare name is looked up on PATH
+    // and a relative path is refused, so the current folder is never searched.
     let whole = line.trim();
-    if whole.contains(['\\', '/', ':'])
+    if is_absolute(whole)
         && let Some(program) = resolve_program(whole, probe, exists)
     {
         return Ok(ShellLaunch {
@@ -289,11 +300,13 @@ pub enum ShellError {
     Override(CustomShellError),
 }
 
+/// An environment value used as a folder: trimmed, absolute (a relative one would be the
+/// current folder in disguise), without a trailing backslash.
 fn base(value: &Option<String>) -> Option<&str> {
     value
         .as_deref()
         .map(str::trim)
-        .filter(|v| !v.is_empty())
+        .filter(|v| is_absolute(v))
         .map(|v| v.trim_end_matches('\\'))
 }
 
@@ -341,7 +354,7 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         .comspec
         .as_deref()
         .map(str::trim)
-        .filter(|c| !c.is_empty() && exists(c))
+        .filter(|c| is_absolute(c) && exists(c))
         .map(String::from);
     let cmd = comspec.or_else(|| {
         let p = format!(r"{system_root}\System32\cmd.exe");
@@ -377,8 +390,10 @@ fn auto_shells(found: &[ShellLaunch]) -> impl Iterator<Item = &ShellLaunch> {
     })
 }
 
+/// Windows ignores case and accepts `/` for `\\`.
 fn same_program(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
+    a.replace('/', "\\")
+        .eq_ignore_ascii_case(&b.replace('/', "\\"))
 }
 
 /// The first Auto shell that is not the program in `first`: the one fallback.
