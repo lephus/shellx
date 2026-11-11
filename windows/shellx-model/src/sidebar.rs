@@ -4,7 +4,8 @@ use serde::Deserialize;
 
 use crate::strings::{Lang, Str, offline_last_seen, t};
 
-#[derive(Clone, Debug, PartialEq, Deserialize)]
+/// `Debug` (hand-written) shows the name's length only: other machines' names never reach a log.
+#[derive(Clone, PartialEq, Deserialize)]
 pub struct MachineInfo {
     pub machine_id: String,
     pub name: String,
@@ -23,6 +24,22 @@ pub struct MachineInfo {
     /// true: the relay sends no such key today, and any other value reads false.
     #[serde(default, deserialize_with = "true_only")]
     pub can_host: bool,
+}
+
+impl std::fmt::Debug for MachineInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MachineInfo")
+            .field("machine_id", &self.machine_id)
+            .field("platform", &self.platform)
+            .field("online", &self.online)
+            .field("can_host", &self.can_host)
+            .field("is_this_machine", &self.is_this_machine)
+            .field(
+                "name",
+                &format_args!("<{} chars>", self.name.chars().count()),
+            )
+            .finish_non_exhaustive()
+    }
 }
 
 fn true_only<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {

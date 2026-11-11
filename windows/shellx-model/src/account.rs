@@ -109,9 +109,9 @@ impl fmt::Debug for AccountEvent {
         match self {
             AccountEvent::Started => write!(f, "Started"),
             AccountEvent::ListResult(r) => f.debug_tuple("ListResult").field(r).finish(),
-            AccountEvent::LoginSubmitted { email, .. } => f
+            AccountEvent::LoginSubmitted { .. } => f
                 .debug_struct("LoginSubmitted")
-                .field("email", email)
+                .field("email", &"<redacted>")
                 .field("password", &"<redacted>")
                 .finish(),
             AccountEvent::LoginResult(r) => f.debug_tuple("LoginResult").field(r).finish(),
@@ -159,9 +159,9 @@ impl fmt::Debug for AccountAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AccountAction::CallList => write!(f, "CallList"),
-            AccountAction::CallLogin { email, .. } => f
+            AccountAction::CallLogin { .. } => f
                 .debug_struct("CallLogin")
-                .field("email", email)
+                .field("email", &"<redacted>")
                 .field("password", &"<redacted>")
                 .finish(),
             AccountAction::CallRegister => write!(f, "CallRegister"),
@@ -198,7 +198,7 @@ struct GoogleRun {
     flow_id: Option<String>,
 }
 
-#[derive(Debug)]
+/// `Debug` (hand-written) shows the state, counts and flags, never the email or the machines' names.
 pub struct AccountFlow {
     state: AccountState,
     /// Last good machine list; kept across network errors.
@@ -239,6 +239,39 @@ pub struct AccountFlow {
 impl Default for AccountFlow {
     fn default() -> Self {
         AccountFlow::new()
+    }
+}
+
+impl fmt::Debug for AccountFlow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let email = if self.email.is_some() {
+            "<set>"
+        } else {
+            "<none>"
+        };
+        f.debug_struct("AccountFlow")
+            .field("state", &self.state)
+            .field("machines", &self.machines.len())
+            .field("register_requested", &self.register_requested)
+            .field("list_in_flight", &self.list_in_flight)
+            .field("login_in_flight", &self.login_in_flight)
+            .field("logout_in_flight", &self.logout_in_flight)
+            .field("retry_list", &self.retry_list)
+            .field("has_session", &self.has_session)
+            .field("session_requested", &self.session_requested)
+            .field("signed_out_by_server", &self.signed_out_by_server)
+            .field("last_list_ms", &self.last_list_ms)
+            .field("last_heartbeat_ms", &self.last_heartbeat_ms)
+            .field("tick_pending", &self.tick_pending)
+            .field("google", &self.google)
+            .field("stale_begins", &self.stale_begins)
+            .field("notice", &self.notice)
+            .field("notice_is_methods", &self.notice_is_methods)
+            .field("email", &format_args!("{email}"))
+            .field("auth_method", &self.auth_method)
+            .field("methods", &self.methods.as_ref().map(Vec::len))
+            .field("removing", &self.removing)
+            .finish()
     }
 }
 
@@ -1785,6 +1818,67 @@ mod tests {
         assert!(f.can_sign_out());
         // signed in: always
         assert!(logged_in().can_sign_out());
+    }
+
+    /// Spec §4.7 layer (2): no email, machine name or device name in `Debug` output (logs, panics).
+    #[test]
+    fn account_debug_never_shows_emails_or_machine_names() {
+        const SECRETS: [&str; 4] = ["secret.person", "Phú's MacBook", "Bếp-PC", "iPhone của Phú"];
+        let check = |what: &str, text: String| {
+            for s in SECRETS {
+                assert!(!text.contains(s), "{what} shows {s:?}: {text}");
+            }
+        };
+        let email = "secret.person@example.com";
+        let mac = MachineInfo {
+            name: "Phú's MacBook".into(),
+            platform: "macos".into(),
+            ..m("mac", false)
+        };
+        let pc = MachineInfo {
+            name: "Bếp-PC".into(),
+            ..m("me", true)
+        };
+        let method = SignInMethod {
+            email: email.into(),
+            linked_via_device_name: Some("iPhone của Phú".into()),
+            ..method("a1", "apple")
+        };
+
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "f1"), 3);
+        f.on(finished("f1", Ok(google_done(email, "google"))), 4);
+        f.on(
+            AccountEvent::ListResult(Ok(vec![mac.clone(), pc.clone()])),
+            5,
+        );
+        f.on(
+            AccountEvent::SignInMethodsResult(Ok(vec![method.clone()])),
+            6,
+        );
+        assert_eq!(f.email(), Some(email));
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        check("flow", format!("{f:?}"));
+        check("flow (pretty)", format!("{f:#?}"));
+
+        let submitted = AccountEvent::LoginSubmitted {
+            email: email.into(),
+            password: "pw".into(),
+        };
+        check("LoginSubmitted", format!("{submitted:?}"));
+        let mut g = logged_out();
+        let actions = g.on(submitted, 7);
+        assert!(matches!(actions[..], [AccountAction::CallLogin { .. }]));
+        check("CallLogin", format!("{actions:?}"));
+        check(
+            "ListResult",
+            format!("{:?}", AccountEvent::ListResult(Ok(vec![mac.clone()]))),
+        );
+        for m in [&mac, &pc] {
+            check("MachineInfo", format!("{m:?} {m:#?}"));
+        }
+        check("SignInMethod", format!("{method:?} {method:#?}"));
     }
 
     #[test]

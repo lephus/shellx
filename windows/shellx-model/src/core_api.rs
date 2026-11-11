@@ -197,8 +197,8 @@ impl fmt::Debug for SessionInfo {
     }
 }
 
-/// One item of `account.identities.list`.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+/// One item of `account.identities.list`. `Debug` hides the email and the linking device's name.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
 pub struct SignInMethod {
     pub identity_id: String,
     pub provider: String,
@@ -210,6 +210,16 @@ pub struct SignInMethod {
     pub linked_via_device_name: Option<String>,
     #[serde(default)]
     pub created_at_unix: u64,
+}
+
+impl fmt::Debug for SignInMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SignInMethod")
+            .field("identity_id", &self.identity_id)
+            .field("provider", &self.provider)
+            .field("is_private_email", &self.is_private_email)
+            .finish_non_exhaustive()
+    }
 }
 
 impl SignInMethod {

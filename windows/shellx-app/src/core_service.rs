@@ -406,7 +406,7 @@ mod tests {
         assert_eq!(
             ran,
             [
-                "CallLogin { email: \"a@b.c\", password: \"<redacted>\" }",
+                "CallLogin { email: \"<redacted>\", password: \"<redacted>\" }",
                 "CallList",
                 "CallRegister",
                 "CallList",
@@ -484,7 +484,7 @@ mod tests {
         assert_eq!(
             ran,
             [
-                "CallLogin { email: \"a@b.c\", password: \"<redacted>\" }",
+                "CallLogin { email: \"<redacted>\", password: \"<redacted>\" }",
                 "CallList",
                 "CallRegister",
                 "CallList",
