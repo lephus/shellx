@@ -220,6 +220,14 @@ public final class EmailSignInModel {
         errorText = nil
     }
 
+    /// Asks the shown field to take the keyboard again (``focusRequest`` grows), for when another flow took it away:
+    /// a field turned off while it has the keyboard loses it. Only while that field takes input: the email step, or
+    /// the code step with a live challenge; never after the sheet closed.
+    public func requestFocus() {
+        guard !closed, step == .email || canEditCode else { return }
+        focusRequest += 1
+    }
+
     /// Back to the email step with the address kept; the challenge, the digits, the failure and the lock are dropped.
     public func useDifferentEmail() {
         guard step == .code, !closed else { return }

@@ -44,17 +44,25 @@ public enum SignInSheetFlows {
         return email.sendCode()
     }
 
-    /// Continue with Google: clears the email failure, then `google.start()`.
+    /// Continue with Google: clears the email failure, then `google.start()`. The email field is off while Google
+    /// waits, so it loses the keyboard; when Google is ready again (a failure, or a cancel in the browser) the field
+    /// asks for it back (``EmailSignInModel/requestFocus()``).
     ///
     /// - Parameters:
     ///   - google: The sheet's Google model.
     ///   - email: The sheet's email model; nil on the "Switch to Google sign-in" sheet.
-    /// - Returns: The flow's task; nil (and nothing cleared) unless ``googleEnabled(google:email:)`` holds.
+    /// - Returns: The flow's task, which ends after the focus request; nil (and nothing cleared) unless
+    ///   ``googleEnabled(google:email:)`` holds.
     @discardableResult
     public static func startGoogle(google: GoogleSignInModel, email: EmailSignInModel?) -> Task<Void, Never>? {
         guard googleEnabled(google: google, email: email) else { return nil }
         email?.clearError()
-        return google.start()
+        guard let flow = google.start() else { return nil }
+        guard let email else { return flow }
+        return Task { [weak google, weak email] in
+            await flow.value
+            if google?.phase == .ready { email?.requestFocus() }
+        }
     }
 
     /// The email field changed: `google.clearError()`, then `email.setEmail(text)`, so typing hides Google's failure.
