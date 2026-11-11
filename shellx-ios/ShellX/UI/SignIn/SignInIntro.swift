@@ -92,6 +92,25 @@ enum SignInIntro {
         return CursorBlink.isOn(elapsed: time - end) ? 1 : 0
     }
 
+    /// Seconds for one turn of the halo's colours around the logo.
+    static let haloTurn: TimeInterval = 6
+
+    /// How far the halo's colours have turned at `time`, in degrees clockwise. Not built yet: the halo is one colour.
+    static func haloAngle(at time: TimeInterval) -> Double {
+        0
+    }
+
+    /// The halo's opacity at the bottom and at the top of a breath, in the light or the dark appearance. Not built
+    /// yet: one range for both.
+    static func haloRange(dark: Bool) -> (low: Double, high: Double) {
+        (glowLow, glowHigh)
+    }
+
+    /// The halo's opacity at `time` in the light or the dark appearance. Not built yet: the glow's, in both.
+    static func haloOpacity(at time: TimeInterval, dark: Bool) -> Double {
+        glowOpacity(at: time)
+    }
+
     /// The opacity of the glow behind the logo at `time`: nothing until the chevrons settle, a fade in to `glowLow`
     /// at `end`, then a breath to `glowHigh` and back every `glowBreath` seconds.
     static func glowOpacity(at time: TimeInterval) -> Double {

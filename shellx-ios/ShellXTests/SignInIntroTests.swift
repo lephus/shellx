@@ -282,6 +282,67 @@ final class SignInIntroTests: XCTestCase {
         }
     }
 
+    // MARK: - The halo
+
+    /// How far two angles are apart, in degrees, the short way round.
+    private func apart(_ a: Double, _ b: Double) -> Double {
+        let difference = abs(a - b).truncatingRemainder(dividingBy: 360)
+        return min(difference, 360 - difference)
+    }
+
+    func testTheHaloTurnsClockwiseOnceEverySixSecondsFromItsStart() {
+        let start = SignInIntro.chevronSettle
+        XCTAssertEqual(SignInIntro.haloTurn, 6)
+        XCTAssertEqual(SignInIntro.haloAngle(at: 0), 0, "before the halo is there, nothing has turned")
+        XCTAssertEqual(SignInIntro.haloAngle(at: start), 0, "it starts when the chevrons have settled")
+        XCTAssertEqual(SignInIntro.haloAngle(at: start + 1.5), 90, accuracy: 1e-9, "a quarter turn in 1.5 s")
+        XCTAssertEqual(SignInIntro.haloAngle(at: start + 3), 180, accuracy: 1e-9)
+        XCTAssertEqual(SignInIntro.haloAngle(at: start + 4.5), 270, accuracy: 1e-9)
+        XCTAssertEqual(apart(SignInIntro.haloAngle(at: start + 6), 0), 0, accuracy: 1e-9, "one turn in 6 s, then again")
+        XCTAssertEqual(SignInIntro.haloAngle(at: start + 7.5), 90, accuracy: 1e-9)
+        XCTAssertEqual(SignInIntro.haloAngle(at: start + 600 * 6 + 1.5), 90, accuracy: 1e-6, "and an hour later")
+
+        var previous = SignInIntro.haloAngle(at: start)
+        for step in 1...1500 {
+            let angle = SignInIntro.haloAngle(at: start + Double(step) / 100)
+            XCTAssertGreaterThanOrEqual(angle, 0)
+            XCTAssertLessThan(angle, 360, "it wraps (\(step) hundredths of a second)")
+            XCTAssertEqual(apart(angle, previous + 0.6), 0, accuracy: 1e-6, "at one speed: 0.6 degrees in 10 ms, clockwise")
+            previous = angle
+        }
+    }
+
+    func testTheHaloBreathesInTheRangeOfItsAppearance() {
+        XCTAssertEqual(SignInIntro.haloRange(dark: false).low, 0.25)
+        XCTAssertEqual(SignInIntro.haloRange(dark: false).high, 0.45)
+        XCTAssertEqual(SignInIntro.haloRange(dark: true).low, 0.35, "on a dark screen the halo is stronger")
+        XCTAssertEqual(SignInIntro.haloRange(dark: true).high, 0.60)
+
+        for dark in [false, true] {
+            let range = SignInIntro.haloRange(dark: dark)
+            XCTAssertEqual(SignInIntro.haloOpacity(at: 0, dark: dark), 0)
+            XCTAssertEqual(SignInIntro.haloOpacity(at: SignInIntro.chevronSettle, dark: dark), 0, "no halo while the chevrons slide")
+            XCTAssertEqual(SignInIntro.haloOpacity(at: SignInIntro.end, dark: dark), range.low, accuracy: 1e-9)
+            XCTAssertEqual(SignInIntro.haloOpacity(at: SignInIntro.end + 1, dark: dark), (range.low + range.high) / 2, accuracy: 1e-9)
+            XCTAssertEqual(SignInIntro.haloOpacity(at: SignInIntro.end + 2, dark: dark), range.high, accuracy: 1e-9)
+            XCTAssertEqual(SignInIntro.haloOpacity(at: SignInIntro.end + 4, dark: dark), range.low, accuracy: 1e-9, "one breath is 4 s")
+            XCTAssertEqual(SignInIntro.haloOpacity(at: SignInIntro.end + 4 * 500 + 2, dark: dark), range.high, accuracy: 1e-6)
+
+            var previous = 0.0
+            for step in 0...180 {
+                let opacity = SignInIntro.haloOpacity(at: Double(step) / 200, dark: dark)
+                XCTAssertGreaterThanOrEqual(opacity, previous - 1e-9, "it only fades in until the intro is over (dark: \(dark))")
+                XCTAssertLessThanOrEqual(opacity, range.low + 1e-9)
+                previous = opacity
+            }
+            for step in 0...160 {
+                let opacity = SignInIntro.haloOpacity(at: SignInIntro.end + Double(step) / 20, dark: dark)
+                XCTAssertGreaterThanOrEqual(opacity, range.low - 1e-9)
+                XCTAssertLessThanOrEqual(opacity, range.high + 1e-9)
+            }
+        }
+    }
+
     // MARK: - When each part is drawn again
 
     func testTheLogoIsDrawnEveryFrameUntilTheIntroIsOverThenAtEachTurnOfTheBlink() throws {

@@ -45,6 +45,8 @@ final class SignInRenderTests: XCTestCase {
         static let faint = SignInIntro.end + 8 * CursorBlink.half
         /// The glow at the very top of its breath.
         static let brightest = SignInIntro.end + SignInIntro.glowBreath / 2
+        /// One second into the halo's first breath: half way up.
+        static let halo = SignInIntro.end + 1
 
         /// The first tagline (`letters` long) is whole and has been held for 0.2 s: its cursor is still on.
         static func held(letters: Int) -> TimeInterval { TypedTaglineView.startDelay + Double(letters) * 0.028 + 0.2 }
@@ -182,6 +184,42 @@ final class SignInRenderTests: XCTestCase {
                 glowing[index].count(where: Self.mint), faint[index].count(where: Self.mint) + 6000 * scale * scale,
                 "the glow breathes: more of it near the top of a breath")
         }
+    }
+
+    func testTheHaloIsARingOfColoursThatTurnsClockwise() throws {
+        // The 240-point logo on the black stage, one second into the halo's breath and 1.5 s later: a quarter turn.
+        // Four points on the halo, 5 points outside the middle of each side of the square: top, right, bottom, left.
+        let rest = try logo(.still, name: "signin-logo")
+        let first = try logo(.at(Moment.halo), name: "signin-logo-halo")
+        let second = try logo(.at(Moment.halo + 1.5), name: "signin-logo-halo-later")
+        var strength: [Int] = []
+        for index in rest.indices {
+            let scale = rest[index].scale
+            let square = try XCTUnwrap(rest[index].litBox())
+            XCTAssertEqual(square.width, CGFloat(240 * scale), accuracy: CGFloat(2 * scale), "still, only the square is lit: no halo")
+            XCTAssertEqual(square.height, CGFloat(240 * scale), accuracy: CGFloat(2 * scale))
+
+            let reach = Int(square.width) / 2 + 5 * scale
+            let (x, y) = (Int(square.midX), Int(square.midY))
+            let points = [(x, y - reach), (x + reach, y), (x, y + reach), (x - reach, y)]
+            let hues = try points.map { try XCTUnwrap(first[index].mean(x: $0.0, y: $0.1, radius: scale).hue, "the halo is coloured at \($0)") }
+            let later = try points.map { try XCTUnwrap(second[index].mean(x: $0.0, y: $0.1, radius: scale).hue, "the halo is coloured at \($0)") }
+            // Hues more than 40 degrees from each other count as different colours.
+            var different: [Double] = []
+            for hue in hues where different.allSatisfy({ Bitmap.Colour.apart($0, hue) > 40 }) { different.append(hue) }
+            XCTAssertGreaterThanOrEqual(different.count, 3, "at least three clearly different colours around the logo: hues \(hues)")
+
+            XCTAssertGreaterThan(Bitmap.Colour.apart(later[0], hues[0]), 30, "1.5 s later the colour at the top is another: \(hues) then \(later)")
+            for side in 0..<4 {
+                XCTAssertLessThan(
+                    Bitmap.Colour.apart(later[(side + 1) % 4], hues[side]), 20,
+                    "the colours travel clockwise: what was at one side is at the next a quarter turn later: \(hues) then \(later)")
+            }
+            // At the top of a breath (the second frame is 2.5 s into it, the top is at 2 s), how lit the halo is.
+            strength.append(points.map { second[index].mean(x: $0.0, y: $0.1, radius: scale).brightest }.reduce(0, +))
+        }
+        XCTAssertGreaterThan(
+            strength[1] * 10, strength[0] * 12, "in the dark appearance the halo is stronger than in the light one: \(strength)")
     }
 
     func testOnTheClockThePartsAreAsAtTheStartBeforeItAndAtRestLongAfter() throws {
@@ -587,6 +625,27 @@ private struct Bitmap {
         }
 
         var brightest: Int { max(r, g, b) }
+        /// The colour's hue, in degrees (red 0, green 120, blue 240); nil for a grey or one too dark to tell.
+        var hue: Double? {
+            let (high, low) = (max(r, g, b), min(r, g, b))
+            guard high - low >= 12 else { return nil }
+            let span = Double(high - low)
+            let sixth: Double
+            if high == r {
+                sixth = (Double(g - b) / span).truncatingRemainder(dividingBy: 6)
+            } else if high == g {
+                sixth = Double(b - r) / span + 2
+            } else {
+                sixth = Double(r - g) / span + 4
+            }
+            return (sixth * 60 + 360).truncatingRemainder(dividingBy: 360)
+        }
+
+        /// How far two hues are apart, in degrees, the short way round.
+        static func apart(_ a: Double, _ b: Double) -> Double {
+            let difference = abs(a - b).truncatingRemainder(dividingBy: 360)
+            return min(difference, 360 - difference)
+        }
         var isWhite: Bool { r >= 250 && g >= 250 && b >= 250 }
         func distance(to other: Colour) -> Int { max(abs(r - other.r), abs(g - other.g), abs(b - other.b)) }
     }
@@ -646,6 +705,21 @@ private struct Bitmap {
     func at(x: Int, y: Int) -> Colour {
         let i = (y * width + x) * 4
         return Colour(r: Int(data[i]), g: Int(data[i + 1]), b: Int(data[i + 2]))
+    }
+
+    /// The mean colour of the square of pixels up to `radius` away from (x, y).
+    func mean(x: Int, y: Int, radius: Int) -> Colour {
+        var (r, g, b, n) = (0, 0, 0, 0)
+        for row in max(0, y - radius)...min(height - 1, y + radius) {
+            for column in max(0, x - radius)...min(width - 1, x + radius) {
+                let colour = at(x: column, y: row)
+                r += colour.r
+                g += colour.g
+                b += colour.b
+                n += 1
+            }
+        }
+        return Colour(r: r / n, g: g / n, b: b / n)
     }
 
     func count(where test: (Colour) -> Bool) -> Int {
