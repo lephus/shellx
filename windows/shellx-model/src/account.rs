@@ -109,9 +109,9 @@ impl fmt::Debug for AccountEvent {
         match self {
             AccountEvent::Started => write!(f, "Started"),
             AccountEvent::ListResult(r) => f.debug_tuple("ListResult").field(r).finish(),
-            AccountEvent::LoginSubmitted { email, .. } => f
+            AccountEvent::LoginSubmitted { .. } => f
                 .debug_struct("LoginSubmitted")
-                .field("email", email)
+                .field("email", &"<redacted>")
                 .field("password", &"<redacted>")
                 .finish(),
             AccountEvent::LoginResult(r) => f.debug_tuple("LoginResult").field(r).finish(),
@@ -159,9 +159,9 @@ impl fmt::Debug for AccountAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AccountAction::CallList => write!(f, "CallList"),
-            AccountAction::CallLogin { email, .. } => f
+            AccountAction::CallLogin { .. } => f
                 .debug_struct("CallLogin")
-                .field("email", email)
+                .field("email", &"<redacted>")
                 .field("password", &"<redacted>")
                 .finish(),
             AccountAction::CallRegister => write!(f, "CallRegister"),
@@ -198,7 +198,7 @@ struct GoogleRun {
     flow_id: Option<String>,
 }
 
-#[derive(Debug)]
+/// `Debug` (hand-written) shows the state, counts and flags, never the email or the machines' names.
 pub struct AccountFlow {
     state: AccountState,
     /// Last good machine list; kept across network errors.
@@ -230,11 +230,48 @@ pub struct AccountFlow {
     signed_out_by_server: bool,
     methods: Option<Vec<SignInMethod>>,
     removing: Option<String>,
+    /// The core has shown that it holds a session: a login or Google sign-in succeeded, a list answered
+    /// anything but `not_logged_in` / `unauthorized` / `http_401`, or a register answered. Cleared with
+    /// the session (`reset_session`) and by a list that says there is none.
+    has_session: bool,
 }
 
 impl Default for AccountFlow {
     fn default() -> Self {
         AccountFlow::new()
+    }
+}
+
+impl fmt::Debug for AccountFlow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let email = if self.email.is_some() {
+            "<set>"
+        } else {
+            "<none>"
+        };
+        f.debug_struct("AccountFlow")
+            .field("state", &self.state)
+            .field("machines", &self.machines.len())
+            .field("register_requested", &self.register_requested)
+            .field("list_in_flight", &self.list_in_flight)
+            .field("login_in_flight", &self.login_in_flight)
+            .field("logout_in_flight", &self.logout_in_flight)
+            .field("retry_list", &self.retry_list)
+            .field("has_session", &self.has_session)
+            .field("session_requested", &self.session_requested)
+            .field("signed_out_by_server", &self.signed_out_by_server)
+            .field("last_list_ms", &self.last_list_ms)
+            .field("last_heartbeat_ms", &self.last_heartbeat_ms)
+            .field("tick_pending", &self.tick_pending)
+            .field("google", &self.google)
+            .field("stale_begins", &self.stale_begins)
+            .field("notice", &self.notice)
+            .field("notice_is_methods", &self.notice_is_methods)
+            .field("email", &format_args!("{email}"))
+            .field("auth_method", &self.auth_method)
+            .field("methods", &self.methods.as_ref().map(Vec::len))
+            .field("removing", &self.removing)
+            .finish()
     }
 }
 
@@ -261,6 +298,7 @@ impl AccountFlow {
             signed_out_by_server: false,
             methods: None,
             removing: None,
+            has_session: false,
         }
     }
 
@@ -325,6 +363,16 @@ impl AccountFlow {
         self.removing.as_deref()
     }
 
+    /// Whether "Sign out" is offered: always while signed in, and in the error state once the core has
+    /// shown a session exists (R4 Major 6: a session whose list fails must still be able to sign out).
+    pub fn can_sign_out(&self) -> bool {
+        match self.state {
+            AccountState::LoggedIn { .. } => true,
+            AccountState::Error(_) => self.has_session,
+            _ => false,
+        }
+    }
+
     /// True once after the server ended the session (the app shows sign-in).
     pub fn take_signed_out_by_server(&mut self) -> bool {
         std::mem::take(&mut self.signed_out_by_server)
@@ -380,6 +428,7 @@ impl AccountFlow {
         self.session_requested = false;
         self.methods = None;
         self.removing = None;
+        self.has_session = false;
     }
 
     pub fn on(&mut self, ev: AccountEvent, now_ms: u64) -> Vec<AccountAction> {
@@ -401,6 +450,13 @@ impl AccountFlow {
                 if self.login_in_flight {
                     return out; // stale: started before the login was submitted
                 }
+                self.has_session = match &result {
+                    Ok(_) => true,
+                    Err(e) => !matches!(
+                        e.code.as_str(),
+                        "not_logged_in" | "unauthorized" | "http_401"
+                    ),
+                };
                 match result {
                     Ok(list) => {
                         self.retry_list = false;
@@ -491,6 +547,7 @@ impl AccountFlow {
                 self.login_in_flight = false;
                 match result {
                     Ok(_) => {
+                        self.has_session = true;
                         self.register_requested = false;
                         self.list_in_flight = true;
                         self.last_list_ms = now_ms;
@@ -500,12 +557,15 @@ impl AccountFlow {
                 }
             }
             AccountEvent::Registered(result) => match result {
+                // Either answer means the core sent the register with a session.
                 Ok(_) => {
+                    self.has_session = true;
                     self.list_in_flight = true;
                     self.last_list_ms = now_ms;
                     out.push(AccountAction::CallList);
                 }
                 Err(e) => {
+                    self.has_session = true;
                     self.register_requested = false;
                     self.state = AccountState::Error(e);
                     self.retry_list = true;
@@ -632,6 +692,7 @@ impl AccountFlow {
                 match result {
                     Ok(info) => {
                         self.google = None;
+                        self.has_session = true;
                         self.email = Some(info.email);
                         self.auth_method = Some(info.auth_method);
                         self.notice = None;
@@ -733,6 +794,7 @@ mod tests {
             last_seen_unix: 0,
             fingerprint: "f".into(),
             is_this_machine: this,
+            can_host: false,
         }
     }
 
@@ -1651,6 +1713,172 @@ mod tests {
         assert!(!format!("{e:?}").contains("g@x"));
         let s = session(Some("g@x"), "google");
         assert!(!format!("{s:?}").contains("g@x"));
+    }
+
+    // ----- sign-out in the error state (R4 Major 6) -----
+
+    #[test]
+    fn sign_out_is_offered_in_the_error_state_and_ends_the_retry_loop() {
+        let mut f = logged_out();
+        assert!(!f.can_sign_out());
+        f.on(
+            AccountEvent::LoginSubmitted {
+                email: "a@b.c".into(),
+                password: "pw".into(),
+            },
+            2,
+        );
+        assert!(!f.can_sign_out(), "signing in");
+        assert_eq!(
+            f.on(AccountEvent::LoginResult(Ok(login_info())), 3),
+            vec![AccountAction::CallList]
+        );
+        let bad = CoreErr::new(
+            "bad_response",
+            "machines.list: invalid type: null, expected a string",
+        );
+        f.on(AccountEvent::ListResult(Err(bad.clone())), 4);
+        assert_eq!(f.state(), &AccountState::Error(bad));
+        assert!(f.can_sign_out());
+        assert_eq!(
+            f.on(AccountEvent::LogoutRequested, 5),
+            vec![AccountAction::CallLogout]
+        );
+        f.on(AccountEvent::LogoutResult(Ok(())), 6);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(!f.can_sign_out());
+        assert!(f.on(AccountEvent::Tick(100_000), 100_000).is_empty());
+
+        // the same after a Google sign-in
+        let mut g = logged_out();
+        g.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        g.on(begun(GooglePurpose::SignIn, "f1"), 3);
+        g.on(finished("f1", Ok(google_done("g@x", "google"))), 4);
+        g.on(AccountEvent::ListResult(Err(net())), 5);
+        assert!(matches!(g.state(), AccountState::Error(_)));
+        assert!(g.can_sign_out());
+    }
+
+    #[test]
+    fn no_sign_out_after_a_first_sign_in_failed() {
+        let mut f = logged_out();
+        f.on(
+            AccountEvent::LoginSubmitted {
+                email: "a@b.c".into(),
+                password: "x".into(),
+            },
+            2,
+        );
+        f.on(
+            AccountEvent::LoginResult(Err(CoreErr::new("invalid_credentials", ""))),
+            3,
+        );
+        assert!(matches!(f.state(), AccountState::Error(e) if e.code == "invalid_credentials"));
+        assert!(!f.can_sign_out());
+        assert!(!AccountFlow::new().can_sign_out(), "unknown");
+    }
+
+    #[test]
+    fn startup_error_with_a_session_offers_sign_out() {
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        f.on(AccountEvent::ListResult(Err(net())), 10);
+        assert!(matches!(f.state(), AccountState::Error(e) if e.code == "network"));
+        assert!(f.can_sign_out());
+        // a list the server refused: the core forgot the session
+        f.on(AccountEvent::Tick(15_010), 15_010);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("unauthorized", ""))),
+            15_011,
+        );
+        assert!(matches!(f.state(), AccountState::Error(_)));
+        assert!(!f.can_sign_out());
+    }
+
+    #[test]
+    fn register_failure_offers_sign_out() {
+        let mut f = logged_out();
+        f.on(
+            AccountEvent::LoginSubmitted {
+                email: "a@b.c".into(),
+                password: "pw".into(),
+            },
+            2,
+        );
+        f.on(AccountEvent::LoginResult(Ok(login_info())), 3);
+        assert_eq!(
+            f.on(AccountEvent::ListResult(Ok(vec![])), 4),
+            vec![AccountAction::CallRegister]
+        );
+        f.on(
+            AccountEvent::Registered(Err(CoreErr::new("invalid_machine", "x"))),
+            5,
+        );
+        assert!(matches!(f.state(), AccountState::Error(e) if e.code == "invalid_machine"));
+        assert!(f.can_sign_out());
+        // signed in: always
+        assert!(logged_in().can_sign_out());
+    }
+
+    /// Spec §4.7 layer (2): no email, machine name or device name in `Debug` output (logs, panics).
+    #[test]
+    fn account_debug_never_shows_emails_or_machine_names() {
+        const SECRETS: [&str; 4] = ["secret.person", "Phú's MacBook", "Bếp-PC", "iPhone của Phú"];
+        let check = |what: &str, text: String| {
+            for s in SECRETS {
+                assert!(!text.contains(s), "{what} shows {s:?}: {text}");
+            }
+        };
+        let email = "secret.person@example.com";
+        let mac = MachineInfo {
+            name: "Phú's MacBook".into(),
+            platform: "macos".into(),
+            ..m("mac", false)
+        };
+        let pc = MachineInfo {
+            name: "Bếp-PC".into(),
+            ..m("me", true)
+        };
+        let method = SignInMethod {
+            email: email.into(),
+            linked_via_device_name: Some("iPhone của Phú".into()),
+            ..method("a1", "apple")
+        };
+
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "f1"), 3);
+        f.on(finished("f1", Ok(google_done(email, "google"))), 4);
+        f.on(
+            AccountEvent::ListResult(Ok(vec![mac.clone(), pc.clone()])),
+            5,
+        );
+        f.on(
+            AccountEvent::SignInMethodsResult(Ok(vec![method.clone()])),
+            6,
+        );
+        assert_eq!(f.email(), Some(email));
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        check("flow", format!("{f:?}"));
+        check("flow (pretty)", format!("{f:#?}"));
+
+        let submitted = AccountEvent::LoginSubmitted {
+            email: email.into(),
+            password: "pw".into(),
+        };
+        check("LoginSubmitted", format!("{submitted:?}"));
+        let mut g = logged_out();
+        let actions = g.on(submitted, 7);
+        assert!(matches!(actions[..], [AccountAction::CallLogin { .. }]));
+        check("CallLogin", format!("{actions:?}"));
+        check(
+            "ListResult",
+            format!("{:?}", AccountEvent::ListResult(Ok(vec![mac.clone()]))),
+        );
+        for m in [&mac, &pc] {
+            check("MachineInfo", format!("{m:?} {m:#?}"));
+        }
+        check("SignInMethod", format!("{method:?} {method:#?}"));
     }
 
     #[test]

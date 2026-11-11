@@ -235,7 +235,7 @@ fn apple_link_pairings_are_marked() {
         "POST",
         "/v2/machines",
         Some(tok),
-        Some(&json!({"name":"Mac","platform":"macos","os_version":"1","app_version":"1","noise_public_key_b64": URL_SAFE_NO_PAD.encode([5u8; 32])})),
+        Some(&json!({"name":"Mac","platform":"macos","os_version":"15.5","app_version":"2.0.0","noise_public_key_b64": URL_SAFE_NO_PAD.encode([5u8; 32])})),
     );
     assert!(st == 200 || st == 201, "{m}");
     let mid = m["machine_id"].as_str().or(m["id"].as_str()).unwrap().to_string();
