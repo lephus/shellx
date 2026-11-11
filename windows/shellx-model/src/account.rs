@@ -3088,31 +3088,95 @@ mod tests {
         }
     }
 
-    /// Checked while the first list was still out: its answer arrived meanwhile and was dropped, so the flow
-    /// asks again instead of staying `Unknown`.
+    /// Review I1: no session to go back to (a failed Google attempt left an error without one), so a refused
+    /// code ends signed out, and nothing retries.
     #[test]
-    fn a_failed_verify_before_the_first_list_answered_asks_again() {
-        let mut f = AccountFlow::new();
-        f.on(AccountEvent::Started, 0);
-        to_code(&mut f, 1);
-        f.on(submit("123456"), 2);
-        f.on(
-            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
-            3,
-        );
-        assert_eq!(f.state(), &AccountState::LoggingIn);
-        assert_eq!(
-            f.on(email_finished("c1", Err(err("invalid_code"))), 4),
-            vec![AccountAction::CallList]
-        );
-        assert_eq!(f.state(), &AccountState::Unknown);
-        f.on(
-            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
-            5,
-        );
+    fn a_failed_verify_after_a_failed_google_attempt_is_signed_out() {
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "g1"), 3);
+        f.on(finished("g1", Err(err("google_timeout"))), 4);
+        assert!(matches!(f.state(), AccountState::Error(e) if e.code == "google_timeout"));
+        assert!(!f.can_sign_out());
+        to_code(&mut f, 1_000);
+        assert_eq!(f.google_failure(), None, "Send code hides Google's failure");
+        f.on(submit("123456"), 2_000);
+        f.on(email_finished("c1", Err(err("invalid_code"))), 2_100);
         assert_eq!(f.state(), &AccountState::LoggedOut);
-        assert_eq!(f.email_step(), Some(EmailStep::Code));
-        assert!(f.email_can_verify());
+        assert!(!f.can_sign_out());
+        assert!(f.on(AccountEvent::Tick(100_000), 100_000).is_empty());
+    }
+
+    /// Review I1, Google's path: the same helper restores an error that holds a session, with its sign-out
+    /// and its list retries; the failure itself is Google's own (`google_failure`), for the dialog.
+    #[test]
+    fn a_failed_google_attempt_from_an_error_with_a_session_keeps_sign_out_and_the_retry() {
+        // The browser answered with a failure; the retry tick came due meanwhile.
+        let mut g = error_with_a_session();
+        g.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 1_000);
+        g.on(begun(GooglePurpose::SignIn, "g1"), 1_000);
+        assert!(g.on(AccountEvent::Tick(15_004), 15_004).is_empty());
+        let acts = g.on(finished("g1", Err(err("google_timeout"))), 15_100);
+        assert!(in_the_list_error(&g), "{:?}", g.state());
+        assert!(g.can_sign_out());
+        assert!(!g.login_in_flight());
+        assert_eq!(
+            g.google_failure().map(|e| e.code.as_str()),
+            Some("google_timeout")
+        );
+        let at = scheduled_tick(&acts).expect("the list retries go on");
+        assert!(
+            g.on(AccountEvent::Tick(at), at)
+                .contains(&AccountAction::CallList)
+        );
+        // Cancelled after begin answered.
+        let mut h = error_with_a_session();
+        h.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 1_000);
+        h.on(begun(GooglePurpose::SignIn, "g1"), 1_000);
+        h.on(AccountEvent::GoogleCancelRequested, 1_100);
+        h.on(
+            finished("g1", Err(CoreErr::new("google_cancelled", ""))),
+            1_200,
+        );
+        assert!(in_the_list_error(&h), "{:?}", h.state());
+        assert!(h.can_sign_out());
+        assert_eq!(h.google_failure(), None);
+        assert!(
+            h.on(AccountEvent::Tick(15_004), 15_004)
+                .contains(&AccountAction::CallList)
+        );
+        // Cancelled before begin answered.
+        let mut k = error_with_a_session();
+        k.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 1_000);
+        k.on(AccountEvent::GoogleCancelRequested, 1_100);
+        assert!(in_the_list_error(&k), "{:?}", k.state());
+        assert!(k.can_sign_out());
+        assert!(
+            k.on(AccountEvent::Tick(15_004), 15_004)
+                .contains(&AccountAction::CallList)
+        );
+        // From signed out a failure reads as before: an error, no sign-out, and the dialog's failure.
+        let mut f = logged_out();
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2);
+        f.on(begun(GooglePurpose::SignIn, "g1"), 3);
+        f.on(finished("g1", Err(err("google_timeout"))), 4);
+        assert!(matches!(f.state(), AccountState::Error(e) if e.code == "google_timeout"));
+        assert!(!f.can_sign_out());
+        assert_eq!(
+            f.google_failure().map(|e| e.code.as_str()),
+            Some("google_timeout")
+        );
+        // A new attempt, and signing in, clear it.
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 5);
+        assert_eq!(f.google_failure(), None);
+        f.on(begun(GooglePurpose::SignIn, "g2"), 6);
+        f.on(finished("g2", Err(err("google_timeout"))), 7);
+        f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 8);
+        f.on(begun(GooglePurpose::SignIn, "g3"), 9);
+        f.on(finished("g3", Ok(google_done("g@x", "google"))), 10);
+        f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 11);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert_eq!(f.google_failure(), None);
     }
 
     /// The send path never changes the account state, so a failed send or Resend leaves an error that holds a
