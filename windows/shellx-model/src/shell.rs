@@ -875,4 +875,176 @@ mod tests {
             assert!(url.is_ascii(), "{path}");
         }
     }
+
+    #[test]
+    fn path_entries_that_are_not_absolute_are_never_searched() {
+        // a pwsh.exe in the folder ShellX was started from must not win
+        let ps = ShellProbe {
+            path: r".;C:\Program Files\PowerShell\7".into(),
+            program_files: Some(r"C:\Program Files".into()),
+            ..ShellProbe::default()
+        };
+        let ex = exists_in(&[r".\pwsh.exe", r"C:\Program Files\PowerShell\7\pwsh.exe"]);
+        let found = find_shells(&ps, &ex);
+        assert_eq!(found[0].kind, Some(ShellKind::Pwsh));
+        assert_eq!(found[0].program, r"C:\Program Files\PowerShell\7\pwsh.exe");
+        // only the relative copy exists: nothing is found
+        let ex = exists_in(&[
+            r".\pwsh.exe",
+            r"\pwsh.exe",
+            r"tools\pwsh.exe",
+            r"C:pwsh.exe",
+        ]);
+        let relative = ShellProbe {
+            path: r";.;tools;..\bin;C:;C:tools;\".into(),
+            ..ShellProbe::default()
+        };
+        assert_eq!(resolve_program("pwsh", &relative, &ex), None);
+        assert!(find_shells(&relative, &ex).is_empty());
+        // absolute entries: drive, UNC, forward slashes
+        let abs = ShellProbe {
+            path: r"\\srv\tools;D:/bin;E:\x".into(),
+            ..ShellProbe::default()
+        };
+        let ex = exists_in(&[r"\\srv\tools\a.exe", r"D:/bin\b.exe"]);
+        assert_eq!(
+            resolve_program("a", &abs, &ex),
+            Some(r"\\srv\tools\a.exe".to_string())
+        );
+        assert_eq!(
+            resolve_program("b.exe", &abs, &ex),
+            Some(r"D:/bin\b.exe".to_string())
+        );
+    }
+
+    #[test]
+    fn a_bare_shellx_shell_is_looked_up_on_path_not_in_the_current_folder() {
+        let p = probe();
+        // "pwsh" and "pwsh.exe" exist as files in the current folder AND on PATH
+        let ex = exists_in(&["pwsh", "pwsh.exe", APPS_PWSH, WINPS, CMD]);
+        let found = find_shells(&p, &ex);
+        for value in ["pwsh", "pwsh.exe"] {
+            let plan = launch_plan(&ShellChoice::Auto, Some(value), &found, &p, &ex).unwrap();
+            assert_eq!(plan.first.program, APPS_PWSH, "{value}");
+        }
+        // only in the current folder: not found
+        let ex = exists_in(&["pwsh", "pwsh.exe"]);
+        for value in ["pwsh", "pwsh.exe"] {
+            assert_eq!(
+                launch_plan(&ShellChoice::Auto, Some(value), &[], &p, &ex),
+                Err(ShellError::Override(CustomShellError::NotFound(
+                    value.into()
+                ))),
+                "{value}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unquoted_shellx_shell_path_works_without_the_extension() {
+        let p = probe();
+        let ex = exists_in(&[r"C:\Program Files\Git\bin\bash.exe"]);
+        let plan = launch_plan(
+            &ShellChoice::Auto,
+            Some(r"C:\Program Files\Git\bin\bash"),
+            &[],
+            &p,
+            &ex,
+        )
+        .unwrap();
+        assert_eq!(plan.first.program, r"C:\Program Files\Git\bin\bash.exe");
+        assert!(plan.first.args.is_empty());
+        // the Settings field accepts the same line
+        assert_eq!(
+            custom_launch(r"C:\Program Files\Git\bin\bash", &p, &ex)
+                .unwrap()
+                .program,
+            r"C:\Program Files\Git\bin\bash.exe"
+        );
+        // with arguments the old rule stays: the program is what comes before the first blank
+        assert_eq!(
+            custom_launch(r"C:\Program Files\Git\bin\bash --login", &p, &ex),
+            Err(CustomShellError::NotFound(r"C:\Program".into()))
+        );
+    }
+
+    #[test]
+    fn auto_never_chooses_git_bash_or_wsl_and_never_repeats_a_program() {
+        // cmd + Git Bash: cmd, and no fallback
+        let plan = auto_plan(&[CMD, BASH]).unwrap();
+        assert_eq!(plan.first.kind, Some(ShellKind::Cmd));
+        assert_eq!(plan.fallback, None);
+        // only Git Bash and WSL: Auto has nothing to start
+        assert_eq!(auto_plan(&[BASH, WSL]), Err(ShellError::NoShellFound));
+        // pwsh + Git Bash + WSL: PowerShell 7, no fallback
+        let plan = auto_plan(&[PWSH, BASH, WSL]).unwrap();
+        assert_eq!(plan.first.kind, Some(ShellKind::Pwsh));
+        assert_eq!(plan.fallback, None);
+        // a chosen Git Bash falls back to the first Auto shell, not to WSL
+        let ex = exists_in(&[BASH, WSL, CMD]);
+        let p = probe();
+        let found = find_shells(&p, &ex);
+        let plan = launch_plan(
+            &ShellChoice::Known {
+                shell: ShellKind::Wsl,
+            },
+            None,
+            &found,
+            &p,
+            &ex,
+        )
+        .unwrap();
+        assert_eq!(plan.first.kind, Some(ShellKind::Wsl));
+        assert_eq!(plan.fallback.unwrap().kind, Some(ShellKind::Cmd));
+        // a chosen Command Prompt falls back to PowerShell, a chosen PowerShell 7 to Windows PowerShell
+        let ex = exists_in(&ALL);
+        let found = find_shells(&p, &ex);
+        let cmd = launch_plan(
+            &ShellChoice::Known {
+                shell: ShellKind::Cmd,
+            },
+            None,
+            &found,
+            &p,
+            &ex,
+        )
+        .unwrap();
+        assert_eq!(cmd.fallback.unwrap().kind, Some(ShellKind::Pwsh));
+        // SHELLX_SHELL=pwsh, a custom line for PowerShell 7: the fallback is another program
+        let plan = launch_plan(&ShellChoice::Auto, Some("pwsh"), &found, &p, &ex).unwrap();
+        assert_eq!(plan.first.program, PWSH);
+        assert_eq!(
+            plan.fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+        let custom = launch_plan(
+            &ShellChoice::Custom {
+                command_line: format!("\"{PWSH}\" -NoProfile"),
+            },
+            None,
+            &found,
+            &p,
+            &ex,
+        )
+        .unwrap();
+        assert_eq!(
+            custom.fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+        // ... compared without regard to case, as Windows does
+        let upper = PWSH.to_uppercase();
+        let plan = launch_plan(
+            &ShellChoice::Custom {
+                command_line: upper,
+            },
+            None,
+            &found,
+            &p,
+            &exists_in(&[&PWSH.to_uppercase(), WINPS]),
+        );
+        assert_eq!(
+            plan.unwrap().fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+    }
 }
