@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import SwiftUI
 import Testing
 @testable import ShellXRemoteUI
@@ -115,6 +116,90 @@ import Testing
         let shared = try #require(plain.currentEditor() as? NSTextView)
         #expect(!(shared is RomanInputFieldEditor))
         #expect(shared.inputContext?.allowedInputSourceLocales == nil)
+    }
+
+    /// One enabled, selectable keyboard input source as this Mac lists it.
+    private struct EnabledSource {
+        let id: String
+        let isLayout: Bool
+        let isASCII: Bool
+        let languages: [String]
+    }
+
+    /// The enabled, selectable keyboard input sources (read only: nothing is selected or changed).
+    private static func enabledSources() -> [EnabledSource]? {
+        let filter = [kTISPropertyInputSourceCategory as String: kTISCategoryKeyboardInputSource as String,
+                      kTISPropertyInputSourceIsSelectCapable as String: true] as CFDictionary
+        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] else { return nil }
+        return list.compactMap { source in
+            guard let id = string(source, kTISPropertyInputSourceID),
+                  let type = string(source, kTISPropertyInputSourceType) else { return nil }
+            let ascii = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsASCIICapable)
+                .map { CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque($0).takeUnretainedValue()) } ?? false
+            let languages = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages)
+                .flatMap { Unmanaged<CFArray>.fromOpaque($0).takeUnretainedValue() as? [String] } ?? []
+            return EnabledSource(id: id, isLayout: type == kTISTypeKeyboardLayout as String, isASCII: ascii, languages: languages)
+        }
+    }
+
+    private static func string(_ source: TISInputSource, _ key: CFString) -> String? {
+        TISGetInputSourceProperty(source, key).map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
+    }
+
+    /// The system's current keyboard input source (read only).
+    private static func currentSourceID() -> String? {
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return nil }
+        return string(source, kTISPropertyInputSourceID)
+    }
+
+    /// The outcome on this Mac: the focused field's input context offers a plain keyboard layout and no Vietnamese input
+    /// method. It needs a Mac with a Vietnamese input method enabled; elsewhere it records that it could not check.
+    @Test func theFocusedFieldOffersAPlainLayoutAndNoVietnameseInputMethod() throws {
+        let sources = try #require(Self.enabledSources())
+        let plainLayouts = sources.filter { $0.isLayout && $0.isASCII }
+        let vietnamese = sources.filter { !$0.isLayout && $0.languages.contains("vi") }.map(\.id)
+        let before = Self.currentSourceID()
+        let field = RomanInputTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        content.addSubview(field)
+        let window = Self.window(content: content)
+        defer { window.orderOut(nil) }
+
+        #expect(window.makeFirstResponder(field))
+        let editor = try #require(field.currentEditor() as? RomanInputFieldEditor)
+        let context = try #require(editor.inputContext)
+        let offered = context.keyboardInputSources ?? []
+        if vietnamese.isEmpty || plainLayouts.isEmpty || plainLayouts.contains(where: { $0.languages.first == "vi" }) {
+            withKnownIssue("not checked: this Mac needs a Vietnamese input method and a non-Vietnamese plain layout") {
+                Issue.record("enabled sources: \(sources.map(\.id)); offered: \(offered)")
+            }
+        } else {
+            #expect(plainLayouts.contains { offered.contains($0.id) }, "offered: \(offered)")
+            #expect(vietnamese.allSatisfy { !offered.contains($0) }, "offered: \(offered)")
+        }
+        // Focusing the field never changes the system's current input source.
+        #expect(Self.currentSourceID() == before)
+    }
+
+    /// Cmd-Z and Shift-Cmd-Z work, and the model hears them: AppKit's undo restores the text without the field's
+    /// usual change notification.
+    @Test func typingCanBeUndoneAndTheModelHearsIt() async throws {
+        let events = Events()
+        let harness = host(field(events))
+        defer { harness.window.orderOut(nil) }
+        await pump { harness.editor != nil }
+        let editor = try #require(harness.editor)
+        #expect(editor.allowsUndo)
+        editor.insertText("phu@", replacementRange: NSRange(location: NSNotFound, length: 0))
+        await turn()   // the run loop closes the typing's undo group
+        let undo = try #require(editor.undoManager)
+        #expect(undo.canUndo)
+        undo.undo()
+        #expect(editor.string == "")
+        #expect(events.changes.last == "")
+        undo.redo()
+        #expect(editor.string == "phu@")
+        #expect(events.changes.last == "phu@")
     }
 
     @Test func theEditorDoesNotCorrectAnAddress() async throws {
