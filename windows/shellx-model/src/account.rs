@@ -651,6 +651,7 @@ impl AccountFlow {
                 if self.login_in_flight {
                     return out; // stale: started before the login was submitted
                 }
+                let had_session = self.has_session;
                 self.has_session = match &result {
                     Ok(_) => true,
                     Err(e) => !matches!(
@@ -710,13 +711,18 @@ impl AccountFlow {
                         }
                     }
                     Err(e)
-                        if e.code == "not_logged_in"
-                            || (self.logged_in()
-                                && matches!(e.code.as_str(), "unauthorized" | "http_401")) =>
+                        if matches!(
+                            e.code.as_str(),
+                            "not_logged_in" | "unauthorized" | "http_401"
+                        ) =>
                     {
-                        // The server (or a revoked token) ended the session while signed in: the notice
-                        // asks for sign-in again.
-                        if self.logged_in() {
+                        // The server (or a revoked token) ended a session this flow had: the notice asks
+                        // for sign-in again. A refusal at start counts (review M2): the core asks the
+                        // server only with a stored session, and it forgets that session on a 401.
+                        let refused = e.code != "not_logged_in";
+                        if self.logged_in()
+                            || (refused && (had_session || self.state == AccountState::Unknown))
+                        {
                             self.session_ended_by_server = true;
                         }
                         self.reset_session();

@@ -659,6 +659,8 @@ pub fn failure_sentence(lang: Lang, code: &str) -> String {
         | "email_sign_in_disabled"
         | "password_sign_in_removed" => Str::SignInUnavailable,
         "switch_from_signed_in_device" => Str::SwitchFromSignedInDevice,
+        // The server refused the session (review M2).
+        "unauthorized" | "http_401" => Str::SessionExpired,
         _ => Str::ServerProblem,
     };
     t(lang, key).to_string()
