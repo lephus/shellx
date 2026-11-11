@@ -212,7 +212,41 @@ impl RootView {
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
+        #[cfg(target_os = "macos")]
+        root.dev_sign_in_preview(window, cx);
         root
+    }
+
+    /// Mac development build only: `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch` opens the
+    /// sign-in dialog on that screen for screenshots, with a made-up address and no core call
+    /// (Ruling 38). Any other value does nothing.
+    #[cfg(target_os = "macos")]
+    fn dev_sign_in_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Ok(value) = std::env::var("SHELLX_DEV_SIGN_IN") else {
+            return;
+        };
+        let value = value.trim();
+        if !matches!(value, "start" | "google" | "code" | "invalid" | "switch") {
+            return;
+        }
+        if value == "google" {
+            self.account
+                .update(cx, |account, cx| account.dev_set_google_available(true, cx));
+        }
+        self.open_sign_in(GooglePurpose::SignIn, window, cx);
+        if matches!(value, "code" | "switch") {
+            self.account
+                .update(cx, |account, cx| account.dev_preview_email(value, cx));
+        }
+        let fill = match value {
+            "invalid" => Some("phu@ẽample.com"),
+            "switch" => Some("you@example.com"),
+            _ => None,
+        };
+        if let Some(text) = fill {
+            self.sign_in
+                .update(cx, |dialog, cx| dialog.dev_fill_email(text, cx));
+        }
     }
 
     /// The forced update, if any: (minimum version, https download link).

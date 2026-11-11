@@ -61,6 +61,12 @@ exits non-zero if no window appeared. The first release build takes about 5 minu
   Windows caption buttons.
 - State goes to `~/.local/share/shellx-native` (created with mode 0700, which shellx-core
   requires).
+- `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch` (Mac development build only) opens the
+  sign-in dialog on that screen for screenshots, with a made-up address and no network call:
+  `start` as this build has it (no Google: a Mac build has no Google client), `google` the same
+  with the Google button, `code` the code step for you@example.com, `invalid` an address with a
+  Vietnamese letter, `switch` the first screen after a 409. With a stored session the dialog
+  closes at once, so move `~/.local/share/shellx-native/core/session.json` aside first.
 
 ## Command line
 

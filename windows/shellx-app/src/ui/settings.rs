@@ -11,7 +11,9 @@ use gpui::{
 use shellx_model::account::AccountState;
 use shellx_model::account::DELETE_ACCOUNT_URL;
 use shellx_model::palette;
-use shellx_model::strings::{Lang, Str, added_from, sign_in_methods_error, t, update_available};
+use shellx_model::strings::{
+    Lang, Str, added_from, sign_in_method_label, sign_in_methods_error, t, update_available,
+};
 use shellx_model::update::{UpdateStatus, download_url};
 
 use super::account::AccountService;
@@ -235,11 +237,7 @@ impl SettingsPanel {
                 } else {
                     m.email.clone()
                 };
-                let kind = if m.is_apple() {
-                    Str::AppleId
-                } else {
-                    Str::GoogleAccount
-                };
+                let kind = sign_in_method_label(&m.provider);
                 let id = m.identity_id.clone();
                 let busy = removing.as_deref() == Some(m.identity_id.as_str());
                 div()

@@ -5,10 +5,12 @@
 //! The sidebar (machines), Settings -> Account and the sign-in dialog
 //! observe it.
 //!
-//! Sign-in is Google only: the dialog calls `google_sign_in`; `OpenBrowser` opens the system
-//! browser and `CallGoogleFinish` (which blocks until the browser answers) runs on its own
-//! background task, never on the serial worker, so a cancel can still be sent. The account
-//! token stays inside shellx-core.
+//! Sign-in is email first: the dialog sends the address (`email_send_code`) and the mailed code
+//! (`email_submit_code`); both calls run on the serial worker. "Continue with Google" shows only when
+//! the core says this build has a Google client (`check_google`, `google_available`): the dialog
+//! calls `google_sign_in`, `OpenBrowser` opens the system browser and `CallGoogleFinish` (which blocks
+//! until the browser answers) runs on its own background task, never on the serial worker, so a
+//! cancel can still be sent. The account token stays inside shellx-core.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -16,6 +18,7 @@ use std::time::{Duration, Instant};
 use gpui::{Context, prelude::*};
 use shellx_model::account::{AccountAction, AccountEvent, AccountFlow, AccountState};
 use shellx_model::core_api::{CoreCall, CoreErr, GooglePurpose, SignInMethod};
+use shellx_model::email_sign_in::EmailStep;
 use shellx_model::sidebar::MachineInfo;
 use shellx_model::update::{CHECK_INTERVAL_SECS, UpdateStatus};
 
@@ -59,6 +62,9 @@ pub struct AccountService {
     google: Option<bool>,
     /// A `Job::GoogleCheck` is queued and has not answered.
     google_checking: bool,
+    /// Mac development build only: the `google` preview's answer, which the core's never replaces.
+    #[cfg(target_os = "macos")]
+    dev_google: Option<bool>,
 }
 
 impl AccountService {
@@ -123,6 +129,8 @@ impl AccountService {
             checked: false,
             google: None,
             google_checking: false,
+            #[cfg(target_os = "macos")]
+            dev_google: None,
         };
         svc.apply(AccountEvent::Started, cx);
         // Queued behind the first account call, so `config.set` has gone out.
@@ -178,6 +186,117 @@ impl AccountService {
         self.apply(AccountEvent::GoogleCancelRequested, cx);
     }
 
+    /// "Send code": the trimmed address and the mail's language (`Lang::locale`).
+    pub fn email_send_code(&mut self, email: String, locale: &'static str, cx: &mut Context<Self>) {
+        self.apply(
+            AccountEvent::EmailCodeRequested {
+                email,
+                locale: locale.to_string(),
+            },
+            cx,
+        );
+    }
+
+    /// The email field's text changed.
+    pub fn email_edited(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailEdited, cx);
+    }
+
+    /// "Resend code".
+    pub fn email_resend(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailResendRequested, cx);
+    }
+
+    /// Verify, Enter or six digits typed: the code field's text (the flow takes its digits).
+    pub fn email_submit_code(&mut self, code: String, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailCodeSubmitted(code), cx);
+    }
+
+    /// "Use a different email".
+    pub fn email_change(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailChangeRequested, cx);
+    }
+
+    /// The dialog closed: a run that is not verifying ends; one that is still applies its answer.
+    pub fn email_cancel(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailCancelled, cx);
+    }
+
+    pub fn email_step(&self) -> Option<EmailStep> {
+        self.flow.email_step()
+    }
+
+    pub fn email_sent_to(&self) -> Option<&str> {
+        self.flow.email_sent_to()
+    }
+
+    pub fn email_error(&self) -> Option<&CoreErr> {
+        self.flow.email_error()
+    }
+
+    pub fn email_can_verify(&self) -> bool {
+        self.flow.email_can_verify()
+    }
+
+    /// Seconds until "Resend code" can be pressed, at this service's clock.
+    pub fn email_resend_wait_secs(&self) -> u64 {
+        self.flow.email_resend_wait_secs(self.now_ms())
+    }
+
+    pub fn email_code_epoch(&self) -> u64 {
+        self.flow.email_code_epoch()
+    }
+
+    /// A sign-in is under way (a code is checked, or this PC is being registered).
+    pub fn signing_in(&self) -> bool {
+        *self.flow.state() == AccountState::LoggingIn
+    }
+
+    /// Mac development build only (screenshots): "code" puts the flow on the code step with a made-up
+    /// challenge for "you@example.com" (resend_in 60); "switch" goes on to `EmailCodeSubmitted("123456")`
+    /// and a 409 (`switch_from_signed_in_device`). It feeds the flow directly and drops the returned
+    /// actions, so no core call is made; any other value does nothing.
+    #[cfg(target_os = "macos")]
+    pub fn dev_preview_email(&mut self, preview: &str, cx: &mut Context<Self>) {
+        use shellx_model::core_api::EmailChallenge;
+        let now = self.now_ms();
+        let mut events = Vec::new();
+        if matches!(preview, "code" | "switch") {
+            events.push(AccountEvent::EmailCodeRequested {
+                email: "you@example.com".into(),
+                locale: "en".into(),
+            });
+            events.push(AccountEvent::EmailBegun(Ok(EmailChallenge {
+                challenge_id: "preview".into(),
+                email: "you@example.com".into(),
+                expires_in: 600,
+                resend_in: 60,
+            })));
+        }
+        if preview == "switch" {
+            events.push(AccountEvent::EmailCodeSubmitted("123456".into()));
+            events.push(AccountEvent::EmailFinished {
+                challenge_id: "preview".into(),
+                result: Err(CoreErr::new("switch_from_signed_in_device", "")),
+            });
+        }
+        if events.is_empty() {
+            return;
+        }
+        for event in events {
+            let _ = self.flow.on(event, now);
+        }
+        cx.notify();
+    }
+
+    /// Mac development build only: the `google` preview shows the Google button although this build
+    /// has no client.
+    #[cfg(target_os = "macos")]
+    pub fn dev_set_google_available(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.dev_google = Some(on);
+        cx.notify();
+    }
+
     pub fn refresh_sign_in_methods(&mut self, cx: &mut Context<Self>) {
         self.apply(AccountEvent::SignInMethodsRequested, cx);
     }
@@ -230,11 +349,11 @@ impl AccountService {
 
     /// The core said this build has a Google client (Ruling 28). False until it answered yes: the dialog
     /// and Settings draw nothing Google-related meanwhile.
-    #[allow(
-        dead_code,
-        reason = "read by the sign-in dialog and Settings › Account (plan B Tasks 5 and 7)"
-    )]
     pub fn google_available(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        if let Some(on) = self.dev_google {
+            return on;
+        }
         self.google == Some(true)
     }
 
