@@ -32,6 +32,19 @@ public final class AppCoordinator {
     @ObservationIgnored private let emailLocale: String
     /// Times the Resend lock of the email sign-in.
     @ObservationIgnored private let clock: any Clock<Duration>
+    /// The email sign-in of the sign-in screen: one model for the coordinator's life, so leaving the app to read the
+    /// mail keeps the step. (Ignored by observation because the macro takes no lazy property; the model is observable
+    /// itself.)
+    @ObservationIgnored public private(set) lazy var emailSignIn: EmailSignInModel = EmailSignInModel(
+        clock: clock,
+        request: { [weak self] email in
+            guard let self else { throw SignInError.server(code: "unknown") }
+            return try await self.requestEmailCode(email: email)
+        },
+        submit: { [weak self] challengeID, code in
+            guard let self else { throw SignInError.server(code: "unknown") }
+            try await self.signInWithEmailCode(challengeID: challengeID, code: code)
+        })
     /// True while a switch to Google or an account deletion is on the relay: a 401 then answers the token the relay is
     /// replacing or deleting, so `handleUnauthorized` only remembers it.
     @ObservationIgnored private var accountChangeInProgress = false
@@ -388,6 +401,24 @@ public final class AppCoordinator {
             throw await endFailedAccountChange(error)
         }
         await finishAccountDeletion()
+    }
+
+    /// A new model for the deletion sheet of an email session: at the email step with the account's address, and
+    /// nothing mailed yet. Its Send mails the code to the account's address (whatever the field holds), and only its
+    /// Verify deletes: the sixth digit never does.
+    public func makeDeleteAccountCode() -> EmailSignInModel {
+        let model = EmailSignInModel(
+            clock: clock, autoSubmit: false,
+            request: { [weak self] _ in
+                guard let self else { throw SignInError.server(code: "unknown") }
+                return try await self.requestDeleteAccountCode()
+            },
+            submit: { [weak self] challengeID, code in
+                guard let self else { throw SignInError.server(code: "unknown") }
+                try await self.deleteAccount(challengeID: challengeID, code: code)
+            })
+        if case let .signedIn(email) = phase { model.begin(email: email) } else { model.begin() }
+        return model
     }
 
     /// The relay deleted the account: forget everything local, as `signOut()` does.
