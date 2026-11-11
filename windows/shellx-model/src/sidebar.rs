@@ -505,22 +505,69 @@ mod tests {
         let pc = host(m("pc", "Bếp-PC", "windows", true, 0, false));
         let mac = m("mac", "MacBook", "macos", true, 0, false);
         let both = [Str::MacCannotHostYet, Str::SignInOnYourMac];
+        let none = |_: &str| false;
         assert_eq!(
-            request_panel_notes(std::slice::from_ref(&me), RelayCanHost),
+            request_panel_notes(std::slice::from_ref(&me), &none, RelayCanHost),
             both
         );
-        assert_eq!(request_panel_notes(&[], RelayCanHost), both);
+        assert_eq!(request_panel_notes(&[], &none, RelayCanHost), both);
         assert_eq!(
-            request_panel_notes(&[me.clone(), pc.clone()], RelayCanHost),
+            request_panel_notes(&[me.clone(), pc.clone()], &none, RelayCanHost),
             both
         );
         assert_eq!(
-            request_panel_notes(&[me.clone(), pc.clone(), mac.clone()], RelayCanHost),
+            request_panel_notes(&[me.clone(), pc.clone(), mac.clone()], &none, RelayCanHost),
             [Str::MacCannotHostYet]
         );
-        assert!(request_panel_notes(&[me.clone(), host(mac.clone())], RelayCanHost).is_empty());
-        assert!(request_panel_notes(&[me.clone(), mac.clone()], AnyMac).is_empty());
-        assert_eq!(request_panel_notes(&[me], AnyMac), both);
+        assert!(
+            request_panel_notes(&[me.clone(), host(mac.clone())], &none, RelayCanHost).is_empty()
+        );
+        assert!(request_panel_notes(&[me.clone(), mac.clone()], &none, AnyMac).is_empty());
+        assert_eq!(request_panel_notes(&[me], &none, AnyMac), both);
+    }
+
+    /// Review M7: the "+" panel is never empty without a sentence, also when every Mac that can be
+    /// asked already has access or a request waiting.
+    #[test]
+    fn the_request_panel_always_says_why_it_is_empty() {
+        use OfferRule::{AnyMac, RelayCanHost};
+        let me = m("me", "PC", "windows", true, 0, true);
+        let a = host(m("a", "MacBook", "macos", true, 0, false));
+        let b = host(m("b", "Mac mini", "macos", false, 0, false));
+        let c = m("c", "iMac", "macos", true, 0, false);
+        let pc = host(m("pc", "Bếp-PC", "windows", true, 0, false));
+        let ms = [me.clone(), a.clone(), b.clone(), c.clone(), pc.clone()];
+        assert!(request_panel_notes(&ms, &|_| false, RelayCanHost).is_empty());
+        assert!(request_panel_notes(&ms, &|id| id == "a", RelayCanHost).is_empty());
+        assert_eq!(
+            request_panel_notes(&ms, &|id| id == "a" || id == "b", RelayCanHost),
+            [Str::NoOtherMachines]
+        );
+        assert!(request_panel_notes(&ms, &|id| id == "a" || id == "b", AnyMac).is_empty());
+        assert_eq!(
+            request_panel_notes(&ms, &|id| id != "pc", AnyMac),
+            [Str::NoOtherMachines]
+        );
+        // Whatever the list, the links and the rule: something to click, or a sentence.
+        let lists: [&[MachineInfo]; 5] = [
+            &[],
+            std::slice::from_ref(&me),
+            &[me.clone(), pc.clone()],
+            &[me.clone(), c.clone()],
+            &ms,
+        ];
+        let links: [&dyn Fn(&str) -> bool; 3] = [&|_| false, &|id| id == "a", &|_| true];
+        for list in lists {
+            for has_link in links {
+                for rule in [RelayCanHost, AnyMac] {
+                    assert!(
+                        !request_targets(list, has_link, rule).is_empty()
+                            || !request_panel_notes(list, has_link, rule).is_empty(),
+                        "{list:?} {rule:?}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
