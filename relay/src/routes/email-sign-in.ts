@@ -12,6 +12,7 @@ import { type EmailLocale, signInCodeEmail } from "../email/sign-in-code.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { type ApiError, Errors, readJsonObject } from "../http/errors.js";
 import { errorKind, logMeta } from "../log.js";
+import { CloseCode } from "../protocol/frames.js";
 import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 
 /**
@@ -84,7 +85,8 @@ emailSignInRoutes.post("/code", jsonBodyLimit, async (c) => {
  *   is added, and nothing else of the account changes;
  * - an account with this address and no Google sign-in: its address was never verified (a legacy password
  *   account). With any other sign-in attached (an Apple ID), 409 and nothing changes. With none, the code
- *   claims it: the password and every earlier session of the account go, then the email sign-in is added;
+ *   claims it: the password and every earlier session of the account go (their live sockets are closed
+ *   with 4002, as after a password change), then the email sign-in is added;
  * - no account: a new one.
  */
 emailSignInRoutes.post("/verify", jsonBodyLimit, async (c) => {
@@ -109,6 +111,7 @@ emailSignInRoutes.post("/verify", jsonBodyLimit, async (c) => {
   const passwordLogin = c.get("config").passwordLogin;
 
   let dropped = 0;
+  let claimed = false;
   let via: "identity" | "email" | "new_account" = "identity";
   const result = db.transaction(() => {
     const match = matchAccount(db, verified, passwordLogin);
@@ -130,6 +133,7 @@ emailSignInRoutes.post("/verify", jsonBodyLimit, async (c) => {
         }
         dropped = dropPasswordAccess(db, userId);
         dropped += db.run("DELETE FROM tokens WHERE device_id IN (SELECT id FROM devices WHERE user_id = ?)", userId).changes;
+        claimed = true;
       }
       identityId = insertIdentity(db, userId, identityFromToken(verified), now);
       via = "email";
@@ -143,6 +147,16 @@ emailSignInRoutes.post("/verify", jsonBodyLimit, async (c) => {
     return { userId, deviceId, email: accountEmail(db, userId) };
   });
 
+  if (claimed) {
+    // The earlier sessions have no token any more; a device that is connected right now would keep its
+    // socket until it reconnects. Close them, as a password change does. The sign-in is committed: a hub
+    // failure here must not turn it into a 500.
+    try {
+      await c.get("hubs").forUser(result.userId).disconnectAllExcept(result.deviceId, CloseCode.revoked);
+    } catch (err) {
+      logMeta("session_close_failed", { device_id: result.deviceId, error: errorKind(err) });
+    }
+  }
   recordAppVersion(db, result.deviceId, c.req.header(CLIENT_VERSION_HEADER));
   logMeta("sign_in", { device_id: result.deviceId, provider: "email", via });
   if (dropped > 0) logMeta("password_access_dropped", { sessions: dropped });
