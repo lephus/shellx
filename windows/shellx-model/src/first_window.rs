@@ -1,5 +1,6 @@
 //! First-window size rule: 1200x760 where it fits, shrunk to the work area where it does not.
-//! All values are logical pixels: the monitor's work area divided by its scale.
+//! All values are logical pixels: the monitor's work area divided by its scale, in the frame
+//! the window API wants (see `WorkArea`).
 
 /// The size the window prefers (logical pixels).
 pub const PREFERRED: (f32, f32) = (1200.0, 760.0);
@@ -29,12 +30,16 @@ impl WorkArea {
     /// divided by the monitor's scale (1.5 for 150 %). A scale that is not finite or not above
     /// zero counts as 1.0.
     pub fn primary_workspace(width_px: f32, height_px: f32, scale: f32) -> WorkArea {
-        let _ = scale;
+        let scale = if scale.is_finite() && scale > 0.0 {
+            scale
+        } else {
+            1.0
+        };
         WorkArea {
             x: 0.0,
             y: 0.0,
-            width: width_px,
-            height: height_px,
+            width: width_px / scale,
+            height: height_px / scale,
         }
     }
 }
