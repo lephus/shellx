@@ -91,6 +91,9 @@ fn app_binding(key: &str, ctrl: bool, alt: bool, shift: bool, ctx: &KeyCtx) -> O
         (true, false, false, "pageup") => Some(PrevTab),
         (false, true, true, "=" | "+") => Some(SplitRight),
         (false, true, true, "-" | "_") => Some(SplitDown),
+        // GPUI-Windows reports Alt+Shift+= as "+" and Alt+Shift+- as "_" with shift consumed.
+        (false, true, false, "+") => Some(SplitRight),
+        (false, true, false, "_") => Some(SplitDown),
         (false, true, false, "left") => Some(FocusPane(Dir::Left)),
         (false, true, false, "right") => Some(FocusPane(Dir::Right)),
         (false, true, false, "up") => Some(FocusPane(Dir::Up)),
@@ -103,12 +106,19 @@ fn app_binding(key: &str, ctrl: bool, alt: bool, shift: bool, ctx: &KeyCtx) -> O
 
 /// Alt+F4 and Alt+Space (Alt held alone) belong to Windows: close the window, open the
 /// system menu. The terminal must neither send them nor swallow them.
-pub fn is_window_system_key(_k: &KeyIn) -> bool {
-    false
+pub fn is_window_system_key(k: &KeyIn) -> bool {
+    k.alt
+        && !k.ctrl
+        && !k.shift
+        && !k.win
+        && matches!(k.key.to_lowercase().as_str(), "f4" | "space")
 }
 
 pub fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
     if ctx.composing || k.win {
+        return KeyAction::Ignore;
+    }
+    if is_window_system_key(k) {
         return KeyAction::Ignore;
     }
     let key = k.key.to_lowercase();
