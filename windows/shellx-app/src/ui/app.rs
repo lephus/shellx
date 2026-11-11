@@ -79,3 +79,16 @@ pub fn run() {
         .detach();
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::background_requested;
+
+    #[test]
+    fn only_the_exact_switch_opens_the_window_in_the_background() {
+        assert!(background_requested(Some("1")));
+        for other in [None, Some(""), Some("0"), Some("true"), Some(" 1")] {
+            assert!(!background_requested(other), "{other:?}");
+        }
+    }
+}
