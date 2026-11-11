@@ -131,9 +131,12 @@ impl AccountService {
             #[cfg(target_os = "macos")]
             dev_google: None,
         };
-        svc.apply(AccountEvent::Started, cx);
-        // Queued behind the first account call, so `config.set` has gone out.
+        // First on the worker (review chunk 1 M7): `auth.google.available` reads only the configuration
+        // (`ConfiguredCore` sends `config.set` before it), so the Google button never waits behind the
+        // startup list, which can take the core's 20 s timeout offline. The answer depends on the build,
+        // not on a session, so nothing it enables changes with a sign-in or a sign-out.
         svc.check_google(cx);
+        svc.apply(AccountEvent::Started, cx);
         // Startup check: queued behind the first account call, so
         // `config.set` has already gone out.
         svc.check_update(cx);
