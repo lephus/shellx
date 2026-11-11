@@ -92,6 +92,51 @@ final class TerminalPaneTests: XCTestCase {
         XCTAssertFalse(surface.isFirstResponder)
     }
 
+    /// A tap on the surface while the pane is about to redraw (the terminal printed, a key changed the model): the
+    /// redraw runs before the surface's report that it took the keyboard reaches the pane, with `focused` still false,
+    /// and must not give the keyboard back. This race made `testACoveredSurfaceGivesUpTheKeyboardAndTheKeyBar` fail now
+    /// and then (review fix round 1, finding 3; the reviewer's probe B).
+    func testATapWhileThePaneRedrawsKeepsTheKeyboard() async throws {
+        let (_, model) = try await makeModel()
+        let host = WindowHost(TerminalPane(model: model, terminalId: "t-zsh", title: "zsh"), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        try await Task.sleep(for: .milliseconds(300))
+        let unfocused = surface.bounds.height
+
+        // A change the pane reads, then the tap, then the redraw in the same turn: the surface's report that it took
+        // the keyboard is still on its way to the pane, so the redraw sees `focused` false.
+        model.toggleCtrl()
+        XCTAssertTrue(surface.becomeFirstResponder())
+        host.controller.view.setNeedsLayout()
+        host.controller.view.layoutIfNeeded()
+        XCTAssertTrue(surface.isFirstResponder, "the redraw before the report did not drop the keyboard")
+
+        let keyBar = await eventually { surface.bounds.height < unfocused }
+        XCTAssertTrue(keyBar, "the key bar takes room under the surface (first responder: \(surface.isFirstResponder))")
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertTrue(surface.isFirstResponder, "the surface keeps the keyboard it took")
+    }
+
+    /// The key bar's hide key sets `focused` false: the surface gives the keyboard up. (The fix above gives it up only when
+    /// `focused` turns false; this is that path.)
+    func testTheHideKeyGivesTheKeyboardUp() async throws {
+        let (_, model) = try await makeModel()
+        let focus = SurfaceFocus()
+        let host = WindowHost(SurfaceHarness(model: model, focus: focus), in: self)
+        let surface = try await host.surface()
+        let live = await eventually { model.phase == .live }
+        XCTAssertTrue(live)
+        XCTAssertTrue(surface.becomeFirstResponder())
+        let told = await eventually { focus.focused }
+        XCTAssertTrue(told, "the surface told its pane it took the keyboard")
+
+        focus.focused = false
+        let released = await eventually { !surface.isFirstResponder }
+        XCTAssertTrue(released, "the hide key gives the keyboard up")
+    }
+
     /// What the panes said to VoiceOver.
     private final class Lines {
         var items: [String] = []
@@ -302,5 +347,24 @@ private struct SwipeHarness: View {
                 alert: .constant(nil), agent: { _ in Color.clear },
                 shell: { pane in TerminalPane(model: terminal, terminalId: pane.id, title: pane.title) })
         }
+    }
+}
+
+/// Where `SurfaceHarness` keeps `focused`, so that a test can set it as the key bar's hide key does.
+@MainActor @Observable
+private final class SurfaceFocus {
+    var focused = false
+}
+
+/// `TerminalSurface` as `TerminalPane` builds it, with `focused` in a test's hands.
+private struct SurfaceHarness: View {
+    let model: TerminalViewModel
+    @Bindable var focus: SurfaceFocus
+
+    var body: some View {
+        TerminalSurface(
+            model: model, terminalId: "t-zsh", revision: model.screenRevision, snapshots: model.snapshots,
+            topShift: model.topShift, typing: model.typing, phase: model.phase, sentInputs: model.sentInputs,
+            acceptsInput: model.acceptsInput, title: "zsh", focused: $focus.focused)
     }
 }
