@@ -1,13 +1,18 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
 import { requestIp } from "../auth/client-ip.js";
+import { parseDevice } from "../auth/device.js";
 import { checkEmail } from "../auth/email.js";
-import { discardEmailCode, EMAIL_CODE_RESEND_SEC, EMAIL_CODE_TTL_MS, issueEmailCode } from "../auth/email-codes.js";
+import { discardEmailCode, EMAIL_CODE_RESEND_SEC, EMAIL_CODE_TTL_MS, issueEmailCode, redeemEmailCode } from "../auth/email-codes.js";
+import { accountEmail, dropPasswordAccess, identityFromToken, insertIdentity, matchAccount, signInDevice } from "../auth/identity.js";
+import type { VerifiedIdToken } from "../auth/id-token.js";
+import { generateToken, hashToken } from "../auth/tokens.js";
 import type { EmailSendResult } from "../email/resend.js";
 import { type EmailLocale, signInCodeEmail } from "../email/sign-in-code.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { type ApiError, Errors, readJsonObject } from "../http/errors.js";
 import { errorKind, logMeta } from "../log.js";
+import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 
 /**
  * Sign-in with a 6-digit code mailed to an address, mounted at /v1/auth/email (spec 2026-11-10 §4).
@@ -64,4 +69,82 @@ emailSignInRoutes.post("/code", jsonBodyLimit, async (c) => {
   }
   logMeta("email_code_sent", { locale });
   return c.json({ challenge_id: issued.challengeId, expires_in: EMAIL_CODE_TTL_MS / 1000, resend_in: EMAIL_CODE_RESEND_SEC, email }, 202);
+});
+
+/**
+ * POST /v1/auth/email/verify {challenge_id, code, device} — one guess at a challenge; the right code signs
+ * the device in, with the answer of /v1/auth/google. The device is checked first, so a bad one spends no
+ * guess. The code is redeemed in its own committed transaction before the account is looked at: a right
+ * code is spent whatever the answer, and the address comes from the challenge row alone (the body has none).
+ * The account is then resolved in a second transaction, as for Google (`matchAccount`):
+ *
+ * - an email sign-in for this address: sign in;
+ * - an account with this address whose password still works (PASSWORD_LOGIN on): 409;
+ * - an account with this address that has a Google sign-in (Google verified the address): the email sign-in
+ *   is added, and nothing else of the account changes;
+ * - an account with this address and no Google sign-in: its address was never verified (a legacy password
+ *   account). With any other sign-in attached (an Apple ID), 409 and nothing changes. With none, the code
+ *   claims it: the password and every earlier session of the account go, then the email sign-in is added;
+ * - no account: a new one.
+ */
+emailSignInRoutes.post("/verify", jsonBodyLimit, async (c) => {
+  if (!(await c.get("limiters").loginIp.limit(requestIp(c)))) throw Errors.rateLimited();
+  const body = await readJsonObject(c.req.raw);
+  const device = parseDevice(body.device);
+  if (device === null || device.kind === "agent") throw Errors.invalidDevice();
+  const db = c.get("db");
+  const now = c.get("now")();
+  const token = generateToken();
+  const tokenHash = await hashToken(token);
+  const refuse = (reason: string, error: () => ApiError): never => {
+    logMeta("sign_in_refused", { provider: "email", reason });
+    throw error();
+  };
+
+  // The last await. When it returns the guess is counted and a right code is spent (committed); the account
+  // transaction below is synchronous and reads the account afresh.
+  const redeemed = await redeemEmailCode(db, body.challenge_id, body.code, now);
+  if (!redeemed.ok) return refuse(redeemed.reason, redeemed.reason === "invalid_code" ? Errors.invalidCode : Errors.codeExpired);
+  const verified: VerifiedIdToken = { provider: "email", subject: redeemed.email, email: redeemed.email, isPrivateEmail: false, audience: "" };
+  const passwordLogin = c.get("config").passwordLogin;
+
+  let dropped = 0;
+  let via: "identity" | "email" | "new_account" = "identity";
+  const result = db.transaction(() => {
+    const match = matchAccount(db, verified, passwordLogin);
+    // A refusal throws: the transaction rolls back, so nothing of the account was written.
+    if (match.kind === "switch_required") return refuse("switch_required", Errors.switchFromSignedInDevice);
+    let userId: string;
+    let identityId: string;
+    if (match.kind === "identity") {
+      userId = match.userId;
+      identityId = match.identityId;
+      db.run("UPDATE identities SET last_used_at = ? WHERE id = ?", now, identityId);
+    } else if (match.kind === "email") {
+      userId = match.userId;
+      if (!match.hasPrimary) {
+        // Nobody verified this account's address. Whoever registered it first may have attached another
+        // sign-in (only an Apple ID is possible), which would stay in the account the mailbox owner enters.
+        if (db.get("SELECT 1 FROM identities WHERE user_id = ?", userId) !== undefined) {
+          return refuse("other_sign_in", Errors.switchFromSignedInDevice);
+        }
+        dropped = dropPasswordAccess(db, userId);
+        dropped += db.run("DELETE FROM tokens WHERE device_id IN (SELECT id FROM devices WHERE user_id = ?)", userId).changes;
+      }
+      identityId = insertIdentity(db, userId, identityFromToken(verified), now);
+      via = "email";
+    } else {
+      userId = crypto.randomUUID();
+      db.run("INSERT INTO users (id, email, password_hash, password_changed_at, created_at) VALUES (?, ?, NULL, ?, ?)", userId, verified.email, now, now);
+      identityId = insertIdentity(db, userId, identityFromToken(verified), now);
+      via = "new_account";
+    }
+    const deviceId = signInDevice(db, userId, device, tokenHash, "email", identityId, now);
+    return { userId, deviceId, email: accountEmail(db, userId) };
+  });
+
+  recordAppVersion(db, result.deviceId, c.req.header(CLIENT_VERSION_HEADER));
+  logMeta("sign_in", { device_id: result.deviceId, provider: "email", via });
+  if (dropped > 0) logMeta("password_access_dropped", { sessions: dropped });
+  return c.json({ user_id: result.userId, device_id: result.deviceId, token, email: result.email });
 });
