@@ -206,6 +206,8 @@ mod tests {
     use shellx_fake_api::{FakeApi, FakeOptions};
     use shellx_model::account::{AccountFlow, AccountState};
     use shellx_model::core_api::FakeCore;
+    use shellx_model::sidebar::{Access, RowAction, build_groups};
+    use shellx_model::strings::Lang;
     use std::collections::VecDeque;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -404,7 +406,7 @@ mod tests {
         assert_eq!(
             ran,
             [
-                "CallLogin { email: \"a@b.c\", password: \"<redacted>\" }",
+                "CallLogin { email: \"<redacted>\", password: \"<redacted>\" }",
                 "CallList",
                 "CallRegister",
                 "CallList",
@@ -435,6 +437,85 @@ mod tests {
         let (ran, _) = drive(&mut flow, &core, AccountEvent::Started, 30_004);
         assert_eq!(ran, ["CallList"]);
         assert_eq!(flow.state(), &AccountState::LoggedOut);
+        api.stop();
+    }
+
+    /// R4 flowA's second run, through the real shellx-core against the fake relay in the real relay's
+    /// list shape: the account already has a signed-in Mac when this PC signs in (Blocker 1 stopped it
+    /// at the first list).
+    #[test]
+    fn sign_in_with_a_mac_already_in_the_account() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let base = api.base_url.clone();
+
+        // The Mac: its own core and state dir, signed in, registered, one heartbeat (online).
+        let mac = crate::core_bridge::CoreBridge::new();
+        config_set(&mac, &cfg(&base, &tmp.path().join("mac"))).unwrap();
+        mac.call("auth.login", json!({"email":"a@b.c","password":"pw"}))
+            .unwrap();
+        mac.call(
+            "machines.register",
+            json!({"name":"MacBook","platform":"macos","os_version":"15.5","app_version":"2.0.0"}),
+        )
+        .unwrap();
+        mac.call("machines.heartbeat", json!({})).unwrap();
+
+        // This PC, the way the window drives it.
+        let dir = tmp.path().join("pc");
+        let core =
+            ConfiguredCore::new(Box::new(crate::core_bridge::CoreBridge::new()), move || {
+                Ok(cfg(&base, &dir))
+            });
+        let mut flow = AccountFlow::new();
+        let (ran, _) = drive(&mut flow, &core, AccountEvent::Started, 0);
+        assert_eq!(ran, ["CallList"]);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+
+        let (ran, _) = drive(
+            &mut flow,
+            &core,
+            AccountEvent::LoginSubmitted {
+                email: "a@b.c".into(),
+                password: "pw".into(),
+            },
+            1,
+        );
+        assert_eq!(
+            ran,
+            [
+                "CallLogin { email: \"<redacted>\", password: \"<redacted>\" }",
+                "CallList",
+                "CallRegister",
+                "CallList",
+                "CallSession"
+            ],
+            "state: {:?}",
+            flow.state()
+        );
+        assert!(
+            matches!(flow.state(), AccountState::LoggedIn { .. }),
+            "{:?}",
+            flow.state()
+        );
+        let machines = flow.machines();
+        assert_eq!(machines.len(), 2, "{machines:?}");
+        let me = machines.iter().find(|m| m.is_this_machine).unwrap();
+        assert_eq!(me.platform, "windows");
+        let other = machines.iter().find(|m| !m.is_this_machine).unwrap();
+        assert_eq!(
+            (other.name.as_str(), other.platform.as_str(), other.online),
+            ("MacBook", "macos", true)
+        );
+        assert_eq!(other.fingerprint, "");
+        // The relay sent no can_host: the Mac is listed but not offered (no Mac build answers a PC yet).
+        assert!(!other.can_host);
+        let groups = build_groups(flow.machines(), &|_| Access::None, 0, Lang::Vi);
+        let mac_row = groups
+            .iter()
+            .find(|g| g.machine_id == other.machine_id)
+            .unwrap();
+        assert_eq!(mac_row.action, RowAction::None);
         api.stop();
     }
 

@@ -391,7 +391,7 @@ class Machine:
             "api_base": harness.api_base,
             "state_dir": str(self.core_dir),
             "app_version": "2.0.0",
-            "os_version": "e2e",
+            "os_version": "15.5",
             "platform": "macos",
             "device_name": self.session,
             "google_auth_url": f"{harness.api_base}/fake-google/auth",
@@ -464,7 +464,7 @@ class Machine:
 
     def register(self) -> dict:
         reg = self.core("machines.register", name=self.session, platform="macos",
-                        os_version="e2e", app_version="2.0.0")
+                        os_version="15.5", app_version="2.0.0")
         self.machine_id, self.slot = reg["machine_id"], reg["slot"]
         return reg
 

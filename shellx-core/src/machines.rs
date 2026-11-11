@@ -102,6 +102,7 @@ pub fn list(agent: &ureq::Agent, cfg: &Config, store: &StateStore) -> Result<Val
                 "online": m.online,
                 "last_seen_unix": m.last_seen_unix.unwrap_or(0),
                 "fingerprint": fp,
+                "can_host": m.can_host,
             })
         })
         .collect();

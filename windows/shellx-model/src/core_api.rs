@@ -197,8 +197,8 @@ impl fmt::Debug for SessionInfo {
     }
 }
 
-/// One item of `account.identities.list`.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+/// One item of `account.identities.list`. `Debug` hides the email and the linking device's name.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
 pub struct SignInMethod {
     pub identity_id: String,
     pub provider: String,
@@ -210,6 +210,16 @@ pub struct SignInMethod {
     pub linked_via_device_name: Option<String>,
     #[serde(default)]
     pub created_at_unix: u64,
+}
+
+impl fmt::Debug for SignInMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SignInMethod")
+            .field("identity_id", &self.identity_id)
+            .field("provider", &self.provider)
+            .field("is_private_email", &self.is_private_email)
+            .finish_non_exhaustive()
+    }
 }
 
 impl SignInMethod {
@@ -534,6 +544,21 @@ mod tests {
         assert_eq!(ms.len(), 2);
         assert!(!ms[1].is_this_machine);
         assert_eq!(f.calls()[0], ("machines.list".into(), json!({})));
+    }
+
+    /// The core's `machines.list` output for the body `relay/test/v2-machines.test.ts:108-111` pins
+    /// (the core never shows the relay's own fingerprint, so it is null).
+    #[test]
+    fn list_machines_accepts_the_cores_output_for_the_relays_list() {
+        let f = fake_with(
+            "machines.list",
+            json!({"machines":[{"is_this_machine":false,"machine_id":"m1","name":"Mac-Studio",
+                "platform":"macos","online":false,"last_seen_unix":0,"fingerprint":null}]}),
+        );
+        let ms = list_machines(&f).unwrap();
+        assert_eq!(ms.len(), 1);
+        assert_eq!(ms[0].fingerprint, "");
+        assert_eq!(ms[0].name, "Mac-Studio");
     }
 
     #[test]

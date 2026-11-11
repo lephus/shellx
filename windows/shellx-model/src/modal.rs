@@ -229,6 +229,41 @@ mod tests {
     }
 
     #[test]
+    fn alt_f4_reaches_windows_under_every_panel() {
+        use crate::keys::{KeyCtx, KeyIn, map_key};
+        let alt_f4 = KeyIn {
+            key: "f4",
+            ctrl: false,
+            alt: true,
+            shift: false,
+            win: false,
+        };
+        let ctx = KeyCtx {
+            has_selection: false,
+            composing: false,
+        };
+        let action = map_key(&alt_f4, &ctx);
+        for p in [
+            Panels::default(),
+            Panels {
+                settings: true,
+                ..Panels::default()
+            },
+            Panels {
+                forced_update: true,
+                ..Panels::default()
+            },
+            Panels {
+                forced_update: true,
+                settings: true,
+                ..Panels::default()
+            },
+        ] {
+            assert_eq!(p.root_key(&action, false), RootKey::Pass, "{p:?}");
+        }
+    }
+
+    #[test]
     fn forced_update_passes_text_and_swallows_everything_else() {
         let p = Panels {
             forced_update: true,

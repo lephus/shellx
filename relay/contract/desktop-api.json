@@ -1,0 +1,50 @@
+{
+  "about": "What the relay answers on the routes the desktop apps call, and what it refuses: relay/test/desktop-contract.test.ts holds the relay to it and shellx-core/tests/relay_contract.rs the fake relay, so change the relay first, then this file, then the fake.",
+  "responses": [
+    {"route": "error", "body": {"error": {"code": "string", "message": "string"}}},
+    {"route": "GET /v2/machines", "status": 200, "body": {"machines": [{"machine_id": "string", "name": "string", "platform": "string", "online": "boolean", "last_seen_unix": "integer|null", "fingerprint": "string"}]}},
+    {"route": "POST /v2/machines", "case": "new", "status": 201, "body": {"machine_id": "string", "slot": "string", "link_slot": "string"}},
+    {"route": "POST /v2/machines", "case": "again", "status": 200, "body": {"machine_id": "string", "slot": "string", "link_slot": "string"}},
+    {"route": "POST /v2/machines/:id/heartbeat", "status": 204, "body": null},
+    {"route": "POST /v2/pairings", "status": 201, "body": {"pairing_id": "string", "code": "string"}},
+    {"route": "GET /v2/pairings?role=requester", "case": "approved", "status": 200, "body": {"pairings": [{"pairing_id": "string", "from_machine_id": "string", "to_machine_id": "string", "requester_fingerprint": "string", "requester_x25519_b64": "string", "code": "string", "status": "string", "sealed_invite_b64?": "string"}]}},
+    {"route": "POST /v2/relay/tickets", "case": "register", "status": 200, "body": {"ticket": "string", "expires_at_unix": "integer", "relay_url": "string"}},
+    {"route": "GET /v1/version", "status": 200, "body": {"min_agent": "string", "min_mobile": "string", "latest_agent": {"version": "string", "mac_url": "string", "win_url": "string"}}},
+    {"route": "POST /v1/auth/email/code", "status": 202, "body": {"challenge_id": "string", "expires_in": "integer", "resend_in": "integer", "email": "string"}},
+    {"route": "POST /v1/auth/email/verify", "status": 200, "body": {"user_id": "string", "device_id": "string", "token": "string", "email": "string"}},
+    {"route": "GET /v1/account/identities", "case": "email sign-in", "status": 200, "body": {"identities": [{"identity_id": "string", "provider": "string", "email": "string", "is_private_email": "boolean", "linked_via_device_name": "string|null", "created_at_unix": "integer"}]}}
+  ],
+  "requests": [
+    {"route": "POST /v2/machines", "base": {"name": "Mac", "platform": "macos", "os_version": "15.2", "app_version": "1.0.0"}, "cases": [
+      {"label": "base", "set": {}, "status": 201},
+      {"label": "name of 100", "set": {"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}, "status": 201},
+      {"label": "name trimmed", "set": {"name": "  Máy của Phú  "}, "status": 201},
+      {"label": "windows", "set": {"platform": "windows", "os_version": "10.0.26100.1"}, "status": 201},
+      {"label": "standard base64 key with padding", "set": {"noise_public_key_b64": "+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/s="}, "status": 201},
+      {"label": "blank name", "set": {"name": "   "}, "status": 400, "error": "invalid_machine"},
+      {"label": "name of 101", "set": {"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}, "status": 400, "error": "invalid_machine"},
+      {"label": "name of 102 UTF-16 units", "set": {"name": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"}, "status": 400, "error": "invalid_machine"},
+      {"label": "name not a string", "set": {"name": 5}, "status": 400, "error": "invalid_machine"},
+      {"label": "platform linux", "set": {"platform": "linux"}, "status": 400, "error": "invalid_machine"},
+      {"label": "platform ios", "set": {"platform": "ios"}, "status": 400, "error": "invalid_machine"},
+      {"label": "os_version 15.x", "set": {"os_version": "15.x"}, "status": 400, "error": "invalid_machine"},
+      {"label": "os_version unknown", "set": {"os_version": "unknown"}, "status": 400, "error": "invalid_machine"},
+      {"label": "os_version e2e", "set": {"os_version": "e2e"}, "status": 400, "error": "invalid_machine"},
+      {"label": "os_version 1.2.3.4.5", "set": {"os_version": "1.2.3.4.5"}, "status": 400, "error": "invalid_machine"},
+      {"label": "app_version 1.0", "set": {"app_version": "1.0"}, "status": 400, "error": "invalid_machine"},
+      {"label": "app_version 1.0.0-beta", "set": {"app_version": "1.0.0-beta"}, "status": 400, "error": "invalid_machine"},
+      {"label": "app_version 1", "set": {"app_version": "1"}, "status": 400, "error": "invalid_machine"},
+      {"label": "key of 31 bytes", "set": {"noise_public_key_b64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}, "status": 400, "error": "invalid_machine"},
+      {"label": "key not base64", "set": {"noise_public_key_b64": "!!!"}, "status": 400, "error": "invalid_machine"}
+    ]},
+    {"route": "POST /v1/auth/email/code", "base": {"email": "foo@bar.com", "locale": "en"}, "cases": [
+      {"label": "base", "set": {}, "status": 202},
+      {"label": "spaces and capitals", "set": {"email": " Foo@Bar.COM "}, "status": 202},
+      {"label": "no @", "set": {"email": "nope"}, "status": 400, "error": "invalid_email"},
+      {"label": "one-label domain", "set": {"email": "a@b"}, "status": 400, "error": "invalid_email"},
+      {"label": "not ASCII", "set": {"email": "phú@bar.com"}, "status": 400, "error": "invalid_email"},
+      {"label": "not a string", "set": {"email": 5}, "status": 400, "error": "invalid_email"},
+      {"label": "disposable", "set": {"email": "x@mailinator.com"}, "status": 400, "error": "disposable_email"}
+    ]}
+  ]
+}

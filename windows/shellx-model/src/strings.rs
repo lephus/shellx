@@ -156,6 +156,15 @@ pub enum Str {
     HiddenEmail,
     RemoveMethod,
     DeleteAccount,
+    /// The "+" picker and the empty machine list: why no Mac is offered (spec §4.5).
+    MacCannotHostYet,
+    /// Under `MacCannotHostYet` when the account has no Mac at all.
+    SignInOnYourMac,
+    /// `failure_sentence` for any code without a sentence of its own.
+    ServerProblem,
+    RateLimited,
+    /// A sign-in route this relay does not have, or has turned off.
+    SignInUnavailable,
 }
 
 impl Str {
@@ -269,6 +278,11 @@ impl Str {
         Str::HiddenEmail,
         Str::RemoveMethod,
         Str::DeleteAccount,
+        Str::MacCannotHostYet,
+        Str::SignInOnYourMac,
+        Str::ServerProblem,
+        Str::RateLimited,
+        Str::SignInUnavailable,
     ];
 }
 
@@ -393,6 +407,15 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::HiddenEmail => "Email ẩn",
             Str::RemoveMethod => "Gỡ",
             Str::DeleteAccount => "Xóa tài khoản…",
+            Str::MacCannotHostYet => {
+                "ShellX cho Mac hiện chưa nhận kết nối từ máy tính Windows. Terminal trên máy này vẫn dùng bình thường."
+            }
+            Str::SignInOnYourMac => {
+                "Đăng nhập ShellX trên Mac bằng cùng tài khoản để thấy Mac ở đây."
+            }
+            Str::ServerProblem => "ShellX đang gặp sự cố. Thử lại sau.",
+            Str::RateLimited => "Thử lại sau ít phút.",
+            Str::SignInUnavailable => "Bản này chưa dùng được cách đăng nhập này.",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -512,6 +535,15 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::HiddenEmail => "Hidden email",
             Str::RemoveMethod => "Remove",
             Str::DeleteAccount => "Delete Account…",
+            Str::MacCannotHostYet => {
+                "ShellX for Mac doesn't accept connections from Windows PCs yet. Terminals on this PC work as usual."
+            }
+            Str::SignInOnYourMac => {
+                "Sign in to ShellX on your Mac with the same account to see it here."
+            }
+            Str::ServerProblem => "ShellX is having a problem. Try again later.",
+            Str::RateLimited => "Try again in a few minutes.",
+            Str::SignInUnavailable => "This way of signing in isn't available in this build.",
         },
     }
 }
@@ -535,8 +567,26 @@ pub fn sign_in_methods_error(lang: Lang, code: &str) -> String {
     }
 }
 
+/// The sentence for a failed account, sign-in or pairing call, never the code: a relay without the
+/// route (or with it turned off) reads as "not available in this build", anything unknown as "ShellX is
+/// having a problem" (spec §4.1).
+pub fn failure_sentence(lang: Lang, code: &str) -> String {
+    let key = match code {
+        "network" => Str::RelayUnreachable,
+        "rate_limited" => Str::RateLimited,
+        "not_found"
+        | "http_404"
+        | "not_configured"
+        | "email_sign_in_disabled"
+        | "password_sign_in_removed" => Str::SignInUnavailable,
+        "switch_from_signed_in_device" => Str::SwitchFromSignedInDevice,
+        _ => Str::ServerProblem,
+    };
+    t(lang, key).to_string()
+}
+
 /// The sign-in dialog's error line for a Google flow failure. `None` for `google_cancelled`
-/// (the person closed it); any code without its own sentence reads as `login_failed(code)`.
+/// (the person closed it); any code without a Google sentence reads as `failure_sentence(code)`.
 pub fn google_error(lang: Lang, code: &str) -> Option<String> {
     let key = match code {
         "google_cancelled" => return None,
@@ -548,7 +598,7 @@ pub fn google_error(lang: Lang, code: &str) -> Option<String> {
         "email_in_use" => Str::EmailInUse,
         "identity_in_use" => Str::IdentityInUse,
         "browser_unavailable" => Str::BrowserUnavailable,
-        other => return Some(login_failed(lang, other)),
+        other => return Some(failure_sentence(lang, other)),
     };
     Some(t(lang, key).to_string())
 }
@@ -661,7 +711,94 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 109);
+        assert_eq!(Str::ALL.len(), 114);
+    }
+
+    #[test]
+    fn failure_sentence_wording() {
+        let pairs = [
+            (
+                Str::ServerProblem,
+                "ShellX đang gặp sự cố. Thử lại sau.",
+                "ShellX is having a problem. Try again later.",
+            ),
+            (
+                Str::RateLimited,
+                "Thử lại sau ít phút.",
+                "Try again in a few minutes.",
+            ),
+            (
+                Str::SignInUnavailable,
+                "Bản này chưa dùng được cách đăng nhập này.",
+                "This way of signing in isn't available in this build.",
+            ),
+        ];
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+    }
+
+    #[test]
+    fn failure_sentences_never_show_codes() {
+        for lang in [Lang::Vi, Lang::En] {
+            let cases: &[(&[&str], Str)] = &[
+                (&["network"], Str::RelayUnreachable),
+                (&["rate_limited"], Str::RateLimited),
+                (
+                    &[
+                        "not_found",
+                        "http_404",
+                        "not_configured",
+                        "email_sign_in_disabled",
+                        "password_sign_in_removed",
+                    ],
+                    Str::SignInUnavailable,
+                ),
+                (
+                    &["switch_from_signed_in_device"],
+                    Str::SwitchFromSignedInDevice,
+                ),
+                (
+                    &[
+                        "bad_response",
+                        "server",
+                        "http_502",
+                        "io",
+                        "invalid_machine",
+                        "",
+                    ],
+                    Str::ServerProblem,
+                ),
+            ];
+            for (codes, key) in cases {
+                for code in *codes {
+                    let out = failure_sentence(lang, code);
+                    assert_eq!(out, t(lang, *key), "{lang:?} {code}");
+                    assert!(!out.contains('_') && !out.contains("http"), "{code}: {out}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn machine_list_sentences_say_why_no_mac_is_offered() {
+        let pairs = [
+            (
+                Str::MacCannotHostYet,
+                "ShellX cho Mac hiện chưa nhận kết nối từ máy tính Windows. Terminal trên máy này vẫn dùng bình thường.",
+                "ShellX for Mac doesn't accept connections from Windows PCs yet. Terminals on this PC work as usual.",
+            ),
+            (
+                Str::SignInOnYourMac,
+                "Đăng nhập ShellX trên Mac bằng cùng tài khoản để thấy Mac ở đây.",
+                "Sign in to ShellX on your Mac with the same account to see it here.",
+            ),
+        ];
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
     }
 
     #[test]
@@ -868,7 +1005,15 @@ mod tests {
             );
             assert_eq!(
                 google_error(lang, "rate_limited"),
-                Some(login_failed(lang, "rate_limited"))
+                Some(t(lang, Str::RateLimited).to_string())
+            );
+            assert_eq!(
+                google_error(lang, "not_configured"),
+                Some(t(lang, Str::SignInUnavailable).to_string())
+            );
+            assert_eq!(
+                google_error(lang, "bad_response"),
+                Some(t(lang, Str::ServerProblem).to_string())
             );
             assert_eq!(
                 t(lang, Str::FontCredits),

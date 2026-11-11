@@ -104,6 +104,7 @@ pub fn this_machine(computer_name: Option<&str>) -> MachineInfo {
         last_seen_unix: 0,
         fingerprint: String::new(),
         is_this_machine: true,
+        can_host: false,
     }
 }
 
@@ -262,6 +263,7 @@ mod tests {
             last_seen_unix: 1_760_841_900,
             fingerprint: "f".into(),
             is_this_machine: false,
+            can_host: false,
         };
         let me = MachineInfo {
             machine_id: "m-pc".into(),
@@ -271,6 +273,7 @@ mod tests {
             last_seen_unix: 0,
             fingerprint: "g".into(),
             is_this_machine: true,
+            can_host: false,
         };
         let list = sidebar_machines(&[mac.clone(), me.clone()], Some("PC-1"));
         assert_eq!(list.len(), 2);
@@ -283,13 +286,21 @@ mod tests {
         );
         assert!(groups[1].dimmed);
         // registered list without this PC yet: this PC is added first
+        let mac_clone = mac.clone();
         let list = sidebar_machines(&[mac], None);
         assert_eq!(list[0].machine_id, LOCAL_MACHINE_ID);
         assert_eq!(list.len(), 2);
+        // another online PC: never offered (a PC does not answer requests)
         let mut online = me;
         online.is_this_machine = false;
         online.machine_id = "m-other".into();
         let groups = build_groups(&[online], &|_| Access::None, 0, Lang::Vi);
+        assert_eq!(groups[0].action, RowAction::None);
+        // an online Mac the relay says can host: offered
+        let mut host = mac_clone;
+        host.online = true;
+        host.can_host = true;
+        let groups = build_groups(&[host], &|_| Access::None, 0, Lang::Vi);
         assert_eq!(groups[0].action, RowAction::RequestAccess);
     }
 
