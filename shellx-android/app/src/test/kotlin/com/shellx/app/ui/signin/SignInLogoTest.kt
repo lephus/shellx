@@ -121,6 +121,14 @@ class SignInLogoTest {
     }
 
     @Test
+    fun theGlowReachesAQuarterOfTheSquaresSidePastItsEdges() {
+        // As the one-colour glow did: 24 dp round a 96 dp logo, which leaves the title below it alone.
+        assertEquals(SignInLogo.VIEWPORT / 4, SignInLogo.GLOW_REACH)
+        assertEquals("at full strength as far as the square's edge", SignInLogo.VIEWPORT / 2, SignInLogo.GLOW_FULL)
+        assertEquals("1.5 times the square's side across", 1.5f * SignInLogo.VIEWPORT, 2 * SignInLogo.GLOW_RADIUS)
+    }
+
+    @Test
     fun theGlowsColoursTurnClockwiseOnceEverySixSeconds() {
         assertEquals(6_000L, SignInLogo.GLOW_TURN_MS)
         assertEquals("nothing turns during the intro", 0f, SignInLogo.turn(0), 0f)

@@ -170,9 +170,10 @@ class SignInIntroRenderTest {
             val after = ring(late[index])
             for (shot in listOf(early[index], late[index])) {
                 val colours = ring(shot)
+                val page = chroma(shot.pixel(shot.width - 1, 0))
                 assertTrue(
-                    "${shot.file.name}: colour on every side of the square (chroma ${colours.map(::chroma)})",
-                    colours.all { chroma(it) >= 24 },
+                    "${shot.file.name}: colour on every side of the square (chroma ${colours.map(::chroma)}, the page's $page)",
+                    colours.all { chroma(it) >= page + 12 },
                 )
                 assertTrue(
                     "${shot.file.name}: three or more hues round the square (${colours.map(::hue)})",
@@ -183,6 +184,18 @@ class SignInIntroRenderTest {
                 "$name: 1.5 s later the colours have moved on (above the square: ${hue(before[0])}° then ${hue(after[0])}°)",
                 apart(hue(before[0]), hue(after[0])) >= 30f,
             )
+            // A quarter turn clockwise: what was left of the square is above it, what was above it is on its right.
+            for (side in 0 until 4) {
+                val was = hue(before[(side + 3) % 4])
+                val now = hue(after[side])
+                assertTrue("$name: side $side has the colour of the side before it ($was° then $now°)", apart(was, now) < 25f)
+            }
+            // The glow ends 24 dp (72 px) from the square: past it there is the page alone.
+            val shot = early[index]
+            val beyond = (0 until 520).sumOf { y ->
+                (0 until 520).count { x -> (x >= 436 || y >= 436) && shot.pixel(x, y) != shot.pixel(shot.width - 1, 0) }
+            }
+            assertEquals("$name: no glow further than 24 dp from the square", 0, beyond)
             assertTrue(
                 "$name: the glow is behind the square and never over it",
                 inside(early[index], 72) == inside(bare[index], 72),
