@@ -138,14 +138,13 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
         send("DELETE", "/v2/phone-grants/$grantId", token, null)
     }
 
-    // Account (contracts §2, §5, §8). Android has no password login, no Apple sign-in and no Google link.
+    // Account (contracts §2, §5, §8): sign-in with Google or with an emailed code, and account deletion. Android has no
+    // password login, no Apple sign-in and no Google link.
 
     /** A fresh single-use nonce for the next sign-in: 1–128 characters of the base64url alphabet. */
     suspend fun nonce(): String {
         val nonce = sendJson("POST", "/v1/auth/nonce", null, JsonObject(emptyMap())).str("nonce")
-        if (nonce.length !in 1..128 || !nonce.all { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == '-' || it == '_' }) {
-            throw RelayApiException.BadResponse()
-        }
+        if (!isBase64UrlToken(nonce)) throw RelayApiException.BadResponse()
         return nonce
     }
 
@@ -157,18 +156,44 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
         val body = buildJsonObject {
             put("id_token", idToken)
             put("nonce", nonce)
-            put(
-                "device",
-                buildJsonObject {
-                    put("kind", "mobile")
-                    put("name", deviceName)
-                    put("platform", "android")
-                    put("public_key", Base64.getUrlEncoder().withoutPadding().encodeToString(clientKey))
-                },
-            )
+            put("device", device(deviceName, clientKey))
         }
-        val reply = sendJson("POST", "/v1/auth/google", null, body)
-        return AccountSignIn(AccountSession(reply.str("user_id"), reply.str("device_id"), reply.str("token")), reply.str("email"))
+        return signIn(sendJson("POST", "/v1/auth/google", null, body))
+    }
+
+    /**
+     * Asks the relay to mail a 6-digit sign-in code to [email] (`POST /v1/auth/email/code`), written in [locale] ("en"
+     * or "vi"). The answer never says whether the address has an account. The challenge id must be 1–128 characters of
+     * the base64url alphabet, the code's life 1 s to a day and the resend wait at most a day
+     * ([RelayApiException.BadResponse] otherwise).
+     */
+    suspend fun requestEmailCode(email: String, locale: String): EmailChallenge {
+        val body = buildJsonObject {
+            put("email", email)
+            put("locale", locale)
+        }
+        val reply = sendJson("POST", "/v1/auth/email/code", null, body)
+        val challengeId = reply.str("challenge_id")
+        val expiresIn = reply.long("expires_in")
+        val resendIn = reply.long("resend_in")
+        val normalized = reply.str("email")
+        if (!isBase64UrlToken(challengeId) || expiresIn !in 1..MAX_CODE_SECONDS || resendIn !in 0..MAX_CODE_SECONDS) {
+            throw RelayApiException.BadResponse()
+        }
+        return EmailChallenge(challengeId, expiresIn.toInt(), resendIn.toInt(), normalized)
+    }
+
+    /**
+     * Signs this phone in with the code mailed for [challengeId] (`POST /v1/auth/email/verify`). [clientKey] is the
+     * phone's Noise static **public** key (`NoiseStaticKey.publicKey`), never its private key.
+     */
+    suspend fun signInWithEmailCode(challengeId: String, code: String, deviceName: String, clientKey: ByteArray): AccountSignIn {
+        val body = buildJsonObject {
+            put("challenge_id", challengeId)
+            put("code", code)
+            put("device", device(deviceName, clientKey))
+        }
+        return signIn(sendJson("POST", "/v1/auth/email/verify", null, body))
     }
 
     /** Deletes the account, proven by a fresh ID token of its identity (`DELETE /v1/account`). */
@@ -176,6 +201,18 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
         val body = buildJsonObject {
             put("id_token", idToken)
             put("nonce", nonce)
+        }
+        send("DELETE", "/v1/account", token, body)
+    }
+
+    /**
+     * Deletes the account, proven by a code mailed to its address (`DELETE /v1/account`). Kotlin cannot overload
+     * [deleteAccount] on parameter names, hence the name.
+     */
+    suspend fun deleteAccountWithEmailCode(challengeId: String, code: String, token: String) {
+        val body = buildJsonObject {
+            put("challenge_id", challengeId)
+            put("code", code)
         }
         send("DELETE", "/v1/account", token, body)
     }
@@ -198,6 +235,22 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
     suspend fun logout(token: String) {
         send("POST", "/v1/auth/logout", token, null)
     }
+
+    /** This phone as the sign-in routes take it (`device`). */
+    private fun device(deviceName: String, clientKey: ByteArray): JsonObject = buildJsonObject {
+        put("kind", "mobile")
+        put("name", deviceName)
+        put("platform", "android")
+        put("public_key", Base64.getUrlEncoder().withoutPadding().encodeToString(clientKey))
+    }
+
+    /** The sign-in routes' answer: `{user_id, device_id, token, email}`. */
+    private fun signIn(reply: ApiJson): AccountSignIn =
+        AccountSignIn(AccountSession(reply.str("user_id"), reply.str("device_id"), reply.str("token")), reply.str("email"))
+
+    /** A nonce or a challenge id as the relay issues them: 1–128 characters of the base64url alphabet. */
+    private fun isBase64UrlToken(value: String): Boolean =
+        value.length in 1..128 && value.all { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' || it == '-' || it == '_' }
 
     // Transport
 
@@ -238,6 +291,9 @@ class RelayApi(val baseUrl: String, okHttpClient: OkHttpClient, private val clie
 
     private companion object {
         const val TIMEOUT_SECONDS = 15L
+
+        /** The longest a code's life or its resend wait may be said to be: a day. */
+        const val MAX_CODE_SECONDS = 86_400L
         val JSON = "application/json".toMediaType()
     }
 }
