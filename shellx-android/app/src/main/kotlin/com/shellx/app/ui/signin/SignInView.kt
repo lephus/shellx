@@ -102,24 +102,31 @@ data class SignInLayout(val logoDp: Int, val subtitle: Boolean, val guide: Boole
         /** A landscape window at least this wide has two columns; a narrower one (a split screen) keeps one. */
         const val SIDE_BY_SIDE_MIN_WIDTH_DP = 600
 
-        fun of(widthDp: Float, heightDp: Float): SignInLayout =
-            SignInLayout(logoDp = SignInLogo.SIZE_DP, subtitle = true, guide = true, sideBySide = false)
+        fun of(widthDp: Float, heightDp: Float): SignInLayout {
+            val landscape = widthDp > heightDp
+            return SignInLayout(
+                logoDp = if (landscape || heightDp < COMPACT_HEIGHT_DP) SignInLogo.COMPACT_SIZE_DP else SignInLogo.SIZE_DP,
+                subtitle = heightDp >= SUBTITLE_MIN_HEIGHT_DP,
+                guide = heightDp >= GUIDE_MIN_HEIGHT_DP,
+                sideBySide = landscape && widthDp >= SIDE_BY_SIDE_MIN_WIDTH_DP,
+            )
+        }
     }
 }
 
 /** The sign-in screen's intro as a whole: the logo, the typed taglines and the three steps share one clock. */
 object SignInIntro {
     /** When the logo and the steps are all in place: from here only the cursors, the glow and the taglines move. */
-    const val SETTLED_MS = 0L
+    val SETTLED_MS: Long = maxOf(SignInLogo.INTRO_MS, SignInGuide.END_MS)
 
     /** After [SETTLED_MS] the clock moves at most 30 times a second, at any display rate. */
     const val FRAME_MS = 33L
 
     /** Whether the intro moves: not when the system's animations are off ("Remove animations", a render, a UI test). */
-    fun animates(animatorsEnabled: Boolean): Boolean = true
+    fun animates(animatorsEnabled: Boolean): Boolean = animatorsEnabled
 
     /** The clock's reading for [ms] once the intro has settled: the last whole [FRAME_MS]. */
-    fun tick(ms: Long): Long = ms
+    fun tick(ms: Long): Long = ms / FRAME_MS * FRAME_MS
 }
 
 /**
