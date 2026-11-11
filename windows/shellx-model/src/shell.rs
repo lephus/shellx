@@ -163,10 +163,21 @@ fn file_name(path: &str) -> &str {
     path.rsplit(['\\', '/']).next().unwrap_or(path)
 }
 
+/// `X:\...`, `X:/...` or `\\server\...`. An empty, `.`, relative or drive-relative (`C:x`) path
+/// is not: the process would resolve it against whatever folder ShellX was started from.
+fn is_absolute(path: &str) -> bool {
+    let c: Vec<char> = path.chars().take(3).collect();
+    let drive =
+        c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && matches!(c[2], '\\' | '/');
+    let unc = c.len() >= 2 && c[0] == '\\' && c[1] == '\\';
+    drive || unc
+}
+
 /// Finds the file `program` names. A name with `\`, `/` or `:` is checked as given, then
 /// with `.exe` added when it has no extension; any other name is looked up in each
-/// `;`-separated `PATH` entry (quotes stripped, empty entries skipped), plain then `.exe`.
-/// The first existing file wins.
+/// `;`-separated `PATH` entry (quotes stripped), plain then `.exe`. Entries that are not
+/// absolute (empty, `.`, relative) are skipped, so a program in ShellX's working folder is
+/// never chosen. The first existing file wins.
 pub fn resolve_program(
     program: &str,
     probe: &ShellProbe,
@@ -189,7 +200,7 @@ pub fn resolve_program(
     }
     for entry in probe.path.split(';') {
         let entry = entry.trim().trim_matches('"');
-        if entry.is_empty() {
+        if !is_absolute(entry) {
             continue;
         }
         let dir = entry.trim_end_matches('\\');
@@ -203,12 +214,27 @@ pub fn resolve_program(
 }
 
 /// A custom shell typed as a command line: its program must exist (the Settings field
-/// calls this on every edit). The result has no kind and no prompt hook.
+/// calls this on every edit). The result has no kind and no prompt hook. A whole line that
+/// is a path to a file (spaces allowed, `.exe` optional) is that program with no arguments.
 pub fn custom_launch(
     line: &str,
     probe: &ShellProbe,
     exists: &dyn Fn(&str) -> bool,
 ) -> Result<ShellLaunch, CustomShellError> {
+    // An unquoted path with spaces that names a file (with or without `.exe`) is that program
+    // with no arguments. Only a value that looks like a path can be one: a bare name is
+    // looked up on PATH, never in the current folder.
+    let whole = line.trim();
+    if whole.contains(['\\', '/', ':'])
+        && let Some(program) = resolve_program(whole, probe, exists)
+    {
+        return Ok(ShellLaunch {
+            kind: None,
+            program,
+            args: Vec::new(),
+            osc7_hook: false,
+        });
+    }
     let mut parts = parse_command_line(line)?.into_iter();
     let typed = parts.next().ok_or(CustomShellError::Empty)?;
     let program =
@@ -340,19 +366,45 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
     found
 }
 
+/// The shells Auto may start, in order: PowerShell 7, Windows PowerShell, Command Prompt.
+/// Git Bash and WSL are only ever started by choice.
+fn auto_shells(found: &[ShellLaunch]) -> impl Iterator<Item = &ShellLaunch> {
+    found.iter().filter(|l| {
+        matches!(
+            l.kind,
+            Some(ShellKind::Pwsh | ShellKind::WindowsPowerShell | ShellKind::Cmd)
+        )
+    })
+}
+
+fn same_program(a: &str, b: &str) -> bool {
+    a.eq_ignore_ascii_case(b)
+}
+
+/// The first Auto shell that is not the program in `first`: the one fallback.
+fn fallback_for(found: &[ShellLaunch], first: &ShellLaunch) -> Option<ShellLaunch> {
+    auto_shells(found)
+        .find(|l| !same_program(&l.program, &first.program))
+        .cloned()
+}
+
 fn auto_plan(found: &[ShellLaunch]) -> Result<LaunchPlan, ShellError> {
-    let first = found.first().ok_or(ShellError::NoShellFound)?.clone();
+    let first = auto_shells(found)
+        .next()
+        .ok_or(ShellError::NoShellFound)?
+        .clone();
     Ok(LaunchPlan {
+        fallback: fallback_for(found, &first),
         first,
-        fallback: found.get(1).cloned(),
     })
 }
 
 /// What to start for the user's `choice` and the `SHELLX_SHELL` override (`env_override`,
 /// which wins when it is not blank). `found` is `find_shells`. The fallback is the next Auto
-/// shell, once; a chosen shell that is no longer installed gives the Auto plan. A whole
-/// override value that names an existing file is that program with no arguments (the old
-/// behaviour, for paths with spaces); otherwise it is a command line.
+/// shell (never Git Bash or WSL, never the same program), once; a chosen shell that is no
+/// longer installed gives the Auto plan. The override is read like a custom command line
+/// (`custom_launch`): a whole value that is a path to a file is that program with no
+/// arguments (the old behaviour, for paths with spaces); a bare name is looked up on PATH.
 pub fn launch_plan(
     choice: &ShellChoice,
     env_override: Option<&str>,
@@ -361,19 +413,10 @@ pub fn launch_plan(
     exists: &dyn Fn(&str) -> bool,
 ) -> Result<LaunchPlan, ShellError> {
     if let Some(value) = env_override.map(str::trim).filter(|v| !v.is_empty()) {
-        let first = if exists(value) {
-            ShellLaunch {
-                kind: None,
-                program: value.to_string(),
-                args: Vec::new(),
-                osc7_hook: false,
-            }
-        } else {
-            custom_launch(value, probe, exists).map_err(ShellError::Override)?
-        };
+        let first = custom_launch(value, probe, exists).map_err(ShellError::Override)?;
         return Ok(LaunchPlan {
+            fallback: fallback_for(found, &first),
             first,
-            fallback: found.first().cloned(),
         });
     }
     match choice {
@@ -381,15 +424,15 @@ pub fn launch_plan(
         ShellChoice::Known { shell } => match found.iter().find(|l| l.kind == Some(*shell)) {
             Some(first) => Ok(LaunchPlan {
                 first: first.clone(),
-                fallback: found.iter().find(|l| l.kind != Some(*shell)).cloned(),
+                fallback: fallback_for(found, first),
             }),
             None => auto_plan(found),
         },
         ShellChoice::Custom { command_line } => {
             let first = custom_launch(command_line, probe, exists).map_err(ShellError::Custom)?;
             Ok(LaunchPlan {
+                fallback: fallback_for(found, &first),
                 first,
-                fallback: found.first().cloned(),
             })
         }
     }
@@ -1011,7 +1054,11 @@ mod tests {
         .unwrap();
         assert_eq!(cmd.fallback.unwrap().kind, Some(ShellKind::Pwsh));
         // SHELLX_SHELL=pwsh, a custom line for PowerShell 7: the fallback is another program
-        let plan = launch_plan(&ShellChoice::Auto, Some("pwsh"), &found, &p, &ex).unwrap();
+        let on_path = ShellProbe {
+            path: r"C:\Program Files\PowerShell\7".into(),
+            ..probe()
+        };
+        let plan = launch_plan(&ShellChoice::Auto, Some("pwsh"), &found, &on_path, &ex).unwrap();
         assert_eq!(plan.first.program, PWSH);
         assert_eq!(
             plan.fallback.unwrap().kind,
