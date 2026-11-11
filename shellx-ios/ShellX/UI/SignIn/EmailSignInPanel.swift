@@ -1,7 +1,7 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The top of the first sign-in screen: the email field, what is wrong with it, and Send code. Every row is full
+/// The top of the first sign-in screen (the email step): the email field, what is wrong with it, and Send code. Every row is full
 /// width and 12 points from the next.
 ///
 /// Send code is off until the field holds something that can be an address (ASCII only); while the address has a
@@ -43,6 +43,45 @@ struct EmailEntryRows: View {
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!enabled || !model.canSend)
             .accessibilityIdentifier("signin.email.send")
+        }
+    }
+}
+
+/// The code step of the sign-in screen, in the place of the field and the buttons: where the code went, the
+/// six-digit field, Verify, Resend and "Use a different email". Every row is full width and 12 points from the next.
+struct EmailCodeStep: View {
+    @Bindable var model: EmailSignInModel
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text(LocalizedStringResource("signin.email.sentTo \(model.sentTo ?? "")"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("signin.email.sentTo")
+
+            EmailCodeField(model: model, label: LocalizedStringResource("signin.email.code"))
+
+            Button {
+                Task { await model.verify() }
+            } label: {
+                EmailBusyLabel(title: LocalizedStringResource("signin.email.verify"), busy: model.step == .verifying)
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(!model.canVerify)
+            .accessibilityIdentifier("signin.email.verify")
+
+            EmailResendButton(model: model)
+
+            Button(action: model.changeEmail) {
+                Text(LocalizedStringResource("signin.email.change"))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(EmailTextButtonStyle())
+            .disabled(model.isBusy)
+            .accessibilityIdentifier("signin.email.change")
         }
     }
 }

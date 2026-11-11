@@ -5,7 +5,8 @@ import UIKit
 /// Sign in with a code sent by email, with Google or with Apple. There is no password field.
 ///
 /// The first screen is the email step: an intro, then the email field with Send code, "or", Google, Apple and the
-/// demo link. The intro is the logo whose chevrons slide in (`SignInLogoView`), the title, three taglines typed one
+/// demo link. Once a code was sent the code step takes the place of these rows (`EmailCodeStep`), with the intro
+/// folded; "Use a different email" brings them back, with the address and the keyboard in the field. The intro is the logo whose chevrons slide in (`SignInLogoView`), the title, three taglines typed one
 /// after another (`TypedTaglineView`) and three steps that appear in turn (`SignInGuideView`). The field and the
 /// buttons are there and work from the first frame; the intro never holds them back or moves them. With Reduce Motion
 /// on, and in tests and screenshots, the intro is still (`SignInIntroMotion`). Nothing takes the keyboard when the
@@ -96,6 +97,17 @@ struct SignInView: View {
                 AccessibilityNotification.Announcement(text).post()
             }
         }
+        .onChange(of: model.step) { old, new in
+            // A code was mailed (the first or a new one): read out where.
+            if old == .sending, new == .code, model.error == nil, let sentTo = model.sentTo {
+                AccessibilityNotification.Announcement(String(localized: "signin.email.sentTo \(sentTo)")).post()
+            }
+        }
+        .onChange(of: model.panel) { old, new in
+            // Back from the code step ("Use a different email", or an address that cannot go on): the keyboard goes
+            // to the email field, where the address still is.
+            if old == .code, new == .email { emailFocus += 1 }
+        }
     }
 
     /// One tree for both arrangements: turning the phone moves the parts and keeps them (the field, its text and the
@@ -158,9 +170,18 @@ struct SignInView: View {
         }
     }
 
-    /// The rows under the intro, one under the other, 12 points apart: the email field and Send code, "or", Google,
-    /// Apple and the demo link. A further way to sign in is one more row.
-    private var actions: some View {
+    /// Under the intro: the first screen's rows, or the code step in their place once a code was sent.
+    @ViewBuilder private var actions: some View {
+        if model.panel == .code {
+            EmailCodeStep(model: model)
+        } else {
+            firstScreenRows
+        }
+    }
+
+    /// The rows of the first screen, one under the other, 12 points apart: the email field and Send code, "or",
+    /// Google, Apple and the demo link. A further way to sign in is one more row.
+    private var firstScreenRows: some View {
         VStack(spacing: 12) {
             EmailEntryRows(model: model, focusRequest: emailFocus, enabled: running == nil, send: sendCode)
 
