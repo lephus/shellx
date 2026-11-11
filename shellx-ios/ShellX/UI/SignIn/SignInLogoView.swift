@@ -62,9 +62,9 @@ struct SignInLogoView: View {
 
     /// The halo behind the square at `time`: the five colours around the logo's centre, turned as far as they have
     /// come, seen through the square's own shape, a little larger and blurred, at the opacity of its breath. So the
-    /// halo is a soft ring that follows the square's outline, full at its edge and gone a sixth of its side further
-    /// out. The colours are one layer that only turns; the shape they are seen through stands still. The halo is
-    /// drawn outside the logo's frame and takes no room.
+    /// halo is a soft ring that follows the square's outline, strong at its edge and gone some 0.23 of its side
+    /// further out (`haloExtent`). The colours are one layer that only turns; the shape they are seen through stands
+    /// still. The halo is drawn outside the logo's frame and takes no room.
     private func halo(at time: TimeInterval) -> some View {
         let spread = size * SignInLogoMark.haloSpread
         let field = size * SignInLogoMark.haloField
@@ -150,13 +150,14 @@ enum SignInLogoMark {
     static let haloPalette: [UInt32] = [0x4AF2A1, 0x60A5FA, 0xA78BFA, 0xF472B6, 0xFBBF24, 0x4AF2A1]
     static let haloColors = haloPalette.map(color)
     /// How far the halo's shape reaches past the square's edge before it starts to fade, as a part of the logo's
-    /// side: at the edge itself the halo is nearly at full strength.
-    static let haloSpread: CGFloat = 0.04
+    /// side: at the edge itself the halo is at four fifths of its strength.
+    static let haloSpread: CGFloat = 0.06
     /// How softly the halo fades: the blur of its shape, as a part of the logo's side.
-    static let haloSoftness: CGFloat = 0.052
+    static let haloSoftness: CGFloat = 0.07
     /// The halo's width across, as a part of the logo's side: the shape and its fade, which is gone 2.4 times the
-    /// blur further out. It ends just inside the 16 points that are free around a 96-point logo, so it never reaches
-    /// the title under it or the screen's edge.
+    /// blur further out. It keeps the reach of the mint glow it replaced as far as the title allows: some 22 points
+    /// round a 96-point logo, gone before the title's letters, which begin 24 points under it. On the left it meets
+    /// the screen's edge, 16 points away, faintly, as the mint glow did.
     static let haloExtent: CGFloat = 1 + 2 * (haloSpread + 2.4 * haloSoftness)
     /// The side of the square of turning colours the halo is cut from, as a part of the logo's side: large enough
     /// to cover the halo out to its corners however far it has turned.
