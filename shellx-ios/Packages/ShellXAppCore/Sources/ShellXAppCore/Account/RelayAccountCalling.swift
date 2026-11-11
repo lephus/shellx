@@ -13,6 +13,11 @@ public protocol RelayAccountCalling: Sendable {
     /// Links an Apple ID without an account to the account of the Mac whose pairing code is `offerURI`.
     func linkApple(offerURI: String, linkToken: String, clientKey: Data) async throws -> AppleLinkApproval
     func deleteAccount(idToken: String, nonce: String, token: String) async throws
+    /// Asks the relay to mail a 6-digit code to `email`; `locale` ("vi" or "en") is the language of the mail.
+    func requestEmailCode(email: String, locale: String) async throws -> EmailChallenge
+    func signInWithEmailCode(challengeID: String, code: String, deviceName: String, clientKey: Data) async throws -> AccountSignIn
+    /// Deletes the account of an email session with a code mailed to its address.
+    func deleteAccount(challengeID: String, code: String, token: String) async throws
     func logout(token: String) async throws
     func machines(token: String) async throws -> [PairedMachineListing]
     func unpair(grantID: String, token: String) async throws

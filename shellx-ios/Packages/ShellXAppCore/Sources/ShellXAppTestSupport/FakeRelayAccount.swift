@@ -18,6 +18,9 @@ public actor FakeRelayAccount: RelayAccountCalling {
         case signInWithApple(identityToken: String, authorizationCode: String, nonce: String, deviceName: String, clientKey: Data)
         case linkApple(offerURI: String, linkToken: String, clientKey: Data)
         case deleteAccount(idToken: String, nonce: String, token: String)
+        case requestEmailCode(email: String, locale: String)
+        case signInWithEmailCode(challengeID: String, code: String, deviceName: String, clientKey: Data)
+        case deleteAccountWithCode(challengeID: String, code: String, token: String)
         case logout(token: String)
         case machines(token: String)
         case unpair(grantID: String, token: String)
@@ -28,6 +31,7 @@ public actor FakeRelayAccount: RelayAccountCalling {
     public enum Function: Sendable {
         case login, logout, machines, unpair, pair, setPushToken
         case nonce, signInWithGoogle, linkGoogle, signInWithApple, linkApple, deleteAccount
+        case requestEmailCode, signInWithEmailCode, deleteAccountWithCode
     }
 
     public private(set) var calls: [Call] = []
@@ -42,6 +46,11 @@ public actor FakeRelayAccount: RelayAccountCalling {
         .signedIn(AccountSignIn(session: AccountSession(userID: "user", deviceID: "device", token: "token"), email: "user@example.com")))
     private var appleLinkSignIn = AccountSignIn(
         session: AccountSession(userID: "user", deviceID: "device", token: "apple-token"), email: "user@example.com")
+    /// nil: a new challenge for every request, see `setEmailChallenge`.
+    private var emailChallenge: Result<EmailChallenge, Error>?
+    private var emailChallengeCount = 0
+    private var emailSignIn: Result<AccountSignIn, Error> = .success(
+        AccountSignIn(session: AccountSession(userID: "user", deviceID: "device", token: "email-token"), email: "user@example.com"))
     private var hooks: [Function: @Sendable () async -> Void] = [:]
     private var grants: [PairedMachineListing] = []
     private var errors: [Function: Error] = [:]
@@ -62,6 +71,11 @@ public actor FakeRelayAccount: RelayAccountCalling {
     public func setLinkGoogle(_ result: Result<AccountSignIn, Error>) { linkGoogleResult = result }
     public func setAppleSignIn(_ result: Result<AppleSignInResult, Error>) { appleSignIn = result }
     public func setAppleLinkSignIn(_ signIn: AccountSignIn) { appleLinkSignIn = signIn }
+    /// nil (the default): the nth request answers `EmailChallenge(challengeID: "challenge-<n>", expiresIn: 600, resendIn: 60,
+    /// email: <the email asked for, trimmed and lowercased>)`, as the relay normalizes.
+    public func setEmailChallenge(_ result: Result<EmailChallenge, Error>?) { emailChallenge = result }
+    /// Default: user "user", device "device", token "email-token", email "user@example.com".
+    public func setEmailSignIn(_ result: Result<AccountSignIn, Error>) { emailSignIn = result }
     /// Runs inside `function`'s call, after it is recorded and before it answers (a 401 racing a request).
     public func setHook(_ hook: (@Sendable () async -> Void)?, for function: Function) { hooks[function] = hook }
     public func setGrants(_ grants: [PairedMachineListing]) { self.grants = grants }
@@ -138,6 +152,28 @@ public actor FakeRelayAccount: RelayAccountCalling {
 
     public func deleteAccount(idToken: String, nonce: String, token: String) async throws {
         try await enter(.deleteAccount(idToken: idToken, nonce: nonce, token: token), .deleteAccount)
+    }
+
+    public func requestEmailCode(email: String, locale: String) async throws -> EmailChallenge {
+        try await enter(.requestEmailCode(email: email, locale: locale), .requestEmailCode)
+        if let emailChallenge { return try emailChallenge.get() }
+        emailChallengeCount += 1
+        return EmailChallenge(
+            challengeID: "challenge-\(emailChallengeCount)", expiresIn: 600, resendIn: 60,
+            email: email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
+    public func signInWithEmailCode(challengeID: String, code: String, deviceName: String, clientKey: Data) async throws
+        -> AccountSignIn
+    {
+        try await enter(
+            .signInWithEmailCode(challengeID: challengeID, code: code, deviceName: deviceName, clientKey: clientKey),
+            .signInWithEmailCode)
+        return try emailSignIn.get()
+    }
+
+    public func deleteAccount(challengeID: String, code: String, token: String) async throws {
+        try await enter(.deleteAccountWithCode(challengeID: challengeID, code: code, token: token), .deleteAccountWithCode)
     }
 
     public func logout(token: String) async throws {
