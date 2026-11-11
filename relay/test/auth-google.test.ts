@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { hashToken } from "../src/auth/tokens.js";
+import { FakeEmailGateway } from "./fake-email.js";
 import { fakeGoogle, googleClaims } from "./fake-idp.js";
 import {
-  call, CountingLimiter, db, deviceBody, errorCode, googleSession, loginDevice, makeApp, newNonce, randomEmail,
+  call, CountingLimiter, db, deviceBody, emailSession, errorCode, googleSession, loginDevice, makeApp, newNonce, randomEmail,
   registerAccount, seedUser, signInGoogle, TEST_CONFIG, unlimited,
 } from "./helpers.js";
 
@@ -117,5 +118,17 @@ describe("POST /v1/auth/google", () => {
   it("records X-ShellX-Version on the device", async () => {
     const s = await googleSession(makeApp(), { headers: { "X-ShellX-Version": "1.8.0" } });
     expect(db().get("SELECT app_version FROM devices WHERE id = ?", s.deviceId)).toEqual({ app_version: "1.8.0" });
+  });
+
+  it("joins an account created with an email code for the same address; a second Google account with it is still refused", async () => {
+    const mail = new FakeEmailGateway();
+    const app = makeApp({ email: mail });
+    const e = await emailSession(app, mail, { email: "ann.lee@example.com" });
+    const g = await googleSession(app, { email: "Ann.Lee@Example.com" });
+    expect(g.userId).toBe(e.userId);
+    expect(db().all("SELECT provider FROM identities WHERE user_id = ? ORDER BY provider", e.userId)).toEqual([{ provider: "email" }, { provider: "google" }]);
+    expect((await devices(app, e.token)).status).toBe(200);
+    const other = await signInGoogle(app, { email: "ann.lee@example.com" });
+    expect([other.status, await errorCode(other)]).toEqual([401, "invalid_credentials"]);
   });
 });
