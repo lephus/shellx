@@ -14,10 +14,15 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
 import com.shellx.app.ui.settings.AccountActions
 import com.shellx.app.ui.settings.DeleteAccountCard
+import com.shellx.app.ui.settings.DeleteAccountCodeCard
 import com.shellx.app.ui.settings.DeleteAccountFlow
 import com.shellx.app.ui.settings.SettingsScreen
 import com.shellx.app.ui.settings.settingsVoiceService
 import com.shellx.app.ui.theme.AppAppearance
+import com.shellx.core.account.AccountAuthMethod
+import com.shellx.core.account.EmailSignInState
+import com.shellx.core.account.EmailSignInState.Step
+import com.shellx.core.account.SignInException
 import com.shellx.core.voice.VoiceLanguage
 import com.shellx.core.voice.VoiceService
 import kotlinx.coroutines.CoroutineScope
@@ -47,12 +52,29 @@ class SettingsRenderTest {
     }
 
     @Composable
-    private fun Settings(email: String, account: AccountActions?, voice: VoiceService? = null) {
+    private fun Settings(
+        email: String,
+        account: AccountActions?,
+        voice: VoiceService? = null,
+        authMethod: AccountAuthMethod = AccountAuthMethod.GOOGLE,
+    ) {
         SettingsScreen(
             email = email, account = account, appearance = AppAppearance.SYSTEM, onAppearance = {}, voice = voice,
-            version = "1.0.0 (100)", openMachines = {}, back = {},
+            version = "1.0.0 (100)", openMachines = {}, back = {}, authMethod = authMethod,
         )
     }
+
+    /** The deletion's card for an account that signed in with an emailed code. No field is focused. */
+    @Composable
+    private fun CodeCard(state: EmailSignInState) {
+        Box(
+            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) { DeleteAccountCodeCard(state, onDelete = {}, onCode = {}, onResend = {}, onCancel = {}) }
+    }
+
+    private fun code(code: String = "123", step: Step = Step.CODE, error: SignInException? = null) =
+        EmailSignInState(step, "phu@example.com", code, resendInSeconds = 42, error = error)
 
     @Composable
     private fun Card(step: DeleteAccountFlow.Step) {
@@ -78,6 +100,43 @@ class SettingsRenderTest {
     @Test
     fun settingsInTheDemo() {
         assertRenders("settings-demo") { Settings("demo@shellx.pro", null) }
+    }
+
+    @Test
+    fun settingsOfAnEmailAccount() {
+        assertRenders("settings-email") { Settings("phu@example.com", AccountActions({}, {}), authMethod = AccountAuthMethod.EMAIL) }
+    }
+
+    @Test
+    fun deleteByCodeQuestion() {
+        assertRenders("delete-account-code-question") { CodeCard(EmailSignInState(Step.EMAIL, email = "phu@example.com")) }
+    }
+
+    @Test
+    fun deleteByCodeSending() {
+        assertRenders("delete-account-code-sending") { CodeCard(EmailSignInState(Step.SENDING, email = "phu@example.com")) }
+    }
+
+    @Test
+    fun deleteByCode() {
+        assertRenders("delete-account-code") { CodeCard(code()) }
+    }
+
+    @Test
+    fun deleteByCodeError() {
+        assertRenders("delete-account-code-error") { CodeCard(code(code = "", error = SignInException.InvalidCode())) }
+    }
+
+    @Test
+    fun deleteByCodeWorking() {
+        assertRenders("delete-account-code-working") { CodeCard(code(code = "123456", step = Step.VERIFYING)) }
+    }
+
+    /** The Pixel 3's window with large text: the card scrolls inside itself if it must, and nothing is cut. */
+    @Test
+    @Config(qualifiers = "w393dp-h713dp-xxhdpi", fontScale = 1.3f)
+    fun deleteByCodeOnThePixel3WithLargeText() {
+        assertRenders("delete-account-code-pixel3-large-font") { CodeCard(code(error = SignInException.InvalidCode())) }
     }
 
     @Test
