@@ -54,6 +54,8 @@ public final class ShellXAccount {
     @ObservationIgnored private var waitingFlowID: String?
     @ObservationIgnored private var googleCancelRequested = false
     @ObservationIgnored private var googleToken: UUID?
+    /// Email codes being verified right now (a closed sheet's verify runs on, Ruling 12); Google waits for none.
+    @ObservationIgnored private var emailVerifications = 0
 
     public init(service: ShellXRemoteService, openURL: @escaping @MainActor (URL) -> Bool = { _ in false }) {
         self.service = service
@@ -109,11 +111,15 @@ public final class ShellXAccount {
     /// Opens Google in the browser and waits for the person. `.signIn` creates the session (and starts the
     /// remote session with the gate on); `.link` switches the current session to Google in place.
     /// Throws the core's code (`google_cancelled`, `google_timeout`, `switch_from_signed_in_device`, ...),
-    /// `google_in_progress` while another flow waits, or `browser_unavailable`.
+    /// `google_in_progress` while another flow waits, `email_sign_in_in_progress` while an email code is being
+    /// verified (so two session writes never race), or `browser_unavailable`.
     @discardableResult
     public func signInWithGoogle(purpose: GoogleSignInPurpose) async throws -> Identity {
         guard googleStep == .idle else {
             throw ShellXCoreError(code: "google_in_progress", message: "a Google sign-in is already waiting")
+        }
+        guard emailVerifications == 0 else {
+            throw ShellXCoreError(code: "email_sign_in_in_progress", message: "an email sign-in code is being verified")
         }
         // Busy from the first await on, so a second click or a cancel during begin is seen.
         googleStep = .waiting(purpose)
@@ -189,12 +195,15 @@ public final class ShellXAccount {
     ///   - code: The digits as typed.
     /// - Returns: The saved identity.
     /// - Throws: The core's code (nothing is saved then), or `google_in_progress` while a Google flow waits, so
-    ///   two session writes never race.
+    ///   two session writes never race. While it runs, ``signInWithGoogle(purpose:)`` refuses with
+    ///   `email_sign_in_in_progress`.
     @discardableResult
     public func signInWithEmailCode(challengeID: String, code: String) async throws -> Identity {
         guard googleStep == .idle else {
             throw ShellXCoreError(code: "google_in_progress", message: "a Google sign-in is waiting")
         }
+        emailVerifications += 1
+        defer { emailVerifications -= 1 }
         let gate = service.env.gateEnabled()
         if gate { await service.prepareLocal() }
         try await service.ensureConfigured()
