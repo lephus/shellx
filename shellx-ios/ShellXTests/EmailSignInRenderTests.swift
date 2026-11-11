@@ -336,6 +336,25 @@ final class EmailSignInRenderTests: XCTestCase {
         XCTAssertLessThan(logo, 52)
     }
 
+    func testTheAddressInTheSentenceIsPlainTextNotALink() async throws {
+        // Text parses Markdown in a localized string and turns an address into a mailto: link, drawn in the link blue.
+        let drawn = try await render("signin-code-step", atCode)
+        for (bitmap, style) in zip(drawn.bitmaps, Self.styles) {
+            let field = try field(bitmap, style)
+            let sentence = rows(in: bitmap, from: field.rows.lowerBound - 80, to: field.rows.lowerBound - 1) { _ in true }
+            let rows = try XCTUnwrap(sentence)
+            var blue = 0
+            for row in rows {
+                let y = row * bitmap.scale + bitmap.scale / 2
+                for x in 0..<bitmap.width {
+                    let colour = bitmap.at(x: x, y: y)
+                    if colour.b > 180, colour.b - colour.r > 80, colour.b - colour.g > 30 { blue += 1 }
+                }
+            }
+            XCTAssertLessThan(blue, 10, "the sentence above the field has no link-blue letters (\(blue) pixels)")
+        }
+    }
+
     func testWithTheKeyboardUpOnASmallPhoneTheCodeFieldAndVerifyStayAboveIt() async throws {
         let keyboard = try await render("signin-code-se-keyboard", on: Self.seKeyboard(260), keyboardUp: true, atCode)
         let tall = try await render("signin-code-se-tall-keyboard", on: Self.seKeyboard(300), keyboardUp: true, atCode)
