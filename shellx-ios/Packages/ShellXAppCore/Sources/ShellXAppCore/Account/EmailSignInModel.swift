@@ -44,8 +44,13 @@ public final class EmailSignInModel {
     }
 
     public private(set) var step: Step = .idle
-    /// What the email field holds.
-    public var email = ""
+    /// What the email field holds. A real change in the email step takes away the last failure: it was about the
+    /// address as it was (as Android's `setEmail` does).
+    public var email = "" {
+        didSet {
+            if step == .email, email != oldValue, error != nil { error = nil }
+        }
+    }
     /// 0–6 ASCII digits.
     public private(set) var code = ""
     /// The address as the relay normalized it; nil until a code was sent.
