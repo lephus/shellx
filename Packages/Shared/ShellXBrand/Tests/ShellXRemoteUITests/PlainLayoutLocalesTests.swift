@@ -43,6 +43,34 @@ import Testing
         #expect(PlainLayoutLocales(sources: [Self.source("com.example.keylayout.Bare", .keyboardLayout, [])]).locales == nil)
     }
 
+    /// Unicode Hex Input lists `""` first (`["", "af", …]` on this Mac): it has no primary language and adds none.
+    @Test func aLayoutWhoseFirstLanguageIsEmptyAddsNone() {
+        let hexInput = Self.source("com.apple.keylayout.UnicodeHexInput", .keyboardLayout, ["", "af", "en"])
+        #expect(PlainLayoutLocales(sources: [hexInput]).locales == nil)
+        #expect(PlainLayoutLocales(sources: [hexInput, Self.abc]).locales == ["en"])
+    }
+
+    /// Apple's Vietnamese layout lists `vi` first and `en` later; Telex lists only `vi`. Allowing `vi` would offer
+    /// Telex, so the layout's own `en` is allowed instead, and the layout is still offered.
+    @Test func aLayoutWhosePrimaryLanguageAnInputModeListsGivesAnotherOfItsLanguages() {
+        let vietnameseLayout = Self.source("com.apple.keylayout.Vietnamese", .keyboardLayout, ["vi", "af", "asa", "en", "de"])
+        #expect(PlainLayoutLocales(sources: [vietnameseLayout, Self.simpleTelex]).locales == ["en"])
+        #expect(PlainLayoutLocales(sources: [Self.simpleTelex, vietnameseLayout, Self.abc]).locales == ["en"])
+        // An input method counts like an input mode.
+        let vietnameseMethod = Self.source("com.example.inputmethod.Vietnamese", .inputMethod, ["vi"])
+        #expect(PlainLayoutLocales(sources: [vietnameseLayout, vietnameseMethod]).locales == ["en"])
+        // Without `en`, the layout's first language no mode or method lists.
+        let noEnglish = Self.source("com.example.keylayout.NoEnglish", .keyboardLayout, ["vi", "af", "de"])
+        #expect(PlainLayoutLocales(sources: [noEnglish, Self.simpleTelex]).locales == ["af"])
+        let englishTaken = Self.source("com.example.inputmode.English", .inputMode, ["en", "af"])
+        #expect(PlainLayoutLocales(sources: [vietnameseLayout, Self.simpleTelex, englishTaken]).locales == ["asa"])
+        // A layout with nothing else to offer keeps its primary language.
+        let onlyVietnamese = Self.source("com.example.keylayout.OnlyVietnamese", .keyboardLayout, ["vi"])
+        #expect(PlainLayoutLocales(sources: [onlyVietnamese, Self.simpleTelex]).locales == ["vi"])
+        // Without such a mode or method the primary language stands.
+        #expect(PlainLayoutLocales(sources: [vietnameseLayout]).locales == ["vi"])
+    }
+
     @Test func eachLanguageIsListedOnceInTheSystemsOrder() {
         let us = Self.source("com.apple.keylayout.US", .keyboardLayout, ["en"])
         #expect(PlainLayoutLocales(sources: [Self.abc, us]).locales == ["en"])
