@@ -259,6 +259,13 @@ private class LogoMark {
         radius = SignInLogo.INNER_GLOW_RADIUS,
     )
     private val haloBox = Size(2 * SignInLogo.GLOW_RADIUS, 2 * SignInLogo.GLOW_RADIUS)
+
+    /**
+     * The halo's box and some way past it on every side. The image the halo is drawn into is whole pixels, and the box
+     * of a logo an odd number of pixels wide ends half way through one: the fade is drawn over this, so it covers
+     * that pixel whole. Ending at the box, it would cover half of it and leave a line of the ring's colour there.
+     */
+    private val haloCover = Rect(Offset.Zero, haloBox).inflate(HALO_SPILL)
     private val haloRing = Brush.sweepGradient(SignInLogo.GLOW_COLORS.map { Color(it) }, center = haloBox.center)
 
     /**
@@ -340,15 +347,18 @@ private class LogoMark {
     /**
      * The glow around the square at full strength, in a box of twice [SignInLogo.GLOW_RADIUS]: the ring of colours
      * round the box's middle, of which the fade keeps what its opacity says (a blur would need API 31). Drawn into an
-     * image of its own: the fade takes away from what is under it.
+     * image of its own: the fade takes away from what is under it, everywhere in the image and not only in the box.
      */
     fun halo(scope: DrawScope) = with(scope) {
         drawRect(haloRing, size = haloBox)
-        drawRect(haloFade, size = haloBox, blendMode = BlendMode.DstIn)
+        drawRect(haloFade, topLeft = haloCover.topLeft, size = haloCover.size, blendMode = BlendMode.DstIn)
     }
 
     private companion object {
         /** The fade's curve is this many straight pieces. */
         const val HALO_STEPS = 16
+
+        /** How far past the halo's box the fade is drawn, in the mark's units: more than a pixel at any size. */
+        const val HALO_SPILL = 64f
     }
 }
