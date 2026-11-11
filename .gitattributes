@@ -30,3 +30,7 @@ Resources/markdown-viewer/webviews-app/** linguist-generated
 # added and writes an ordinary conflict whenever a hunk is anything else. Same
 # registration.
 cmux.xcodeproj/project.pbxproj merge=pbxproj-v1
+
+# windows/vendor holds third-party crates copied verbatim (plus ShellX patches,
+# windows/vendor/README.md); keep them out of GitHub Linguist's language stats.
+windows/vendor/** linguist-vendored
