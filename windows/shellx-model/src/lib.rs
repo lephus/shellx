@@ -14,6 +14,7 @@ pub mod palette;
 pub mod paste;
 pub mod remote_state;
 pub mod selection;
+pub mod shell;
 pub mod sidebar;
 pub mod strings;
 pub mod tabs;
