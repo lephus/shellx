@@ -3196,6 +3196,48 @@ mod tests {
         assert!(offers_start(&g) && g.accepts_login());
     }
 
+    /// Review chunk 1 M5: "We sent a 6-digit code to …" is drawn only while that code can still be
+    /// verified; it goes when the relay lost the challenge (a failed Resend, an expired code).
+    #[test]
+    fn the_sent_to_line_goes_with_the_challenge() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        assert_eq!(f.email_code_sent_to(), Some("foo@bar.com"));
+        f.on(submit("123456"), 2_000);
+        assert_eq!(
+            f.email_code_sent_to(),
+            Some("foo@bar.com"),
+            "while it is checked"
+        );
+        f.on(email_finished("c1", Err(err("network"))), 2_100);
+        assert_eq!(f.email_code_sent_to(), Some("foo@bar.com"));
+        // A Resend the relay answers with a lost mail: the challenge goes, and the line with it.
+        f.on(AccountEvent::EmailResendRequested, 61_000);
+        assert_eq!(
+            f.email_code_sent_to(),
+            Some("foo@bar.com"),
+            "the old code still works"
+        );
+        f.on(
+            AccountEvent::EmailBegun(Err(err("email_send_failed"))),
+            61_000,
+        );
+        assert_eq!(f.email_sent_to(), Some("foo@bar.com"));
+        assert_eq!(f.email_code_sent_to(), None);
+        f.on(AccountEvent::EmailResendRequested, 61_100);
+        assert_eq!(
+            f.email_code_sent_to(),
+            None,
+            "nothing to verify while the new code is on its way"
+        );
+        f.on(AccountEvent::EmailBegun(Ok(challenge("c2"))), 61_200);
+        assert_eq!(f.email_code_sent_to(), Some("foo@bar.com"));
+        // An expired code.
+        f.on(submit("123456"), 61_300);
+        f.on(email_finished("c2", Err(err("code_expired"))), 61_400);
+        assert_eq!(f.email_code_sent_to(), None);
+    }
+
     /// Review I1: no session to go back to (a failed Google attempt left an error without one), so a refused
     /// code ends signed out, and nothing retries.
     #[test]
