@@ -112,7 +112,8 @@ chạy trên Mac; `shellx-app` chỉ nối dây. Phần gọi Win32 gói nhỏ, 
   phục không giải phóng hai lần (R1 F5); (d) bước biên dịch shader khi build chéo, hiện đang vá bằng script trong
   container, chuyển vào bản chép (script `patch-gpui-build-rs.py` bị bỏ và `build-in-container.sh` thôi gọi nó; ảnh
   container vì thế được dựng lại một lần). Mọi bản build (Mac, CI, build chéo) dùng cùng một bản; `Cargo.lock` của
-  `windows/` đổi đúng một mục (gpui mất nguồn và checksum) và được commit. Mỗi file GPUI bị sửa mang một dòng
+  `windows/` đổi đúng một mục (gpui mất nguồn và checksum) và được commit; để được vậy, thư mục chép phải bị loại
+  khỏi workspace (`exclude`), nếu không nó thành một thành viên và kéo theo thay đổi khác. Mỗi file GPUI bị sửa mang một dòng
   ghi chú "đã sửa bởi ShellX" ở đầu file, theo điều 4(b) của giấy phép Apache-2.0.
   Lý do chọn chép thay cho cách rẻ hơn: riêng bản vá (a) có thể làm ở tầng app bằng cách chặn thông điệp nhả
   phím `VK_PACKET` trước khi GPUI thấy, nhưng (b), (c) và phần lớn mục "để sau" về bàn phím và bộ gõ (R2 F3, F8,
@@ -221,8 +222,9 @@ khoá nếu relay có gửi khoá), nên với relay thật kết quả là `fin
 khoá được viết lại: hai test kỳ vọng null theo hình dạng thật; phần tính vân tay từ khoá được giữ bằng một tuỳ
 chọn của relay giả chỉ bật trong đúng test đó. Không đổi relay trong Phần 1.
 
-Thêm một test chạy trọn luồng đăng nhập của Windows qua lõi thật với relay giả đã sửa; test này phải đỏ trên code
-hôm nay.
+Thêm một test chạy trọn luồng đăng nhập của Windows qua lõi thật với relay giả đã sửa. Với relay giả hôm nay (có
+gửi khoá) test này xanh, và đó chính là cách lỗi đã lọt; nó phải đỏ ngay khi relay giả trả đúng hình dạng thật và
+trước khi mô hình được sửa. Thứ tự commit phải cho thấy điều đó.
 
 ## 5. Cách kiểm chứng
 
@@ -236,8 +238,9 @@ Code chỉ dành cho Windows không biên dịch trên Mac. Cần **một lệnh
 đích Windows mà không tạo bộ cài, mục tiêu dưới 10 phút khi bộ nhớ đệm còn ấm. Nó biên dịch commit đang đứng
 (không phải file chưa commit), như script build chéo hiện có.
 - **Ưu tiên chạy ngay trên máy này** **[người viết]**: Docker đang chạy ở đây (kiến trúc arm64). Một ảnh "chỉ biên
-  dịch" không cần wine (clang, lld, cargo-xwin, zig đều biên dịch chéo được từ arm64); bước biên dịch shader của
-  GPUI, vốn cần wine, được bỏ qua trong chế độ chỉ kiểm tra (bản chép GPUI cho phép điều đó).
+  dịch" không cần wine (clang, lld, cargo-xwin, zig đều biên dịch chéo được từ arm64). Lệnh kiểm tra dùng cấu hình
+  build "dev": ở cấu hình đó GPUI không biên dịch shader (nó chỉ làm khi tắt debug assertion), nên không cần wine
+  và không cần thêm bản vá nào.
 - **Không được thì dùng container trên VPS** như script hiện có, thêm chế độ không tạo bộ cài và giữ bộ nhớ đệm
   giữa các lượt. VPS dùng chung với dịch vụ đang chạy thật: giữ giới hạn 4 CPU và 10 GB như hiện nay, kiểm dung
   lượng đĩa trước (việc deploy cần còn trống 4 GB), không chạy hai lượt cùng lúc, chỉ thao tác trong thư mục build
