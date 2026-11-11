@@ -28,6 +28,10 @@ public final class AppCoordinator {
     @ObservationIgnored private let pendingWipeDefaults: UserDefaults
     private static let pendingWipeKey = "shellx.localWipePending"
     @ObservationIgnored private let makeHub: @MainActor () -> MachineHub
+    /// The language of the code mail: "vi" or "en".
+    @ObservationIgnored private let emailLocale: String
+    /// Times the Resend lock of the email sign-in.
+    @ObservationIgnored private let clock: any Clock<Duration>
     /// True while a switch to Google or an account deletion is on the relay: a 401 then answers the token the relay is
     /// replacing or deleting, so `handleUnauthorized` only remembers it.
     @ObservationIgnored private var accountChangeInProgress = false
@@ -38,8 +42,11 @@ public final class AppCoordinator {
         vault: AccountVault, relay: any RelayAccountCalling, identity: any IdentityProviding = UnavailableIdentityProvider(),
         deviceName: String, wipers: [any LocalDataWiping],
         pendingWipeDefaults: UserDefaults = .standard,
+        emailLocale: String = EmailCodeLocale.current, clock: any Clock<Duration> = ContinuousClock(),
         makeHub: @escaping @MainActor () -> MachineHub
     ) {
+        self.emailLocale = emailLocale
+        self.clock = clock
         self.pendingWipeDefaults = pendingWipeDefaults
         self.vault = vault
         self.relay = relay
@@ -132,6 +139,39 @@ public final class AppCoordinator {
                 finish: { [weak self] outcome in await self?.finishAppleLink(outcome) })
             phase = .linkingApple
         }
+    }
+
+    /// Asks the relay to mail a code to `email`. Stores nothing; the phase stays.
+    public func requestEmailCode(email: String) async throws(SignInError) -> EmailChallenge {
+        signInNotice = nil
+        guard await retryPendingWipe() else { throw .localWipePending }
+        do {
+            return try await relay.requestEmailCode(email: email, locale: emailLocale)
+        } catch {
+            throw Self.emailCallError(error)
+        }
+    }
+
+    /// The mailed code for `challengeID`: a right one signs in like Google, with `auth_method` email.
+    public func signInWithEmailCode(challengeID: String, code: String) async throws(SignInError) {
+        signInNotice = nil
+        guard await retryPendingWipe() else { throw .localWipePending }
+        let key = try await phoneKey()
+        let signIn: AccountSignIn
+        do {
+            signIn = try await relay.signInWithEmailCode(
+                challengeID: challengeID, code: code, deviceName: deviceName, clientKey: key)
+        } catch {
+            throw Self.emailCallError(error)
+        }
+        try await completeSignIn(signIn, method: .email)
+    }
+
+    /// What an email call of the relay threw. A relay from before email sign-in has no such route (404 `not_found`):
+    /// that reads as "not available", but only here, so Google and Apple keep their words for a 404.
+    private static func emailCallError(_ error: any Error) -> SignInError {
+        if case RelayAPIError.http(404, "not_found") = error { return .providerUnavailable }
+        return SignInError(error)
     }
 
     private func phoneKey() async throws(SignInError) -> Data {
@@ -299,10 +339,12 @@ public final class AppCoordinator {
     }
 
     /// S1 §6.8: sign in again with the account's provider, delete the account on the relay, then forget everything
-    /// local exactly as `signOut()` does (without unpairing or logging out: the account is gone).
+    /// local exactly as `signOut()` does (without unpairing or logging out: the account is gone). An email session
+    /// has no provider to sign in with again: it deletes with a mailed code, `deleteAccount(challengeID:code:)`.
     public func deleteAccount() async throws(SignInError) {
         guard let stored = try? await vault.session() else { throw .server(code: "signed_out") }
         if stored.authMethod == .password { throw .switchToGoogleFirst }
+        if stored.authMethod == .email { throw .server(code: "code_required") }
         let nonce: String
         let idToken: String
         do {
@@ -322,6 +364,34 @@ public final class AppCoordinator {
         } catch {
             throw await endFailedAccountChange(error)
         }
+        await finishAccountDeletion()
+    }
+
+    /// Delete Account for an email session, first half: mails a code to the account's address.
+    public func requestDeleteAccountCode() async throws(SignInError) -> EmailChallenge {
+        guard let stored = try? await vault.session() else { throw .server(code: "signed_out") }
+        guard stored.authMethod == .email else { throw .server(code: "not_email_session") }
+        do {
+            return try await relay.requestEmailCode(email: stored.email, locale: emailLocale)
+        } catch {
+            throw Self.emailCallError(error)
+        }
+    }
+
+    /// Second half: deletes on the relay, then forgets everything local exactly as `deleteAccount()` does.
+    public func deleteAccount(challengeID: String, code: String) async throws(SignInError) {
+        guard let stored = try? await vault.session() else { throw .server(code: "signed_out") }
+        beginAccountChange()
+        do {
+            try await relay.deleteAccount(challengeID: challengeID, code: code, token: stored.token)
+        } catch {
+            throw await endFailedAccountChange(error)
+        }
+        await finishAccountDeletion()
+    }
+
+    /// The relay deleted the account: forget everything local, as `signOut()` does.
+    private func finishAccountDeletion() async {
         await stopHub()
         await forgetLocalData()
         authMethod = nil
