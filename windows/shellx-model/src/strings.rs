@@ -827,7 +827,18 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 127);
+        assert_eq!(Str::ALL.len(), 129);
+    }
+
+    #[test]
+    fn sign_in_again_strings() {
+        assert_eq!(t(Lang::En, Str::SessionExpired), "Your session expired.");
+        assert_eq!(
+            t(Lang::Vi, Str::SessionExpired),
+            "Phiên đăng nhập đã hết hạn."
+        );
+        assert_eq!(t(Lang::En, Str::SignInAgain), "Sign in again");
+        assert_eq!(t(Lang::Vi, Str::SignInAgain), "Đăng nhập lại");
     }
 
     #[test]

@@ -2013,9 +2013,10 @@ mod tests {
         assert_eq!(f.email(), Some("a@b.c"));
     }
 
+    /// Ruling 29: no dialog opens by itself; the notice stays until the next sign-in.
     #[test]
-    fn server_sign_out_shows_sign_in() {
-        for code in ["unauthorized", "http_401", "not_logged_in"] {
+    fn a_server_sign_out_shows_the_notice_until_the_next_sign_in() {
+        for code in ["not_logged_in", "unauthorized", "http_401"] {
             let mut f = logged_in();
             f.on(AccountEvent::Tick(16_000), 16_000);
             f.on(
@@ -2023,14 +2024,32 @@ mod tests {
                 16_000,
             );
             assert_eq!(f.state(), &AccountState::LoggedOut, "{code}");
-            assert!(f.take_signed_out_by_server(), "{code}");
-            assert!(!f.take_signed_out_by_server(), "{code}");
+            assert!(f.session_ended_by_server(), "{code}");
+            assert!(
+                f.session_ended_by_server(),
+                "{code}: reading it changes nothing"
+            );
+            f.on(AccountEvent::Tick(40_000), 40_000);
+            f.on(AccountEvent::Started, 40_001);
+            f.on(
+                AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+                40_002,
+            );
+            assert!(
+                f.session_ended_by_server(),
+                "{code}: ticks and a restart keep it"
+            );
+            // Signing in again (an email code) clears it once the flow is LoggedIn.
+            assert_eq!(f.on(send(), 41_000), vec![begin_call()]);
+            f.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), 41_000);
+            f.on(submit("123456"), 41_100);
+            f.on(email_finished("c1", Ok(done())), 41_200);
+            assert!(f.session_ended_by_server(), "{code}: not before LoggedIn");
+            f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 41_300);
+            assert!(matches!(f.state(), AccountState::LoggedIn { .. }), "{code}");
+            assert!(!f.session_ended_by_server(), "{code}");
         }
-        let mut f = logged_in();
-        f.on(AccountEvent::LogoutRequested, 2_000);
-        f.on(AccountEvent::LogoutResult(Ok(())), 2_100);
-        assert!(!f.take_signed_out_by_server());
-        // not_logged_in outside LoggedIn keeps today's behaviour: signed out, no flag
+        // No session at start: signed out, no notice.
         let mut f = AccountFlow::new();
         f.on(AccountEvent::Started, 0);
         f.on(
@@ -2038,7 +2057,13 @@ mod tests {
             1,
         );
         assert_eq!(f.state(), &AccountState::LoggedOut);
-        assert!(!f.take_signed_out_by_server());
+        assert!(!f.session_ended_by_server());
+        // The person signed out: no notice.
+        let mut f = logged_in();
+        f.on(AccountEvent::LogoutRequested, 2_000);
+        f.on(AccountEvent::LogoutResult(Ok(())), 2_100);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(!f.session_ended_by_server());
     }
 
     fn method(id: &str, provider: &str) -> SignInMethod {
@@ -2878,6 +2903,7 @@ mod tests {
         f.on(AccountEvent::Tick(17_200), 17_200);
         f.on(AccountEvent::ListResult(Err(err("unauthorized"))), 17_300);
         assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(f.session_ended_by_server());
         assert_eq!(f.auth_method(), None);
         assert_eq!(f.email(), None);
         assert_eq!(f.email_step(), None);
