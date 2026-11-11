@@ -85,9 +85,15 @@ pub fn request_targets<'a>(
         .collect()
 }
 
-/// The sentences the "+" picker and an empty machine list show: no Mac besides this machine → why none
-/// can be reached and what to do; some Mac but none offered → why; otherwise none.
-pub fn request_panel_notes(machines: &[MachineInfo], rule: OfferRule) -> &'static [Str] {
+/// The sentences the "+" picker shows: no Mac besides this machine → why none can be reached and what
+/// to do; some Mac but none offered → why; every offered Mac already linked (`has_link`: granted or
+/// pending) → that nothing is left to ask (review M7); otherwise none. So the picker is never empty
+/// without a sentence.
+pub fn request_panel_notes(
+    machines: &[MachineInfo],
+    has_link: &dyn Fn(&str) -> bool,
+    rule: OfferRule,
+) -> &'static [Str] {
     let mut macs = machines
         .iter()
         .filter(|m| !m.is_this_machine && m.platform == "macos")
@@ -96,6 +102,8 @@ pub fn request_panel_notes(machines: &[MachineInfo], rule: OfferRule) -> &'stati
         &[Str::MacCannotHostYet, Str::SignInOnYourMac]
     } else if !macs.any(|m| can_offer_access(m, rule)) {
         &[Str::MacCannotHostYet]
+    } else if request_targets(machines, has_link, rule).is_empty() {
+        &[Str::NoOtherMachines]
     } else {
         &[]
     }
