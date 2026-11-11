@@ -264,6 +264,8 @@ struct GoogleRun {
     purpose: GooglePurpose,
     /// Known once `auth.google.begin` answered.
     flow_id: Option<String>,
+    /// `SignIn` only: the error state with a stored session the attempt interrupted (`resume_point`).
+    resume: Option<CoreErr>,
 }
 
 /// An email code sign-in the person started. `Debug` (hand-written) shows the step only.
@@ -281,14 +283,8 @@ struct EmailRun {
     error: Option<CoreErr>,
     /// "Resend code" stays locked until this time.
     resend_at_ms: u64,
-    /// While verifying: what the verify interrupted, restored when the code is refused.
-    resume: Option<Resume>,
-}
-
-/// The account state a verify started from, and whether its list retries were running.
-struct Resume {
-    state: AccountState,
-    retry_list: bool,
+    /// While verifying: the error state with a stored session the verify interrupted (`resume_point`).
+    resume: Option<CoreErr>,
 }
 
 impl fmt::Debug for EmailRun {
@@ -343,6 +339,8 @@ pub struct AccountFlow {
     stale_email_begins: u32,
     /// Moves whenever the dialog must empty its code field (`email_code_epoch`).
     email_epoch: u64,
+    /// The last Google sign-in attempt's failure (`google_failure`).
+    google_failure: Option<CoreErr>,
 }
 
 impl Default for AccountFlow {
@@ -383,6 +381,7 @@ impl fmt::Debug for AccountFlow {
             .field("email_run", &self.email_run)
             .field("stale_email_begins", &self.stale_email_begins)
             .field("email_epoch", &self.email_epoch)
+            .field("google_failure", &self.google_failure)
             .finish()
     }
 }
@@ -414,6 +413,7 @@ impl AccountFlow {
             email_run: None,
             stale_email_begins: 0,
             email_epoch: 0,
+            google_failure: None,
         }
     }
 
@@ -535,39 +535,43 @@ impl AccountFlow {
         self.email_epoch
     }
 
-    /// A refused code leaves the account as the verify found it: signed out stays signed out; an error that
-    /// holds a stored session stays, with its sign-out and its list retries; a state the first list had not
-    /// settled yet asks again (that list's answer was dropped while the code was checked).
-    fn resume_after_refused_code(
+    /// What a sign-in attempt (an email verify, a Google sign-in) interrupts and must give back when it
+    /// fails: an error state that holds a stored session (R4 Blocker 1, offline at start, a failed
+    /// register). Anything else has no session to go back to.
+    fn resume_point(&self) -> Option<CoreErr> {
+        match &self.state {
+            AccountState::Error(e) if self.has_session => Some(e.clone()),
+            _ => None,
+        }
+    }
+
+    /// A sign-in attempt failed (review I1, one helper for both paths): an error that holds a session comes
+    /// back with its sign-out and its list retries (the tick that came due meanwhile was used up, so a new
+    /// one is armed); otherwise the flow takes `otherwise`.
+    fn end_sign_in_attempt(
         &mut self,
-        resume: Option<Resume>,
+        resume: Option<CoreErr>,
+        otherwise: AccountState,
         now_ms: u64,
         out: &mut Vec<AccountAction>,
     ) {
+        self.login_in_flight = false;
         match resume {
-            Some(Resume {
-                state: AccountState::Error(e),
-                retry_list,
-            }) if self.has_session => {
+            Some(e) if self.has_session => {
                 self.state = AccountState::Error(e);
-                self.retry_list = retry_list;
-                if retry_list {
-                    self.arm(self.last_list_ms + LIST_INTERVAL_MS, now_ms, out);
-                }
+                self.retry_list = true;
+                self.arm(self.last_list_ms + LIST_INTERVAL_MS, now_ms, out);
             }
-            Some(Resume {
-                state: AccountState::Unknown,
-                ..
-            }) => {
-                self.state = AccountState::Unknown;
-                if !self.list_in_flight {
-                    self.list_in_flight = true;
-                    self.last_list_ms = now_ms;
-                    out.push(AccountAction::CallList);
-                }
-            }
-            _ => self.state = AccountState::LoggedOut,
+            _ => self.state = otherwise,
         }
+    }
+
+    /// Why the last Google sign-in attempt failed (not a cancel), for the dialog's line under the Google
+    /// button. The account state may be another error (an error with a session comes back after the
+    /// attempt), so the dialog never words `AccountState::Error` as Google's. Cleared by the next Google
+    /// attempt, by "Send code" and by signing in.
+    pub fn google_failure(&self) -> Option<&CoreErr> {
+        self.google_failure.as_ref()
     }
 
     /// Forgets the email run; the answer of a code request still on its way is owed and ignored.
@@ -583,20 +587,28 @@ impl AccountFlow {
         matches!(self.state, AccountState::LoggedIn { .. })
     }
 
-    /// A Google flow ended without a session: `SignIn` shows the error (a cancel returns to signed
-    /// out); `Link` keeps the session and sets the notice (a cancel sets nothing).
-    fn end_google(&mut self, purpose: GooglePurpose, result: Result<(), CoreErr>) {
-        self.google = None;
+    /// A Google flow ended without a session: `SignIn` keeps its failure for the dialog and ends the
+    /// attempt (an error with a session comes back; else the error, or signed out after a cancel); `Link`
+    /// keeps the session and sets the notice (a cancel sets nothing).
+    fn end_google(
+        &mut self,
+        purpose: GooglePurpose,
+        result: Result<(), CoreErr>,
+        now_ms: u64,
+        out: &mut Vec<AccountAction>,
+    ) {
+        let resume = self.google.take().and_then(|g| g.resume);
         let Err(e) = result else { return };
         let cancelled = e.code == "google_cancelled";
         match purpose {
             GooglePurpose::SignIn => {
-                self.login_in_flight = false;
-                self.state = if cancelled {
+                let otherwise = if cancelled {
                     AccountState::LoggedOut
                 } else {
+                    self.google_failure = Some(e.clone());
                     AccountState::Error(e)
                 };
+                self.end_sign_in_attempt(resume, otherwise, now_ms, out);
             }
             GooglePurpose::Link => {
                 if !cancelled {
@@ -676,6 +688,7 @@ impl AccountFlow {
                                     self.last_heartbeat_ms = now_ms;
                                     self.drop_email_run();
                                     self.session_ended_by_server = false;
+                                    self.google_failure = None;
                                 }
                                 // A later list without this machine (revoked
                                 // elsewhere) may register it once more.
@@ -845,6 +858,7 @@ impl AccountFlow {
                 if self.google.is_some() {
                     return out;
                 }
+                let mut resume = None;
                 match purpose {
                     // An email run on the first screen gives way (with its failure); one with a code on its
                     // way, shown or being checked refuses Google (one sign-in flow at a time).
@@ -856,6 +870,8 @@ impl AccountFlow {
                                 .is_none_or(|r| r.step == EmailStep::Email) =>
                     {
                         self.drop_email_run();
+                        resume = self.resume_point();
+                        self.google_failure = None;
                         self.state = AccountState::LoggingIn;
                         self.retry_list = false;
                         self.login_in_flight = true;
@@ -867,6 +883,7 @@ impl AccountFlow {
                 self.google = Some(GoogleRun {
                     purpose,
                     flow_id: None,
+                    resume,
                 });
                 out.push(AccountAction::CallGoogleBegin(purpose));
             }
@@ -896,7 +913,7 @@ impl AccountFlow {
                         out.push(AccountAction::OpenBrowser(b.auth_url));
                         out.push(AccountAction::CallGoogleFinish(b.flow_id));
                     }
-                    Err(e) => self.end_google(purpose, Err(e)),
+                    Err(e) => self.end_google(purpose, Err(e), now_ms, &mut out),
                 }
             }
             AccountEvent::GoogleFinished { flow_id, result } => {
@@ -911,6 +928,7 @@ impl AccountFlow {
                 match result {
                     Ok(info) => {
                         self.google = None;
+                        self.google_failure = None;
                         self.has_session = true;
                         self.email = Some(info.email);
                         self.auth_method = Some(info.auth_method);
@@ -926,7 +944,7 @@ impl AccountFlow {
                             GooglePurpose::Link => out.push(AccountAction::CallListSignInMethods),
                         }
                     }
-                    Err(e) => self.end_google(purpose, Err(e)),
+                    Err(e) => self.end_google(purpose, Err(e), now_ms, &mut out),
                 }
             }
             AccountEvent::GoogleCancelRequested => {
@@ -938,11 +956,15 @@ impl AccountFlow {
                     None => {
                         // begin has not answered: forget the flow and cancel what it returns.
                         let purpose = run.purpose;
-                        self.google = None;
+                        let resume = self.google.take().and_then(|g| g.resume);
                         self.stale_begins += 1;
                         if purpose == GooglePurpose::SignIn {
-                            self.login_in_flight = false;
-                            self.state = AccountState::LoggedOut;
+                            self.end_sign_in_attempt(
+                                resume,
+                                AccountState::LoggedOut,
+                                now_ms,
+                                &mut out,
+                            );
                         }
                     }
                 }
@@ -1008,6 +1030,7 @@ impl AccountFlow {
                     return out;
                 }
                 let email = email.trim().to_string();
+                self.google_failure = None;
                 self.email_run = Some(EmailRun {
                     step: EmailStep::Sending,
                     shown: true,
@@ -1107,12 +1130,13 @@ impl AccountFlow {
                 else {
                     return out;
                 };
+                let resume = match &self.state {
+                    AccountState::Error(e) if self.has_session => Some(e.clone()),
+                    _ => None,
+                };
                 run.step = EmailStep::Verifying;
                 run.error = None;
-                run.resume = Some(Resume {
-                    state: self.state.clone(),
-                    retry_list: self.retry_list,
-                });
+                run.resume = resume;
                 // As `GoogleRequested(SignIn)`: the sign-in is under way.
                 self.state = AccountState::LoggingIn;
                 self.retry_list = false;
@@ -1148,9 +1172,8 @@ impl AccountFlow {
                     }
                     Err(e) => e,
                 };
-                self.login_in_flight = false;
                 let resume = self.email_run.as_mut().and_then(|r| r.resume.take());
-                self.resume_after_refused_code(resume, now_ms, &mut out);
+                self.end_sign_in_attempt(resume, AccountState::LoggedOut, now_ms, &mut out);
                 let Some(run) = self.email_run.as_mut().filter(|r| r.shown) else {
                     // The dialog closed meanwhile: nobody sees the failure.
                     self.email_run = None;

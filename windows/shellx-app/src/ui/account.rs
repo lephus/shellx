@@ -171,6 +171,11 @@ impl AccountService {
         self.flow.google_in_flight()
     }
 
+    /// Why the last Google sign-in attempt failed, for the dialog's line under the Google button.
+    pub fn google_failure(&self) -> Option<&CoreErr> {
+        self.flow.google_failure()
+    }
+
     /// "Continue with Google" (`SignIn`) or the switch from a password session (`Link`).
     pub fn google_sign_in(&mut self, purpose: GooglePurpose, cx: &mut Context<Self>) {
         self.apply(AccountEvent::GoogleRequested(purpose), cx);

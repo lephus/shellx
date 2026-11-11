@@ -738,11 +738,12 @@ impl SignInDialog {
                 google_waiting,
             } => {
                 // One failure line at a time (D3): Google's, else the run's, else the address hint.
+                // Google's line is its own attempt's failure, never the account state (which may be
+                // an error the attempt came back to: review I1).
                 let google_line = if c.google && self.started && !google_waiting {
-                    match account.state() {
-                        AccountState::Error(e) => google_error(lang, &e.code),
-                        _ => None,
-                    }
+                    account
+                        .google_failure()
+                        .and_then(|e| google_error(lang, &e.code))
                 } else {
                     None
                 };
