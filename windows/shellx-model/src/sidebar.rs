@@ -13,6 +13,9 @@ pub struct MachineInfo {
     pub online: bool,
     #[serde(default, deserialize_with = "null_as_zero")]
     pub last_seen_unix: i64,
+    /// `""` when the core has none: it never shows the relay's own fingerprint and computes one only
+    /// from a key, which the relay's list does not carry (R4 Blocker 1). Not used to decide anything.
+    #[serde(default, deserialize_with = "string_or_empty")]
     pub fingerprint: String,
     #[serde(default)]
     pub is_this_machine: bool,
@@ -20,6 +23,14 @@ pub struct MachineInfo {
 
 fn null_as_zero<'de, D: serde::Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
     Ok(Option::<i64>::deserialize(d)?.unwrap_or(0))
+}
+
+/// A string is kept; null or any other JSON value reads as `""` (one odd item never fails the list).
+fn string_or_empty<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    Ok(match serde_json::Value::deserialize(d)? {
+        serde_json::Value::String(s) => s,
+        _ => String::new(),
+    })
 }
 
 /// Local knowledge of access to a machine.
