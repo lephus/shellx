@@ -124,20 +124,37 @@ import Testing
 
     /// The system's current keyboard input source (read only).
     private static func currentSourceID() -> String? {
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-              let id = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return nil }
-        return Unmanaged<CFString>.fromOpaque(id).takeUnretainedValue() as String
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return nil }
+        return string(source, kTISPropertyInputSourceID)
+    }
+
+    /// The enabled, selectable keyboard input sources as raw facts, the test's own reading of the system (not
+    /// `SystemKeyboardInputSources`, so a regression in the code under test cannot also decide whether the check runs):
+    /// each source's id and whether it is ASCII-capable. Read only: nothing is selected or changed.
+    private static func rawEnabledSources() -> [(id: String, isASCIICapable: Bool)] {
+        let filter = [kTISPropertyInputSourceCategory as String: kTISCategoryKeyboardInputSource as String,
+                      kTISPropertyInputSourceIsSelectCapable as String: true] as CFDictionary
+        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] else { return [] }
+        return list.compactMap { source in
+            guard let id = string(source, kTISPropertyInputSourceID) else { return nil }
+            let ascii = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsASCIICapable)
+                .map { CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque($0).takeUnretainedValue()) } ?? false
+            return (id, ascii)
+        }
+    }
+
+    private static func string(_ source: TISInputSource, _ key: CFString) -> String? {
+        TISGetInputSourceProperty(source, key).map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
     }
 
     /// The outcome on this Mac: the focused field's input context offers a plain keyboard layout and no Vietnamese
-    /// input method (it reads the context's own list of offered sources; nothing is selected). It needs a Mac with a
-    /// Vietnamese input method and a plain layout of another language enabled; elsewhere it records that it could not
-    /// check.
+    /// input method (it reads the context's own list of offered sources; nothing is selected). Whether it can check
+    /// comes from raw facts only: an enabled Apple Vietnamese input mode (`com.apple.inputmethod.VietnameseIM.*`) and an
+    /// enabled ASCII-capable Apple layout (`com.apple.keylayout.*`). Without both it records that it could not check.
     @Test func theFocusedFieldOffersAPlainLayoutAndNoVietnameseInputMethod() throws {
-        let sources = try #require(SystemKeyboardInputSources().enabled())
-        let plainLayouts = sources.filter { $0.kind == .keyboardLayout && $0.isASCIICapable }.map(\.identifier)
-        let vietnamese = sources.filter { $0.kind != .keyboardLayout && $0.languages.contains("vi") }.map(\.identifier)
-        let allowed = PlainLayoutLocales(sources: sources).locales ?? []
+        let raw = Self.rawEnabledSources()
+        let vietnamese = raw.map(\.id).filter { $0.hasPrefix("com.apple.inputmethod.VietnameseIM.") }
+        let plainLayouts = raw.filter { $0.isASCIICapable && $0.id.hasPrefix("com.apple.keylayout.") }.map(\.id)
         let before = Self.currentSourceID()
         let field = PlainLayoutTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
@@ -149,9 +166,9 @@ import Testing
         let editor = try #require(field.currentEditor() as? PlainLayoutFieldEditor)
         let context = try #require(editor.inputContext)
         let offered = context.keyboardInputSources ?? []
-        if vietnamese.isEmpty || allowed.isEmpty || allowed.contains("vi") {
-            withKnownIssue("not checked: this Mac needs a Vietnamese input method and a non-Vietnamese plain layout") {
-                Issue.record("enabled sources: \(sources.map(\.identifier)); offered: \(offered)")
+        if vietnamese.isEmpty || plainLayouts.isEmpty {
+            withKnownIssue("not checked: this Mac needs an Apple Vietnamese input mode and an ASCII Apple layout enabled") {
+                Issue.record("enabled sources: \(raw.map(\.id)); offered: \(offered)")
             }
         } else {
             #expect(plainLayouts.contains { offered.contains($0) }, "offered: \(offered)")
