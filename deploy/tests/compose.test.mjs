@@ -211,3 +211,16 @@ test('sign-in: the relay takes the Google/Apple sign-in settings and PASSWORD_LO
   assert.doesNotMatch(compose, /TEST_IDP/);
   assert.doesNotMatch(readFileSync(join(deployDir, 'relay.env'), 'utf8'), /TEST_IDP|GOOGLE_CLIENT|APPLE_|PASSWORD_LOGIN/);
 });
+
+test('email sign-in: the relay takes RESEND_API_KEY and EMAIL_FROM from .env only, and no Resend key is written in the deploy files', () => {
+  const relay = service('relay');
+  for (const name of ['RESEND_API_KEY', 'EMAIL_FROM']) {
+    assert.match(relay, new RegExp(`^ {6}${name}: \\$\\{${name}:-\\}$`, 'm'), name);
+  }
+  const relayEnv = readFileSync(join(deployDir, 'relay.env'), 'utf8');
+  assert.doesNotMatch(relayEnv, /RESEND|EMAIL_FROM/);
+  const readme = readFileSync(join(deployDir, 'README.md'), 'utf8');
+  assert.match(readme, /^## Email sign-in \(once, by hand\)$/m);
+  // Resend keys start with "re_": none may appear in the compose file, relay.env or the runbook.
+  assert.doesNotMatch(compose + relayEnv + readme, /\bre_[A-Za-z0-9]{8,}/);
+});
