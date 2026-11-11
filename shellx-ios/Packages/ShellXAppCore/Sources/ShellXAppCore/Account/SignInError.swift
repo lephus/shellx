@@ -25,6 +25,16 @@ public enum SignInError: Error, Equatable, Sendable {
     case providerFailed
     /// Delete Account on a password session: switch to Google first.
     case switchToGoogleFirst
+    /// Email sign-in: the relay refused the address as not an email address, or it is over 254 bytes.
+    case invalidEmail
+    /// Email sign-in: the address is of a disposable-mail domain.
+    case disposableEmail
+    /// The emailed code is wrong; the same code can be tried again.
+    case invalidCode
+    /// The emailed code no longer works: expired, already used, or the fifth wrong try.
+    case codeExpired
+    /// The relay could not send the email.
+    case emailSendFailed
 
     /// Maps what the relay and the identity providers threw.
     init(_ error: Error) {
@@ -37,6 +47,13 @@ public enum SignInError: Error, Equatable, Sendable {
             case (409, "email_in_use"): self = .emailInUse
             case (409, "identity_in_use"): self = .identityInUse
             case (429, _): self = .rateLimited
+            case (400, "invalid_email"): self = .invalidEmail
+            case (400, "disposable_email"): self = .disposableEmail
+            case (401, "invalid_code"): self = .invalidCode
+            case (410, "code_expired"): self = .codeExpired
+            case (502, "email_send_failed"): self = .emailSendFailed
+            // The relay has no key to send mail with: email sign-in is not offered there.
+            case (503, "email_sign_in_disabled"): self = .providerUnavailable
             default: self = .server(code: code)
             }
         case let provider as IdentityProviderError:

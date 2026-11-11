@@ -2,7 +2,8 @@ import ShellXAppCore
 import SwiftUI
 
 /// The signed-in email, and (outside the demo) switch to Google for a password session, sign out, and delete the
-/// account. Sign out and delete ask before they do anything.
+/// account. Sign out and delete ask before they do anything. An account signed in with an emailed code says so on its
+/// email row and deletes with a new code.
 struct AccountSection: View {
     let email: String
     let account: AccountActions?
@@ -11,6 +12,8 @@ struct AccountSection: View {
     @State private var switching = false
     @State private var switchError: String?
     @State private var deleteStep: DeleteAccountSheet.Step?
+    /// The deletion of an email session: a new model each time the sheet opens.
+    @State private var deleteCode: EmailSignInModel?
 
     var body: some View {
         Section {
@@ -19,7 +22,9 @@ struct AccountSection: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             } label: {
-                Text(LocalizedStringResource("signin.email"))
+                Text(account?.authMethod == .email
+                    ? LocalizedStringResource("settings.account.method.email")
+                    : LocalizedStringResource("signin.email"))
             }
             .accessibilityElement(children: .combine)
 
@@ -56,7 +61,11 @@ struct AccountSection: View {
                 .disabled(signingOut)
 
                 Button(role: .destructive) {
-                    deleteStep = account.authMethod == .password ? .switchFirst : .confirm
+                    if account.authMethod == .email, let makeModel = account.deleteCode {
+                        deleteCode = makeModel()
+                    } else {
+                        deleteStep = account.authMethod == .password ? .switchFirst : .confirm
+                    }
                 } label: {
                     Text(LocalizedStringResource("settings.account.delete"))
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -85,8 +94,11 @@ struct AccountSection: View {
         } message: {
             Text(LocalizedStringResource("settings.account.signOut.confirm"))
         }
-        .sheet(isPresented: Binding(get: { deleteStep != nil }, set: { if !$0 { deleteStep = nil } })) {
-            if let account, let step = deleteStep {
+        .sheet(isPresented: Binding(get: { deleteStep != nil || deleteCode != nil }, set: { if !$0 { closeDeletion() } })) {
+            if let deleteCode {
+                DeleteAccountSheet(code: deleteCode, close: closeDeletion)
+                    .interactiveDismissDisabled(deleteCode.isBusy)
+            } else if let account, let step = deleteStep {
                 DeleteAccountSheet(
                     step: step,
                     delete: { delete(account) },
@@ -95,6 +107,13 @@ struct AccountSection: View {
                     .interactiveDismissDisabled(step == .working)
             }
         }
+    }
+
+    /// Closes the deletion sheet and drops its model (the sheet cannot close while a request runs).
+    private func closeDeletion() {
+        deleteCode?.cancel()
+        deleteCode = nil
+        deleteStep = nil
     }
 
     private func switchToGoogle(_ account: AccountActions) {

@@ -4911,7 +4911,7 @@
       }
     },
     "signin.error.providerUnavailable": {
-      "comment": "The build has no Google client ID.",
+      "comment": "The build has no Google client ID. Also: the relay has no email sign-in (404 not_found, 503 email_sign_in_disabled).",
       "extractionState": "manual",
       "localizations": {
         "en": {

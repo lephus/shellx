@@ -19,6 +19,11 @@ enum SignInErrorText {
         case .providerUnavailable: String(localized: "signin.error.providerUnavailable")
         case .providerFailed: String(localized: "signin.error.providerFailed")
         case .switchToGoogleFirst: String(localized: "settings.account.delete.switchFirst")
+        case .invalidEmail: String(localized: "signin.error.invalidEmail")
+        case .disposableEmail: String(localized: "signin.error.disposableEmail")
+        case .invalidCode: String(localized: "signin.error.invalidCode")
+        case .codeExpired: String(localized: "signin.error.codeExpired")
+        case .emailSendFailed: String(localized: "signin.error.emailSendFailed")
         }
     }
 

@@ -42,6 +42,9 @@ final class DemoRelayTests: XCTestCase {
             ("signInWithApple", { _ = try await relay.signInWithApple(identityToken: "i", authorizationCode: "c", nonce: "n", deviceName: "p", clientKey: key) }),
             ("linkApple", { _ = try await relay.linkApple(offerURI: "u", linkToken: "l", clientKey: key) }),
             ("deleteAccount", { try await relay.deleteAccount(idToken: "i", nonce: "n", token: "t") }),
+            ("requestEmailCode", { _ = try await relay.requestEmailCode(email: "a@b.c", locale: "en") }),
+            ("signInWithEmailCode", { _ = try await relay.signInWithEmailCode(challengeID: "c", code: "1", deviceName: "p", clientKey: key) }),
+            ("deleteAccountWithCode", { try await relay.deleteAccount(challengeID: "c", code: "1", token: "t") }),
         ]
         for (name, call) in calls {
             do { try await call(); XCTFail(name) } catch { XCTAssertEqual(error as? RelayAPIError, DemoRelay.refusal, name) }

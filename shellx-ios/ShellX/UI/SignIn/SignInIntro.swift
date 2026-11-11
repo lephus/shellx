@@ -260,22 +260,61 @@ struct TypewriterSchedule: Equatable, Sendable {
     }
 }
 
-/// How the sign-in screen lays itself out in `size`, the room inside the safe area.
+/// How the sign-in screen lays itself out in `size`, the room inside the safe area (less the keyboard while it is
+/// up).
+///
+/// Under the intro the first screen holds the email field, Send code, "or", Google, Apple and the demo link; these
+/// never shrink or go. When the room is short the intro gives way, in this order: the subtitle, then the three steps,
+/// then the large logo. While the intro is folded (the keyboard is up, an address is typed, or the code step shows)
+/// only a small logo and the title stay, so the field and its button stand above the keyboard.
 struct SignInLayout: Equatable, Sendable {
-    /// The logo's side: 96 points, 72 in a window under 600 points high or wider than it is high.
+    /// Two columns from this width. No iPhone is this wide upright (440 at most) and every iPhone is wider on its side
+    /// (667 at least); a keyboard changes the height of the room, never its width.
+    static let sidewaysWidth: CGFloat = 500
+    // Measured at the default text size on the narrowest iPhones (375 and 393 points wide), where the steps wrap most:
+    // the screen needs 566 points with the 72-point logo, 590 with the 96-point one, 754 with the steps and 840 with
+    // the subtitle; beside the intro (335 points per column) the field and the buttons need 358, and 521 under the
+    // steps. Vietnamese needs no more. The fit tests draw each threshold on its worst window; under 24 points too few
+    // would only eat the margin under the demo link.
+
+    /// One column: the subtitle from this height (the iPhone Pro Max upright, not the iPhone Plus or 16).
+    static let subtitleHeight: CGFloat = 845
+    /// One column: the three steps from this height (the iPhone 16 upright, 759 points, not the iPhone SE or mini).
+    static let guideHeight: CGFloat = 756
+    /// One column: the 96-point logo from this height (the iPhone SE upright keeps it).
+    static let largeLogoHeight: CGFloat = 595
+    /// Two columns: the three steps over the field from this height (no iPhone on its side is this high).
+    static let sidewaysGuideHeight: CGFloat = 525
+
+    /// The logo's side: 96 points; 72 in a short window or on its side; 48 folded.
     let logoSize: CGFloat
-    /// Whether the subtitle shows under the taglines: only in 700 points of height or more.
+    /// Whether the typed taglines show under the title: not while folded.
+    let showsTaglines: Bool
+    /// Whether the subtitle shows under the taglines: upright, from `subtitleHeight`.
     let showsSubtitle: Bool
-    /// Whether the three steps show: not under 400 points of height.
+    /// Whether the three steps show: upright from `guideHeight`, on its side from `sidewaysGuideHeight`.
     let showsGuide: Bool
-    /// Landscape: the logo, the title and the taglines on the left, the steps and the buttons on the right.
+    /// Landscape: the logo, the title and the taglines on the left, the steps, the field and the buttons on the right.
     let sideBySide: Bool
 
-    init(size: CGSize) {
-        sideBySide = size.width > size.height
-        logoSize = size.height < 600 || size.width > size.height ? 72 : 96
-        showsSubtitle = size.height >= 700
-        showsGuide = size.height >= 400
+    init(size: CGSize, folded: Bool = false) {
+        sideBySide = size.width >= Self.sidewaysWidth
+        if folded {
+            logoSize = 48
+            showsTaglines = false
+            showsSubtitle = false
+            showsGuide = false
+        } else if sideBySide {
+            logoSize = 72
+            showsTaglines = true
+            showsSubtitle = false
+            showsGuide = size.height >= Self.sidewaysGuideHeight
+        } else {
+            logoSize = size.height >= Self.largeLogoHeight ? 96 : 72
+            showsTaglines = true
+            showsSubtitle = size.height >= Self.subtitleHeight
+            showsGuide = size.height >= Self.guideHeight
+        }
     }
 }
 

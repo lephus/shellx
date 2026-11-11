@@ -29,6 +29,7 @@ final class AccountRenderTests: XCTestCase {
         let errors: [SignInError] = [
             .invalidCredentials, .rateLimited, .network, .server(code: "x"), .localWipePending, .switchFromSignedInDevice,
             .emailInUse, .identityInUse, .reauthRequired, .providerUnavailable, .providerFailed, .switchToGoogleFirst,
+            .invalidEmail, .disposableEmail, .invalidCode, .codeExpired, .emailSendFailed,
         ]
         let messages = errors.compactMap(SignInErrorText.message(for:))
         XCTAssertEqual(messages.count, errors.count)
@@ -87,6 +88,15 @@ final class AccountRenderTests: XCTestCase {
         try assertRenders(NavigationStack { SettingsView(email: "phu@example.com", account: actions(.password)) }, name: "settings-password")
     }
 
+    func testSettingsOfAnEmailSessionNameTheMethod() throws {
+        let google = try SnapshotWriter().write(
+            NavigationStack { SettingsView(email: "phu@example.com", account: actions(.google)) }, name: "settings")
+        let email = try SnapshotWriter().write(
+            NavigationStack { SettingsView(email: "phu@example.com", account: actions(.email)) }, name: "settings-email")
+        XCTAssertNotEqual(google.first?.pngData(), email.first?.pngData(), "the email row says \"Email code\"")
+        XCTAssertNotEqual(String(localized: "settings.account.method.email"), String(localized: "signin.email"))
+    }
+
     func testSettingsInTheDemoShowOnlyTheEmail() throws {
         try assertRenders(NavigationStack { SettingsView(email: "demo@shellx.pro", account: nil) }, name: "settings-demo")
     }
@@ -103,6 +113,7 @@ final class AccountRenderTests: XCTestCase {
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .password, dismissed: true))
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .google, dismissed: false))
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .apple, dismissed: false))
+        XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: .email, dismissed: false))
         XCTAssertFalse(SwitchToGoogleBanner.isShown(authMethod: nil, dismissed: false))
     }
 
