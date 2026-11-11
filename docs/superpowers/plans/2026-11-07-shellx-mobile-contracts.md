@@ -957,3 +957,66 @@ Rule for any later Android text surface that must keep Vietnamese composing: §2
 p95 < 16 ms), two-chip swiping, floods (`yes | head -100000`, base64 of 5 MB), vim / htop, ＋ without moving the Mac's selection,
 and home / back — all need a relay that answers sign-in (the production relay answers 404 to `/v1/auth/nonce` until 1D deploys 1A)
 plus plan 2B's Mac build. Record "Part B pending: needs a relay with 1A (and 1D's Android client) and the 2B Mac build" in the ledger.
+
+## 30. Additions from the email-code sign-in plan, Android part
+
+Plan `2026-11-11-shellx-email-code-signin-android.md` with the user's email-first change of 2026-11-11
+(`.superpowers/sdd/2026-11-11-shellx-email-code-signin/email-first-brief.md`); spec S4. The relay API is §29's. Names
+checked against the branch tip of `feat/shellx-email-code-signin-android`. (Numbered 30: §29 is the relay part's on
+`develop`; this branch was cut before it landed, so the merge renumbers nothing but joins the two appends.)
+
+**Kotlin Link (`com.shellx.link.account`)**
+- `EmailChallenge(challengeId, expiresIn, resendIn, email)`, redacted `toString()`; `RelayApi.requestEmailCode(email, locale)`,
+  `signInWithEmailCode(challengeId, code, deviceName, clientKey)`, `deleteAccountWithEmailCode(challengeId, code, token)`
+  (Kotlin cannot overload `deleteAccount` on names). A 202 needs `challenge_id` of 1–128 base64url characters,
+  `expires_in` 1..86 400, `resend_in` 0..86 400, else `BadResponse`.
+
+**`:core` (`com.shellx.core.account`)**
+- `AccountAuthMethod { GOOGLE, EMAIL }` (`wire`, `ofWire`); `StoredSession.authMethod`, stored as `auth_method` (absent:
+  google; unknown: the session is unreadable); `AppPhase.SignedIn.authMethod`.
+- `SignInException.{InvalidEmail, DisposableEmail, InvalidCode, CodeExpired, EmailSendFailed}`; `SignInException.ofEmail`
+  (any 404 and `503 email_sign_in_disabled` → `ProviderUnavailable`); the three `RelayAccountCalling` members.
+- `AppCoordinator.requestEmailCode`, `signInWithEmailCode` (shares Google's one-at-a-time slot), `requestAccountDeletionCode`,
+  `deleteAccountWithEmailCode` (shares `deleteAccount()`'s slot and tail); `deleteAccount()` on an email session throws
+  `Server("code_required")` and calls nothing.
+- `EmailCodeActions`, `EmailSignInModel`, `EmailSignInState` (steps IDLE, EMAIL, SENDING, CODE, VERIFYING, DONE; the
+  countdown reads `Clock.nowMs()`; `Saved` never holds the code). A 410 opens Resend at once; a 409 on verify goes back to
+  the email step.
+
+**App**
+- The first screen is the email step (user's change, 2026-11-11): intro, then the email field with Send code, "or",
+  Continue with Google, "Try without an account". No "Continue with email" button (the key `signin.email.continue` stays in
+  the catalog, unused on Android). No focus on arrival. The intro folds to the 72 dp logo and the title while the keyboard
+  is up (`WindowInsets.isImeVisible`), while an address is typed, and in the code step; the field keeps its focus through
+  the fold. "Session expired" and Google's failure show on the first screen; an email failure under its field.
+- `SignInView(…, email, clock, emailRestore)`; `SignInContent(…, email, emailCalls, autoFocus, keyboardUp)`;
+  `SignInLayout.of(width, height, folded)`. Thresholds (measured at font 1.0, en and vi): one column 760 dp (subtitle),
+  705 dp (steps), 560 dp (big logo); two columns 700 dp (subtitle), 470 dp (steps). The room is measured without the
+  keyboard. The Pixel 3 (393 × 713) shows the first screen whole at font 1.0; at 1.3 it scrolls.
+- System Back: from the code step to the first screen (the address kept, the field focused); ignored while a request is on
+  the relay; on the first screen it is the system's. Android has no Cancel button.
+- Tags: `signin.or`, `signin.email.{field,send,error,sentTo,code,verify,resend,change}`, `delete.code.{intro,field,resend}`
+  (`signin.email` is gone with the button).
+- Settings: `AccountActions.emailDeletion`; `AccountSection(…, authMethod, clock)`, `SettingsScreen(…, authMethod, clock)`;
+  the e-mail row reads "Email code" for an email session. `DeleteAccountCodeCard`, `DeleteAccountCodeDialog` (its own width,
+  24 dp margins, `usePlatformDefaultWidth = false`); deletion by code never auto-submits. The code step is restored from
+  saved state held above the NavHost; the deletion dialog is not restored after process death.
+
+**Strings**: the 18 catalog keys of Task 1 (spam hint inside `signin.email.sentTo %@`); Android's `signin_subtitle` names
+Google and email.
+
+**Behaviour the iPhone part shares**: email first, Google below; a 409 on verify goes back to the email step;
+`deleteAccount()` on an email session is `Server("code_required")`; a 410 opens Resend at once. Android-only: system Back
+instead of a Cancel button; the field stops at 254 characters.
+
+**Test support**: `ScriptedRelay.emailCode`, `emailSignIn`, `deleteByCode` and its three call records; `imeInset`.
+
+**Seen on the API 36 emulator** (nothing sent to a relay): no keyboard on arrival; a tap brings Gboard's email layout
+and folds the intro, portrait and landscape, with the field and Send code above it; the keyboard going down on an empty
+field brings the whole intro back; a killed process comes back with the typed address. Gboard measured 255 dp above a
+three-button bar, 279 dp above the gesture bar (the fit tests keep 300 dp).
+
+**Not verified on a device**: the code step at all (it needs a relay with §29), the number pad and paste in the code
+field, the keyboard after coming back from the mail app, the keyboard over the deletion dialog, TalkBack on the first
+screen and the code step, the first screen on the Pixel 3 itself. No parity-ledger row: the iPhone part compares at its
+landing.
