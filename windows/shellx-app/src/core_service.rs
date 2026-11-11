@@ -904,4 +904,96 @@ mod tests {
             assert!(code_digits(s).is_some(), "{s:?}");
         }
     }
+
+    /// Review chunk 1 M3: the likeliest production failure. An account that still has a password (the
+    /// relay's PASSWORD_LOGIN is on) answers 409 on verify: the first screen with the switch sentence.
+    #[test]
+    fn a_password_account_gets_the_switch_answer_through_the_real_core() {
+        use shellx_model::strings::{Str, email_error, t};
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        // Another device signs in to that account with its password.
+        let other = crate::core_bridge::CoreBridge::new();
+        config_set(&other, &cfg(&api.base_url, &tmp.path().join("other"))).unwrap();
+        other
+            .call("auth.login", json!({"email":"foo@bar.com","password":"pw"}))
+            .unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let mut flow = on_the_code_step(&core);
+        let code = api.email_code("foo@bar.com").unwrap();
+        drive(&mut flow, &core, submit_code(&code), 2_000);
+        assert_eq!(flow.email_step(), Some(EmailStep::Email));
+        assert_eq!(
+            email_error_code(&flow),
+            Some("switch_from_signed_in_device")
+        );
+        assert_eq!(flow.email_sent_to(), None);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+        for lang in [Lang::En, Lang::Vi] {
+            assert_eq!(
+                email_error(lang, "switch_from_signed_in_device"),
+                t(lang, Str::SwitchFromSignedInDevice)
+            );
+        }
+        api.stop();
+    }
+
+    /// Review chunk 1 M3: addresses the relay refuses, one of them one the model lets through.
+    #[test]
+    fn addresses_the_relay_refuses_answer_through_the_real_core() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        for (address, code) in [
+            ("x@mailinator.com", "disposable_email"),
+            // A one-letter top-level domain: plausible for the dialog, refused by the relay.
+            ("a@b.c", "invalid_email"),
+        ] {
+            let mut flow = AccountFlow::new();
+            drive(&mut flow, &core, AccountEvent::Started, 0);
+            drive(&mut flow, &core, send_code(address, "en"), 1);
+            assert_eq!(flow.email_step(), Some(EmailStep::Email), "{address}");
+            assert_eq!(email_error_code(&flow), Some(code), "{address}");
+            assert_eq!(flow.state(), &AccountState::LoggedOut, "{address}");
+        }
+        api.stop();
+    }
+
+    /// Review chunk 1 M3: offline. A verify keeps the code for another try; a send stays on the first
+    /// screen; both read the network sentence. "Offline" is a relay address where nothing listens (a
+    /// stopped fake still holds its port and lets a request wait for the core's 20 s timeout).
+    #[test]
+    fn offline_through_the_real_core() {
+        use shellx_model::strings::{Str, email_error, t};
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let nobody = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port())
+        };
+        let dir = tmp.path().join("offline");
+        let offline =
+            ConfiguredCore::new(Box::new(crate::core_bridge::CoreBridge::new()), move || {
+                Ok(cfg(&nobody, &dir))
+            });
+
+        let mut on_code = on_the_code_step(&core);
+        drive(&mut on_code, &offline, submit_code("123456"), 3_000);
+        assert_eq!(on_code.email_step(), Some(EmailStep::Code));
+        assert_eq!(email_error_code(&on_code), Some("network"));
+        assert!(on_code.email_can_verify(), "the challenge is kept");
+        assert_eq!(on_code.state(), &AccountState::LoggedOut);
+
+        let mut first = AccountFlow::new();
+        drive(&mut first, &offline, AccountEvent::Started, 0);
+        drive(&mut first, &offline, send_code("foo@bar.com", "vi"), 1);
+        assert_eq!(first.email_step(), Some(EmailStep::Email));
+        assert_eq!(email_error_code(&first), Some("network"));
+        assert_eq!(
+            email_error(Lang::Vi, "network"),
+            t(Lang::Vi, Str::RelayUnreachable)
+        );
+        api.stop();
+    }
 }
