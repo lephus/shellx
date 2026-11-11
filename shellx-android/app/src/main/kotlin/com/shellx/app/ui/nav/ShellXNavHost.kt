@@ -11,8 +11,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
@@ -39,10 +41,13 @@ import com.shellx.app.ui.pending.PendingListView
 import com.shellx.app.ui.settings.AccountActions
 import com.shellx.app.ui.settings.SettingsScreen
 import com.shellx.app.ui.settings.versionText
+import com.shellx.app.ui.signin.EmailSignInSaver
 import com.shellx.app.ui.signin.SignInView
 import com.shellx.app.ui.workspaces.OtherSessionsView
 import com.shellx.app.ui.workspaces.WorkspaceView
 import com.shellx.core.account.AppPhase
+import com.shellx.core.account.EmailCodeActions
+import com.shellx.core.account.EmailSignInModel
 import com.shellx.core.link.SessionRef
 import com.shellx.core.workspaces.WorkspaceRef
 import kotlinx.coroutines.launch
@@ -64,6 +69,14 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
     val startDemo: () -> Unit = { composition.appScope.launch { composition.demo.start() } }
     // The work screens open routes by string (WorkRoutes); like the navigator's opens, a double tap opens one page.
     val open: (String) -> Unit = { route -> nav.navigate(route) { launchSingleTop = true } }
+    // What a killed process needs to come back to the sign-in screen's email or code step: the address, the challenge
+    // and its two deadlines, never the code. Kept here, above the NavHost: RootSync replaces the restored sign_in page
+    // at start, so that page's own saved state would be lost.
+    val emailRestore = rememberSaveable(stateSaver = EmailSignInSaver) { mutableStateOf<EmailSignInModel.Saved?>(null) }
+    // It is the sign-in screen's: once an account or the demo shows, there is no step to come back to.
+    LaunchedEffect(root) {
+        if (root != Routes.LAUNCH && root != Routes.SIGN_IN) emailRestore.value = null
+    }
 
     // A tap on what takes no tap of its own, on any page, puts the keyboard down (phone check 2026-11-11).
     TapOutsideHidesKeyboard(modifier.fillMaxSize()) {
@@ -78,10 +91,19 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
             composable(Routes.LAUNCH) { LaunchView() }
             composable(Routes.SIGN_IN) {
                 val phase by composition.real.coordinator.phase.collectAsStateWithLifecycle()
+                val email = remember(composition) {
+                    EmailCodeActions(
+                        requestCode = { address, locale -> composition.real.coordinator.requestEmailCode(address, locale) },
+                        verify = { challengeId, code -> composition.real.coordinator.signInWithEmailCode(challengeId, code) },
+                    )
+                }
                 SignInView(
                     expired = (phase as? AppPhase.SignedOut)?.expired == true,
                     signIn = { composition.real.coordinator.signInWithGoogle() },
                     startDemo = startDemo,
+                    email = email,
+                    clock = composition.clock,
+                    emailRestore = emailRestore,
                 )
             }
             // The three roots draw by the current state, so a root still waiting to be swapped is never stale.

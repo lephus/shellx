@@ -81,18 +81,22 @@ object EmailStepFields {
 
 /**
  * A field's own text: what was typed shows at once, in the same frame, whatever the screen's state does meanwhile (a
- * field fed straight from a StateFlow drops fast keystrokes). When the text [handed] in changes to something the field
- * does not show (the model emptied the code, or took the relay's spelling of the address), the field takes it, with
- * the cursor at its end. Never saved with the screen: the code must not reach the saved state, and the address comes
- * back from the model.
+ * field fed straight from a StateFlow drops fast keystrokes). When the state behind the field moves on and its text is
+ * not what the field shows (the model emptied the code, or took the relay's spelling of the address), the field takes
+ * the state's text, with the cursor at its end. Never saved with the screen: the code must not reach the saved state,
+ * and the address comes back from the model.
  */
-private class FieldText(handed: String) {
+private class FieldText(handed: String, revision: Any?) {
     var value by mutableStateOf(at(handed))
-    private var lastHanded = handed
+    private var lastRevision = revision
 
-    fun follow(handed: String) {
-        if (handed == lastHanded) return
-        lastHanded = handed
+    /**
+     * [handed] is the state's text and [revision] the state it came with. Only a new [revision] is looked at: the same
+     * one handed in again says nothing new, and what was typed since stays.
+     */
+    fun follow(handed: String, revision: Any?) {
+        if (revision == lastRevision) return
+        lastRevision = revision
         if (handed != value.text) value = at(handed)
     }
 
@@ -156,8 +160,8 @@ internal fun EmailStep(
     modifier: Modifier = Modifier,
 ) {
     val sending = state.step == EmailSignInState.Step.SENDING
-    val field = remember { FieldText(state.email) }
-    field.follow(state.email)
+    val field = remember { FieldText(state.email, state) }
+    field.follow(state.email, state)
     val focus = remember { FocusRequester() }
     if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus() }
 
@@ -219,6 +223,7 @@ internal fun CodeStep(state: EmailSignInState, calls: EmailStepCalls, autoFocus:
             onDone = calls.verify,
             modifier = Modifier.fillMaxWidth().testTag("signin.email.code"),
             autoFocus = autoFocus,
+            revision = state,
         )
         StepFailure(state.error, "signin.email.error")
         WaitingButton(
@@ -244,6 +249,10 @@ internal fun CodeStep(state: EmailSignInState, calls: EmailStepCalls, autoFocus:
  * The six-digit field (sign-in and Delete Account): one field, so a paste and an autofill land whole and TalkBack reads
  * one. It shows digits only, at most six of them, whatever is typed or pasted ("123 456", a whole sentence). [onDone] is
  * the keyboard's Done. The test tag comes with [modifier].
+ *
+ * The field shows what is typed at once and reports it with [onCode]. It takes [code] back when [revision] changes and
+ * [code] is not what it shows: hand in the state [code] comes from, so that a code the model emptied in the same frame
+ * it was typed in (a wrong code refused at once) empties the field too. By default [revision] is [code] itself.
  */
 @Composable
 fun EmailCodeField(
@@ -254,9 +263,10 @@ fun EmailCodeField(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     autoFocus: Boolean = false,
+    revision: Any? = code,
 ) {
-    val field = remember { FieldText(code) }
-    field.follow(code)
+    val field = remember { FieldText(code, revision) }
+    field.follow(code, revision)
     val focus = remember { FocusRequester() }
     if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus() }
 
