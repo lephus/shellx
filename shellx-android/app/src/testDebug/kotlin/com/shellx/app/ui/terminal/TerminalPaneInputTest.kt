@@ -23,9 +23,13 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
+import com.shellx.app.ui.components.TapOutsideHidesKeyboard
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -482,6 +486,39 @@ class TerminalPaneInputTest {
         until { !surface.hasFocus() }
         assertTrue(ime.hides >= 1)
         assertFalse(tagged("terminal.key.escape"))
+    }
+
+    /**
+     * A tap outside the page (the top bar, the chips, the room beside the grid) just after the page took the keyboard
+     * back (a rotation): the keyboard goes the surface's own way, as the key bar's hide key sends it, so when the system
+     * then takes it down the page never takes that for the window settling and asks for it again (contracts §28).
+     */
+    @Test
+    fun aTapOutsideJustAfterTheKeyboardWasTakenBackAsksForNothing() {
+        start()
+        var held = false
+        show {
+            TapOutsideHidesKeyboard(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxWidth().height(80.dp).testTag("above"))
+                    TerminalPane(
+                        model, "t-zsh", "zsh", shown = true, modifier = Modifier.weight(1f),
+                        holdsKeyboard = { held = it }, retakesKeyboard = true,
+                    )
+                }
+            }
+        }
+        until { model.phase == TerminalViewPhase.Live && surface().hasFocus() && ime.shows == 1 }
+        keyboard(300)
+        until { held }
+        compose.onNodeWithTag("above").performClick()
+        until { !surface().hasFocus() && !tagged("terminal.key.escape") }
+        assertEquals("the surface hid its keyboard itself", 1, ime.hides)
+        assertFalse(held)
+        keyboard(0)
+        idle(300)
+        assertEquals("the page asked for the keyboard again", 1, ime.shows)
+        assertFalse(surface().hasFocus())
     }
 
     // TerminalPaneTests.swift, re-expressed for Android (ruling 11)

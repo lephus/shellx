@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shellx.app.R
+import com.shellx.app.ui.components.TapOutsideHidesKeyboard
 import com.shellx.app.ui.components.isCompactHeight
 import com.shellx.core.link.MachineHub
 import com.shellx.core.pairing.SheetPresence
@@ -57,13 +58,16 @@ fun PendingSheetHost(route: PendingRoute, hub: MachineHub, center: DecisionCente
         dragHandle = if (compact) null else ({ BottomSheetDefaults.DragHandle() }),
     ) {
         kept.SaveableStateProvider("${route.kind}/${route.id.machineId}/${route.id.requestId}") {
-            Box {
-                when (route.kind) {
-                    PendingRoute.Kind.QUESTION -> QuestionAnswerSheet(item, state, send, close)
-                    PendingRoute.Kind.PLAN -> PlanReviewSheet(item, state, send, close)
-                    PendingRoute.Kind.FULL_TEXT -> FullTextSheet(item.item, close)
+            // The sheet's window is not the screen's: a tap on its own empty area puts a field's keyboard down here.
+            TapOutsideHidesKeyboard {
+                Box {
+                    when (route.kind) {
+                        PendingRoute.Kind.QUESTION -> QuestionAnswerSheet(item, state, send, close)
+                        PendingRoute.Kind.PLAN -> PlanReviewSheet(item, state, send, close)
+                        PendingRoute.Kind.FULL_TEXT -> FullTextSheet(item.item, close)
+                    }
+                    Announcement(if (state.handledElsewhere) stringResource(R.string.pending_status_handled_elsewhere) else "")
                 }
-                Announcement(if (state.handledElsewhere) stringResource(R.string.pending_status_handled_elsewhere) else "")
             }
         }
     }

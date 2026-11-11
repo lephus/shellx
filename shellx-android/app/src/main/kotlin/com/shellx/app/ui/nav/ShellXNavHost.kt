@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +30,7 @@ import com.shellx.app.SignedInScope
 import com.shellx.app.ui.LaunchView
 import com.shellx.app.ui.SignedInView
 import com.shellx.app.ui.agent.AgentView
+import com.shellx.app.ui.components.TapOutsideHidesKeyboard
 import com.shellx.app.ui.home.EndedSessionsView
 import com.shellx.app.ui.machines.MachinesView
 import com.shellx.app.ui.pairing.CancelPairingWhenLeft
@@ -63,116 +65,118 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
     // The work screens open routes by string (WorkRoutes); like the navigator's opens, a double tap opens one page.
     val open: (String) -> Unit = { route -> nav.navigate(route) { launchSingleTop = true } }
 
-    NavHost(
-        navController = nav,
-        startDestination = Routes.LAUNCH,
-        modifier = modifier,
-        enterTransition = { fadeIn(tween(FADE_MS)) },
-        exitTransition = { fadeOut(tween(FADE_MS)) },
-        popEnterTransition = { fadeIn(tween(FADE_MS)) },
-        popExitTransition = { fadeOut(tween(FADE_MS)) },
-    ) {
-        composable(Routes.LAUNCH) { LaunchView() }
-        composable(Routes.SIGN_IN) {
-            val phase by composition.real.coordinator.phase.collectAsStateWithLifecycle()
-            SignInView(
-                expired = (phase as? AppPhase.SignedOut)?.expired == true,
-                signIn = { composition.real.coordinator.signInWithGoogle() },
-                startDemo = startDemo,
-            )
-        }
-        // The three roots draw by the current state, so a root still waiting to be swapped is never stale.
-        for (route in listOf(Routes.FIRST_MAC, Routes.HOME, Routes.DEMO)) {
-            composable(route) {
-                SignedIn(composition) { scope ->
-                    val active by composition.active.collectAsStateWithLifecycle()
-                    SignedInView(active, scope, navigator, startDemo = if (active.isDemo) null else startDemo)
-                }
-            }
-        }
-        composable(Routes.PAIRING) {
-            SignedIn(composition) { scope ->
-                CancelPairingWhenLeft { scope.pairing.cancel() }
-                PairingScreen(scope.pairing, close = navigator::back)
-            }
-        }
-        composable(WorkRoutes.WORKSPACE) { e ->
-            SignedIn(composition) { scope ->
-                WorkspaceView(
-                    scope,
-                    WorkspaceRef(e.arguments?.getString("machineId").orEmpty(), e.arguments?.getString("workspaceId").orEmpty()),
-                    open = open,
-                    back = navigator::back,
+    // A tap on what takes no tap of its own, on any page, puts the keyboard down (phone check 2026-11-11).
+    TapOutsideHidesKeyboard(modifier.fillMaxSize()) {
+        NavHost(
+            navController = nav,
+            startDestination = Routes.LAUNCH,
+            enterTransition = { fadeIn(tween(FADE_MS)) },
+            exitTransition = { fadeOut(tween(FADE_MS)) },
+            popEnterTransition = { fadeIn(tween(FADE_MS)) },
+            popExitTransition = { fadeOut(tween(FADE_MS)) },
+        ) {
+            composable(Routes.LAUNCH) { LaunchView() }
+            composable(Routes.SIGN_IN) {
+                val phase by composition.real.coordinator.phase.collectAsStateWithLifecycle()
+                SignInView(
+                    expired = (phase as? AppPhase.SignedOut)?.expired == true,
+                    signIn = { composition.real.coordinator.signInWithGoogle() },
+                    startDemo = startDemo,
                 )
             }
-        }
-        composable(WorkRoutes.AGENT) { e ->
-            SignedIn(composition) { scope ->
-                val ref = remember(e) {
-                    WorkRoutes.sessionRef(
-                        scope.hub.state.value,
-                        e.arguments?.getString("machineId").orEmpty(),
-                        e.arguments?.getString("sessionId").orEmpty(),
+            // The three roots draw by the current state, so a root still waiting to be swapped is never stale.
+            for (route in listOf(Routes.FIRST_MAC, Routes.HOME, Routes.DEMO)) {
+                composable(route) {
+                    SignedIn(composition) { scope ->
+                        val active by composition.active.collectAsStateWithLifecycle()
+                        SignedInView(active, scope, navigator, startDemo = if (active.isDemo) null else startDemo)
+                    }
+                }
+            }
+            composable(Routes.PAIRING) {
+                SignedIn(composition) { scope ->
+                    CancelPairingWhenLeft { scope.pairing.cancel() }
+                    PairingScreen(scope.pairing, close = navigator::back)
+                }
+            }
+            composable(WorkRoutes.WORKSPACE) { e ->
+                SignedIn(composition) { scope ->
+                    WorkspaceView(
+                        scope,
+                        WorkspaceRef(e.arguments?.getString("machineId").orEmpty(), e.arguments?.getString("workspaceId").orEmpty()),
+                        open = open,
+                        back = navigator::back,
                     )
                 }
-                AgentView(scope, ref, open = open, back = navigator::back)
             }
-        }
-        composable(
-            WorkRoutes.PENDING,
-            arguments = listOf(
-                navArgument("machineId") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-                navArgument("workspaceId") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-            ),
-        ) { e ->
-            SignedIn(composition) { scope ->
-                val m = e.arguments?.getString("machineId")
-                val w = e.arguments?.getString("workspaceId")
-                PendingListView(
-                    scope.hub, scope.decisions, scope.sheets,
-                    only = if (m != null && w != null) ({ it.isIn(m, w) }) else null,
-                    back = navigator::back,
-                )
-            }
-        }
-        composable(Routes.SESSIONS, Routes.SESSIONS_ARGUMENTS) { e ->
-            SignedIn(composition) { scope ->
-                if (e.arguments?.getString("kind") == SessionListKind.ENDED.wire) {
-                    EndedSessionsView(scope, navigator)
-                } else {
-                    OtherSessionsView(scope, e.arguments?.getString("machineId").orEmpty(), navigator)
+            composable(WorkRoutes.AGENT) { e ->
+                SignedIn(composition) { scope ->
+                    val ref = remember(e) {
+                        WorkRoutes.sessionRef(
+                            scope.hub.state.value,
+                            e.arguments?.getString("machineId").orEmpty(),
+                            e.arguments?.getString("sessionId").orEmpty(),
+                        )
+                    }
+                    AgentView(scope, ref, open = open, back = navigator::back)
                 }
             }
-        }
-        composable(Routes.MACHINES) { SignedIn(composition) { scope -> MachinesView(scope, navigator) } }
-        composable(Routes.SETTINGS) {
-            SignedIn(composition) { scope ->
-                val active by composition.active.collectAsStateWithLifecycle()
-                val phase by active.coordinator.phase.collectAsStateWithLifecycle()
-                val appearance by composition.appearance.appearance.collectAsStateWithLifecycle()
-                val account = remember(active) {
-                    if (active.isDemo) null else AccountActions({ active.coordinator.signOut() }, { active.coordinator.deleteAccount() })
+            composable(
+                WorkRoutes.PENDING,
+                arguments = listOf(
+                    navArgument("machineId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("workspaceId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) { e ->
+                SignedIn(composition) { scope ->
+                    val m = e.arguments?.getString("machineId")
+                    val w = e.arguments?.getString("workspaceId")
+                    PendingListView(
+                        scope.hub, scope.decisions, scope.sheets,
+                        only = if (m != null && w != null) ({ it.isIn(m, w) }) else null,
+                        back = navigator::back,
+                    )
                 }
-                SettingsScreen(
-                    email = (phase as? AppPhase.SignedIn)?.email.orEmpty(),
-                    account = account,
-                    appearance = appearance,
-                    onAppearance = composition.appearance::set,
-                    voice = scope.voice,
-                    version = versionText(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toLong()),
-                    openMachines = navigator::openMachines,
-                    back = navigator::back,
-                    // The real account's, as the automatic ask's (SignedInFrame).
-                    settings = composition.settings,
-                )
+            }
+            composable(Routes.SESSIONS, Routes.SESSIONS_ARGUMENTS) { e ->
+                SignedIn(composition) { scope ->
+                    if (e.arguments?.getString("kind") == SessionListKind.ENDED.wire) {
+                        EndedSessionsView(scope, navigator)
+                    } else {
+                        OtherSessionsView(scope, e.arguments?.getString("machineId").orEmpty(), navigator)
+                    }
+                }
+            }
+            composable(Routes.MACHINES) { SignedIn(composition) { scope -> MachinesView(scope, navigator) } }
+            composable(Routes.SETTINGS) {
+                SignedIn(composition) { scope ->
+                    val active by composition.active.collectAsStateWithLifecycle()
+                    val phase by active.coordinator.phase.collectAsStateWithLifecycle()
+                    val appearance by composition.appearance.appearance.collectAsStateWithLifecycle()
+                    val account = remember(active) {
+                        if (active.isDemo) null else AccountActions({ active.coordinator.signOut() }, { active.coordinator.deleteAccount() })
+                    }
+                    SettingsScreen(
+                        email = (phase as? AppPhase.SignedIn)?.email.orEmpty(),
+                        account = account,
+                        appearance = appearance,
+                        onAppearance = composition.appearance::set,
+                        voice = scope.voice,
+                        version = versionText(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toLong()),
+                        openMachines = navigator::openMachines,
+                        back = navigator::back,
+                        // The real account's, as the automatic ask's (SignedInFrame).
+                        settings = composition.settings,
+                    )
+                }
             }
         }
     }
