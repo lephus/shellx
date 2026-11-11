@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -35,10 +36,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The email step and the code step with the keyboard up, where a phone is smallest: the Pixel 3 (393 × 713 dp between
- * its bars), with Vietnamese and with large text, and turned (737 × 369 dp). The field that has the focus, and on the
- * Pixel 3 the button under it, stand above the keyboard; the keyboard coming and going moves nothing. Robolectric shows
- * no keyboard: its room comes as the system's inset ([imeInset]).
+ * The first screen's email field and the code step with the keyboard up, where a phone is smallest: the Pixel 3 (393 ×
+ * 713 dp between its bars), with Vietnamese and with large text, and turned (737 × 369 dp). A tap on the field brings
+ * the keyboard, and the intro folds to the small logo and the title: the field and Send code stand above the keyboard
+ * and keep the focus. The keyboard going down with an empty field brings the whole intro back; with an address typed
+ * the intro stays folded and the keyboard moves nothing. Robolectric shows no keyboard: its room comes as the system's
+ * inset ([imeInset]); the test hands it in after the tap, as a phone does.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics, so the lines are as long and as tall as on a phone.
@@ -63,15 +66,16 @@ class SignInEmailFitTest {
         }
     }
 
-    private fun openTheEmailStep() {
+    /** Shows the first screen and taps its field, as a phone does: the field has the focus, the keyboard is not up yet. */
+    private fun tapTheField() {
         show()
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").assertIsNotFocused().performClick()
         rule.waitForIdle()
         rule.onNodeWithTag("signin.email.field").assertIsFocused()
     }
 
     private fun openTheCodeStep(address: String = "phu@example.com") {
-        openTheEmailStep()
+        tapTheField()
         rule.onNodeWithTag("signin.email.field").performTextInput(address)
         rule.onNodeWithTag("signin.email.send").performClick()
         rule.waitForIdle()
@@ -101,42 +105,79 @@ class SignInEmailFitTest {
         }
     }
 
-    private fun assertTheEmailStepStandsAboveTheKeyboard() {
-        openTheEmailStep()
+    private fun logoWidth(): Dp = bounds("signin.logo").width
+
+    private fun assertFolded() {
+        assertTrue("the logo is ${logoWidth()} wide", abs((logoWidth() - 72.dp).value) < 0.5f)
+        for (gone in listOf("signin.tagline", "signin.subtitle", "signin.guide.1")) {
+            assertFalse("$gone folds away while the keyboard is up", exists(gone))
+        }
+    }
+
+    private fun assertTheFieldStandsAboveTheKeyboard() {
+        tapTheField()
         rule.imeInset(KEYBOARD)
 
-        assertTrue("the logo is ${bounds("signin.logo").width} wide", abs((bounds("signin.logo").width - 72.dp).value) < 0.5f)
+        assertFolded()
         assertAboveTheKeyboard(KEYBOARD, "signin.logo", "signin.title", "signin.email.field", "signin.email.send")
-        for (gone in listOf("signin.tagline", "signin.subtitle", "signin.guide.1", "signin.google")) {
-            assertFalse("$gone is not part of an email step", exists(gone))
-        }
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
+        // Google and the demo link stay on the screen, under the keyboard if they must.
+        for (tag in listOf("signin.or", "signin.google", "signin.demo")) rule.onNodeWithTag(tag).assertExists()
     }
 
     @Test
     @Config(qualifiers = PIXEL_3)
-    fun onThePixel3TheEmailStepStandsAboveTheKeyboard() = assertTheEmailStepStandsAboveTheKeyboard()
+    fun onThePixel3TheFieldStandsAboveTheKeyboard() = assertTheFieldStandsAboveTheKeyboard()
 
     @Test
     @Config(qualifiers = "vi-$PIXEL_3")
-    fun onThePixel3TheEmailStepStandsAboveTheKeyboardInVietnamese() = assertTheEmailStepStandsAboveTheKeyboard()
+    fun onThePixel3TheFieldStandsAboveTheKeyboardInVietnamese() = assertTheFieldStandsAboveTheKeyboard()
 
     @Test
     @Config(qualifiers = PIXEL_3, fontScale = 1.3f)
-    fun onThePixel3TheEmailStepStandsAboveTheKeyboardWithLargeText() = assertTheEmailStepStandsAboveTheKeyboard()
+    fun onThePixel3TheFieldStandsAboveTheKeyboardWithLargeText() = assertTheFieldStandsAboveTheKeyboard()
+
+    @Test
+    @Config(qualifiers = "vi-$PIXEL_3", fontScale = 1.3f)
+    fun onThePixel3TheFieldStandsAboveTheKeyboardWithLargeVietnameseText() = assertTheFieldStandsAboveTheKeyboard()
 
     @Test
     @Config(qualifiers = PIXEL_3)
-    fun theKeyboardMovesNothing() {
-        openTheEmailStep()
-        val still = listOf("signin.logo", "signin.title", "signin.email.field", "signin.email.send")
-        val before = still.associateWith { bounds(it) }
-
+    fun theKeyboardGoingDownWithAnEmptyFieldBringsTheWholeIntroBack() {
+        tapTheField()
+        assertTrue("whole before the keyboard comes", abs((logoWidth() - 96.dp).value) < 0.5f)
         rule.imeInset(KEYBOARD)
-        assertEquals("with the keyboard up", before, still.associateWith { bounds(it) })
+        assertFolded()
+
+        // The system's Back puts the keyboard down and leaves the focus where it was.
+        rule.imeInset(0.dp)
+        assertTrue("the big logo is back: ${logoWidth()}", abs((logoWidth() - 96.dp).value) < 0.5f)
+        for (tag in listOf("signin.tagline", "signin.guide.1", "signin.guide.3")) rule.onNodeWithTag(tag).assertIsDisplayed()
         rule.onNodeWithTag("signin.email.field").assertIsFocused()
 
+        // The keyboard again: folded again, and the same field still has the focus.
+        rule.imeInset(KEYBOARD)
+        assertFolded()
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = PIXEL_3)
+    fun withAnAddressTypedTheKeyboardMovesNothing() {
+        tapTheField()
+        rule.imeInset(KEYBOARD)
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.waitForIdle()
+        val still = listOf("signin.logo", "signin.title", "signin.email.field", "signin.email.send")
+        val before = still.associateWith { bounds(it) }
+        assertFolded()
+
         rule.imeInset(0.dp)
-        assertEquals("with the keyboard down again", before, still.associateWith { bounds(it) })
+        assertEquals("with the keyboard down", before, still.associateWith { bounds(it) })
+        assertFolded()
+        rule.imeInset(KEYBOARD)
+        assertEquals("with the keyboard up again", before, still.associateWith { bounds(it) })
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
     }
 
     private fun assertTheCodeStepStandsAboveTheKeyboard() {
@@ -168,7 +209,7 @@ class SignInEmailFitTest {
     @Test
     @Config(qualifiers = PIXEL_3_TURNED)
     fun inLandscapeTheFocusedFieldComesAboveTheKeyboard() {
-        openTheEmailStep()
+        tapTheField()
         rule.imeInset(LANDSCAPE_KEYBOARD)
         assertAboveTheKeyboard(LANDSCAPE_KEYBOARD, "signin.email.field")
         assertTrue("the logo is beside the field", bounds("signin.logo").right <= bounds("signin.email.field").left)

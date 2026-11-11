@@ -9,7 +9,14 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -24,7 +31,9 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasProgressBarRangeInfo
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -86,10 +95,14 @@ class SignInViewTest {
     /** While set, a verify waits for it. */
     private var heldVerify: CompletableDeferred<Unit>? = null
 
+    /** While set, a code request waits for it. */
+    private var heldRequest: CompletableDeferred<Unit>? = null
+
     /** The relay as the test scripts it: every challenge is "c1", for the address trimmed and in lower case. */
     private val email = EmailCodeActions(
         requestCode = { address, locale ->
             requests += address to locale
+            heldRequest?.await()
             requestFailures.removeFirstOrNull()?.let { throw it }
             EmailChallenge("c1", 600, 60, address.trim().lowercase())
         },
@@ -127,9 +140,9 @@ class SignInViewTest {
     private fun fieldText(tag: String): String =
         rule.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.EditableText].text
 
-    /** From the first step to the code step for [address], by taps and typing. */
+    /** From the first screen to the code step for [address], by taps and typing. */
     private fun reachTheCodeStep(address: String = "phu@example.com") {
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performClick()
         rule.onNodeWithTag("signin.email.field").performTextInput(address)
         rule.onNodeWithTag("signin.email.send").performClick()
         rule.waitForIdle()
@@ -233,6 +246,7 @@ class SignInViewTest {
     }
 
     @Test
+    @Config(qualifiers = WITH_THE_STEPS)
     fun theButtonsWorkFromTheFirstFrame() {
         // Not one frame of the intro passes: the clock stands still.
         rule.mainClock.autoAdvance = false
@@ -390,46 +404,107 @@ class SignInViewTest {
         }
     }
 
-    // Continue with email
+    // The email step is the first screen.
 
     @Test
-    fun continueWithEmailOpensTheEmailStepAndBackLeavesIt() {
+    @Config(qualifiers = WITH_THE_STEPS)
+    fun theFirstScreenIsTheEmailStepWithGoogleBelow() {
         show()
-        rule.onNodeWithTag("signin.or").assertIsDisplayed()
-        assertFalse("Back is the system's on the first step", rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
-
-        rule.onNodeWithTag("signin.email").assertTextEquals(string(R.string.signin_email_continue)).performClick()
         rule.waitForIdle()
-
-        rule.onNodeWithTag("signin.email.field").assertIsDisplayed().assertIsFocused()
-        for (gone in listOf("signin.google", "signin.email", "signin.tagline", "signin.guide.1", "signin.subtitle")) {
-            rule.onNodeWithTag(gone).assertDoesNotExist()
+        val order = listOf("signin.email.field", "signin.email.send", "signin.or", "signin.google", "signin.demo")
+        for ((above, below) in order.zipWithNext()) {
+            val a = rule.onNodeWithTag(above).assertIsDisplayed().getUnclippedBoundsInRoot()
+            val b = rule.onNodeWithTag(below).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue("$above ($a) stands above $below ($b)", a.bottom <= b.top)
         }
-        rule.onNodeWithTag("signin.logo").assertIsDisplayed()
-        rule.onNodeWithTag("signin.title").assertIsDisplayed()
-        rule.onNodeWithTag("signin.demo").assertIsDisplayed()
+        rule.onNodeWithTag("signin.email.send").assertTextEquals(string(R.string.signin_email_send)).assertIsNotEnabled()
+        rule.onNode(hasText(string(R.string.signin_email_continue))).assertDoesNotExist()
+        rule.onNodeWithTag("signin.email").assertDoesNotExist()
 
-        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
-        rule.waitForIdle()
-        rule.onNodeWithTag("signin.google").assertIsDisplayed()
-        rule.onNodeWithTag("signin.email.field").assertDoesNotExist()
-        assertFalse(rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
+        // No keyboard on arrival: nothing has the focus, and the whole intro shows.
+        rule.onNodeWithTag("signin.email.field").assertIsNotFocused()
+        rule.onNodeWithTag("signin.tagline").assertIsDisplayed()
+        assertFalse("Back is the system's on the first screen", rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
         assertEquals(emptyList<Pair<String, String>>(), requests)
     }
 
     @Test
-    fun whileGoogleRunsTheEmailButtonIsOff() {
+    fun sendCodeIsOnOnceTheFieldHoldsAnAddress() {
+        show()
+        rule.onNodeWithTag("signin.email.field").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@")
+        rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.field").performTextInput("example.com")
+        rule.onNodeWithTag("signin.email.send").assertIsEnabled()
+    }
+
+    /**
+     * A keyboard's Tab goes top to bottom: the field, Send code, Google, the demo link (TalkBack reads in the same order:
+     * [theFirstScreenIsTheEmailStepWithGoogleBelow]). Tab leaves touch mode, as on a phone with a keyboard.
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    @Config(qualifiers = WITH_THE_STEPS)
+    fun theFocusGoesFromTheFieldToSendThenGoogleThenTheDemo() {
+        var focusManager: FocusManager? = null
+        var inputMode: InputModeManager? = null
+        rule.setContent {
+            ShellXTheme {
+                focusManager = LocalFocusManager.current
+                inputMode = LocalInputModeManager.current
+                Screen(emailRestore = mutableStateOf(null))
+            }
+        }
+        rule.onNodeWithTag("signin.email.field").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
+        rule.runOnIdle { inputMode!!.requestInputMode(InputMode.Keyboard) }
+        for (tag in listOf("signin.email.send", "signin.google", "signin.demo")) {
+            rule.runOnIdle { focusManager!!.moveFocus(FocusDirection.Next) }
+            rule.onNodeWithTag(tag).assertIsFocused()
+        }
+    }
+
+    @Test
+    fun whileGoogleRunsTheEmailStepIsOff() {
         val answer = CompletableDeferred<Unit>()
         show(signIn = { answer.await() })
-        rule.onNodeWithTag("signin.email").assertIsEnabled()
+        rule.onNodeWithTag("signin.email.field").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.onNodeWithTag("signin.email.send").assertIsEnabled()
 
         rule.onNodeWithTag("signin.google").performClick()
         rule.waitForIdle()
-        rule.onNodeWithTag("signin.email").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.field").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.demo").assertIsNotEnabled()
 
         answer.complete(Unit)
         rule.waitForIdle()
-        rule.onNodeWithTag("signin.email").assertIsEnabled()
+        rule.onNodeWithTag("signin.email.field").assertIsEnabled()
+        rule.onNodeWithTag("signin.email.send").assertIsEnabled()
+        assertEquals(emptyList<Pair<String, String>>(), requests)
+    }
+
+    @Test
+    fun whileACodeIsAskedForGoogleIsOff() {
+        heldRequest = CompletableDeferred()
+        show()
+        rule.onNodeWithTag("signin.email.field").performClick()
+        rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
+        rule.onNodeWithTag("signin.email.send").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("signin.email.field").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.google").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.demo").assertIsNotEnabled()
+        assertTrue("Back waits for the relay", rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
+
+        heldRequest?.complete(Unit)
+        rule.waitForIdle()
+        rule.onNodeWithTag("signin.email.code").assertIsFocused()
+        rule.onNodeWithTag("signin.google").assertDoesNotExist()
     }
 
     /** Review Focus 1 and 3: a pasted "123 456" signs in by itself, once. */
@@ -437,7 +512,7 @@ class SignInViewTest {
     fun aCodeSignsInOnceAndAutoSubmits() {
         heldVerify = CompletableDeferred()
         show()
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performClick()
         rule.onNodeWithTag("signin.email.field").performTextInput("Phu@Example.com")
         rule.onNodeWithTag("signin.email.send").performClick()
         rule.waitForIdle()
@@ -445,6 +520,7 @@ class SignInViewTest {
         rule.onNodeWithTag("signin.email.sentTo").assertTextEquals(context.getString(R.string.signin_email_sent_to, "phu@example.com"))
         rule.onNodeWithTag("signin.email.code").assertIsFocused()
         rule.onNodeWithTag("signin.demo").assertDoesNotExist()
+        rule.onNodeWithTag("signin.google").assertDoesNotExist()
 
         rule.onNodeWithTag("signin.email.code").performTextInput("123 456")
         rule.waitForIdle()
@@ -500,7 +576,7 @@ class SignInViewTest {
     fun anOldRelaySaysNotAvailableInThisBuild() {
         requestFailures += SignInException.ProviderUnavailable()
         show()
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performClick()
         rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
         rule.onNodeWithTag("signin.email.send").performClick()
         rule.waitForIdle()
@@ -515,7 +591,7 @@ class SignInViewTest {
     fun offlineKeepsWhatWasTyped() {
         requestFailures += SignInException.Network()
         show()
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performClick()
         rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
         rule.onNodeWithTag("signin.email.send").performClick()
         rule.waitForIdle()
@@ -540,15 +616,21 @@ class SignInViewTest {
     }
 
     @Test
-    fun useADifferentEmailGoesBackWithTheAddress() {
+    fun useADifferentEmailGoesBackToTheFirstScreenWithTheAddress() {
         show()
         reachTheCodeStep("Phu@Example.com")
+        assertTrue("Back goes a step back from the code step", rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
         rule.onNodeWithTag("signin.email.change").performClick()
         rule.waitForIdle()
 
         assertEquals("phu@example.com", fieldText("signin.email.field"))
+        // On the way back the field takes the focus: a different address is what comes next.
+        rule.onNodeWithTag("signin.email.field").assertIsFocused()
         rule.onNodeWithTag("signin.email.code").assertDoesNotExist()
         rule.onNodeWithTag("signin.email.send").assertIsEnabled()
+        rule.onNodeWithTag("signin.google").assertIsDisplayed()
+        rule.onNodeWithTag("signin.demo").assertIsDisplayed()
+        assertFalse(rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
 
         // Back from the code step is the same step back.
         rule.onNodeWithTag("signin.email.send").performClick()
@@ -557,6 +639,9 @@ class SignInViewTest {
         rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()
         assertEquals("phu@example.com", fieldText("signin.email.field"))
+        rule.onNodeWithTag("signin.google").assertIsDisplayed()
+        assertFalse("then Back is the system's again", rule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
+        assertEquals(2, requests.size)
     }
 
     /** Review Focus 5: nothing is asked or sent again. */
@@ -616,9 +701,9 @@ class SignInViewTest {
         val restore = mutableStateOf<EmailSignInModel.Saved?>(null)
         show(emailRestore = restore)
         rule.waitForIdle()
-        assertNull("nothing on the first step", restore.value)
+        assertNull("nothing while the field is empty", restore.value)
 
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performClick()
         rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
         rule.waitForIdle()
         assertEquals(EmailSignInModel.Saved("phu@example.com", null, 0, 0), restore.value)
@@ -654,7 +739,7 @@ class SignInViewTest {
                 }
             }
         }
-        rule.onNodeWithTag("signin.email").performClick()
+        rule.onNodeWithTag("signin.email.field").performClick()
         rule.onNodeWithTag("signin.email.field").performTextInput("phu@example.com")
         rule.onNodeWithTag("signin.email.field").assertIsFocused()
 
@@ -676,13 +761,16 @@ class SignInViewTest {
 
     @Test
     fun aShortWindowLeavesTheStepsOut() {
-        // Robolectric's own window is 320 × 470 dp: under 660 dp of height the buttons need the steps' room.
+        // Robolectric's own window is 320 × 470 dp: under 705 dp of height the field and the buttons need the steps' room.
         show()
         rule.onNodeWithTag("signin.guide.1").assertDoesNotExist()
-        for (tag in listOf("signin.google", "signin.or", "signin.email", "signin.demo")) rule.onNodeWithTag(tag).assertExists()
+        for (tag in listOf("signin.email.field", "signin.email.send", "signin.or", "signin.google", "signin.demo")) {
+            rule.onNodeWithTag(tag).assertExists()
+        }
     }
 
     @Test
+    @Config(qualifiers = WITH_THE_STEPS)
     fun tryWithoutAnAccountStartsTheDemo() {
         var demos = 0
         var offersDemo by mutableStateOf(true)
@@ -699,7 +787,7 @@ class SignInViewTest {
     }
 
     private companion object {
-        /** The Pixel 3's window between its bars: tall enough (660 dp) for the three steps above the buttons. */
+        /** The Pixel 3's window between its bars: tall enough (705 dp) for the three steps above the field. */
         const val WITH_THE_STEPS = "w393dp-h713dp"
     }
 }

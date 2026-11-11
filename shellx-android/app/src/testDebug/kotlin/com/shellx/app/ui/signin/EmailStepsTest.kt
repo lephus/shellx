@@ -60,8 +60,8 @@ class EmailStepsTest {
 
     private fun show(content: @Composable () -> Unit) = rule.setContent { ShellXTheme { content() } }
 
-    private fun emailStep(state: EmailSignInState, startDemo: (() -> Unit)? = {}) =
-        show { EmailStep(state, calls, startDemo, autoFocus = false) }
+    private fun emailStep(state: EmailSignInState, enabled: Boolean = true) =
+        show { EmailStep(state, calls, autoFocus = false, enabled = enabled) }
 
     private fun codeStep(state: EmailSignInState) = show { CodeStep(state, calls, autoFocus = false) }
 
@@ -83,7 +83,7 @@ class EmailStepsTest {
     @Test
     fun theEmailStepSendsOnlyWhatLooksLikeAnEmail() {
         var state by mutableStateOf(EmailSignInState(Step.EMAIL, email = "phu@"))
-        show { EmailStep(state, calls, startDemo = {}, autoFocus = false) }
+        show { EmailStep(state, calls, autoFocus = false) }
         rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
 
         state = EmailSignInState(Step.EMAIL, email = "phu@example.com")
@@ -106,7 +106,7 @@ class EmailStepsTest {
     fun theFieldsCarryTheirAutofillTypes() {
         var state by mutableStateOf(EmailSignInState(Step.EMAIL))
         show {
-            if (state.step == Step.EMAIL) EmailStep(state, calls, startDemo = null, autoFocus = false) else CodeStep(state, calls, autoFocus = false)
+            if (state.step == Step.EMAIL) EmailStep(state, calls, autoFocus = false) else CodeStep(state, calls, autoFocus = false)
         }
         assertEquals(setOf("username", "emailAddress"), contentHints("signin.email.field"))
         state = code()
@@ -116,7 +116,7 @@ class EmailStepsTest {
     @Test
     fun aFailureStandsUnderItsField() {
         var state by mutableStateOf(EmailSignInState(Step.EMAIL, email = "phu@example", error = SignInException.InvalidEmail()))
-        show { EmailStep(state, calls, startDemo = {}, autoFocus = false) }
+        show { EmailStep(state, calls, autoFocus = false) }
         rule.onNodeWithTag("signin.email.error")
             .assertTextEquals(string(R.string.signin_error_invalid_email))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
@@ -138,11 +138,28 @@ class EmailStepsTest {
         emailStep(EmailSignInState(Step.SENDING, email = "phu@example.com"))
         rule.onNodeWithTag("signin.email.field").assertIsNotEnabled()
         rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
-        rule.onNodeWithTag("signin.demo").assertIsNotEnabled()
         rule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate), useUnmergedTree = true).assertExists()
         // TalkBack still hears the button's name.
         rule.onNodeWithTag("signin.email.send")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf(string(R.string.signin_email_send))))
+    }
+
+    /** The first screen turns its field off while Google signs in: neither the button nor the keyboard's Send sends. */
+    @Test
+    fun anEmailStepTurnedOffSendsNothing() {
+        emailStep(EmailSignInState(Step.EMAIL, email = "phu@example.com"), enabled = false)
+        rule.onNodeWithTag("signin.email.field").assertIsNotEnabled()
+        rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
+        assertEquals("phu@example.com", fieldText("signin.email.field"))
+        assertEquals(0, sends)
+    }
+
+    /** The steps start idle until the screen starts them: the field already takes an address. */
+    @Test
+    fun anIdleStepIsTheEmailStep() {
+        emailStep(EmailSignInState())
+        rule.onNodeWithTag("signin.email.field").assertIsEnabled().performTextInput("phu@example.com")
+        assertEquals("phu@example.com", emails.last())
     }
 
     @Test

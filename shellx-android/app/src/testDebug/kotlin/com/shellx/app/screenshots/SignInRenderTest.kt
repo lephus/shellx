@@ -26,8 +26,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Sign-in with its email and code steps, the first-Mac screen and the demo banner (SignInRenderTests,
- * MachinesRenderTests, DemoRenderTests). No render focuses a field: a cursor blinks, and a capture never settles.
+ * Sign-in (its first screen is the email step, Google below) with the code step, the first-Mac screen and the demo
+ * banner (SignInRenderTests, MachinesRenderTests, DemoRenderTests). No render focuses a field: a cursor blinks, and a
+ * capture never settles; "keyboard up" draws the screen as it stands with a keyboard, in the room the keyboard leaves.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -98,12 +99,13 @@ class SignInRenderTest {
         assertRenders("signin-tablet-landscape", width = 1280) { SignInView(expired = false, signIn = {}, startDemo = {}) }
     }
 
-    // The email and code steps, drawn from a state.
+    // The first screen and the code step, drawn from a state.
 
     @Composable
-    private fun EmailSteps(state: EmailSignInState) {
+    private fun EmailSteps(state: EmailSignInState, keyboardUp: Boolean = false) {
         SignInContent(
             expired = false, error = null, busy = false, continueWithGoogle = {}, startDemo = {}, introMs = null, email = state,
+            keyboardUp = keyboardUp,
         )
     }
 
@@ -124,9 +126,10 @@ class SignInRenderTest {
         error: SignInException? = null,
     ) = EmailSignInState(step, "phu@example.com", code, resendInSeconds, codeDead = codeDead, error = error)
 
+    /** An address typed and the keyboard down: the intro stays folded. */
     @Test
     fun emailStep() {
-        assertRenders("signin-email") { EmailSteps(EmailSignInState(Step.EMAIL)) }
+        assertRenders("signin-email") { EmailSteps(EmailSignInState(Step.EMAIL, email = "phu@example.com")) }
     }
 
     @Test
@@ -187,25 +190,41 @@ class SignInRenderTest {
         assertRenders("signin-code-landscape", width = 2355) { EmailSteps(code()) }
     }
 
-    /** The Pixel 3 with a 300 dp keyboard up: what is left above it (the keyboard's place is a plain block). */
+    /** The Pixel 3 just after a tap on the field: a 300 dp keyboard up, the intro folded (the keyboard is a plain block). */
+    @Test
+    @Config(qualifiers = "w393dp-h713dp-xxhdpi")
+    fun firstScreenAboveTheKeyboard() {
+        assertRenders("signin-keyboard") { AboveAKeyboard(300.dp) { EmailSteps(EmailSignInState(Step.EMAIL), keyboardUp = true) } }
+    }
+
+    @Test
+    @Config(qualifiers = "w393dp-h713dp-xxhdpi", fontScale = 1.3f)
+    fun firstScreenAboveTheKeyboardWithLargeText() {
+        assertRenders("signin-keyboard-large-font") {
+            AboveAKeyboard(300.dp) { EmailSteps(EmailSignInState(Step.EMAIL), keyboardUp = true) }
+        }
+    }
+
     @Test
     @Config(qualifiers = "w393dp-h713dp-xxhdpi")
     fun emailStepAboveTheKeyboard() {
         assertRenders("signin-email-keyboard") {
-            AboveAKeyboard(300.dp) { EmailSteps(EmailSignInState(Step.EMAIL, email = "phu@example.com")) }
+            AboveAKeyboard(300.dp) { EmailSteps(EmailSignInState(Step.EMAIL, email = "phu@example.com"), keyboardUp = true) }
         }
     }
 
     @Test
     @Config(qualifiers = "w393dp-h713dp-xxhdpi")
     fun codeStepAboveTheKeyboard() {
-        assertRenders("signin-code-keyboard") { AboveAKeyboard(300.dp) { EmailSteps(code(error = SignInException.InvalidCode())) } }
+        assertRenders("signin-code-keyboard") {
+            AboveAKeyboard(300.dp) { EmailSteps(code(error = SignInException.InvalidCode()), keyboardUp = true) }
+        }
     }
 
     @Test
     @Config(qualifiers = "w393dp-h713dp-xxhdpi", fontScale = 1.3f)
     fun codeStepAboveTheKeyboardWithLargeText() {
-        assertRenders("signin-code-keyboard-large-font") { AboveAKeyboard(300.dp) { EmailSteps(code()) } }
+        assertRenders("signin-code-keyboard-large-font") { AboveAKeyboard(300.dp) { EmailSteps(code(), keyboardUp = true) } }
     }
 
     /** A phone turned with its 251 dp keyboard up: the email field is what is left to see. */
@@ -213,7 +232,7 @@ class SignInRenderTest {
     @Config(qualifiers = "w785dp-h393dp-land-xxhdpi")
     fun emailStepInLandscapeAboveTheKeyboard() {
         assertRenders("signin-email-keyboard-landscape", width = 2355) {
-            AboveAKeyboard(251.dp) { EmailSteps(EmailSignInState(Step.EMAIL, email = "phu@example.com")) }
+            AboveAKeyboard(251.dp) { EmailSteps(EmailSignInState(Step.EMAIL), keyboardUp = true) }
         }
     }
 

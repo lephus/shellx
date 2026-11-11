@@ -40,6 +40,23 @@ class EmailSignInHolderTest {
         assertNull(with(EmailSignInSaver) { SaverScope { true }.save(null) })
     }
 
+    /** The sign-in screen's first screen is the email step: a new holder starts there, a restored one where it was. */
+    @Test
+    fun theStepsStartOnTheEmailStep() {
+        val clock = ManualClock()
+        val fresh = EmailSignInHolder(actions, clock, restored = null).model.state.value
+        assertEquals(EmailSignInState.Step.EMAIL, fresh.step)
+        assertEquals("", fresh.email)
+
+        val typed = EmailSignInHolder(actions, clock, EmailSignInModel.Saved("a@b.c", null, 0, 0)).model.state.value
+        assertEquals(EmailSignInState.Step.EMAIL, typed.step)
+        assertEquals("a@b.c", typed.email)
+
+        val code = EmailSignInModel.Saved("a@b.c", "c1", clock.nowMs() + 600_000, clock.nowMs() + 60_000)
+        assertEquals(EmailSignInState.Step.CODE, EmailSignInHolder(actions, clock, code).model.state.value.step)
+        assertEquals(emptyList<Pair<String, String>>(), requests)
+    }
+
     @Test
     fun aKilledAppComesBackToTheCodeStepWithTheTimeLeft() {
         val clock = ManualClock()

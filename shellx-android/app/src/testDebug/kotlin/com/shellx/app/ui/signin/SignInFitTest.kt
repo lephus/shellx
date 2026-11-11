@@ -2,6 +2,8 @@ package com.shellx.app.ui.signin
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -27,9 +29,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The sign-in screen's first step, with both ways in, holds in every window it must: the Pixel 3 (393 × 785 dp, about
- * 713 dp between its bars), turned (737 × 369 dp), a taller phone, a short phone, a tablet, each with large text too
- * (font scale 1.3). Robolectric draws no system bars, so a window here is the room between them.
+ * The sign-in screen's first screen (the email field with Send code, "or", Google, the demo link) holds in every window
+ * it must: the Pixel 3 (393 × 785 dp, about 713 dp between its bars) whole without a scroll at font scale 1.0 in English
+ * and Vietnamese, turned (737 × 369 dp), a taller phone, a short phone, a tablet, the windows at the layout's
+ * thresholds; with large text (font scale 1.3) a portrait screen may scroll, and nothing overlaps or is cut. Robolectric
+ * draws no system bars, so a window here is the room between them.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // Real text metrics, so the lines are as long and as tall as on a phone.
@@ -79,17 +83,25 @@ class SignInFitTest {
         assertDp("the logo", 96.dp, bounds("signin.logo").height)
     }
 
+    /** Large text: [tags] stand one under another, none cut at the sides, each reached by a scroll. */
+    private fun assertTheScreenScrollsToEach(vararg tags: String) {
+        assertStacked(*tags)
+        val window = rule.onRoot().getUnclippedBoundsInRoot()
+        for (tag in tags) {
+            assertTrue("$tag is inside the window's sides", bounds(tag).left >= window.left && bounds(tag).right <= window.right)
+        }
+        for (tag in tags.reversed() + tags) rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+    }
+
     private fun assertTheLandscapeScreenFits() {
-        assertWholeOnScreen(
-            "signin.logo", "signin.title", "signin.tagline", "signin.google", "signin.or", "signin.email", "signin.demo",
-        )
+        assertWholeOnScreen("signin.logo", "signin.title", "signin.tagline", *CONTROLS)
         assertStacked("signin.logo", "signin.title", "signin.tagline")
-        assertStacked("signin.google", "signin.or", "signin.email", "signin.demo")
+        assertStacked(*CONTROLS)
         assertDp("the logo", 72.dp, bounds("signin.logo").width)
         assertFalse("no steps under 400 dp of height", exists("signin.guide.1"))
         assertFalse(exists("signin.subtitle"))
         for (left in listOf("signin.logo", "signin.title", "signin.tagline")) {
-            assertTrue("$left is beside the buttons", bounds(left).right <= bounds("signin.google").left)
+            assertTrue("$left is beside the field and the buttons", bounds(left).right <= bounds("signin.email.field").left)
         }
     }
 
@@ -111,21 +123,33 @@ class SignInFitTest {
 
     @Test
     @Config(qualifiers = PIXEL_3, fontScale = 1.3f)
-    fun largeTextOnThePixel3ClipsNothing() {
+    fun largeTextOnThePixel3ScrollsAndCutsNothing() {
         show()
-        assertThePortraitScreenFits()
+        assertTheScreenScrollsToEach(*PORTRAIT)
+        assertDp("the logo", 96.dp, bounds("signin.logo").width)
     }
 
     @Test
     @Config(qualifiers = "vi-$PIXEL_3", fontScale = 1.3f)
-    fun largeVietnameseTextOnThePixel3ClipsNothing() {
+    fun largeVietnameseTextOnThePixel3ScrollsAndCutsNothing() {
         show()
-        assertThePortraitScreenFits()
+        assertTheScreenScrollsToEach(*PORTRAIT)
     }
 
-    /** From 800 dp of height the subtitle has room again, under the taglines. */
+    /** Arriving, nothing has the focus: the keyboard stays down and the whole intro shows. */
+    @Test
+    @Config(qualifiers = PIXEL_3)
+    fun theFieldWaitsForATap() {
+        show()
+        rule.onNodeWithTag("signin.email.field").assertIsNotFocused()
+        rule.onNodeWithTag("signin.email.send").assertIsNotEnabled()
+        assertDp("the logo", 96.dp, bounds("signin.logo").width)
+    }
+
+    /** From 760 dp of height the subtitle has room again, under the taglines. */
+    private val tall = PORTRAIT.flatMap { if (it == "signin.tagline") listOf(it, "signin.subtitle") else listOf(it) }.toTypedArray()
+
     private fun assertTheTallScreenFits() {
-        val tall = PORTRAIT.flatMap { if (it == "signin.tagline") listOf(it, "signin.subtitle") else listOf(it) }.toTypedArray()
         assertWholeOnScreen(*tall)
         assertStacked(*tall)
         assertDp("the logo", 96.dp, bounds("signin.logo").width)
@@ -139,17 +163,53 @@ class SignInFitTest {
     }
 
     @Test
+    @Config(qualifiers = "vi-$TALL_PHONE")
+    fun aTallPhoneKeepsTheSubtitleInVietnamese() {
+        show()
+        assertTheTallScreenFits()
+    }
+
+    @Test
     @Config(qualifiers = TALL_PHONE, fontScale = 1.3f)
     fun aTallPhoneWithLargeTextKeepsTheSubtitle() {
         show()
+        assertTheScreenScrollsToEach(*tall)
+    }
+
+    /** The narrowest phone at the thresholds: its lines wrap the most, and it still needs no scroll. */
+    @Test
+    @Config(qualifiers = "w360dp-h760dp-xhdpi")
+    fun aNarrowPhoneAtTheSubtitlesThresholdFits() {
+        show()
         assertTheTallScreenFits()
+    }
+
+    @Test
+    @Config(qualifiers = "vi-w360dp-h760dp-xhdpi")
+    fun aNarrowPhoneAtTheSubtitlesThresholdFitsInVietnamese() {
+        show()
+        assertTheTallScreenFits()
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h705dp-xhdpi")
+    fun aNarrowPhoneAtTheStepsThresholdFits() {
+        show()
+        assertThePortraitScreenFits()
+    }
+
+    @Test
+    @Config(qualifiers = "vi-w360dp-h705dp-xhdpi")
+    fun aNarrowPhoneAtTheStepsThresholdFitsInVietnamese() {
+        show()
+        assertThePortraitScreenFits()
     }
 
     @Test
     @Config(qualifiers = PIXEL_3)
     fun thePixel3LeavesTheSubtitleToTheTaglines() {
         show()
-        assertFalse("under 800 dp the taglines stand in for the subtitle", exists("signin.subtitle"))
+        assertFalse("under 760 dp the taglines stand in for the subtitle", exists("signin.subtitle"))
     }
 
     @Test
@@ -188,9 +248,9 @@ class SignInFitTest {
 
     @Test
     @Config(qualifiers = PIXEL_3)
-    fun aFailureStandsBetweenTheStepsAndTheButtons() {
+    fun aFailureStandsBetweenTheStepsAndTheField() {
         show(expired = true, error = SignInException.SwitchFromSignedInDevice())
-        assertStacked("signin.guide.3", "signin.expired", "signin.error", "signin.google", "signin.or", "signin.email", "signin.demo")
+        assertStacked("signin.guide.3", "signin.expired", "signin.error", *CONTROLS)
         rule.onNodeWithTag("signin.demo").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag("signin.logo").performScrollTo().assertIsDisplayed()
     }
@@ -213,22 +273,40 @@ class SignInFitTest {
     @Config(qualifiers = PIXEL_3_TURNED, fontScale = 1.3f)
     fun aFailureInLandscapeWithLargeTextIsReachedByAScroll() {
         show(error = SignInException.SwitchFromSignedInDevice())
-        assertStacked("signin.error", "signin.google", "signin.or", "signin.email", "signin.demo")
+        assertStacked("signin.error", *CONTROLS)
         for (tag in listOf("signin.error", "signin.demo", "signin.logo")) {
             rule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
     }
 
-    @Test
-    @Config(qualifiers = "w360dp-h592dp-xhdpi")
-    fun aShortPhoneHasTheSmallLogoAndNeitherSubtitleNorSteps() {
-        show()
+    private fun assertTheShortScreenFits(logo: Dp) {
         val shown = PORTRAIT.filterNot { it.startsWith("signin.guide.") }.toTypedArray()
         assertWholeOnScreen(*shown)
         assertStacked(*shown)
-        assertDp("the logo", 72.dp, bounds("signin.logo").width)
+        assertDp("the logo", logo, bounds("signin.logo").width)
         assertFalse("the taglines stand in for the subtitle", exists("signin.subtitle"))
-        assertFalse("under 660 dp of height the steps leave their room to the buttons", exists("signin.guide.1"))
+        assertFalse("under 705 dp of height the steps leave their room to the field and the buttons", exists("signin.guide.1"))
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h592dp-xhdpi")
+    fun aShortPhoneHasNeitherSubtitleNorSteps() {
+        show()
+        assertTheShortScreenFits(logo = 96.dp)
+    }
+
+    @Test
+    @Config(qualifiers = "vi-w360dp-h560dp-xhdpi")
+    fun aShortPhoneAtTheBigLogosThresholdFits() {
+        show()
+        assertTheShortScreenFits(logo = 96.dp)
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h540dp-xhdpi")
+    fun aWindowUnder560DpHasTheSmallLogo() {
+        show()
+        assertTheShortScreenFits(logo = 72.dp)
     }
 
     @Test
@@ -237,9 +315,26 @@ class SignInFitTest {
         show()
         assertWholeOnScreen(*PORTRAIT, "signin.subtitle")
         assertStacked("signin.logo", "signin.title", "signin.tagline", "signin.subtitle")
-        assertStacked("signin.guide.1", "signin.guide.2", "signin.guide.3", "signin.google", "signin.or", "signin.email", "signin.demo")
+        assertStacked("signin.guide.1", "signin.guide.2", "signin.guide.3", *CONTROLS)
         assertDp("the logo", 72.dp, bounds("signin.logo").width)
         assertTrue(bounds("signin.title").right <= bounds("signin.guide.1").left)
+    }
+
+    /** Two columns at the steps' threshold, on a narrow landscape window where the steps wrap the most. */
+    @Test
+    @Config(qualifiers = "w700dp-h470dp-land-mdpi")
+    fun aLandscapeWindowAtTheStepsThresholdFits() {
+        show()
+        assertWholeOnScreen("signin.logo", "signin.title", "signin.tagline", "signin.guide.1", "signin.guide.3", *CONTROLS)
+        assertStacked("signin.guide.1", "signin.guide.2", "signin.guide.3", *CONTROLS)
+    }
+
+    @Test
+    @Config(qualifiers = "vi-w700dp-h470dp-land-mdpi")
+    fun aLandscapeWindowAtTheStepsThresholdFitsInVietnamese() {
+        show()
+        assertWholeOnScreen("signin.logo", "signin.title", "signin.tagline", "signin.guide.1", "signin.guide.3", *CONTROLS)
+        assertStacked("signin.guide.1", "signin.guide.2", "signin.guide.3", *CONTROLS)
     }
 
     private companion object {
@@ -252,10 +347,12 @@ class SignInFitTest {
         /** A phone with 852 dp between its bars. */
         const val TALL_PHONE = "w393dp-h852dp-440dpi"
 
-        /** Everything the Pixel 3's portrait window shows, from the top (the subtitle needs 800 dp of height). */
+        /** The first screen's field and buttons, from the top. */
+        val CONTROLS = arrayOf("signin.email.field", "signin.email.send", "signin.or", "signin.google", "signin.demo")
+
+        /** Everything the Pixel 3's portrait window shows, from the top (the subtitle needs 760 dp of height). */
         val PORTRAIT = arrayOf(
-            "signin.logo", "signin.title", "signin.tagline",
-            "signin.guide.1", "signin.guide.2", "signin.guide.3", "signin.google", "signin.or", "signin.email", "signin.demo",
+            "signin.logo", "signin.title", "signin.tagline", "signin.guide.1", "signin.guide.2", "signin.guide.3", *CONTROLS,
         )
     }
 }
