@@ -88,6 +88,15 @@ final class AccountRenderTests: XCTestCase {
         try assertRenders(NavigationStack { SettingsView(email: "phu@example.com", account: actions(.password)) }, name: "settings-password")
     }
 
+    func testSettingsOfAnEmailSessionNameTheMethod() throws {
+        let google = try SnapshotWriter().write(
+            NavigationStack { SettingsView(email: "phu@example.com", account: actions(.google)) }, name: "settings")
+        let email = try SnapshotWriter().write(
+            NavigationStack { SettingsView(email: "phu@example.com", account: actions(.email)) }, name: "settings-email")
+        XCTAssertNotEqual(google.first?.pngData(), email.first?.pngData(), "the email row says \"Email code\"")
+        XCTAssertNotEqual(String(localized: "settings.account.method.email"), String(localized: "signin.email"))
+    }
+
     func testSettingsInTheDemoShowOnlyTheEmail() throws {
         try assertRenders(NavigationStack { SettingsView(email: "demo@shellx.pro", account: nil) }, name: "settings-demo")
     }
