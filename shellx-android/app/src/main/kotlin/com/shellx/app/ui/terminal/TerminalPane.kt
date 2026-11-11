@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shellx.app.R
+import com.shellx.app.ui.components.LocalKeyboardHolder
 import com.shellx.app.ui.components.SecondaryButton
 import com.shellx.app.ui.components.Spinner
 import com.shellx.app.ui.components.isCompactHeight
@@ -143,7 +144,8 @@ private tailrec fun Context.activity(): Activity? = when (this) {
  * with [retakesKeyboard] takes the keyboard back once its terminal takes input, as the iPhone keeps it through a
  * rotation (and not after a navigation push and Back). The key bar shows under the surface while
  * it has the keyboard ([showsKeyBar] in tests), only on the page shown and only while it takes input; when the soft
- * keyboard hides (system Back, its own key), the surface gives the focus up and the key bar goes. A paste over the
+ * keyboard hides (system Back, its own key) or the user taps outside the page (`TapOutsideHidesKeyboard`), the surface
+ * gives the focus up and the key bar goes. A paste over the
  * limit says so on the page shown only, for `AgentView.NOTICE_DURATION`. [engaged] is called when the user takes the
  * keyboard on the page shown or sends it input (a tap, the focus, typing): the workspace screen settles on its chip.
  * [holdsKeyboard] is told whether the page shown holds the soft keyboard, that is has the focus while the keyboard
@@ -243,6 +245,17 @@ private fun ColumnScope.ShownPage(
         } else if (!restoring) {
             currentKept(false)
         }
+    }
+    // A tap outside the page (the top bar, the chips, the room beside the grid) hides the keyboard as the key bar's hide
+    // key does, the surface's own way: it hides the keyboard it asked for and gives the focus up itself, so to the rule
+    // below the keyboard then going down is the user's doing, never the system's (TapOutsideHidesKeyboard).
+    val holder = LocalKeyboardHolder.current
+    DisposableEffect(holder, focused, surface) {
+        val view = surface
+        if (holder == null || !focused || view == null) return@DisposableEffect onDispose {}
+        val hide: () -> Unit = { view.clearTerminalFocus() }
+        holder.hide = hide
+        onDispose { if (holder.hide === hide) holder.hide = null }
     }
     // Only once the window has the focus: a keyboard asked for before is shown, then hidden by the system as the window
     // takes the focus (API 36 emulator), and the rule below would then give the focus up.

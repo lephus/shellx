@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.shellx.app.R
+import com.shellx.app.ui.components.TapOutsideHidesKeyboard
 import com.shellx.app.ui.theme.ShellXTheme
 import com.shellx.core.text.takeGraphemes
 import com.shellx.core.workspaces.WorkspaceTitle
@@ -44,7 +45,8 @@ import com.shellx.core.workspaces.WorkspaceTitle
 @Composable
 fun WorkspaceRenameSheet(current: String, save: (String) -> Unit, cancel: () -> Unit) {
     ModalBottomSheet(onDismissRequest = cancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        WorkspaceRenameContent(current, save, cancel)
+        // The sheet's window is not the screen's: a tap on its own empty area puts the field's keyboard down here.
+        TapOutsideHidesKeyboard { WorkspaceRenameContent(current, save, cancel) }
     }
 }
 
