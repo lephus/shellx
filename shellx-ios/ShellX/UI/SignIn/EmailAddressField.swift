@@ -13,6 +13,9 @@ struct EmailAddressField: UIViewRepresentable {
     let placeholder: String
     /// A new value puts the keyboard in the field.
     var focusRequest = 0
+    /// Asked at each edit; false while the code is asked for: the field then takes no edit (the request is for the address
+    /// shown) and keeps the keyboard. A question, not a value, so that it is never a SwiftUI update behind the model.
+    var editable: @MainActor () -> Bool = { true }
     let submit: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -66,6 +69,11 @@ struct EmailAddressField: UIViewRepresentable {
         init(_ parent: EmailAddressField) { self.parent = parent }
 
         @objc func changed(_ field: UITextField) {
+            // An edit that came in another way (pasted, inserted) while edits are refused is put back.
+            guard parent.editable() else {
+                if field.text != parent.text { field.text = parent.text }
+                return
+            }
             let text = field.text ?? ""
             if parent.text != text { parent.text = text }
         }
@@ -73,6 +81,10 @@ struct EmailAddressField: UIViewRepresentable {
         func textFieldShouldReturn(_ field: UITextField) -> Bool {
             parent.submit()
             return false
+        }
+
+        func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+            parent.editable()
         }
     }
 }

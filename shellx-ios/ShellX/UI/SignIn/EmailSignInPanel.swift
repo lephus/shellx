@@ -5,7 +5,8 @@ import SwiftUI
 /// width and 12 points from the next.
 ///
 /// Send code is off until the field holds something that can be an address (ASCII only); while the address has a
-/// letter outside ASCII the field says so, so a disabled button is never a riddle.
+/// letter outside ASCII the field says so, so a disabled button is never a riddle. While the code is asked for, the
+/// field takes no edit (the failure that may come back is about the address shown) and keeps the keyboard.
 struct EmailEntryRows: View {
     @Bindable var model: EmailSignInModel
     /// A new value puts the keyboard in the field.
@@ -21,7 +22,8 @@ struct EmailEntryRows: View {
                     model.begin()
                     model.email = text
                 }),
-                placeholder: String(localized: "signin.email.field"), focusRequest: focusRequest, submit: send
+                placeholder: String(localized: "signin.email.field"), focusRequest: focusRequest,
+                editable: { model.step != .sending }, submit: send
             )
             .frame(maxWidth: .infinity)
             .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 12))
