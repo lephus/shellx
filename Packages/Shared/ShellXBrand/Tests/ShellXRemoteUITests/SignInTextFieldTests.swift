@@ -24,18 +24,18 @@ import Testing
         let standIn: StandIn
         let hosting: NSHostingView<SignInTextField>
 
-        var field: RomanInputTextField? { SignInTextFieldTests.roman(in: hosting) }
+        var field: PlainLayoutTextField? { SignInTextFieldTests.roman(in: hosting) }
 
         /// The field's own editor while it has the keyboard.
-        var editor: RomanInputFieldEditor? {
-            guard let field, let editor = field.currentEditor() as? RomanInputFieldEditor,
+        var editor: PlainLayoutFieldEditor? {
+            guard let field, let editor = field.currentEditor() as? PlainLayoutFieldEditor,
                   window.firstResponder === editor else { return nil }
             return editor
         }
     }
 
-    private static func roman(in view: NSView) -> RomanInputTextField? {
-        if let field = view as? RomanInputTextField { return field }
+    private static func roman(in view: NSView) -> PlainLayoutTextField? {
+        if let field = view as? PlainLayoutTextField { return field }
         for subview in view.subviews {
             if let field = roman(in: subview) { return field }
         }
@@ -97,8 +97,11 @@ import Testing
         }
     }
 
-    @Test func theFocusedFieldAllowsOnlyRomanInputSources() throws {
-        let field = RomanInputTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+    /// The setting: the focused field's own input context allows the languages of this Mac's plain keyboard layouts,
+    /// and the window's shared field editor, used by every other field, is untouched.
+    @Test func theFocusedFieldAllowsOnlyItsPlainLayoutLanguages() throws {
+        let expected = PlainLayoutLocales(sources: SystemKeyboardInputSources().enabled()).locales
+        let field = PlainLayoutTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
         let plain = NSTextField(frame: NSRect(x: 0, y: 40, width: 200, height: 24))
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
         content.addSubview(field)
@@ -107,74 +110,51 @@ import Testing
         defer { window.orderOut(nil) }
 
         #expect(window.makeFirstResponder(field))
-        let editor = try #require(field.currentEditor() as? RomanInputFieldEditor)
+        let editor = try #require(field.currentEditor() as? PlainLayoutFieldEditor)
         #expect(window.firstResponder === editor)
-        #expect(editor.inputContext?.allowedInputSourceLocales == [NSAllRomanInputSourcesLocaleIdentifier])
+        let context = try #require(editor.inputContext)
+        #expect(context.allowedInputSourceLocales == expected)
 
-        // The window's shared field editor, used by every other field, is untouched.
         #expect(window.makeFirstResponder(plain))
         let shared = try #require(plain.currentEditor() as? NSTextView)
-        #expect(!(shared is RomanInputFieldEditor))
-        #expect(shared.inputContext?.allowedInputSourceLocales == nil)
-    }
-
-    /// One enabled, selectable keyboard input source as this Mac lists it.
-    private struct EnabledSource {
-        let id: String
-        let isLayout: Bool
-        let isASCII: Bool
-        let languages: [String]
-    }
-
-    /// The enabled, selectable keyboard input sources (read only: nothing is selected or changed).
-    private static func enabledSources() -> [EnabledSource]? {
-        let filter = [kTISPropertyInputSourceCategory as String: kTISCategoryKeyboardInputSource as String,
-                      kTISPropertyInputSourceIsSelectCapable as String: true] as CFDictionary
-        guard let list = TISCreateInputSourceList(filter, false)?.takeRetainedValue() as? [TISInputSource] else { return nil }
-        return list.compactMap { source in
-            guard let id = string(source, kTISPropertyInputSourceID),
-                  let type = string(source, kTISPropertyInputSourceType) else { return nil }
-            let ascii = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsASCIICapable)
-                .map { CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque($0).takeUnretainedValue()) } ?? false
-            let languages = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages)
-                .flatMap { Unmanaged<CFArray>.fromOpaque($0).takeUnretainedValue() as? [String] } ?? []
-            return EnabledSource(id: id, isLayout: type == kTISTypeKeyboardLayout as String, isASCII: ascii, languages: languages)
-        }
-    }
-
-    private static func string(_ source: TISInputSource, _ key: CFString) -> String? {
-        TISGetInputSourceProperty(source, key).map { Unmanaged<CFString>.fromOpaque($0).takeUnretainedValue() as String }
+        #expect(!(shared is PlainLayoutFieldEditor))
+        let sharedContext = try #require(shared.inputContext)
+        #expect(sharedContext.allowedInputSourceLocales == nil)
     }
 
     /// The system's current keyboard input source (read only).
     private static func currentSourceID() -> String? {
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return nil }
-        return string(source, kTISPropertyInputSourceID)
+        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+              let id = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return nil }
+        return Unmanaged<CFString>.fromOpaque(id).takeUnretainedValue() as String
     }
 
-    /// The outcome on this Mac: the focused field's input context offers a plain keyboard layout and no Vietnamese input
-    /// method. It needs a Mac with a Vietnamese input method enabled; elsewhere it records that it could not check.
+    /// The outcome on this Mac: the focused field's input context offers a plain keyboard layout and no Vietnamese
+    /// input method (it reads the context's own list of offered sources; nothing is selected). It needs a Mac with a
+    /// Vietnamese input method and a plain layout of another language enabled; elsewhere it records that it could not
+    /// check.
     @Test func theFocusedFieldOffersAPlainLayoutAndNoVietnameseInputMethod() throws {
-        let sources = try #require(Self.enabledSources())
-        let plainLayouts = sources.filter { $0.isLayout && $0.isASCII }
-        let vietnamese = sources.filter { !$0.isLayout && $0.languages.contains("vi") }.map(\.id)
+        let sources = try #require(SystemKeyboardInputSources().enabled())
+        let plainLayouts = sources.filter { $0.kind == .keyboardLayout && $0.isASCIICapable }.map(\.identifier)
+        let vietnamese = sources.filter { $0.kind != .keyboardLayout && $0.languages.contains("vi") }.map(\.identifier)
+        let allowed = PlainLayoutLocales(sources: sources).locales ?? []
         let before = Self.currentSourceID()
-        let field = RomanInputTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        let field = PlainLayoutTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
         content.addSubview(field)
         let window = Self.window(content: content)
         defer { window.orderOut(nil) }
 
         #expect(window.makeFirstResponder(field))
-        let editor = try #require(field.currentEditor() as? RomanInputFieldEditor)
+        let editor = try #require(field.currentEditor() as? PlainLayoutFieldEditor)
         let context = try #require(editor.inputContext)
         let offered = context.keyboardInputSources ?? []
-        if vietnamese.isEmpty || plainLayouts.isEmpty || plainLayouts.contains(where: { $0.languages.first == "vi" }) {
+        if vietnamese.isEmpty || allowed.isEmpty || allowed.contains("vi") {
             withKnownIssue("not checked: this Mac needs a Vietnamese input method and a non-Vietnamese plain layout") {
-                Issue.record("enabled sources: \(sources.map(\.id)); offered: \(offered)")
+                Issue.record("enabled sources: \(sources.map(\.identifier)); offered: \(offered)")
             }
         } else {
-            #expect(plainLayouts.contains { offered.contains($0.id) }, "offered: \(offered)")
+            #expect(plainLayouts.contains { offered.contains($0) }, "offered: \(offered)")
             #expect(vietnamese.allSatisfy { !offered.contains($0) }, "offered: \(offered)")
         }
         // Focusing the field never changes the system's current input source.

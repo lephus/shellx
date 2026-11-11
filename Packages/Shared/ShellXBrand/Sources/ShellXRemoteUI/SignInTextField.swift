@@ -1,10 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// A one-line AppKit field for the sign-in sheet. Its own field editor allows only Roman input sources while it is
-/// focused, so Apple's Vietnamese Telex and VNI are not offered; autocorrection and text replacement are off. Return calls
-/// `onSubmit` and Escape calls `onCancel`, except while a composition is open (the input method gets those keys); the
-/// field takes the keyboard when it appears and whenever `focusRequest` changes.
+/// A one-line AppKit field for the sign-in sheet. While it is focused, its own field editor allows only the languages
+/// of the person's plain keyboard layouts (``PlainLayoutLocales``): with ABC and Vietnamese Simple Telex enabled, Telex
+/// is not offered. With no plain layout there is no restriction, and the ASCII rule of ``EmailSignInModel`` is the
+/// guard, as it is for paste and third-party typing tools. Autocorrection and text replacement are off; undo works.
+/// Return calls `onSubmit` and Escape calls `onCancel`, except while a composition is open (the input method gets
+/// those keys); the field takes the keyboard when it appears and whenever `focusRequest` changes.
 ///
 /// ```swift
 /// SignInTextField(
@@ -63,8 +65,8 @@ public struct SignInTextField: NSViewRepresentable {
     ///
     /// - Parameter context: The representable's context.
     /// - Returns: The field.
-    public func makeNSView(context: Context) -> RomanInputTextField {
-        let field = RomanInputTextField(frame: .zero)
+    public func makeNSView(context: Context) -> PlainLayoutTextField {
+        let field = PlainLayoutTextField(frame: .zero)
         field.usesSingleLineMode = true
         field.cell?.wraps = false
         field.cell?.isScrollable = true
@@ -83,7 +85,7 @@ public struct SignInTextField: NSViewRepresentable {
     /// - Parameters:
     ///   - field: The field.
     ///   - context: The representable's context.
-    public func updateNSView(_ field: RomanInputTextField, context: Context) {
+    public func updateNSView(_ field: PlainLayoutTextField, context: Context) {
         let coordinator = context.coordinator
         coordinator.onChange = onChange
         coordinator.onSubmit = onSubmit

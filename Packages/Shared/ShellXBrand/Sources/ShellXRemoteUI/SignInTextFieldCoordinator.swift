@@ -57,7 +57,7 @@ public final class SignInTextFieldCoordinator: NSObject, NSTextFieldDelegate {
     /// editing session (and its selection) as it is.
     ///
     /// - Parameter field: The field to focus.
-    func takeKeyboard(_ field: RomanInputTextField) {
+    func takeKeyboard(_ field: PlainLayoutTextField) {
         Task { @MainActor [weak field] in
             guard let field, let window = field.window else { return }
             if let editor = field.currentEditor(), window.firstResponder === editor { return }
