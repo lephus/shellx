@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod core_api;
+pub mod first_window;
 pub mod google_button;
 pub mod history;
 pub mod keys;
