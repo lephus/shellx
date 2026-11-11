@@ -4,20 +4,32 @@
 # (windows/cross/Dockerfile) and downloads the unsigned installer to this Mac.
 #
 #   scripts/shellx/release/build-windows-cross.sh [OUT_DIR]
+#   scripts/shellx/release/build-windows-cross.sh --preflight
 #
 # Builds the committed HEAD (git archive), not the working tree. The ghostty submodule is
 # fetched on the VPS at the commit HEAD pins. Env:
 #   SHELLX_VPS          ssh destination        (default higio@42.115.41.70)
-#   SHELLX_VPS_SSH_OPTS extra ssh options      (default -S ~/.ssh/cm-shellx-vps, the ControlMaster)
+#   SHELLX_VPS_SSH_OPTS extra ssh options      (default -S ~/.ssh/cm-shellx-vps, the ControlMaster;
+#                                               set but empty means no options)
 #   SHELLX_WINBUILD_DIR build dir on the VPS   (default phu/shellx/.winbuild, relative to ~)
 #   SHELLX_WINBUILD_TAG docker image tag       (default the windows/cross tree hash)
 #   SHELLX_WINBUILD_KEEP_TARGET=1 keep the cargo target dir in the cache volume
+#   SHELLX_WINBUILD_MIN_FREE_GIB  free GiB the VPS needs in ~ to start (default 14: 4 stay free
+#                                 for deploys, up to 10 for the image, caches and target)
+#
+# The VPS is shared with a production service. Guards (the preflight), checked before every
+# build and alone with --preflight (exit 0 = a build may start, 1 = it must not):
+# - at least SHELLX_WINBUILD_MIN_FREE_GIB GiB free in the build user's home;
+# - one Windows build at a time: every run is the container shellx-winbuild-run, and none
+#   may already be running.
+# After a build, when the free space is under the minimum, older shellx-winbuild image tags
+# are removed (only those; never other images, never a prune).
 #
 # Differences from the CI build (.github/workflows/shellx-windows.yml, windows-2025):
 # - clang-cl/lld-link 18 + llvm-rc against the MSVC CRT and Windows SDK that cargo-xwin
 #   downloads (xwin), not cl.exe/link.exe/rc.exe from Visual Studio.
-# - gpui 0.2.2's build.rs only compiles its HLSL on a Windows host; the container patches
-#   it (windows/cross/patch-gpui-build-rs.py) and runs the SDK's fxc.exe under wine.
+# - The vendored gpui 0.2.2 (windows/vendor, patch (d)) compiles its HLSL for a Windows
+#   target on any build host; the container runs the SDK's fxc.exe under wine.
 # - Tests: shellx-model and the installer unittests run on the Linux host (as the CI model
 #   job). The Windows-target tests, the --smoke/--version runs and the install/uninstall
 #   smoke of the CI app/installer jobs do NOT run here; smoke the installer on a Windows PC.
@@ -27,13 +39,39 @@ set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$repo"
+vps="${SHELLX_VPS:-higio@42.115.41.70}"
+# No colon: an explicitly empty SHELLX_VPS_SSH_OPTS means no options.
+read -r -a ssh_opts <<< "${SHELLX_VPS_SSH_OPTS-"-S $HOME/.ssh/cm-shellx-vps"}"
+min_free="${SHELLX_WINBUILD_MIN_FREE_GIB:-14}"
+[[ "$min_free" =~ ^[0-9]+$ ]] || { echo "SHELLX_WINBUILD_MIN_FREE_GIB must be a whole number of GiB: '$min_free'" >&2; exit 1; }
+
+vssh() { ssh ${ssh_opts[@]+"${ssh_opts[@]}"} "$vps" "$@"; }
+vps_free_gib() { vssh "df -Pk ~ | awk 'NR==2 {print int(\$4/1048576)}'"; }
+preflight() {
+  local free running
+  free="$(vps_free_gib)"
+  [[ "$free" =~ ^[0-9]+$ ]] || { echo "cannot read the free disk space on the VPS: '$free'" >&2; exit 1; }
+  if (( free < min_free )); then
+    echo "VPS has $free GiB free in ~; a Windows build needs $min_free (4 stay free for deploys)" >&2
+    exit 1
+  fi
+  running="$(vssh "docker ps -q -f 'name=^shellx-winbuild-run\$'")"
+  if [[ -n "$running" ]]; then
+    echo "another Windows build is running on the VPS" >&2
+    exit 1
+  fi
+  echo "preflight: $free GiB free, no Windows build running"
+}
+if [[ "${1:-}" == --preflight ]]; then
+  preflight
+  exit 0
+fi
+
 # The sign-in button needs Google's official mark in the commit being built.
 branding_args=()
 [[ -z "${SHELLX_GOOGLE_BRANDING_ROOT:-}" ]] || branding_args=(--root "$SHELLX_GOOGLE_BRANDING_ROOT")
 python3 scripts/shellx/check-google-branding.py --git-rev HEAD ${branding_args[@]+"${branding_args[@]}"} >&2 || exit 1
 out_dir="${1:-$repo/dist/windows}"
-vps="${SHELLX_VPS:-higio@42.115.41.70}"
-read -r -a ssh_opts <<< "${SHELLX_VPS_SSH_OPTS:--S $HOME/.ssh/cm-shellx-vps}"
 remote="${SHELLX_WINBUILD_DIR:-phu/shellx/.winbuild}"
 volume=shellx-winbuild-cargo
 
@@ -50,9 +88,10 @@ if [[ -n "$(git status --porcelain -- windows cmux-tui shellx-core)" ]]; then
 fi
 echo "ShellX for Windows $version from $commit (ghostty $ghostty_sha), image $image"
 
-vssh() { ssh "${ssh_opts[@]}" "$vps" "$@"; }
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+
+preflight
 
 # 1. Image (cached by docker; the tag is the windows/cross tree hash).
 git archive --format=tar.gz -o "$tmp/cross.tgz" HEAD:windows/cross
@@ -73,10 +112,12 @@ vssh "set -euo pipefail
   cd ~/$remote
   mkdir -p src out
   # A run killed before its exit trap can leave root-owned files behind.
-  docker run --rm -v \$PWD/src:/src -v \$PWD/out:/out $image chown -R \$(id -u):\$(id -g) /src /out
+  docker run --rm --name shellx-winbuild-run -v \$PWD/src:/src -v \$PWD/out:/out $image chown -R \$(id -u):\$(id -g) /src /out
   cd src
   rm -rf windows cmux-tui shellx-core
-  tar -xzf ../src.tgz
+  # Fresh modification times: git archive stamps the commit time, which can make the kept
+  # cargo cache skip a changed file.
+  tar -xmzf ../src.tgz
   if [[ \"\$(git -C ghostty rev-parse HEAD 2>/dev/null)\" != $ghostty_sha ]]; then
     rm -rf ghostty
     mkdir ghostty
@@ -110,6 +151,22 @@ grep -q "$(cut -d' ' -f1 "$out_dir/ShellX-Setup-$version.exe.sha256")" "$out_dir
 
 # 5. Free the big intermediates; keep the registry, xwin and zig caches for the next run.
 if [[ "${SHELLX_WINBUILD_KEEP_TARGET:-0}" != 1 ]]; then
-  vssh "docker run --rm -v $volume:/cache $image rm -rf /cache/target /cache/zig-local"
+  vssh "docker run --rm --name shellx-winbuild-run -v $volume:/cache $image rm -rf /cache/target /cache/zig-local"
+fi
+
+# 6. Disk: when under the minimum, remove older shellx-winbuild image tags (only those).
+free_after="$(vps_free_gib </dev/null || true)"
+echo "VPS: ${free_after:-?} GiB free after the build"
+if [[ "$free_after" =~ ^[0-9]+$ ]] && (( free_after < min_free )); then
+  old_tags=()
+  while IFS= read -r t; do
+    [[ -z "$t" || "$t" == "<none>" || "$t" == "$tag" ]] || old_tags+=("$t")
+  done < <(vssh "docker images shellx-winbuild --format '{{.Tag}}'" </dev/null)
+  for t in ${old_tags[@]+"${old_tags[@]}"}; do
+    echo "removing image shellx-winbuild:$t"
+    vssh "docker image rm shellx-winbuild:$t" </dev/null >/dev/null \
+      || echo "warning: could not remove shellx-winbuild:$t" >&2
+  done
+  echo "VPS: $(vps_free_gib </dev/null) GiB free"
 fi
 echo "Built $out_dir/ShellX-Setup-$version.exe (unsigned)"

@@ -64,7 +64,7 @@ RUN mkdir -p /tmp/sdk && cd /tmp/sdk \
  && rm -rf /tmp/sdk vsmanifest.json \
  && ls -la /opt/fxc
 
-COPY fxc-wine.sh llvm-rc.sh build-in-container.sh patch-gpui-build-rs.py /opt/winbuild/
+COPY fxc-wine.sh llvm-rc.sh build-in-container.sh zig-libc-msvc.sh /opt/winbuild/
 RUN chmod +x /opt/winbuild/*.sh
 
 # Caches live on the shellx-winbuild-cargo volume at /cache. XWIN_INCLUDE_DEBUG_SYMBOLS keeps

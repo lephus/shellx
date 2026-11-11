@@ -20,18 +20,9 @@ cd /src/windows
 # the exported commit (what a clean checkout reports).
 [[ "${CMUX_TUI_BUILD_COMMIT:-}" =~ ^[0-9a-f]{40}$ ]] || { echo "set CMUX_TUI_BUILD_COMMIT to the exported commit" >&2; exit 1; }
 
-# zig (libghostty-vt links libc for its SIMD C++ code) cannot find a Windows SDK on Linux:
-# point it at the CRT + SDK that cargo-xwin splats into $XWIN_CACHE_DIR/xwin.
-xwin_root="$XWIN_CACHE_DIR/xwin"
-cat > /tmp/zig-libc-msvc.txt <<EOF
-include_dir=$xwin_root/sdk/include/ucrt
-sys_include_dir=$xwin_root/crt/include
-crt_dir=$xwin_root/sdk/lib/ucrt/x86_64
-msvc_lib_dir=$xwin_root/crt/lib/x86_64
-kernel32_lib_dir=$xwin_root/sdk/lib/um/x86_64
-gcc_dir=
-EOF
-export ZIG_LIBC=/tmp/zig-libc-msvc.txt
+# zig needs ZIG_LIBC to find the CRT + SDK that cargo-xwin downloads.
+# shellcheck source=zig-libc-msvc.sh
+source /opt/winbuild/zig-libc-msvc.sh
 
 version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Cargo.toml)"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "cannot read the workspace version: '$version'" >&2; exit 1; }
@@ -42,7 +33,6 @@ step() { echo; echo "== $*"; }
 
 step "fetch crates (locked)"
 cargo fetch --locked
-python3 -I /opt/winbuild/patch-gpui-build-rs.py
 
 step "test shellx-model (Linux host, as the CI model job)"
 cargo test --locked -p shellx-model
