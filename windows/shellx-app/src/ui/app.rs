@@ -29,6 +29,19 @@ pub struct Services {
 
 impl Global for Services {}
 
+/// Development on a Mac only: `SHELLX_DEV_BACKGROUND=1` opens the window without
+/// taking the keyboard or coming to the front. An automated run of the built window
+/// uses it, so the terminal in that window can never catch what a person is typing
+/// in another app. Windows builds ignore the variable.
+fn dev_background() -> bool {
+    cfg!(target_os = "macos")
+        && background_requested(std::env::var("SHELLX_DEV_BACKGROUND").ok().as_deref())
+}
+
+fn background_requested(value: Option<&str>) -> bool {
+    value == Some("1")
+}
+
 pub fn run() {
     Application::new().with_assets(Assets).run(|cx: &mut App| {
         if let Err(error) = cx
@@ -45,6 +58,7 @@ pub fn run() {
             core: Arc::new(ConfiguredCore::this_pc(MachineFacts::this_pc())),
         });
 
+        let background = dev_background();
         let bounds = Bounds::centered(None, size(px(1200.0), px(760.0)), cx);
         let window = cx
             .open_window(
@@ -60,6 +74,7 @@ pub fn run() {
                     }),
                     window_min_size: Some(size(px(720.0), px(420.0))),
                     app_id: Some("pro.shellx.desktop".into()),
+                    focus: !background,
                     ..Default::default()
                 },
                 |window, cx| cx.new(|cx| RootView::new(window, cx)),
@@ -68,7 +83,9 @@ pub fn run() {
         window
             .update(cx, |root, window, cx| {
                 root.focus_terminal(window, cx);
-                cx.activate(true);
+                if !background {
+                    cx.activate(true);
+                }
             })
             .ok();
         cx.on_window_closed(|cx| {
