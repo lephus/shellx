@@ -65,7 +65,9 @@ struct SignInView: View {
             || !model.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// How a change of step or of the fold moves: not at all with Reduce Motion.
+    /// How the fold moves with the keyboard: not at all with Reduce Motion. A change of step is not animated: a
+    /// crossfade would draw the first screen and the code step over each other for a quarter of a second, and the
+    /// intro is folded on both sides of it.
     private var change: Animation? {
         motion == .animated ? .snappy(duration: 0.25) : nil
     }
@@ -82,7 +84,6 @@ struct SignInView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .background(Color.appBackground)
-        .animation(change, value: model.panel)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(change) { keyboardUp = true }
         }

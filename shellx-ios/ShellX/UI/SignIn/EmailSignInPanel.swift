@@ -54,7 +54,8 @@ struct EmailCodeStep: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text(LocalizedStringResource("signin.email.sentTo \(model.sentTo ?? "")"))
+            // Verbatim: Text would parse the localized sentence as Markdown and draw the address as a mailto: link.
+            Text(verbatim: String(localized: "signin.email.sentTo \(model.sentTo ?? "")"))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
