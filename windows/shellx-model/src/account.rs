@@ -281,6 +281,14 @@ struct EmailRun {
     error: Option<CoreErr>,
     /// "Resend code" stays locked until this time.
     resend_at_ms: u64,
+    /// While verifying: what the verify interrupted, restored when the code is refused.
+    resume: Option<Resume>,
+}
+
+/// The account state a verify started from, and whether its list retries were running.
+struct Resume {
+    state: AccountState,
+    retry_list: bool,
 }
 
 impl fmt::Debug for EmailRun {
@@ -521,6 +529,41 @@ impl AccountFlow {
     /// different email").
     pub fn email_code_epoch(&self) -> u64 {
         self.email_epoch
+    }
+
+    /// A refused code leaves the account as the verify found it: signed out stays signed out; an error that
+    /// holds a stored session stays, with its sign-out and its list retries; a state the first list had not
+    /// settled yet asks again (that list's answer was dropped while the code was checked).
+    fn resume_after_refused_code(
+        &mut self,
+        resume: Option<Resume>,
+        now_ms: u64,
+        out: &mut Vec<AccountAction>,
+    ) {
+        match resume {
+            Some(Resume {
+                state: AccountState::Error(e),
+                retry_list,
+            }) if self.has_session => {
+                self.state = AccountState::Error(e);
+                self.retry_list = retry_list;
+                if retry_list {
+                    self.arm(self.last_list_ms + LIST_INTERVAL_MS, now_ms, out);
+                }
+            }
+            Some(Resume {
+                state: AccountState::Unknown,
+                ..
+            }) => {
+                self.state = AccountState::Unknown;
+                if !self.list_in_flight {
+                    self.list_in_flight = true;
+                    self.last_list_ms = now_ms;
+                    out.push(AccountAction::CallList);
+                }
+            }
+            _ => self.state = AccountState::LoggedOut,
+        }
     }
 
     /// Forgets the email run; the answer of a code request still on its way is owed and ignored.
@@ -962,6 +1005,7 @@ impl AccountFlow {
                     challenge: None,
                     error: None,
                     resend_at_ms: 0,
+                    resume: None,
                 });
                 out.push(AccountAction::CallEmailBegin { email, locale });
             }
@@ -1053,6 +1097,10 @@ impl AccountFlow {
                 };
                 run.step = EmailStep::Verifying;
                 run.error = None;
+                run.resume = Some(Resume {
+                    state: self.state.clone(),
+                    retry_list: self.retry_list,
+                });
                 // As `GoogleRequested(SignIn)`: the sign-in is under way.
                 self.state = AccountState::LoggingIn;
                 self.retry_list = false;
@@ -1089,7 +1137,8 @@ impl AccountFlow {
                     Err(e) => e,
                 };
                 self.login_in_flight = false;
-                self.state = AccountState::LoggedOut;
+                let resume = self.email_run.as_mut().and_then(|r| r.resume.take());
+                self.resume_after_refused_code(resume, now_ms, &mut out);
                 let Some(run) = self.email_run.as_mut().filter(|r| r.shown) else {
                     // The dialog closed meanwhile: nobody sees the failure.
                     self.email_run = None;
