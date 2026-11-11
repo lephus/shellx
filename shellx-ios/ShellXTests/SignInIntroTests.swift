@@ -455,18 +455,20 @@ final class SignInIntroTests: XCTestCase {
         XCTAssertEqual(SignInLogoMark.haloPalette.first, SignInLogoMark.haloPalette.last, "the turn closes without a seam")
         XCTAssertEqual(SignInLogoMark.haloColors.count, SignInLogoMark.haloPalette.count)
 
-        XCTAssertLessThanOrEqual(SignInLogoMark.haloExtent, 1.35, "no wider than 1.35 times the logo")
-        XCTAssertGreaterThan(SignInLogoMark.haloExtent, 1.25)
-        // 16 points are free around a 96-point logo: beside it to the screen's edge, under it to the title.
-        XCTAssertLessThan((SignInLogoMark.haloExtent - 1) / 2 * 96, 16, "the halo ends inside the room around the logo")
+        // The halo keeps the reach of the mint glow it replaces (the square blurred by 0.16 of its side, seen some 25
+        // points around a 96-point logo), as far as the title allows: the title's letters begin 24 points under the
+        // logo, and the halo is gone before them.
+        let reach = (SignInLogoMark.haloExtent - 1) / 2 * 96
+        XCTAssertGreaterThanOrEqual(reach, 20, "the halo reaches about as far round a 96-point logo as the mint glow did")
+        XCTAssertLessThanOrEqual(reach, 23, "and ends before the title's letters, 24 points under the logo")
 
         // The colours turn in a square; the halo is cut from it. Its farthest point is on the square's diagonal: the
         // corner of its shape (the logo's corner, a little larger) and the fade beyond. The inscribed circle of the
         // square of colours must reach it, or a turn would cut the halo's corners.
         let half = 0.5 + SignInLogoMark.haloSpread
         let corner = SignInLogoMark.cornerRadius / SignInLogoMark.side + SignInLogoMark.haloSpread
-        let reach = (half - corner) * 2.squareRoot() + corner + 2.4 * SignInLogoMark.haloSoftness
-        XCTAssertGreaterThan(SignInLogoMark.haloField / 2, reach, "the turning colours cover the halo to its corners")
+        let farthest = (half - corner) * 2.squareRoot() + corner + 2.4 * SignInLogoMark.haloSoftness
+        XCTAssertGreaterThan(SignInLogoMark.haloField / 2, farthest, "the turning colours cover the halo to its corners")
     }
 
     func testAGradientRunsAcrossItsShapeAsInTheDrawing() {
