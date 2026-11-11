@@ -92,7 +92,13 @@ lock="~/$remote/.lock"
 
 vssh() { ssh ${ssh_opts[@]+"${ssh_opts[@]}"} "$vps" "$@"; }
 vps_free_gib() { vssh "df -Pk ~ | awk 'NR==2 {print int(\$4/1048576)}'"; }
-vps_build_running() { [[ -n "$(vssh "docker ps -q -f 'name=^shellx-winbuild-run\$'")" ]]; }
+# A failure to ask docker is a refusal (exit 1), never "no build running".
+vps_build_running() {
+  local out
+  out="$(vssh "docker ps -q -f 'name=^shellx-winbuild-run\$'")" \
+    || { echo "cannot ask docker on the VPS whether a build is running" >&2; exit 1; }
+  [[ -n "$out" ]]
+}
 # Read-only: never creates or removes the lock.
 preflight() {
   local free held
