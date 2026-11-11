@@ -6,6 +6,9 @@
 #   scripts/shellx/release/build-windows-cross.sh [OUT_DIR]
 #   scripts/shellx/release/build-windows-cross.sh --preflight
 #   scripts/shellx/release/build-windows-cross.sh --unlock
+#   scripts/shellx/release/build-windows-cross.sh -h | --help
+# Any other argument that starts with "-", or more than one argument, prints the usage (exit 2)
+# before anything reaches the VPS.
 #
 # Builds the committed HEAD (git archive), not the working tree. The ghostty submodule is
 # fetched on the VPS at the commit HEAD pins. Env:
@@ -42,6 +45,27 @@
 # - Same as CI: Rust from cmux-tui/rust-toolchain.toml, zig from ghostty/build.zig.zon,
 #   --locked, static CRT (checked), Inno Setup 6.7.1, unsigned.
 set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: scripts/shellx/release/build-windows-cross.sh [OUT_DIR]    build the installer on the VPS (OUT_DIR: dist/windows)
+       scripts/shellx/release/build-windows-cross.sh --preflight  check the VPS guards only (read-only)
+       scripts/shellx/release/build-windows-cross.sh --unlock     remove a stale build lock (refused while a build runs)
+SHELLX_WINBUILD_DIR (default phu/shellx/.winbuild) is a relative path below ~ on the VPS: not empty,
+no "." or ".." part, no leading "/", only A-Z a-z 0-9 . _ - /.
+EOF
+}
+# A mistyped option must not become OUT_DIR and start a build on the shared VPS.
+mode=build
+if [[ $# -gt 1 ]]; then
+  usage >&2; exit 2
+fi
+case "${1:-}" in
+  --preflight) mode=preflight ;;
+  --unlock) mode=unlock ;;
+  -h|--help) usage; exit 0 ;;
+  -*) usage >&2; exit 2 ;;
+esac
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$repo"
@@ -106,9 +130,9 @@ unlock() {
     *) echo "cannot remove the build lock $lock on the VPS: '$result'" >&2; exit 1 ;;
   esac
 }
-case "${1:-}" in
-  --preflight) preflight; exit 0 ;;
-  --unlock) unlock; exit 0 ;;
+case "$mode" in
+  preflight) preflight; exit 0 ;;
+  unlock) unlock; exit 0 ;;
 esac
 
 # The sign-in button needs Google's official mark in the commit being built.
