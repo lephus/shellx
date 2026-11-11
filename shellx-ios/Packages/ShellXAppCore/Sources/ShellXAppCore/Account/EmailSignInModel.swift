@@ -16,13 +16,19 @@ public final class EmailSignInModel {
     public nonisolated static let codeLength = 6
     public nonisolated static let maxEmailBytes = 254
 
-    /// Trimmed, it has an "@" that is not first, and after it a "." that is neither the next character nor the last.
-    /// Only whether Send is worth pressing: the relay does the real check.
+    /// Trimmed, it is ASCII only, it has an "@" that is not first, and after it a "." that is neither the next
+    /// character nor the last. Only whether Send is worth pressing: the relay does the real check.
     public nonisolated static func looksLikeEmail(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let at = trimmed.firstIndex(of: "@"), at != trimmed.startIndex else { return false }
+        guard isASCII(trimmed), let at = trimmed.firstIndex(of: "@"), at != trimmed.startIndex else { return false }
         let domain = trimmed[trimmed.index(after: at)...]
         return domain.indices.contains { domain[$0] == "." && $0 != domain.startIndex && domain.index(after: $0) != domain.endIndex }
+    }
+
+    /// Whether every character of `text` is ASCII. The relay takes ASCII addresses only, and a Vietnamese keyboard
+    /// (Telex) turns "ex" into "ẽ" even in an email field.
+    public nonisolated static func isASCII(_ text: String) -> Bool {
+        text.unicodeScalars.allSatisfy(\.isASCII)
     }
 
     /// The first six digits of `text` as ASCII (any character with a `wholeNumberValue` of 0–9 counts); the rest is
@@ -59,6 +65,12 @@ public final class EmailSignInModel {
     public var isEntering: Bool { panel != .providers }
     public var isBusy: Bool { step == .sending || step == .verifying }
     public var canSend: Bool { step == .email && Self.looksLikeEmail(email) }
+    /// What shows under the email field: the last failure, else `.invalidEmail` while the address has a character
+    /// outside ASCII, so that a disabled Send says why. An address still being typed is not wrong.
+    public var emailFieldError: SignInError? {
+        if let error { return error }
+        return Self.isASCII(email.trimmingCharacters(in: .whitespacesAndNewlines)) ? nil : .invalidEmail
+    }
     /// A code was sent and can still be verified: false before a send and after a 410.
     public var codeIsLive: Bool { challengeID != nil }
     public var canVerify: Bool { step == .code && code.count == Self.codeLength && codeIsLive }
