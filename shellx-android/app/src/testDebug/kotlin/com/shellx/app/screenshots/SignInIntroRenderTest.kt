@@ -154,6 +154,40 @@ class SignInIntroRenderTest {
     private fun hues(colours: List<Int>): List<Float> =
         colours.map(::hue).fold(emptyList()) { seen, next -> if (seen.all { apart(it, next) >= 40f }) seen + next else seen }
 
+    /**
+     * How opaque the glow is on the light page and on the dark one, from the four points of [ring] in the [light] and
+     * the [dark] render of one moment. Each point is its page's colour under one colour of the ring, which is the
+     * same in both renders: page + (seen − page) / opacity is that colour either way. The two opacities are the ones
+     * that fit all four points and their three channels best (least squares).
+     */
+    private fun opacities(light: Snapshot, dark: Snapshot): Pair<Double, Double> {
+        fun channels(argb: Int) = listOf((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
+        val lightPage = channels(light.pixel(light.width - 1, 0))
+        val darkPage = channels(dark.pixel(dark.width - 1, 0))
+        // a · u − b · v = d, for u = 1 / the opacity on light and v = 1 / the opacity on dark.
+        var aa = 0.0
+        var ab = 0.0
+        var bb = 0.0
+        var ad = 0.0
+        var bd = 0.0
+        for ((onLight, onDark) in ring(light).zip(ring(dark))) {
+            for (channel in 0 until 3) {
+                val a = (channels(onLight)[channel] - lightPage[channel]).toDouble()
+                val b = (channels(onDark)[channel] - darkPage[channel]).toDouble()
+                val d = (darkPage[channel] - lightPage[channel]).toDouble()
+                aa += a * a
+                ab += a * b
+                bb += b * b
+                ad += a * d
+                bd += b * d
+            }
+        }
+        val determinant = aa * bb - ab * ab
+        val u = (ad * bb - ab * bd) / determinant
+        val v = (ab * ad - aa * bd) / determinant
+        return 1 / u to 1 / v
+    }
+
     @Test
     fun theGlowIsARingOfColoursThatTurns() {
         // The glow at its strongest, half a breath after the intro, and a quarter turn (1.5 s) later.
@@ -165,16 +199,33 @@ class SignInIntroRenderTest {
             Page { SignInLogo(96.dp, pose = { SignInLogo.pose(first).copy(glow = 0f) }) }
         }
         val still = assertRenders("signin-logo-still") { Page { SignInLogo(96.dp, pose = { SignInLogo.REST }) } }
+
+        // The dark page has the stronger glow: 0.60 against 0.45 at its strongest, a little less where it is measured
+        // (4 dp out, where the fade has begun). The renders come light then dark, in English then in Vietnamese.
+        for (light in listOf(0, 2)) {
+            val (onLight, onDark) = opacities(early[light], early[light + 1])
+            val name = early[light + 1].file.name
+            assertTrue("$name: the glow at its strongest is 0.51 to 0.61 on the dark page ($onDark)", onDark in 0.51..0.61)
+            assertTrue("$name: and 0.38 to 0.46 on the light one ($onLight)", onLight in 0.38..0.46)
+            val (laterOnLight, laterOnDark) = opacities(late[light], late[light + 1])
+            assertTrue(
+                "${late[light + 1].file.name}: 1.5 s later too it is stronger on the dark page " +
+                    "($laterOnDark, on the light one $laterOnLight)",
+                laterOnDark > 1.2 * laterOnLight && laterOnDark < onDark && laterOnLight < onLight,
+            )
+        }
+
         for (index in early.indices) {
             val name = early[index].file.name
             val before = ring(early[index])
             val after = ring(late[index])
             for (shot in listOf(early[index], late[index])) {
                 val colours = ring(shot)
-                val page = chroma(shot.pixel(shot.width - 1, 0))
+                val pageChroma = chroma(shot.pixel(shot.width - 1, 0))
                 assertTrue(
-                    "${shot.file.name}: colour on every side of the square (chroma ${colours.map(::chroma)}, the page's $page)",
-                    colours.all { chroma(it) >= page + 12 },
+                    "${shot.file.name}: colour on every side of the square (chroma ${colours.map(::chroma)}, " +
+                        "the page's $pageChroma)",
+                    colours.all { chroma(it) >= pageChroma + 12 },
                 )
                 assertTrue(
                     "${shot.file.name}: three or more hues round the square (${colours.map(::hue)})",
@@ -212,7 +263,7 @@ class SignInIntroRenderTest {
             assertTrue("${rest.file.name}: the glow's place is the page", ring(rest).all { it == (page or (0xFF shl 24)) })
             val lit = (0 until 432).sumOf { y ->
                 (0 until 432).count { x ->
-                    (x !in 72 until 360 || y !in 72 until 360) && early[index].pixel(x, y) != early[index].pixel(1178, 0)
+                    (x !in 72 until 360 || y !in 72 until 360) && shot.pixel(x, y) != shot.pixel(shot.width - 1, 0)
                 }
             }
             assertTrue("$name: the glow is there, around the square ($lit px)", lit > 20_000)
