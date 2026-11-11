@@ -392,6 +392,37 @@ import ShellXRemoteCore
         #expect(rig.model.submitCode() == nil)
     }
 
+    /// Another flow (Google) can ask the shown field to take the keyboard again, but only while that field takes input.
+    @Test func theShownFieldAsksForTheKeyboardOnlyWhileItTakesInput() async {
+        let rig = EmailSignInRig()
+        var focus = rig.model.focusRequest
+        rig.model.requestFocus()
+        #expect(rig.model.focusRequest == focus + 1)
+        rig.model.setEmail("Foo@Bar.com")
+        let send = rig.model.sendCode()
+        #expect(await rig.send.pending())
+        focus = rig.model.focusRequest
+        rig.model.requestFocus()
+        #expect(rig.model.focusRequest == focus)
+        rig.send.resolve(EmailSignInRig.challenge("ch-1"))
+        await send?.value
+        focus = rig.model.focusRequest
+        rig.model.requestFocus()
+        #expect(rig.model.focusRequest == focus + 1)
+        let verify = rig.model.setCode("123456")
+        #expect(await rig.verify.pending())
+        rig.verify.fail("code_expired")
+        await verify?.value
+        focus = rig.model.focusRequest
+        rig.model.requestFocus()
+        #expect(rig.model.focusRequest == focus)
+        rig.model.useDifferentEmail()
+        rig.model.cancel()
+        focus = rig.model.focusRequest
+        rig.model.requestFocus()
+        #expect(rig.model.focusRequest == focus)
+    }
+
     @Test func cancelWhileSendingIgnoresTheLateChallenge() async {
         let rig = EmailSignInRig()
         rig.model.setEmail("Foo@Bar.com")

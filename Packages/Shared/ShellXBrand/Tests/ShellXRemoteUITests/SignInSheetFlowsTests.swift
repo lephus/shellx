@@ -86,4 +86,39 @@ import ShellXRemoteCore
         #expect(rig.model.step == .code)
         #expect(!SignInSheetFlows.googleEnabled(google: google, email: rig.model))
     }
+
+    /// The email field is off while Google waits, and a field turned off while it has the keyboard loses it. Once
+    /// Google is ready again (a failure, or a cancel in the browser) the field asks for the keyboard back. A sheet
+    /// that closed, or a Google sign-in that worked, asks for nothing.
+    @Test func theEmailFieldAsksForTheKeyboardBackAfterAGoogleAttempt() async {
+        let gate = CallGate<String>(), rig = EmailSignInRig()
+        let google = googleModel(gate)
+        let before = rig.model.focusRequest
+        await failGoogle(google, gate, email: rig.model)
+        #expect(rig.model.focusRequest == before + 1)
+        let cancelled = SignInSheetFlows.startGoogle(google: google, email: rig.model)
+        #expect(await gate.pending())
+        #expect(rig.model.focusRequest == before + 1)
+        gate.fail("google_cancelled")
+        await cancelled?.value
+        #expect(google.errorText == nil)
+        #expect(rig.model.focusRequest == before + 2)
+        let closing = SignInSheetFlows.startGoogle(google: google, email: rig.model)
+        #expect(await gate.pending())
+        rig.model.cancel()
+        google.cancel()
+        gate.fail("google_cancelled")
+        await closing?.value
+        #expect(rig.model.focusRequest == before + 2)
+
+        let okGate = CallGate<String>(), okRig = EmailSignInRig()
+        let signedIn = googleModel(okGate)
+        let okBefore = okRig.model.focusRequest
+        let ok = SignInSheetFlows.startGoogle(google: signedIn, email: okRig.model)
+        #expect(await okGate.pending())
+        okGate.resolve("g@shellx.test")
+        await ok?.value
+        #expect(signedIn.phase == .signedIn(email: "g@shellx.test"))
+        #expect(okRig.model.focusRequest == okBefore)
+    }
 }
