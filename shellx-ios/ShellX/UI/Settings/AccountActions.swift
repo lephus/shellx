@@ -6,6 +6,9 @@ struct AccountActions {
     var signOut: () async -> Void
     var switchToGoogle: () async throws -> Void
     var deleteAccount: () async throws -> Void
+    /// A new model for the deletion sheet of an email session (it mails the code, then deletes with it); nil in fakes
+    /// that have none.
+    var deleteCode: (@MainActor () -> EmailSignInModel)? = nil
 }
 
 extension AccountActions {
@@ -15,6 +18,7 @@ extension AccountActions {
             authMethod: coordinator.authMethod ?? .google,
             signOut: { await coordinator.signOut() },
             switchToGoogle: { try await coordinator.switchToGoogle() },
-            deleteAccount: { try await coordinator.deleteAccount() })
+            deleteAccount: { try await coordinator.deleteAccount() },
+            deleteCode: { coordinator.makeDeleteAccountCode() })
     }
 }
