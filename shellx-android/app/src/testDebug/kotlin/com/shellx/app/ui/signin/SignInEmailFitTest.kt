@@ -247,7 +247,12 @@ class SignInEmailFitTest {
         /** The same phone turned: the three-button bar is at the side. */
         const val PIXEL_3_TURNED = "w737dp-h369dp-land-440dpi"
 
-        /** Gboard in portrait above the navigation bar: an estimate until the emulator check measures it. */
+        /**
+         * Gboard in portrait above the navigation bar, with room to spare: measured on the API 36 emulator (1080 × 2340,
+         * 440 dpi) at 255 dp above a three-button bar (the Pixel 3's) and 279 dp above the gesture bar. 300 dp stands for
+         * a taller keyboard (Gboard's number row, a larger keyboard height), so the field is checked above more than the
+         * default keyboard takes.
+         */
         val KEYBOARD = 300.dp
 
         /** Gboard on a phone held sideways (measured on the API 36 emulator, ledger A-36). */
