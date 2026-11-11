@@ -145,8 +145,11 @@ object ShellXSnapshots {
         }
     }
 
-    /** `ValueAnimator.setDurationScale` is hidden; Robolectric runs it (its shadow) for the test's sandbox only. */
-    private fun <T> withoutAnimations(block: () -> T): T {
+    /**
+     * Runs [block] with the system's animations off, as with "Remove animations" (a screen read in it draws its still
+     * frame). `ValueAnimator.setDurationScale` is hidden; Robolectric runs it (its shadow) for the test's sandbox only.
+     */
+    fun <T> withoutAnimations(block: () -> T): T {
         val setScale = ValueAnimator::class.java.getMethod("setDurationScale", Float::class.javaPrimitiveType)
         val before = ValueAnimator.getDurationScale()
         setScale.invoke(null, 0f)
