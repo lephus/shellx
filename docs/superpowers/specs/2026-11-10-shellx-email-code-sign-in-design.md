@@ -82,8 +82,8 @@ DELETE /v1/account           bearer + {challenge_id, code}           thêm cách
 ```
 
 Quy tắc:
-- `challenge_id`: 32 byte ngẫu nhiên base64url (43 ký tự, `generateToken()`); DB chỉ giữ `sha256(challenge_id)`.
-- Mã: 6 chữ số từ `crypto.randomInt(0, 1_000_000)` có đệm số 0; DB chỉ giữ `sha256(challenge_id + ":" + code)`.
+- `challenge_id`: 32 byte ngẫu nhiên base64url (43 ký tự, `generateToken()`); DB chỉ giữ `HMAC-SHA-256(key, challenge_id)`; khoá 32 byte ngẫu nhiên tạo mỗi lần relay khởi động, không lưu, không log (sửa theo review 2026-11-11: hash không khoá cho phép người đọc DB dò đủ 10^6 mã).
+- Mã: 6 chữ số từ `crypto.randomInt(0, 1_000_000)` có đệm số 0; DB chỉ giữ `HMAC-SHA-256(key, challenge_id + ":" + code)` cùng khoá; relay khởi động lại thì mọi mã đang chờ trả 410.
   Ai đọc được DB vẫn không đoán nổi mã vì thiếu `challenge_id` (128 bit), đúng cách relay giữ token và nonce.
   So băm bằng `timingSafeEqual`.
 - Hạn 10 phút (600 s), tối đa 5 lần đoán một mã, mỗi email chỉ mã mới nhất còn hiệu lực (xin mã mới xoá
@@ -150,8 +150,8 @@ và `tokens` để nới CHECK (`provider IN ('google','apple','email','test')`,
 ```sql
 CREATE TABLE email_codes (
   id             TEXT PRIMARY KEY,                 -- UUID, dùng làm Idempotency-Key gửi Resend
-  challenge_hash BLOB NOT NULL UNIQUE,             -- sha256(challenge_id)
-  code_hash      BLOB NOT NULL,                    -- sha256(challenge_id || ':' || code)
+  challenge_hash BLOB NOT NULL UNIQUE,             -- HMAC-SHA-256(key, challenge_id)
+  code_hash      BLOB NOT NULL,                    -- HMAC-SHA-256(key, challenge_id || ':' || code)
   email          TEXT NOT NULL,                    -- đã chuẩn hoá; sống tối đa 10 phút
   attempts       INTEGER NOT NULL DEFAULT 0,
   created_at     INTEGER NOT NULL,
