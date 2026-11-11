@@ -34,6 +34,20 @@ pub fn remote_paste_fits(encoded_len: usize) -> bool {
     encoded_len <= REMOTE_PASTE_MAX_BYTES
 }
 
+/// Whether pasting `text` into a pane must be confirmed first: more than one line would run
+/// as several commands at once. A newline is `\n` or `\r`; a trailing newline, or only
+/// whitespace after one, is still one line. A pane in bracketed-paste mode (`bracketed`,
+/// mode 2004) receives the text as data, so it never asks.
+pub fn needs_paste_confirmation(text: &str, bracketed: bool) -> bool {
+    if bracketed {
+        return false;
+    }
+    match text.find(['\n', '\r']) {
+        Some(i) => text[i..].chars().any(|c| !c.is_whitespace()),
+        None => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +111,34 @@ mod tests {
         // and UTF-8 bytes, not chars
         let vi = "ệ".repeat(REMOTE_PASTE_MAX_BYTES / 2);
         assert!(!remote_paste_fits(encode_paste(&vi, false).len()));
+    }
+
+    #[test]
+    fn multi_line_means_text_after_a_newline() {
+        for t in [
+            "echo hi",
+            "echo hi\n",
+            "echo hi\r\n",
+            "a\n  \t\n",
+            "a\n\u{00A0}",
+            "",
+        ] {
+            assert!(!needs_paste_confirmation(t, false), "{t:?}");
+        }
+        for t in [
+            "a\nb",
+            "a\r\nb\r\n",
+            "a\rb",
+            "\nb",
+            "echo 1\necho 2\necho 3",
+        ] {
+            assert!(needs_paste_confirmation(t, false), "{t:?}");
+        }
+    }
+
+    #[test]
+    fn a_bracketed_paste_never_asks() {
+        assert!(!needs_paste_confirmation("a\nb", true));
+        assert!(!needs_paste_confirmation("echo 1\necho 2", true));
     }
 }

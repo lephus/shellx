@@ -71,6 +71,40 @@ pub fn wheel_action(lines: i32, modes: ScreenModes) -> WheelAction {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SecondaryButton {
+    Right,
+    Middle,
+}
+
+/// What a click on a pane does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaneClick {
+    /// Only move the focus to the pane.
+    FocusOnly,
+    Paste,
+    CopySelection,
+    Nothing,
+}
+
+/// Right and middle clicks as in the Windows console. A click on an unfocused pane only
+/// focuses it. On the focused pane the right button copies the selection, or pastes when
+/// there is none; the middle button does nothing.
+pub fn secondary_click(
+    button: SecondaryButton,
+    pane_focused: bool,
+    has_selection: bool,
+) -> PaneClick {
+    if !pane_focused {
+        return PaneClick::FocusOnly;
+    }
+    match button {
+        SecondaryButton::Right if has_selection => PaneClick::CopySelection,
+        SecondaryButton::Right => PaneClick::Paste,
+        SecondaryButton::Middle => PaneClick::Nothing,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,5 +209,32 @@ mod tests {
                 count: i32::MIN.unsigned_abs()
             }
         );
+    }
+
+    #[test]
+    fn secondary_clicks_follow_the_windows_console() {
+        for button in [SecondaryButton::Right, SecondaryButton::Middle] {
+            for has_selection in [false, true] {
+                assert_eq!(
+                    secondary_click(button, false, has_selection),
+                    PaneClick::FocusOnly,
+                    "{button:?} {has_selection}"
+                );
+            }
+        }
+        assert_eq!(
+            secondary_click(SecondaryButton::Right, true, true),
+            PaneClick::CopySelection
+        );
+        assert_eq!(
+            secondary_click(SecondaryButton::Right, true, false),
+            PaneClick::Paste
+        );
+        for has_selection in [false, true] {
+            assert_eq!(
+                secondary_click(SecondaryButton::Middle, true, has_selection),
+                PaneClick::Nothing
+            );
+        }
     }
 }
