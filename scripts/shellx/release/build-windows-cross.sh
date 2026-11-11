@@ -27,10 +27,14 @@
 # - at least SHELLX_WINBUILD_MIN_FREE_GIB GiB free in the build user's home;
 # - one Windows build at a time: no build holds the lock ~/<build dir>/.lock, and no container
 #   shellx-winbuild-run (the name of every container a run starts) is running.
-# A build takes the lock (an atomic mkdir) before it changes anything on the VPS and removes it
-# on exit, also after a failed step or Ctrl-C. A lock left by a lost connection makes the next
-# run refuse; --unlock removes it when no shellx-winbuild-run container is running (a run that
-# is still uploading has no container yet: unlock only when you know no run is active).
+# A build takes the lock (an atomic mkdir) before it changes anything on the VPS and writes its
+# owner line into .lock/owner: "<host> pid <pid> <UTC start> <commit>". Every refusal because of
+# a held lock prints that line. On exit (also after a failed step or Ctrl-C) a run removes the
+# lock only while the owner line is still its own; otherwise it leaves it and says so.
+# A lock left by a lost connection makes the next run refuse. --unlock prints the owner line and
+# removes the lock unless a shellx-winbuild-run container is running or the owner is a live pid
+# on this host. A run that is still uploading from another machine has no container yet, so use
+# --unlock only when the owner shown is no longer running.
 # After a build, when the free space is under the minimum, older shellx-winbuild image tags
 # are removed (only those; never other images, never a prune).
 #
@@ -89,6 +93,10 @@ if [[ $remote_ok -ne 1 ]]; then
   exit 2
 fi
 lock="~/$remote/.lock"
+# The owner line names this host; only A-Z a-z 0-9 . _ - survive, so it can be single-quoted remotely.
+this_host="$(hostname -s 2>/dev/null || hostname)"
+this_host="${this_host//[^A-Za-z0-9._-]/_}"
+owner_re='^[A-Za-z0-9._: -]+$'
 
 vssh() { ssh ${ssh_opts[@]+"${ssh_opts[@]}"} "$vps" "$@"; }
 vps_free_gib() { vssh "df -Pk ~ | awk 'NR==2 {print int(\$4/1048576)}'"; }
@@ -99,24 +107,34 @@ vps_build_running() {
     || { echo "cannot ask docker on the VPS whether a build is running" >&2; exit 1; }
   [[ -n "$out" ]]
 }
+# Read-only. Sets lock_state (held or free) and lock_owner (its owner line, empty if none).
+read_lock() {
+  local out
+  out="$(vssh "if [ -e $lock ]; then echo held; cat $lock/owner 2>/dev/null || true; else echo free; fi")"
+  lock_state="$(printf '%s\n' "$out" | sed -n 1p)"
+  lock_owner="$(printf '%s\n' "$out" | sed -n 2p)"
+  case "$lock_state" in
+    held|free) ;;
+    *) echo "cannot read the build lock on the VPS: '$out'" >&2; exit 1 ;;
+  esac
+}
+refuse_held() {
+  echo "another Windows build holds the lock $lock on the VPS" >&2
+  echo "  owner: ${1:-(no owner recorded)}" >&2
+  echo "  use scripts/shellx/release/build-windows-cross.sh --unlock only when that run is no longer running" >&2
+  exit 1
+}
 # Read-only: never creates or removes the lock.
 preflight() {
-  local free held
+  local free
   free="$(vps_free_gib)"
   [[ "$free" =~ ^[0-9]+$ ]] || { echo "cannot read the free disk space on the VPS: '$free'" >&2; exit 1; }
   if (( free < min_free )); then
     echo "VPS has $free GiB free in ~; a Windows build needs $min_free (4 stay free for deploys)" >&2
     exit 1
   fi
-  held="$(vssh "if [ -e $lock ]; then echo held; else echo free; fi")"
-  case "$held" in
-    free) ;;
-    held)
-      echo "another Windows build holds the lock $lock on the VPS" \
-        "(if none is running: scripts/shellx/release/build-windows-cross.sh --unlock)" >&2
-      exit 1 ;;
-    *) echo "cannot read the build lock on the VPS: '$held'" >&2; exit 1 ;;
-  esac
+  read_lock
+  [[ $lock_state == free ]] || refuse_held "$lock_owner"
   if vps_build_running; then
     echo "another Windows build is running on the VPS" >&2
     exit 1
@@ -124,15 +142,34 @@ preflight() {
   echo "preflight: $free GiB free, no Windows build running"
 }
 unlock() {
-  local result
+  local o_host o_word o_pid o_rest result
+  read_lock
+  if [[ $lock_state == free ]]; then
+    echo "no build lock $lock on the VPS"
+    return 0
+  fi
+  if [[ -n "$lock_owner" ]]; then
+    echo "build lock $lock, owner: $lock_owner"
+  else
+    echo "build lock $lock has no owner file (a run stopped while taking it, or an older script took it)"
+  fi
   if vps_build_running; then
     echo "a Windows build is running on the VPS (container shellx-winbuild-run); the lock stays" >&2
     exit 1
   fi
-  result="$(vssh "if [ -d $lock ]; then rmdir $lock && echo removed; else echo absent; fi")"
+  if [[ -n "$lock_owner" ]]; then
+    [[ "$lock_owner" =~ $owner_re ]] || { echo "unexpected owner line; check the VPS by hand: '$lock_owner'" >&2; exit 1; }
+    read -r o_host o_word o_pid o_rest <<< "$lock_owner"
+    if [[ "$o_host" == "$this_host" && "$o_word" == pid && "$o_pid" =~ ^[0-9]+$ ]] && kill -0 "$o_pid" 2>/dev/null; then
+      echo "the owner, pid $o_pid on this Mac, is still running; the lock stays" >&2
+      exit 1
+    fi
+  fi
+  # Remove only the lock that was read: if its owner line changed meanwhile, touch nothing.
+  result="$(vssh "if [ \"\$(cat $lock/owner 2>/dev/null)\" = '$lock_owner' ]; then rm -f $lock/owner && rmdir $lock && echo removed; else echo changed; fi")"
   case "$result" in
-    removed) echo "removed the build lock $lock on the VPS" ;;
-    absent) echo "no build lock $lock on the VPS" ;;
+    removed) echo "removed the build lock $lock${lock_owner:+ (owner: $lock_owner)}" ;;
+    changed) echo "the build lock $lock changed while unlocking; nothing removed" >&2; exit 1 ;;
     *) echo "cannot remove the build lock $lock on the VPS: '$result'" >&2; exit 1 ;;
   esac
 }
@@ -163,15 +200,23 @@ echo "ShellX for Windows $version from $commit (ghostty $ghostty_sha), image $im
 
 tmp="$(mktemp -d)"
 locked=0
-# On every exit (success, a failed step, Ctrl-C): drop the temp dir and the lock this run took.
-# Keeps the run's own exit status.
+owner="$this_host pid $$ $(date -u +%Y-%m-%dT%H:%M:%SZ) ${commit:0:10}"
+# On every exit (success, a failed step, Ctrl-C): drop the temp dir and the lock this run took,
+# but only while its owner line is still this run's. Keeps the run's own exit status.
 cleanup() {
-  local status=$?
+  local status=$? release
   trap - EXIT INT TERM
   rm -rf "$tmp"
-  if [[ $locked -eq 1 ]] && ! vssh "rmdir $lock" </dev/null; then
-    echo "could not remove the build lock $lock on the VPS; when no build runs there:" \
-      "scripts/shellx/release/build-windows-cross.sh --unlock" >&2
+  if [[ $locked -eq 1 ]]; then
+    release="$(vssh "if [ ! -d $lock ]; then echo gone; elif [ \"\$(cat $lock/owner 2>/dev/null)\" = '$owner' ]; then rm -f $lock/owner && rmdir $lock && echo released; else echo foreign; cat $lock/owner 2>/dev/null || true; fi" </dev/null)" \
+      || release=error
+    case "$(printf '%s\n' "$release" | sed -n 1p)" in
+      released) ;;
+      gone) echo "the build lock $lock was already gone when this run ended" >&2 ;;
+      foreign) echo "left the build lock $lock in place: its owner is no longer this run ($(printf '%s\n' "$release" | sed -n 2p))" >&2 ;;
+      *) echo "could not remove the build lock $lock on the VPS ($owner); this run has ended, so:" \
+           "scripts/shellx/release/build-windows-cross.sh --unlock" >&2 ;;
+    esac
   fi
   exit "$status"
 }
@@ -180,14 +225,12 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 preflight
-# The lock: an atomic mkdir, before anything on the VPS changes. A second run fails here.
-lock_result="$(vssh "mkdir -p ~/$remote && if mkdir $lock 2>/dev/null; then echo taken; else echo held; fi")"
-case "$lock_result" in
+# The lock: an atomic mkdir, before anything on the VPS changes, then the owner line in the same
+# command (if that write fails, the lock is dropped again). A second run fails here.
+lock_result="$(vssh "mkdir -p ~/$remote && if mkdir $lock 2>/dev/null; then if printf '%s\n' '$owner' > $lock/owner; then echo taken; else rm -f $lock/owner; rmdir $lock; echo no-owner; fi; else echo held; cat $lock/owner 2>/dev/null || true; fi")"
+case "$(printf '%s\n' "$lock_result" | sed -n 1p)" in
   taken) locked=1 ;;
-  held)
-    echo "another Windows build holds the lock $lock on the VPS" \
-      "(if none is running: scripts/shellx/release/build-windows-cross.sh --unlock)" >&2
-    exit 1 ;;
+  held) refuse_held "$(printf '%s\n' "$lock_result" | sed -n 2p)" ;;
   *) echo "cannot take the build lock on the VPS: '$lock_result'" >&2; exit 1 ;;
 esac
 
