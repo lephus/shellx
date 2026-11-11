@@ -21,6 +21,7 @@ use shellx_model::account_view::{AccountView, account_view};
 use shellx_model::core_api::{CoreCall, CoreErr, GooglePurpose, SignInMethod};
 use shellx_model::email_sign_in::EmailStep;
 use shellx_model::sidebar::MachineInfo;
+use shellx_model::strings::Lang;
 use shellx_model::update::{CHECK_INTERVAL_SECS, UpdateStatus};
 
 use super::update_banner::open_https;
@@ -154,14 +155,10 @@ impl AccountService {
         self.flow.accepts_login()
     }
 
-    /// A failed logout (the session stays); the settings panel shows it.
+    /// A failed logout or Google switch (the session stays); the switch dialog words it, Settings shows
+    /// it through `view`.
     pub fn notice(&self) -> Option<&CoreErr> {
         self.flow.notice()
-    }
-
-    /// The notice is a failed sign-in-methods list or removal.
-    pub fn notice_is_methods(&self) -> bool {
-        self.flow.notice_is_methods()
     }
 
     /// Local UTC offset for "lần cuối HH:MM", refreshed with every list.
@@ -361,9 +358,9 @@ impl AccountService {
         self.flow.session_ended_by_server()
     }
 
-    /// What Settings › Account draws.
-    pub fn view(&self) -> AccountView {
-        account_view(&self.flow)
+    /// What Settings › Account draws, in `lang`.
+    pub fn view(&self, lang: Lang) -> AccountView {
+        account_view(&self.flow, self.google_available(), lang)
     }
 
     /// The core said this build has a Google client (Ruling 28). False until it answered yes: the dialog

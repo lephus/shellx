@@ -2,7 +2,7 @@
 //! only draws it.
 
 use crate::account::{AccountFlow, AccountState};
-use crate::strings::Str;
+use crate::strings::{Lang, Str, failure_sentence};
 
 /// What Settings › Account draws.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -12,11 +12,23 @@ pub struct AccountView {
     pub sign_in: Option<Str>,
     /// "Your session expired." above the button.
     pub session_expired: bool,
+    /// "Sign out": a session is stored (LoggedIn, and an error state that holds one: R4 Major 6).
+    pub sign_out: bool,
+    /// "Switch to Google sign-in": a password session, and the build has a Google client (Ruling 28).
+    pub google_switch: bool,
+    /// The line under the account, as a sentence: the notice (a failed sign-out, a sign-in methods
+    /// failure), else the error state's. Never a code, never the core's message.
+    pub error: Option<String>,
 }
 
-pub fn account_view(flow: &AccountFlow) -> AccountView {
+/// `google_available`: the core said this build has a Google client.
+pub fn account_view(flow: &AccountFlow, google_available: bool, lang: Lang) -> AccountView {
     let signed_in = matches!(flow.state(), AccountState::LoggedIn { .. });
     let expired = flow.session_ended_by_server() && !signed_in;
+    let error = flow.notice().map(|e| &e.code).or(match flow.state() {
+        AccountState::Error(e) => Some(&e.code),
+        _ => None,
+    });
     AccountView {
         sign_in: (!signed_in).then_some(if expired {
             Str::SignInAgain
@@ -24,6 +36,9 @@ pub fn account_view(flow: &AccountFlow) -> AccountView {
             Str::SignInEllipsis
         }),
         session_expired: expired,
+        sign_out: flow.can_sign_out(),
+        google_switch: flow.needs_google_switch() && google_available,
+        error: error.map(|code| failure_sentence(lang, code)),
     }
 }
 

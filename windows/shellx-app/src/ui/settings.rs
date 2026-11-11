@@ -11,9 +11,7 @@ use gpui::{
 use shellx_model::account::AccountState;
 use shellx_model::account::DELETE_ACCOUNT_URL;
 use shellx_model::palette;
-use shellx_model::strings::{
-    Lang, Str, added_from, sign_in_method_label, sign_in_methods_error, t, update_available,
-};
+use shellx_model::strings::{Lang, Str, added_from, sign_in_method_label, t, update_available};
 use shellx_model::update::{UpdateStatus, download_url};
 
 use super::account::AccountService;
@@ -115,7 +113,8 @@ impl SettingsPanel {
 
     fn account_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
         let account = self.account.read(cx);
-        let view = account.view();
+        // Everything below comes from the view (Ruling 33): no code and no text from the core is drawn.
+        let view = account.view(lang);
         let signed_in = matches!(account.state(), AccountState::LoggedIn { .. });
         let who = if signed_in {
             account
@@ -124,30 +123,12 @@ impl SettingsPanel {
         } else {
             t(lang, Str::NotLoggedIn).to_string()
         };
-        // A failed logout, else why the account is not working (offline at
-        // start, a state-folder problem): the sidebar no longer shows these.
-        let notice = account
-            .notice()
-            .map(|e| {
-                if account.notice_is_methods() {
-                    sign_in_methods_error(lang, &e.code)
-                } else {
-                    e.message.clone()
-                }
-            })
-            .or_else(|| match account.state() {
-                AccountState::Error(e) if e.message.trim().is_empty() => {
-                    Some(t(lang, Str::Error).to_string())
-                }
-                AccountState::Error(e) => Some(format!("{} · {}", t(lang, Str::Error), e.message)),
-                _ => None,
-            });
         Self::section(t(lang, Str::Account))
             .child(div().text_color(theme::text_hi()).truncate().child(who))
             .when(!signed_in, |s| {
                 s.child(Self::muted(t(lang, Str::SignInSubtitle)))
             })
-            .when(signed_in && account.needs_google_switch(), |s| {
+            .when(view.google_switch, |s| {
                 s.child(
                     div()
                         .flex()
@@ -177,7 +158,9 @@ impl SettingsPanel {
                 )
             })
             .when(signed_in, |s| s.child(self.methods_block(lang, cx)))
-            .children(notice.filter(|m| !m.is_empty()).map(|m| {
+            // A failed sign-out or methods list, else why the account is not working (offline at
+            // start, a state-folder problem): the sidebar does not show these.
+            .children(view.error.map(|m| {
                 div()
                     .text_size(theme::SMALL_SIZE)
                     .text_color(theme::hsla(palette::ERROR))
@@ -195,7 +178,7 @@ impl SettingsPanel {
                     ),
                 ))
             })
-            .when(signed_in, |s| {
+            .when(view.sign_out, |s| {
                 s.child(
                     div().flex().child(
                         button(
