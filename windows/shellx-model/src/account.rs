@@ -2867,4 +2867,158 @@ mod tests {
         check("flow", format!("{f:?}"));
         check("flow (pretty)", format!("{f:#?}"));
     }
+
+    // ----- a failed email attempt returns the flow to the state it started from -----
+
+    /// R4 Blocker 1's path: a sign-in whose list the core refused, so `Error` holds a stored session (retry
+    /// tick pending at 15_004).
+    fn error_with_a_session() -> AccountFlow {
+        let mut f = logged_out();
+        f.on(
+            AccountEvent::LoginSubmitted {
+                email: "a@b.c".into(),
+                password: "pw".into(),
+            },
+            2,
+        );
+        f.on(AccountEvent::LoginResult(Ok(login_info())), 3);
+        f.on(AccountEvent::ListResult(Err(err("bad_response"))), 4);
+        assert!(matches!(f.state(), AccountState::Error(e) if e.code == "bad_response"));
+        assert!(f.can_sign_out());
+        f
+    }
+
+    fn scheduled_tick(acts: &[AccountAction]) -> Option<u64> {
+        acts.iter().find_map(|a| match a {
+            AccountAction::ScheduleTick { at_ms } => Some(*at_ms),
+            _ => None,
+        })
+    }
+
+    fn in_the_list_error(f: &AccountFlow) -> bool {
+        matches!(f.state(), AccountState::Error(e) if e.code == "bad_response")
+    }
+
+    #[test]
+    fn a_failed_verify_returns_to_the_state_it_started_from() {
+        // Signed out: back to LoggedOut, and a right code then signs in.
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        f.on(submit("123456"), 2_000);
+        f.on(email_finished("c1", Err(err("invalid_code"))), 2_100);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(!f.can_sign_out());
+        f.on(submit("654321"), 2_200);
+        assert_eq!(
+            f.on(email_finished("c1", Ok(done())), 2_300),
+            vec![AccountAction::CallList]
+        );
+        f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 2_400);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+
+        // An error that holds a session: that error stays, with "Sign out" and the list retries.
+        let mut g = error_with_a_session();
+        to_code(&mut g, 1_000);
+        assert!(
+            in_the_list_error(&g),
+            "sending a code changes no account state"
+        );
+        g.on(submit("123456"), 2_000);
+        assert_eq!(g.state(), &AccountState::LoggingIn);
+        // The retry tick fires while the code is checked: nothing lists then.
+        assert!(g.on(AccountEvent::Tick(15_004), 15_004).is_empty());
+        let acts = g.on(email_finished("c1", Err(err("invalid_code"))), 15_100);
+        assert!(in_the_list_error(&g), "{:?}", g.state());
+        assert!(g.can_sign_out());
+        assert!(!g.login_in_flight());
+        assert_eq!(g.email_step(), Some(EmailStep::Code));
+        assert_eq!(error_code(&g), Some("invalid_code"));
+        let at = scheduled_tick(&acts).expect("the list retries go on");
+        assert!(
+            g.on(AccountEvent::Tick(at), at)
+                .contains(&AccountAction::CallList)
+        );
+        g.on(AccountEvent::ListResult(Err(err("bad_response"))), at);
+        assert!(in_the_list_error(&g) && g.can_sign_out());
+        // A right code then signs in.
+        assert_eq!(
+            g.on(submit("654321"), at + 1),
+            vec![finish_call("c1", "654321")]
+        );
+        assert_eq!(
+            g.on(email_finished("c1", Ok(done())), at + 2),
+            vec![AccountAction::CallList]
+        );
+        g.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), at + 3);
+        assert!(matches!(g.state(), AccountState::LoggedIn { .. }));
+        assert_eq!(g.auth_method(), Some("email"));
+
+        // Any other refusal, and a verify the dialog no longer shows, keep that error too.
+        for (code, close) in [("network", false), ("invalid_code", true)] {
+            let mut h = error_with_a_session();
+            to_code(&mut h, 1_000);
+            h.on(submit("123456"), 2_000);
+            if close {
+                h.on(AccountEvent::EmailCancelled, 2_050);
+            }
+            h.on(email_finished("c1", Err(err(code))), 2_100);
+            assert!(in_the_list_error(&h), "{code}: {:?}", h.state());
+            assert!(h.can_sign_out(), "{code}");
+            assert!(
+                h.on(AccountEvent::Tick(15_004), 15_004)
+                    .contains(&AccountAction::CallList),
+                "{code}"
+            );
+        }
+    }
+
+    /// Checked while the first list was still out: its answer arrived meanwhile and was dropped, so the flow
+    /// asks again instead of staying `Unknown`.
+    #[test]
+    fn a_failed_verify_before_the_first_list_answered_asks_again() {
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        to_code(&mut f, 1);
+        f.on(submit("123456"), 2);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+            3,
+        );
+        assert_eq!(f.state(), &AccountState::LoggingIn);
+        assert_eq!(
+            f.on(email_finished("c1", Err(err("invalid_code"))), 4),
+            vec![AccountAction::CallList]
+        );
+        assert_eq!(f.state(), &AccountState::Unknown);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+            5,
+        );
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert!(f.email_can_verify());
+    }
+
+    /// The send path never changes the account state, so a failed send or Resend leaves an error that holds a
+    /// session as it was.
+    #[test]
+    fn a_failed_send_leaves_the_account_state_alone() {
+        let mut g = error_with_a_session();
+        assert_eq!(g.on(send(), 5), vec![begin_call()]);
+        assert!(in_the_list_error(&g));
+        g.on(AccountEvent::EmailBegun(Err(err("rate_limited"))), 6);
+        assert!(in_the_list_error(&g) && g.can_sign_out());
+        g.on(send(), 7);
+        g.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), 7);
+        g.on(AccountEvent::EmailResendRequested, 61_000);
+        g.on(
+            AccountEvent::EmailBegun(Err(err("email_send_failed"))),
+            61_000,
+        );
+        assert!(in_the_list_error(&g) && g.can_sign_out());
+        assert!(
+            g.on(AccountEvent::Tick(61_000), 61_000)
+                .contains(&AccountAction::CallList)
+        );
+    }
 }
