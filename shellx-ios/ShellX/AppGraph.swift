@@ -24,18 +24,18 @@ struct AppGraph {
 
 #if DEBUG
 extension AppCoordinator {
-    /// A coordinator over memory and a fake relay, for previews and render tests (Debug only).
+    /// A coordinator over memory and a fake relay, for previews and render tests (Debug only). A test passes its own
+    /// `relay` to preset its answers.
     @MainActor
-    static func preview() -> AppCoordinator {
-        AppGraph.preview().coordinator
+    static func preview(relay: FakeRelayAccount = FakeRelayAccount()) -> AppCoordinator {
+        AppGraph.preview(relay: relay).coordinator
     }
 }
 
 extension AppGraph {
     /// A graph over memory and a fake relay, for previews and render tests (Debug only).
-    static func preview() -> AppGraph {
+    static func preview(relay: FakeRelayAccount = FakeRelayAccount()) -> AppGraph {
         let vault = AccountVault(store: InMemorySecretStore())
-        let relay = FakeRelayAccount()
         let latency = LatencyLog()
         let launch = LaunchMark(latency: latency)
         let scopes = SignedInScope.Slot()

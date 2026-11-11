@@ -76,4 +76,12 @@ public actor DemoRelay: RelayAccountCalling {
     }
 
     public func deleteAccount(idToken: String, nonce: String, token: String) async throws { throw Self.refusal }
+
+    public func requestEmailCode(email: String, locale: String) async throws -> EmailChallenge { throw Self.refusal }
+
+    public func signInWithEmailCode(challengeID: String, code: String, deviceName: String, clientKey: Data) async throws
+        -> AccountSignIn
+    { throw Self.refusal }
+
+    public func deleteAccount(challengeID: String, code: String, token: String) async throws { throw Self.refusal }
 }

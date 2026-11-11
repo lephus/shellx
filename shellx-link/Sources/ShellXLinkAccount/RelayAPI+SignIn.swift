@@ -1,7 +1,7 @@
 import Foundation
 import ShellXLinkCore
 
-/// A session the relay handed out for a Google or Apple sign-in, with the account's email.
+/// A session the relay handed out for a Google, Apple or emailed-code sign-in, with the account's email.
 /// The token is a bearer secret: descriptions and the mirror leave it and the email out.
 public struct AccountSignIn: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible,
     CustomReflectable
@@ -24,6 +24,33 @@ public struct AccountSignIn: Equatable, Sendable, CustomStringConvertible, Custo
     }
 }
 
+/// What the relay answers when it mails a code. `challengeID` signs in together with the mailed code, so descriptions
+/// and the mirror leave it and the email out: "EmailChallenge(expiresIn: 600, resendIn: 60, <redacted>)".
+public struct EmailChallenge: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
+    public var challengeID: String
+    /// Seconds until the code stops working.
+    public var expiresIn: Int
+    /// Seconds until another code may be asked for.
+    public var resendIn: Int
+    /// The address as the relay normalized it.
+    public var email: String
+
+    public init(challengeID: String, expiresIn: Int, resendIn: Int, email: String) {
+        self.challengeID = challengeID
+        self.expiresIn = expiresIn
+        self.resendIn = resendIn
+        self.email = email
+    }
+
+    public var description: String { "EmailChallenge(expiresIn: \(expiresIn), resendIn: \(resendIn), <redacted>)" }
+    public var debugDescription: String { description }
+    public var customMirror: Mirror {
+        Mirror(self, children: ["expiresIn": expiresIn, "resendIn": resendIn], displayStyle: .struct)
+    }
+}
+
 public enum AppleSignInResult: Equatable, Sendable {
     case signedIn(AccountSignIn)
     case linkRequired(linkToken: String, expiresIn: Int)
@@ -38,14 +65,17 @@ extension RelayAPI {
     /// A fresh single-use nonce for the next sign-in (`POST /v1/auth/nonce`).
     public func nonce() async throws -> String {
         let reply: NonceReply = try await send("POST", "/v1/auth/nonce", token: nil, body: [:])
-        let n = reply.nonce
-        guard (1...128).contains(n.utf8.count),
-            n.utf8.allSatisfy({
+        guard Self.isBase64URLSecret(reply.nonce) else { throw RelayAPIError.badResponse }
+        return reply.nonce
+    }
+
+    /// What the relay hands out as a nonce or a challenge id: 1–128 base64url characters.
+    private static func isBase64URLSecret(_ text: String) -> Bool {
+        (1...128).contains(text.utf8.count)
+            && text.utf8.allSatisfy {
                 ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5a) || ($0 >= 0x61 && $0 <= 0x7a)
                     || $0 == 0x2d || $0 == 0x5f
-            })
-        else { throw RelayAPIError.badResponse }
-        return n
+            }
     }
 
     public func signInWithGoogle(idToken: String, nonce: String, deviceName: String, clientKey: Data)
@@ -116,6 +146,34 @@ extension RelayAPI {
             "DELETE", "/v1/account", token: token, body: ["id_token": idToken, "nonce": nonce])
     }
 
+    /// Asks the relay to mail a 6-digit code to `email` (`POST /v1/auth/email/code`). The address goes as given: the
+    /// relay normalizes it and answers with the address it mailed. `locale` is "vi" or "en", the language of the mail.
+    public func requestEmailCode(email: String, locale: String) async throws -> EmailChallenge {
+        let reply: EmailChallengeReply = try await send(
+            "POST", "/v1/auth/email/code", token: nil, body: ["email": email, "locale": locale])
+        guard Self.isBase64URLSecret(reply.challengeID), reply.expiresIn > 0, reply.resendIn >= 0, !reply.email.isEmpty
+        else { throw RelayAPIError.badResponse }
+        return EmailChallenge(
+            challengeID: reply.challengeID, expiresIn: reply.expiresIn, resendIn: reply.resendIn, email: reply.email)
+    }
+
+    /// Signs in with the code mailed for `challengeID` (`POST /v1/auth/email/verify`). `code` goes as a string: a
+    /// leading zero is part of it.
+    public func signInWithEmailCode(challengeID: String, code: String, deviceName: String, clientKey: Data)
+        async throws -> AccountSignIn
+    {
+        let reply: SignInReply = try await send(
+            "POST", "/v1/auth/email/verify", token: nil,
+            body: ["challenge_id": challengeID, "code": code, "device": device(deviceName, clientKey)])
+        return try reply.signIn()
+    }
+
+    /// `DELETE /v1/account` with a code mailed to the account's address (an account that signs in by email).
+    public func deleteAccount(challengeID: String, code: String, token: String) async throws {
+        let _: Empty = try await send(
+            "DELETE", "/v1/account", token: token, body: ["challenge_id": challengeID, "code": code])
+    }
+
     private func device(_ name: String, _ clientKey: Data) -> [String: String] {
         ["kind": "mobile", "platform": "ios", "name": name, "public_key": Self.base64URL(clientKey)]
     }
@@ -124,6 +182,19 @@ extension RelayAPI {
 // MARK: - Wire types
 
 private struct NonceReply: Decodable { var nonce: String }
+
+private struct EmailChallengeReply: Decodable {
+    var challengeID: String
+    var expiresIn: Int
+    var resendIn: Int
+    var email: String
+    private enum CodingKeys: String, CodingKey {
+        case challengeID = "challenge_id"
+        case expiresIn = "expires_in"
+        case resendIn = "resend_in"
+        case email
+    }
+}
 
 private struct SignInReply: Decodable {
     var userID: String?

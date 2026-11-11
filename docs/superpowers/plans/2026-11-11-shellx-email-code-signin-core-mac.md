@@ -113,6 +113,16 @@ Facts learned after the afternoon revision; one line each.
 65. The Windows plan (Plan B) is on hold, and its Task 0 and Stage 2 are no longer scheduled after this plan. The Execution line, Task 0's header and Task 0 Step 7 no longer order this plan around Plan B, and Revision 44 is superseded. "Interfaces for Plan B" stays: the Windows work will still consume it (fact 3).
 66. New Ruling 33: this plan leaves the fake's `GET /v2/machines` as it is, although the relay's items carry no `noise_public_key_b64`, so against the relay the core answers `"fingerprint": null`. The relay's shape would break three core tests, whose fix is a design choice outside D1–D9, and Windows `shellx-app` tests that this plan cannot change. Task 9 Steps 2 and 7 and Contract additions name the drift for the Windows work (fact 2).
 
+## Revision 2026-11-12 (b): what Stage 1's reviews changed (read before Tasks 8–10)
+
+Stage 1 is done and reviewed: Tasks 1–3 are on `develop` (d847812117); Tasks 4–7 are on the branch (merged from `feat/shellx-email-code-signin-mac-swift`). Three things differ from the text below; where they conflict, this section wins.
+
+1. **Task 7's field is not "Roman-only".** A review proved by running that AppKit's "all Roman input sources" filter still offers Apple's Vietnamese Telex. The field now allows one language for each of the person's own plain keyboard layouts (enabled, ASCII-capable keyboard layouts; input modes and methods never count; a layout whose primary language an enabled input mode also lists gives another language of its own list, `en` first; no plain layout means no restriction). The types are `SignInTextField`, `SignInTextFieldCoordinator`, `PlainLayoutTextField`, `PlainLayoutFieldEditor`, `PlainLayoutLocales`, `KeyboardInputSource`, `SystemKeyboardInputSources` (read the code for the exact names; every mention of `RomanInput…` and of the test `theFocusedFieldAllowsOnlyRomanInputSources` below is superseded). On this Mac (ABC + Simple Telex) the focused field offers ABC, the Character Palette and Dictation, and not Telex.
+2. **Task 9 Step 4's hand check for the field** becomes: with Telex as the current input source, click the email field: the input menu shows the plain layout and Telex cannot be chosen; leave the field: the input source is Telex again. Also type with a third-party tool (Unikey, EVKey) if one is installed: the ASCII rule must keep Send code off and show the sentence.
+3. **One sign-in flow at a time is enforced in `ShellXAccount` in both directions**, and a second email verify is refused while one runs (`email_sign_in_in_progress`); undo and redo in the two fields now report to the model. Known and accepted: the codes `email_sign_in_in_progress` and `google_in_progress` can show raw on the Google path when a sheet is reopened during a slow verify (the Google path is unchanged by this plan); after a failed Google attempt the email field is enabled again but does not get the keyboard back by itself: **Task 8 must give it back** (review of Tasks 4–7, Minor 3).
+
+Task 0 is complete on this Mac (2026-11-12): the Metal toolchain, submodules, the prebuilt GhosttyKit, Rust 1.88 and zig 0.16.0 are in place; `scripts/shellx/test-app.sh ShellXAboutTests` passed after a 25-minute cold compile (DerivedData `cmux-emailsignin-tests`), and the tagged build `--tag emailsignin` succeeded in 15 minutes. The release-Mac fallback (Task 0 Step 8) is not needed. GitHub Actions stays blocked.
+
 ## Global Constraints
 
 - **Relay API.** The source of truth is contracts §29 and, on `develop`, `relay/src/routes/email-sign-in.ts:38-166`, `relay/src/auth/email-codes.ts`, `relay/src/auth/email.ts` and `relay/src/auth/device.ts`. Spec §4 is background:
@@ -320,7 +330,7 @@ What each RPC writes and needs:
   - keeps `device.key`;
   - drops `machine.json` only when the account changed (`auth::save_session`).
 
-  `auth.session` then reports `auth_method: "email"`. On any error nothing is written.
+  `auth.session` then reports `auth_method: "email"`. On any error no session or machine file is written; `device.key` may be created before the request, as `auth.google.finish` and `auth.login` do, because the relay must receive the public key (review of Tasks 1–3, Minor 1).
 - Neither sends a bearer, and neither needs a session.
 - A later call may answer 401 `unauthorized`, for example after the email sign-in is removed on another device or after a Google link to another address. That is handled as for any session.
 
@@ -338,6 +348,7 @@ What each RPC writes and needs:
 | `invalid_device` | finish | The relay's 400 (not expected: the core builds the device) | server sentence |
 | `bad_request` | either | The relay's 400 for a body that is not a JSON object (`relay/src/http/errors.ts:73-75`; not expected: the core builds the body) | server sentence |
 | `network` | either | No answer: offline, DNS, TLS, or the 20 s timeout | the network sentence. A failed Resend keeps the challenge (the relay may or may not have replaced it; a later 410 will tell); a failed verify keeps the digits |
+| `internal_error`, `payload_too_large` | either | relay 500 / 413 with a JSON error code; the core passes the code through unchanged (review of Tasks 1–3) | server sentence |
 | `http_<status>` | either | A non-2xx answer without a JSON error code, for example a 502/503/504 from the proxy while the relay is being deployed | server sentence; a failed Resend keeps the challenge |
 | `server` | either | A 2xx body the core cannot use: a 202 without `challenge_id`, or a 200 without `token`, `user_id`, `device_id` or `email` | server sentence |
 | `not_configured` | either | `config.set` never ran | server sentence |

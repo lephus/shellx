@@ -3,7 +3,7 @@ import Foundation
 /// The signed-in account as kept in the Keychain. The token is a bearer secret: descriptions and
 /// the mirror leave it out.
 /// How the stored session signed in; mirrors the relay's `tokens.auth_method`.
-public enum AccountAuthMethod: String, Codable, Sendable { case password, google, apple }
+public enum AccountAuthMethod: String, Codable, Sendable { case password, google, apple, email }
 
 public struct StoredSession: Codable, Equatable, Sendable, CustomStringConvertible,
     CustomDebugStringConvertible, CustomReflectable

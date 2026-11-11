@@ -216,36 +216,92 @@ final class SignInIntroTests: XCTestCase {
 
     // MARK: - Layout
 
-    func testAPhoneInPortraitGetsTheFullLogoAndTheGuide() {
+    func testAPhoneInPortraitGetsTheLogoTheStepsAndTheSubtitleItHasRoomFor() {
+        // iPhone 16 Pro Max upright: 440 x 860 points inside the safe area.
+        let proMax = SignInLayout(size: CGSize(width: 440, height: 860))
+        XCTAssertEqual(proMax.logoSize, 96)
+        XCTAssertTrue(proMax.showsSubtitle, "tall enough for the subtitle under the taglines")
+        XCTAssertTrue(proMax.showsGuide)
+        XCTAssertTrue(proMax.showsTaglines)
+
+        // iPhone 16 Plus: 430 x 839.
+        let plus = SignInLayout(size: CGSize(width: 430, height: 839))
+        XCTAssertFalse(plus.showsSubtitle, "the email field and Send code take the subtitle's room")
+        XCTAssertTrue(plus.showsGuide)
+
+        // iPhone 16: 393 x 759.
         let iphone16 = SignInLayout(size: CGSize(width: 393, height: 759))
         XCTAssertEqual(iphone16.logoSize, 96)
-        XCTAssertTrue(iphone16.showsSubtitle, "tall enough for the subtitle under the taglines")
+        XCTAssertFalse(iphone16.showsSubtitle)
         XCTAssertTrue(iphone16.showsGuide)
+        XCTAssertTrue(iphone16.showsTaglines)
         XCTAssertFalse(iphone16.sideBySide)
 
+        // iPhone SE: 375 x 647.
         let se = SignInLayout(size: CGSize(width: 375, height: 647))
-        XCTAssertEqual(se.logoSize, 96)
-        XCTAssertFalse(se.showsSubtitle, "under 700 points the taglines replace the subtitle")
-        XCTAssertTrue(se.showsGuide)
+        XCTAssertEqual(se.logoSize, 96, "the steps give way before the large logo")
+        XCTAssertFalse(se.showsSubtitle)
+        XCTAssertFalse(se.showsGuide)
+        XCTAssertTrue(se.showsTaglines)
         XCTAssertFalse(se.sideBySide)
     }
 
-    func testAShortOrSidewaysWindowShrinksTheLogo() {
-        XCTAssertEqual(SignInLayout(size: CGSize(width: 360, height: 599)).logoSize, 72)
-        XCTAssertEqual(SignInLayout(size: CGSize(width: 360, height: 600)).logoSize, 96)
-        XCTAssertEqual(SignInLayout(size: CGSize(width: 1000, height: 800)).logoSize, 72, "landscape, however tall")
+    func testTheIntroGivesWayToTheFieldSubtitleFirstThenTheStepsThenTheLargeLogo() {
+        XCTAssertGreaterThan(SignInLayout.subtitleHeight, SignInLayout.guideHeight)
+        XCTAssertGreaterThan(SignInLayout.guideHeight, SignInLayout.largeLogoHeight)
+        func layout(_ height: CGFloat) -> SignInLayout { SignInLayout(size: CGSize(width: 375, height: height)) }
+        XCTAssertEqual(SignInLayout.subtitleHeight, 845)
+        XCTAssertTrue(layout(845).showsSubtitle)
+        XCTAssertFalse(layout(844).showsSubtitle)
+        XCTAssertEqual(SignInLayout.guideHeight, 756)
+        XCTAssertTrue(layout(756).showsGuide)
+        XCTAssertFalse(layout(755).showsGuide)
+        XCTAssertEqual(layout(755).logoSize, 96)
+        XCTAssertEqual(SignInLayout.largeLogoHeight, 595)
+        XCTAssertEqual(layout(595).logoSize, 96)
+        XCTAssertEqual(layout(594).logoSize, 72)
     }
 
-    func testLandscapePutsTheLogoBesideTheButtonsAndHidesTheGuideUnder400Points() {
+    func testAShortOrSidewaysWindowShrinksTheLogo() {
+        XCTAssertEqual(SignInLayout(size: CGSize(width: 375, height: 594)).logoSize, 72)
+        XCTAssertEqual(SignInLayout(size: CGSize(width: 375, height: 595)).logoSize, 96)
+        XCTAssertEqual(SignInLayout(size: CGSize(width: 1000, height: 800)).logoSize, 72, "on its side, however tall")
+    }
+
+    func testLandscapePutsTheLogoBesideTheFieldAndShowsTheStepsOnlyWhereTheyFit() {
         let iphone16 = SignInLayout(size: CGSize(width: 734, height: 372))
         XCTAssertTrue(iphone16.sideBySide)
         XCTAssertEqual(iphone16.logoSize, 72)
         XCTAssertFalse(iphone16.showsGuide)
         XCTAssertFalse(iphone16.showsSubtitle)
+        XCTAssertTrue(iphone16.showsTaglines)
 
-        let proMax = SignInLayout(size: CGSize(width: 838, height: 419))
+        let proMax = SignInLayout(size: CGSize(width: 832, height: 419))
         XCTAssertTrue(proMax.sideBySide)
-        XCTAssertTrue(proMax.showsGuide, "400 points or more fit the three rows beside the buttons")
+        XCTAssertFalse(proMax.showsGuide, "the field and Send code take the steps' room beside the intro")
+
+        XCTAssertEqual(SignInLayout.sidewaysGuideHeight, 525)
+        XCTAssertTrue(SignInLayout(size: CGSize(width: 832, height: 525)).showsGuide)
+        XCTAssertFalse(SignInLayout(size: CGSize(width: 832, height: 524)).showsGuide)
+        XCTAssertFalse(SignInLayout(size: CGSize(width: 832, height: 900)).showsSubtitle, "never on its side")
+    }
+
+    func testTheKeyboardNeverTurnsTheScreenOnItsSide() {
+        // An iPhone SE upright under a tall keyboard, a Pro Max upright under one, then two phones on their side.
+        let sizes = [CGSize(width: 375, height: 300), CGSize(width: 440, height: 250), CGSize(width: 667, height: 375), CGSize(width: 734, height: 160)]
+        XCTAssertEqual(sizes.map { SignInLayout(size: $0).sideBySide }, [false, false, true, true])
+        XCTAssertEqual(SignInLayout.sidewaysWidth, 500)
+    }
+
+    func testFoldedTheIntroKeepsASmallLogoAndTheTitleWhateverTheRoom() {
+        for size in [CGSize(width: 393, height: 759), CGSize(width: 375, height: 387), CGSize(width: 430, height: 839), CGSize(width: 734, height: 160)] {
+            let folded = SignInLayout(size: size, folded: true)
+            XCTAssertEqual(folded.logoSize, 48, "\(size)")
+            XCTAssertFalse(folded.showsTaglines, "\(size)")
+            XCTAssertFalse(folded.showsSubtitle, "\(size)")
+            XCTAssertFalse(folded.showsGuide, "\(size)")
+            XCTAssertEqual(folded.sideBySide, SignInLayout(size: size).sideBySide, "folding never changes the columns (\(size))")
+        }
     }
 
     func testNothingShowsForAnEmptySizeExceptWhatAlwaysShows() {
@@ -254,6 +310,15 @@ final class SignInIntroTests: XCTestCase {
         XCTAssertFalse(zero.showsGuide)
         XCTAssertFalse(zero.showsSubtitle)
         XCTAssertFalse(zero.sideBySide)
+        XCTAssertTrue(zero.showsTaglines)
+    }
+
+    func testTheEmailFieldAsksForAnEnglishKeyboardWhenTheUserHasOne() {
+        XCTAssertEqual(EmailKeyboard.preferred(among: ["vi-VN", "emoji", "en-US"]), 2)
+        XCTAssertEqual(EmailKeyboard.preferred(among: [nil, "EN-GB", "en-US"]), 1)
+        XCTAssertEqual(EmailKeyboard.preferred(among: ["en"]), 0)
+        XCTAssertNil(EmailKeyboard.preferred(among: ["vi-VN", "emoji", "dictation"]), "no English keyboard: the system chooses")
+        XCTAssertNil(EmailKeyboard.preferred(among: []))
     }
 
     // MARK: - The halo

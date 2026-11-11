@@ -39,8 +39,10 @@ struct TerminalSurface: UIViewRepresentable {
         // The keyboard follows `focused`: the key bar's hide key sets it false; a tap on the surface sets it true. The
         // surface takes the keyboard only when `focused` turns true: after another field took it, `focused` is still
         // true until the surface's loss reaches the pane, and a redraw meanwhile (a terminal that keeps printing) must
-        // not take it back.
+        // not take it back. Likewise it gives the keyboard up only when `focused` turns false: after a tap took it,
+        // `focused` is still false until the surface's report reaches the pane, and a redraw meanwhile must not drop it.
         let turnedOn = focused && !context.coordinator.focused
+        let turnedOff = !focused && context.coordinator.focused
         context.coordinator.focused = focused
         if !view.canBecomeFirstResponder {
             // The page stopped taking input (a retry wait with no view, the Mac went offline, a card covers it): the
@@ -48,7 +50,7 @@ struct TerminalSurface: UIViewRepresentable {
             if view.isFirstResponder { view.resignFirstResponder() }
         } else if turnedOn, !view.isFirstResponder, view.window != nil {
             view.becomeFirstResponder()
-        } else if !focused, view.isFirstResponder {
+        } else if turnedOff, view.isFirstResponder {
             view.resignFirstResponder()
         }
     }

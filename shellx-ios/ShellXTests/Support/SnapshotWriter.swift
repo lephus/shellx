@@ -60,6 +60,9 @@ struct SnapshotWriter {
         let image = UIGraphicsImageRenderer(bounds: bounds, format: UIGraphicsImageRendererFormat()).image { _ in
             window.drawHierarchy(in: bounds, afterScreenUpdates: true)
         }
+        // A field that took the keyboard in this render (the code field does) gives it up before its window goes, so
+        // no keyboard is left up for the tests that follow.
+        window.endEditing(true)
         window.isHidden = true
         window.rootViewController = nil
         return image

@@ -1073,3 +1073,85 @@ three-button bar, 279 dp above the gesture bar (the fit tests keep 300 dp).
 field, the keyboard after coming back from the mail app, the keyboard over the deletion dialog, TalkBack on the first
 screen and the code step, the first screen on the Pixel 3 itself. No parity-ledger row: the iPhone part compares at its
 landing.
+
+## 31. Additions from the email-code sign-in plan, iPhone part
+
+Plan `2026-11-11-shellx-email-code-signin-ios.md` with the user's email-first change of 2026-11-11
+(`.superpowers/sdd/2026-11-11-shellx-email-code-signin/email-first-brief.md`); spec S4. The relay API is §29's. Names
+checked against the branch tip of `feat/shellx-email-code-signin-ios`.
+
+**`ShellXLinkAccount`** (shellx-link): `EmailChallenge { challengeID, expiresIn, resendIn, email }` (descriptions and the
+mirror leave out the challenge id and the address); `RelayAPI.requestEmailCode(email:locale:) -> EmailChallenge`,
+`signInWithEmailCode(challengeID:code:deviceName:clientKey:) -> AccountSignIn`, `deleteAccount(challengeID:code:token:)`.
+A 202 is accepted only with a base64url `challenge_id` of 1–128 characters, `expires_in` > 0, `resend_in` ≥ 0 and an
+email, else `RelayAPIError.badResponse`; every other status keeps the relay's code as `.http(status:code:)`.
+
+**`ShellXAppCore`**
+- `AccountAuthMethod.email` (stored as `"auth_method": "email"`; a session without the field is still `password`; a build
+  from before this part reads an `email` session as unreadable and shows sign-in).
+- `SignInError` gains `invalidEmail`, `disposableEmail`, `invalidCode`, `codeExpired`, `emailSendFailed`;
+  `503 email_sign_in_disabled` and, for the email calls only, `404 not_found` read as `providerUnavailable`;
+  `400 invalid_device` and anything else as `server`. `RelayAccountCalling` gains the three calls.
+- `AppCoordinator.requestEmailCode(email:)`, `signInWithEmailCode(challengeID:code:)`, `requestDeleteAccountCode()`,
+  `deleteAccount(challengeID:code:)`; `deleteAccount()` on an email session throws `.server(code: "code_required")` and
+  calls nothing. `emailSignIn` (one `EmailSignInModel` for the coordinator's life) and `makeDeleteAccountCode()` (a new
+  one per deletion sheet, `autoSubmit` false). `EmailCodeLocale.relayValue(appLanguage:)`: `vi` for Vietnamese, else `en`.
+- `EmailSignInModel` (steps idle, email, sending, code, verifying, done; panels providers, email, code):
+  `looksLikeEmail` refuses text with any character outside ASCII (a Vietnamese Telex keyboard turns "ex" into "ẽ");
+  `emailFieldError` is what shows under the email field (the last failure, else `invalidEmail` while the text has a
+  character outside ASCII); a real change of the address in the email step takes the last failure away (as Android's
+  `setEmail`); over 254 bytes is refused as `invalidEmail` without a request; the Resend countdown is computed from
+  elapsed time on an injected clock.
+
+**Behaviour the other apps can mirror**: one field for the six digits; pasted or autofilled text is cut to its first six
+digits; the sixth digit submits a sign-in and never a deletion; 401 `invalid_code` empties the field and keeps the
+challenge; 410 `code_expired` empties the field, turns it and Verify off until a new code is sent, and ends the Resend
+lock at once; a Resend answered 502 `email_send_failed`, 503 or 404 drops the challenge the same way (the relay replaced
+the old code before it failed to mail the new one), while 429 and a network failure keep the code already mailed;
+409 `switch_from_signed_in_device` goes back to the email step with the address; Delete Account mails the code on the
+press of its button, never when the sheet opens. Nothing of a running sign-in is persisted: after iOS ends the app the
+screen starts over (Android restores the code step).
+
+**App (iPhone)**
+- The first screen is the email step: intro, then the email field with Send code, "or", Continue with Google, Sign in
+  with Apple, "Try without an account". No "Continue with email" button and no Cancel: `signin.email.continue` is unused
+  on the iPhone too and stays in the catalog (no check complains). No focus on arrival. "Session expired", the Apple-link
+  notice and a Google or Apple failure stand over the field; an email failure (or the outside-ASCII hint) under it.
+- The email field is a `UITextField` subclass (`EmailAddressTextField`): `textInputMode` returns the user's first English
+  keyboard when there is one (`EmailKeyboard.preferred(among:)`), else the system's choice; email keyboard,
+  `.emailAddress` content type, no correction, capitalization, spell checking or smart punctuation; return key Send.
+  While the code is asked for it takes no edit and keeps the keyboard. Both fields fill their 50-point box
+  (`BoxedTextField`: the 16-point inset is inside the field), so a tap anywhere in the box reaches them.
+  The code field (`OneTimeCodeTextField`) is UIKit too: number pad, `.oneTimeCode`, each edit cut by the model and
+  written back in the same call. It is off only for a dead code, never while a request runs (the keyboard stays up
+  through a wrong code).
+- `SignInLayout(size:folded:)`: two columns from 500 points of width (never from the height, which a keyboard changes);
+  folded (the keyboard up, an address typed, or the code step) a 48-point logo and the title only; otherwise the intro
+  gives way subtitle first (from 845 points high), then the steps (756), then the 96-point logo (595, else 72); on its
+  side the logo is 72 and the steps need 525, more than any iPhone has. Measured at the default text size, en and vi:
+  the iPhone 16 keeps the steps, the iPhone SE keeps the large logo and drops the steps; both fit without scrolling; at
+  large text sizes the screen scrolls. One view tree for both arrangements (`AnyLayout`), so turning the phone keeps the
+  fields, what is typed and the keyboard. The step switch is not animated (a crossfade drew both steps over each other).
+- `SignInView(…, keyboardUp:)` fixes the keyboard state for render tests. Accessibility ids: `signin.email.field`,
+  `.error`, `.send`, `.or`, `.sentTo`, `.code`, `.verify`, `.resend`, `.change`; `deleteAccount.code`, `.error`,
+  `.delete`, `.cancel`.
+- Settings › Account has no sign-in-method row on the iPhone: the email row's label reads "Email code"
+  (`settings.account.method.email`) for an email session. `AccountActions.deleteCode`;
+  `DeleteAccountSheet(code:close:)` (whole height for the keyboard; no swipe-down while a request runs).
+
+**Strings**: the 18 catalog keys of §30 / Task 1, used under their exact names (`signin.email.sentTo %@`,
+`signin.email.resendIn %lld` carry their argument in the key). The "check your spam folder" sentence is part of
+`signin.email.sentTo %@`; the iPhone draws that sentence verbatim (Markdown would turn the address into a link).
+
+**Test support**: `AppGraph.preview(relay:)` and `AppCoordinator.preview(relay:)` (Debug only); `FakeRelayAccount`'s three
+calls, `setEmailChallenge`, `setEmailSignIn`; `CoordinatorRig` with a `ManualClock` and locale `vi`; the render tests'
+`Bitmap` lives in `ShellXTests/Support/Bitmap.swift` with `band(of:)`, `bands(of:)`, `googleButtonTop()`.
+
+**Seen on the simulator** (iPhone 16, iOS 26.5, a hosted test driving the live screen, no relay): no keyboard on arrival;
+the field brings the email keyboard and folds the intro with the field and Send code above it; "ẽ" shows the hint and
+keeps Send code off; the code step brings the number pad; a wrong code empties the field and keeps the keyboard; "Use a
+different email" returns to the address with the email keyboard.
+
+**Not verified on a device**: everything on a real iPhone (no device here): a real relay and mail, autofill of the code
+from Mail, a third-party or Vietnamese keyboard in the email field (the simulator has only English), VoiceOver, the
+keyboard after coming back from the mail app.
