@@ -54,7 +54,8 @@ public final class ShellXAccount {
     @ObservationIgnored private var waitingFlowID: String?
     @ObservationIgnored private var googleCancelRequested = false
     @ObservationIgnored private var googleToken: UUID?
-    /// Email codes being verified right now (a closed sheet's verify runs on, Ruling 12); Google waits for none.
+    /// Email codes being verified right now, at most one (a closed sheet's verify runs on, Ruling 12); neither Google
+    /// nor another email verify starts while it is above zero.
     @ObservationIgnored private var emailVerifications = 0
 
     public init(service: ShellXRemoteService, openURL: @escaping @MainActor (URL) -> Bool = { _ in false }) {
@@ -194,13 +195,17 @@ public final class ShellXAccount {
     ///   - challengeID: The id from ``requestEmailCode(email:locale:)``.
     ///   - code: The digits as typed.
     /// - Returns: The saved identity.
-    /// - Throws: The core's code (nothing is saved then), or `google_in_progress` while a Google flow waits, so
-    ///   two session writes never race. While it runs, ``signInWithGoogle(purpose:)`` refuses with
-    ///   `email_sign_in_in_progress`.
+    /// - Throws: The core's code (nothing is saved then), `google_in_progress` while a Google flow waits, or
+    ///   `email_sign_in_in_progress` while another code is being verified (a closed sheet's verify runs on), so two
+    ///   session writes never race. While it runs, ``signInWithGoogle(purpose:)`` refuses with
+    ///   `email_sign_in_in_progress` too.
     @discardableResult
     public func signInWithEmailCode(challengeID: String, code: String) async throws -> Identity {
         guard googleStep == .idle else {
             throw ShellXCoreError(code: "google_in_progress", message: "a Google sign-in is waiting")
+        }
+        guard emailVerifications == 0 else {
+            throw ShellXCoreError(code: "email_sign_in_in_progress", message: "an email sign-in code is being verified")
         }
         emailVerifications += 1
         defer { emailVerifications -= 1 }
