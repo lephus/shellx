@@ -1099,8 +1099,9 @@ email, else `RelayAPIError.badResponse`; every other status keeps the relay's co
 - `EmailSignInModel` (steps idle, email, sending, code, verifying, done; panels providers, email, code):
   `looksLikeEmail` refuses text with any character outside ASCII (a Vietnamese Telex keyboard turns "ex" into "ẽ");
   `emailFieldError` is what shows under the email field (the last failure, else `invalidEmail` while the text has a
-  character outside ASCII); over 254 bytes is refused as `invalidEmail` without a request; the Resend countdown is
-  computed from elapsed time on an injected clock.
+  character outside ASCII); a real change of the address in the email step takes the last failure away (as Android's
+  `setEmail`); over 254 bytes is refused as `invalidEmail` without a request; the Resend countdown is computed from
+  elapsed time on an injected clock.
 
 **Behaviour the other apps can mirror**: one field for the six digits; pasted or autofilled text is cut to its first six
 digits; the sixth digit submits a sign-in and never a deletion; 401 `invalid_code` empties the field and keeps the
@@ -1119,6 +1120,8 @@ screen starts over (Android restores the code step).
 - The email field is a `UITextField` subclass (`EmailAddressTextField`): `textInputMode` returns the user's first English
   keyboard when there is one (`EmailKeyboard.preferred(among:)`), else the system's choice; email keyboard,
   `.emailAddress` content type, no correction, capitalization, spell checking or smart punctuation; return key Send.
+  While the code is asked for it takes no edit and keeps the keyboard. Both fields fill their 50-point box
+  (`BoxedTextField`: the 16-point inset is inside the field), so a tap anywhere in the box reaches them.
   The code field (`OneTimeCodeTextField`) is UIKit too: number pad, `.oneTimeCode`, each edit cut by the model and
   written back in the same call. It is off only for a dead code, never while a request runs (the keyboard stays up
   through a wrong code).
