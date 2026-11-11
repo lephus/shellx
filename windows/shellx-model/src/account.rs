@@ -783,7 +783,8 @@ impl AccountFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core_api::{GoogleBegin, GoogleSignIn, SessionInfo, SignInMethod};
+    use crate::core_api::{EmailChallenge, GoogleBegin, GoogleSignIn, SessionInfo, SignInMethod};
+    use crate::email_sign_in::EmailStep;
 
     fn m(id: &str, this: bool) -> MachineInfo {
         MachineInfo {
@@ -1887,5 +1888,615 @@ mod tests {
             DELETE_ACCOUNT_URL,
             "https://shellx.pro/privacy#delete-account"
         );
+    }
+
+    // ----- email code sign-in (D2, D3, D4) -----
+
+    fn challenge(id: &str) -> EmailChallenge {
+        EmailChallenge {
+            challenge_id: id.into(),
+            email: "foo@bar.com".into(),
+            expires_in: 600,
+            resend_in: 60,
+        }
+    }
+
+    fn done() -> GoogleSignIn {
+        google_done("foo@bar.com", "email")
+    }
+
+    fn email_finished(id: &str, r: Result<GoogleSignIn, CoreErr>) -> AccountEvent {
+        AccountEvent::EmailFinished {
+            challenge_id: id.into(),
+            result: r,
+        }
+    }
+
+    fn err(code: &str) -> CoreErr {
+        CoreErr::new(code, "x")
+    }
+
+    fn send() -> AccountEvent {
+        AccountEvent::EmailCodeRequested {
+            email: " Foo@Bar.com ".into(),
+            locale: "vi".into(),
+        }
+    }
+
+    fn begin_call() -> AccountAction {
+        AccountAction::CallEmailBegin {
+            email: "Foo@Bar.com".into(),
+            locale: "vi".into(),
+        }
+    }
+
+    fn submit(text: &str) -> AccountEvent {
+        AccountEvent::EmailCodeSubmitted(text.into())
+    }
+
+    fn finish_call(id: &str, code: &str) -> AccountAction {
+        AccountAction::CallEmailFinish {
+            challenge_id: id.into(),
+            code: code.into(),
+        }
+    }
+
+    fn error_code(f: &AccountFlow) -> Option<&str> {
+        f.email_error().map(|e| e.code.as_str())
+    }
+
+    /// `send()`, then the relay's challenge "c1", both at `now`: the code step.
+    fn to_code(f: &mut AccountFlow, now: u64) {
+        assert_eq!(f.on(send(), now), vec![begin_call()]);
+        assert!(
+            f.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), now)
+                .is_empty()
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+    }
+
+    #[test]
+    fn email_sign_in_runs_email_code_verify_then_lists() {
+        let mut f = logged_out();
+        assert_eq!(f.email_code_epoch(), 0);
+        assert_eq!(f.on(send(), 2), vec![begin_call()]);
+        assert_eq!(f.email_step(), Some(EmailStep::Sending));
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(
+            f.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), 3)
+                .is_empty()
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert_eq!(f.email_sent_to(), Some("foo@bar.com"));
+        assert!(f.email_can_verify());
+        assert_eq!(f.email_code_epoch(), 1);
+        assert_eq!(
+            f.on(submit(" 123 456\n"), 4),
+            vec![finish_call("c1", "123456")]
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Verifying));
+        assert_eq!(f.state(), &AccountState::LoggingIn);
+        assert!(f.login_in_flight());
+        assert_eq!(
+            f.on(email_finished("c1", Ok(done())), 5),
+            vec![AccountAction::CallList]
+        );
+        assert_eq!(f.email_step(), None);
+        let acts = f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 6);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert!(!acts.contains(&AccountAction::CallSession), "{acts:?}");
+        assert_eq!(f.email(), Some("foo@bar.com"));
+        assert_eq!(f.auth_method(), Some("email"));
+        assert!(!f.needs_google_switch());
+    }
+
+    #[test]
+    fn send_code_needs_a_plausible_ascii_address_and_runs_once() {
+        let mut f = logged_out();
+        for bad in ["nope", "phu@ẽample.com"] {
+            let ev = AccountEvent::EmailCodeRequested {
+                email: bad.into(),
+                locale: "en".into(),
+            };
+            assert!(f.on(ev, 2).is_empty(), "{bad}");
+            assert_eq!(f.email_step(), None, "{bad}");
+        }
+        assert_eq!(f.on(send(), 3), vec![begin_call()]);
+        assert!(f.on(send(), 4).is_empty());
+        assert_eq!(f.email_step(), Some(EmailStep::Sending));
+    }
+
+    #[test]
+    fn editing_the_address_clears_the_email_failure() {
+        let mut f = logged_out();
+        f.on(send(), 2);
+        f.on(AccountEvent::EmailBegun(Err(err("rate_limited"))), 3);
+        assert_eq!(f.email_step(), Some(EmailStep::Email));
+        assert_eq!(error_code(&f), Some("rate_limited"));
+        assert!(f.on(AccountEvent::EmailEdited, 4).is_empty());
+        assert_eq!(f.email_error(), None);
+        assert_eq!(f.email_step(), Some(EmailStep::Email));
+
+        let mut g = logged_out();
+        assert!(g.on(AccountEvent::EmailEdited, 2).is_empty());
+        assert_eq!(g.email_step(), None);
+
+        // On the code step an edit changes nothing (the email field is not drawn there).
+        let mut h = logged_out();
+        to_code(&mut h, 1_000);
+        assert_eq!(
+            h.on(AccountEvent::EmailResendRequested, 61_000),
+            vec![begin_call()]
+        );
+        h.on(AccountEvent::EmailBegun(Err(err("rate_limited"))), 61_000);
+        assert!(h.on(AccountEvent::EmailEdited, 61_000).is_empty());
+        assert_eq!(error_code(&h), Some("rate_limited"));
+        assert_eq!(h.email_step(), Some(EmailStep::Code));
+    }
+
+    #[test]
+    fn a_failed_send_returns_to_the_first_screen_with_the_error() {
+        for code in [
+            "invalid_email",
+            "disposable_email",
+            "rate_limited",
+            "email_send_failed",
+            "network",
+            "http_503",
+        ] {
+            let mut f = logged_out();
+            f.on(send(), 2);
+            assert!(f.on(AccountEvent::EmailBegun(Err(err(code))), 3).is_empty());
+            assert_eq!(f.email_step(), Some(EmailStep::Email), "{code}");
+            assert_eq!(error_code(&f), Some(code));
+            assert_eq!(f.state(), &AccountState::LoggedOut, "{code}");
+            assert!(!f.email_can_verify(), "{code}");
+            assert_eq!(f.on(send(), 4), vec![begin_call()], "{code}");
+            assert_eq!(f.email_error(), None, "{code}");
+        }
+    }
+
+    #[test]
+    fn a_relay_without_email_sign_in_keeps_the_app_signed_out() {
+        let mut f = logged_out();
+        f.on(send(), 2);
+        f.on(
+            AccountEvent::EmailBegun(Err(err("email_sign_in_disabled"))),
+            3,
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Email));
+        assert_eq!(error_code(&f), Some("email_sign_in_disabled"));
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.notice(), None);
+    }
+
+    #[test]
+    fn a_wrong_code_empties_the_field_and_stays_on_the_code_step() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        let epoch = f.email_code_epoch();
+        f.on(submit("123456"), 2_000);
+        assert!(
+            f.on(email_finished("c1", Err(err("invalid_code"))), 2_100)
+                .is_empty()
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert_eq!(error_code(&f), Some("invalid_code"));
+        assert!(f.email_can_verify());
+        assert_eq!(f.email_code_epoch(), epoch + 1);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert!(!f.login_in_flight());
+        assert_eq!(
+            f.on(submit("654321"), 2_200),
+            vec![finish_call("c1", "654321")]
+        );
+    }
+
+    #[test]
+    fn an_expired_code_drops_the_challenge_and_unlocks_resend() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        let epoch = f.email_code_epoch();
+        f.on(submit("123456"), 2_000);
+        f.on(email_finished("c1", Err(err("code_expired"))), 5_000);
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert_eq!(error_code(&f), Some("code_expired"));
+        assert!(!f.email_can_verify());
+        assert_eq!(f.email_resend_wait_secs(5_000), 0);
+        assert_eq!(f.email_code_epoch(), epoch + 1);
+        assert!(f.on(submit("123456"), 5_000).is_empty());
+        assert_eq!(
+            f.on(AccountEvent::EmailResendRequested, 5_000),
+            vec![begin_call()]
+        );
+    }
+
+    #[test]
+    fn a_switch_answer_returns_to_the_first_screen() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        let epoch = f.email_code_epoch();
+        f.on(submit("123456"), 2_000);
+        f.on(
+            email_finished("c1", Err(err("switch_from_signed_in_device"))),
+            5_000,
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Email));
+        assert_eq!(error_code(&f), Some("switch_from_signed_in_device"));
+        assert_eq!(f.email_sent_to(), None);
+        assert!(!f.email_can_verify());
+        assert_eq!(f.email_resend_wait_secs(5_000), 0);
+        assert_eq!(f.email_code_epoch(), epoch + 1);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.on(send(), 5_100), vec![begin_call()]);
+    }
+
+    #[test]
+    fn a_disabled_relay_on_verify_keeps_the_code() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        let epoch = f.email_code_epoch();
+        f.on(submit("123456"), 2_000);
+        f.on(
+            email_finished("c1", Err(err("email_sign_in_disabled"))),
+            2_000,
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert_eq!(error_code(&f), Some("email_sign_in_disabled"));
+        assert!(f.email_can_verify());
+        assert_eq!(f.email_resend_wait_secs(2_000), 59);
+        assert_eq!(f.email_code_epoch(), epoch);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(
+            f.on(submit("123456"), 2_100),
+            vec![finish_call("c1", "123456")]
+        );
+    }
+
+    #[test]
+    fn a_verify_refused_for_rate_network_or_server_keeps_the_code() {
+        for code in ["rate_limited", "network", "http_503", "invalid_device"] {
+            let mut f = logged_out();
+            to_code(&mut f, 1_000);
+            let epoch = f.email_code_epoch();
+            f.on(submit("123456"), 2_000);
+            f.on(email_finished("c1", Err(err(code))), 2_000);
+            assert_eq!(f.email_step(), Some(EmailStep::Code), "{code}");
+            assert_eq!(error_code(&f), Some(code));
+            assert!(f.email_can_verify(), "{code}");
+            assert_eq!(f.email_resend_wait_secs(2_000), 59, "{code}");
+            assert_eq!(f.email_code_epoch(), epoch, "{code}");
+            assert_eq!(f.state(), &AccountState::LoggedOut, "{code}");
+            assert!(!f.login_in_flight(), "{code}");
+            assert_eq!(
+                f.on(submit("123456"), 2_100),
+                vec![finish_call("c1", "123456")],
+                "{code}"
+            );
+        }
+    }
+
+    #[test]
+    fn verify_runs_once_for_a_double_submit() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        assert_eq!(
+            f.on(submit("123456"), 2_000),
+            vec![finish_call("c1", "123456")]
+        );
+        assert!(f.on(submit("123456"), 2_000).is_empty());
+        let mut g = logged_out();
+        to_code(&mut g, 1_000);
+        for s in ["12345", "1234567"] {
+            assert!(g.on(submit(s), 2_000).is_empty(), "{s}");
+            assert_eq!(g.email_step(), Some(EmailStep::Code), "{s}");
+        }
+    }
+
+    #[test]
+    fn resend_is_locked_for_the_relays_resend_in() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        assert_eq!(f.email_resend_wait_secs(1_000), 60);
+        assert_eq!(f.email_resend_wait_secs(1_500), 60);
+        assert_eq!(f.email_resend_wait_secs(60_200), 1);
+        assert_eq!(f.email_resend_wait_secs(61_000), 0);
+        assert!(f.on(AccountEvent::EmailResendRequested, 30_000).is_empty());
+        assert_eq!(
+            f.on(AccountEvent::EmailResendRequested, 61_000),
+            vec![begin_call()]
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Sending));
+        assert_eq!(f.email_sent_to(), Some("foo@bar.com"));
+        let epoch = f.email_code_epoch();
+        f.on(AccountEvent::EmailBegun(Ok(challenge("c2"))), 62_000);
+        assert_eq!(f.email_resend_wait_secs(62_000), 60);
+        assert_eq!(f.email_code_epoch(), epoch + 1);
+        assert_eq!(
+            f.on(submit("123456"), 62_100),
+            vec![finish_call("c2", "123456")]
+        );
+    }
+
+    #[test]
+    fn a_failed_resend_keeps_the_challenge_for_rate_limited_and_network() {
+        for code in ["rate_limited", "network", "http_503"] {
+            let mut f = logged_out();
+            to_code(&mut f, 1_000);
+            let epoch = f.email_code_epoch();
+            f.on(AccountEvent::EmailResendRequested, 61_000);
+            f.on(AccountEvent::EmailBegun(Err(err(code))), 61_000);
+            assert_eq!(f.email_step(), Some(EmailStep::Code), "{code}");
+            assert_eq!(error_code(&f), Some(code));
+            assert_eq!(f.email_resend_wait_secs(61_000), 0, "{code}");
+            assert!(f.email_can_verify(), "{code}");
+            assert_eq!(f.email_code_epoch(), epoch, "{code}");
+            assert_eq!(
+                f.on(AccountEvent::EmailResendRequested, 61_000),
+                vec![AccountAction::CallEmailBegin {
+                    email: "Foo@Bar.com".into(),
+                    locale: "vi".into()
+                }],
+                "{code}"
+            );
+            f.on(AccountEvent::EmailBegun(Err(err(code))), 61_000);
+            assert_eq!(f.email_step(), Some(EmailStep::Code), "{code}");
+            assert!(f.email_can_verify(), "{code}");
+            // last: a Resend at Verifying is refused
+            assert_eq!(
+                f.on(submit("123456"), 61_100),
+                vec![finish_call("c1", "123456")],
+                "{code}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_resend_drops_the_challenge_the_relay_lost() {
+        for code in ["email_send_failed", "email_sign_in_disabled"] {
+            let mut f = logged_out();
+            to_code(&mut f, 1_000);
+            let epoch = f.email_code_epoch();
+            f.on(AccountEvent::EmailResendRequested, 61_000);
+            f.on(AccountEvent::EmailBegun(Err(err(code))), 61_000);
+            assert_eq!(f.email_step(), Some(EmailStep::Code), "{code}");
+            assert_eq!(error_code(&f), Some(code));
+            assert!(!f.email_can_verify(), "{code}");
+            assert_eq!(f.email_resend_wait_secs(61_000), 0, "{code}");
+            assert_eq!(f.email_code_epoch(), epoch + 1, "{code}");
+            assert_eq!(f.email_sent_to(), Some("foo@bar.com"), "{code}");
+            assert!(f.on(submit("123456"), 61_100).is_empty(), "{code}");
+            assert_eq!(
+                f.on(AccountEvent::EmailResendRequested, 61_200),
+                vec![begin_call()],
+                "{code}"
+            );
+        }
+    }
+
+    #[test]
+    fn use_a_different_email_returns_to_the_first_screen() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        assert!(f.on(AccountEvent::EmailChangeRequested, 2_000).is_empty());
+        assert_eq!(f.email_step(), Some(EmailStep::Email));
+        assert_eq!(f.email_sent_to(), None);
+        assert_eq!(f.email_error(), None);
+        assert!(!f.email_can_verify());
+        assert_eq!(f.on(send(), 2_100), vec![begin_call()]);
+
+        let mut g = logged_out();
+        to_code(&mut g, 1_000);
+        g.on(submit("123456"), 2_000);
+        assert!(g.on(AccountEvent::EmailChangeRequested, 2_100).is_empty());
+        assert_eq!(g.email_step(), Some(EmailStep::Verifying));
+    }
+
+    #[test]
+    fn closing_while_sending_ignores_the_late_challenge() {
+        let mut f = logged_out();
+        f.on(send(), 2);
+        assert!(f.on(AccountEvent::EmailCancelled, 3).is_empty());
+        assert_eq!(f.email_step(), None);
+        assert_eq!(f.on(send(), 4), vec![begin_call()]);
+        assert_eq!(f.email_step(), Some(EmailStep::Sending));
+        assert!(
+            f.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), 5)
+                .is_empty()
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Sending));
+        f.on(AccountEvent::EmailBegun(Ok(challenge("c2"))), 6);
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert_eq!(f.on(submit("123456"), 7), vec![finish_call("c2", "123456")]);
+    }
+
+    #[test]
+    fn closing_while_verifying_still_signs_in_when_the_code_was_right() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        f.on(submit("123456"), 2_000);
+        assert!(f.on(AccountEvent::EmailCancelled, 2_100).is_empty());
+        assert_eq!(f.email_step(), None);
+        assert_eq!(f.state(), &AccountState::LoggingIn);
+        assert!(f.on(send(), 2_200).is_empty());
+        assert!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2_300)
+                .is_empty()
+        );
+        assert_eq!(
+            f.on(email_finished("c1", Ok(done())), 2_400),
+            vec![AccountAction::CallList]
+        );
+        assert_eq!(f.email(), Some("foo@bar.com"));
+    }
+
+    #[test]
+    fn closing_while_verifying_a_wrong_code_ends_signed_out_without_an_error() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        f.on(submit("123456"), 2_000);
+        f.on(AccountEvent::EmailCancelled, 2_100);
+        assert!(
+            f.on(email_finished("c1", Err(err("invalid_code"))), 2_200)
+                .is_empty()
+        );
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.email_step(), None);
+        assert_eq!(f.email_error(), None);
+        assert_eq!(f.on(send(), 2_300), vec![begin_call()]);
+    }
+
+    #[test]
+    fn reopening_after_a_close_starts_clean() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        assert!(f.on(AccountEvent::EmailCancelled, 2_000).is_empty());
+        assert_eq!(f.email_step(), None);
+        assert_eq!(f.email_sent_to(), None);
+        assert_eq!(f.email_error(), None);
+        assert!(!f.email_can_verify());
+        f.on(send(), 2_100);
+        assert_eq!(f.email_step(), Some(EmailStep::Sending));
+    }
+
+    #[test]
+    fn a_late_list_result_does_not_reset_the_email_step() {
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        assert_eq!(f.state(), &AccountState::Unknown);
+        to_code(&mut f, 1);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+            2,
+        );
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+        assert!(f.email_can_verify());
+    }
+
+    #[test]
+    fn email_and_google_share_the_first_screen() {
+        let mut f = logged_out();
+        f.on(send(), 2);
+        assert!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 3)
+                .is_empty()
+        );
+        f.on(AccountEvent::EmailBegun(Ok(challenge("c1"))), 4);
+        assert!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 5)
+                .is_empty()
+        );
+        assert_eq!(f.email_step(), Some(EmailStep::Code));
+
+        let mut g = logged_out();
+        g.on(send(), 2);
+        g.on(AccountEvent::EmailBegun(Err(err("invalid_email"))), 3);
+        assert_eq!(g.email_step(), Some(EmailStep::Email));
+        assert_eq!(
+            g.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 4),
+            vec![AccountAction::CallGoogleBegin(GooglePurpose::SignIn)]
+        );
+        assert_eq!(g.email_step(), None);
+        assert_eq!(g.email_error(), None);
+        assert!(g.on(send(), 5).is_empty(), "a Google flow is waiting");
+        assert_eq!(g.email_step(), None);
+
+        let mut h = logged_in();
+        assert!(h.on(send(), 2_000).is_empty());
+        assert_eq!(h.email_step(), None);
+    }
+
+    #[test]
+    fn a_stale_email_finish_is_ignored() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        f.on(submit("123456"), 2_000);
+        assert!(f.on(email_finished("c0", Ok(done())), 2_100).is_empty());
+        assert_eq!(f.email_step(), Some(EmailStep::Verifying));
+        assert_eq!(f.email(), None);
+
+        let mut g = logged_out();
+        to_code(&mut g, 1_000);
+        assert!(g.on(email_finished("c1", Ok(done())), 2_000).is_empty());
+        assert_eq!(g.email_step(), Some(EmailStep::Code));
+        assert_eq!(g.email(), None);
+    }
+
+    /// Ruling 35: the core would run an email finish next to a waiting Google flow, so the flow keeps them apart.
+    #[test]
+    fn only_one_sign_in_flow_runs_at_a_time() {
+        let mut f = logged_out();
+        assert_eq!(
+            f.on(AccountEvent::GoogleRequested(GooglePurpose::SignIn), 2),
+            vec![AccountAction::CallGoogleBegin(GooglePurpose::SignIn)]
+        );
+        assert_eq!(
+            f.on(begun(GooglePurpose::SignIn, "g1"), 3),
+            vec![
+                AccountAction::OpenBrowser("https://accounts.google.com/x".into()),
+                AccountAction::CallGoogleFinish("g1".into())
+            ]
+        );
+        assert!(f.on(send(), 4).is_empty());
+        assert!(f.on(submit("123456"), 5).is_empty());
+        assert!(f.on(AccountEvent::EmailResendRequested, 6).is_empty());
+        assert_eq!(f.email_step(), None);
+        assert_eq!(f.google_in_flight(), Some(GooglePurpose::SignIn));
+        f.on(finished("g1", Err(err("google_cancelled"))), 7);
+        assert_eq!(f.google_in_flight(), None);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.on(send(), 8), vec![begin_call()]);
+    }
+
+    #[test]
+    fn an_email_session_ended_by_the_server_signs_out() {
+        let mut f = logged_out();
+        to_code(&mut f, 1_000);
+        f.on(submit("123456"), 2_000);
+        f.on(email_finished("c1", Ok(done())), 2_100);
+        f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 2_200);
+        assert!(matches!(f.state(), AccountState::LoggedIn { .. }));
+        assert_eq!(f.auth_method(), Some("email"));
+        f.on(AccountEvent::Tick(17_200), 17_200);
+        f.on(AccountEvent::ListResult(Err(err("unauthorized"))), 17_300);
+        assert_eq!(f.state(), &AccountState::LoggedOut);
+        assert_eq!(f.auth_method(), None);
+        assert_eq!(f.email(), None);
+        assert_eq!(f.email_step(), None);
+    }
+
+    #[test]
+    fn email_codes_addresses_and_challenges_never_in_debug() {
+        const SECRETS: [&str; 4] = ["foo@bar.com", "Foo@Bar.com", "123456", "CH-SECRET"];
+        let check = |what: &str, text: String| {
+            for s in SECRETS {
+                assert!(!text.contains(s), "{what} shows {s:?}: {text}");
+            }
+        };
+        let ch = challenge("CH-SECRET");
+        check("EmailCodeRequested", format!("{:?}", send()));
+        check(
+            "EmailBegun",
+            format!("{:?}", AccountEvent::EmailBegun(Ok(ch.clone()))),
+        );
+        check("EmailCodeSubmitted", format!("{:?}", submit("123456")));
+        check(
+            "EmailFinished",
+            format!("{:?}", email_finished("CH-SECRET", Ok(done()))),
+        );
+        check("CallEmailBegin", format!("{:?}", begin_call()));
+        check(
+            "CallEmailFinish",
+            format!("{:?}", finish_call("CH-SECRET", "123456")),
+        );
+        assert_eq!(format!("{:?}", AccountEvent::EmailEdited), "EmailEdited");
+
+        let mut f = logged_out();
+        f.on(send(), 2);
+        f.on(AccountEvent::EmailBegun(Ok(ch)), 3);
+        assert!(f.email_can_verify());
+        check("flow", format!("{f:?}"));
+        check("flow (pretty)", format!("{f:#?}"));
     }
 }
