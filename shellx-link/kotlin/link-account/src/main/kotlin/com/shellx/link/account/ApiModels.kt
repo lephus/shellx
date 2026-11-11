@@ -8,9 +8,21 @@ data class AccountSession(val userId: String, val deviceId: String, val token: S
     override fun toString(): String = "AccountSession(user=$userId, device=$deviceId, <redacted>)"
 }
 
-/** A session the relay handed out for a Google sign-in, with the account's email. Neither the token nor the email prints. */
+/**
+ * A session the relay handed out for a sign-in (Google, or an emailed code), with the account's email. Neither the
+ * token nor the email prints.
+ */
 data class AccountSignIn(val session: AccountSession, val email: String) {
     override fun toString(): String = "AccountSignIn(user=${session.userId}, device=${session.deviceId}, <redacted>)"
+}
+
+/**
+ * What the relay answers to a code request (`POST /v1/auth/email/code`): the challenge the mailed code belongs to, how
+ * many seconds the code lives ([expiresIn]) and how long until another one may be asked for ([resendIn]), and the
+ * address as the relay normalized it. Neither the challenge nor the email prints.
+ */
+data class EmailChallenge(val challengeId: String, val expiresIn: Int, val resendIn: Int, val email: String) {
+    override fun toString(): String = "EmailChallenge(expiresIn=$expiresIn, resendIn=$resendIn, <redacted>)"
 }
 
 /** How a phone pairing request stands (`GET /v2/phone-pairings/<id>`). */

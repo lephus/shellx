@@ -3,6 +3,7 @@ package com.shellx.core.testing
 import com.shellx.core.account.RelayAccountCalling
 import com.shellx.link.account.AccountSession
 import com.shellx.link.account.AccountSignIn
+import com.shellx.link.account.EmailChallenge
 import com.shellx.link.account.PairedMachine
 import com.shellx.link.account.PairedMachineListing
 import com.shellx.link.core.PairingOffer
@@ -11,7 +12,11 @@ import kotlinx.coroutines.delay
 
 /**
  * A RelayAccountCalling that records every call and answers from presets (port of FakeRelayAccount.swift, without
- * `login`, with 1C's Google and delete presets and hooks). Thread-safe; no lock is held across a suspension.
+ * `login`, with 1C's Google and delete presets and hooks, and the email-code calls). Thread-safe; no lock is held across
+ * a suspension.
+ *
+ * A code request answers `EmailChallenge("challenge-<n>", 600, 60, <the address trimmed and in lower case>)`, n counting
+ * from 1, as the relay hands out a new challenge each time; a sign-in with a code answers [setEmailSignIn]'s preset.
  *
  * Pairing works like the relay and `PhonePairing`: the offer is parsed (a bad one throws its PairingOfferException),
  * the "Mac" approves after the approval delay, and the paired machine comes from the offer, host key included, unless
@@ -25,6 +30,9 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
         data object Nonce : Call
         data class SignInWithGoogle(val idToken: String, val nonce: String, val deviceName: String, val clientKeyHex: String) : Call
         data class DeleteAccount(val idToken: String, val nonce: String, val token: String) : Call
+        data class RequestEmailCode(val email: String, val locale: String) : Call
+        data class SignInWithEmailCode(val challengeId: String, val code: String, val deviceName: String, val clientKeyHex: String) : Call
+        data class DeleteAccountWithEmailCode(val challengeId: String, val code: String, val token: String) : Call
         data class Logout(val token: String) : Call
         data class Machines(val token: String) : Call
         data class Unpair(val grantId: String, val token: String) : Call
@@ -33,7 +41,10 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
         data class UnsetPushToken(val token: String) : Call
     }
 
-    enum class Function { NONCE, SIGN_IN_WITH_GOOGLE, DELETE_ACCOUNT, LOGOUT, MACHINES, UNPAIR, PAIR, SET_PUSH_TOKEN, UNSET_PUSH_TOKEN }
+    enum class Function {
+        NONCE, SIGN_IN_WITH_GOOGLE, DELETE_ACCOUNT, LOGOUT, MACHINES, UNPAIR, PAIR, SET_PUSH_TOKEN, UNSET_PUSH_TOKEN,
+        REQUEST_EMAIL_CODE, SIGN_IN_WITH_EMAIL_CODE, DELETE_ACCOUNT_WITH_EMAIL_CODE,
+    }
 
     private val lock = Any()
     private val recorded = ArrayList<Call>()
@@ -42,6 +53,9 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
     private var noncesAnswered = 0
     private var googleSignIn: Result<AccountSignIn> =
         Result.success(AccountSignIn(AccountSession("user", "device", "token"), "user@example.com"))
+    private var emailSignIn: Result<AccountSignIn> =
+        Result.success(AccountSignIn(AccountSession("user", "device", "token"), "user@example.com"))
+    private var challengesAnswered = 0
     private val hooks = HashMap<Function, suspend () -> Unit>()
     private val errors = HashMap<Function, Exception>()
     private val grants = ArrayList<PairedMachineListing>()
@@ -62,6 +76,11 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
 
     fun setGoogleSignIn(result: Result<AccountSignIn>) {
         synchronized(lock) { googleSignIn = result }
+    }
+
+    /** What a sign-in with an emailed code answers. */
+    fun setEmailSignIn(result: Result<AccountSignIn>) {
+        synchronized(lock) { emailSignIn = result }
     }
 
     fun setGrants(grants: List<PairedMachineListing>) {
@@ -132,6 +151,21 @@ class FakeRelayAccount(private val sleep: suspend (Duration) -> Unit = { delay(i
 
     override suspend fun deleteAccount(idToken: String, nonce: String, token: String) {
         enter(Call.DeleteAccount(idToken, nonce, token), Function.DELETE_ACCOUNT)
+    }
+
+    override suspend fun requestEmailCode(email: String, locale: String): EmailChallenge {
+        enter(Call.RequestEmailCode(email, locale), Function.REQUEST_EMAIL_CODE)
+        val n = synchronized(lock) { ++challengesAnswered }
+        return EmailChallenge("challenge-$n", 600, 60, email.trim().lowercase())
+    }
+
+    override suspend fun signInWithEmailCode(challengeId: String, code: String, deviceName: String, clientKey: ByteArray): AccountSignIn {
+        enter(Call.SignInWithEmailCode(challengeId, code, deviceName, clientKey.hex()), Function.SIGN_IN_WITH_EMAIL_CODE)
+        return synchronized(lock) { emailSignIn }.getOrThrow()
+    }
+
+    override suspend fun deleteAccountWithEmailCode(challengeId: String, code: String, token: String) {
+        enter(Call.DeleteAccountWithEmailCode(challengeId, code, token), Function.DELETE_ACCOUNT_WITH_EMAIL_CODE)
     }
 
     override suspend fun logout(token: String) {
