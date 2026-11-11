@@ -1244,4 +1244,34 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].program, r"C:\Windows\System32\cmd.exe");
     }
+
+    #[test]
+    fn same_program_folds_case_beyond_ascii() {
+        let p = probe();
+        let upper = r"C:\USERS\PHÚ\TOOLS\PWSH.EXE";
+        let pwsh = r"C:\Users\Phú\tools\pwsh.exe";
+        let winps = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+        let files = [upper, pwsh, winps];
+        let ex = exists_in(&files);
+        let found = vec![
+            ShellLaunch {
+                kind: Some(ShellKind::Pwsh),
+                program: pwsh.into(),
+                args: vec![],
+                osc7_hook: true,
+            },
+            ShellLaunch {
+                kind: Some(ShellKind::WindowsPowerShell),
+                program: winps.into(),
+                args: vec![],
+                osc7_hook: true,
+            },
+        ];
+        let plan = launch_plan(&ShellChoice::Auto, Some(upper), &found, &p, &ex).unwrap();
+        assert_eq!(plan.first.program, upper);
+        assert_eq!(
+            plan.fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+    }
 }

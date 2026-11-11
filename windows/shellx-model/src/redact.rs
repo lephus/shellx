@@ -535,6 +535,45 @@ mod tests {
     }
 
     #[test]
+    fn a_relay_token_with_re_inside_is_not_cut_as_a_resend_key() {
+        // `-re_` inside a longer run: the whole run is a token, nothing stays readable
+        assert_eq!(
+            redact("Bearer AbCdEfGhIjKlMnOpQrSt-re_Wx9z0123456789AbCdE"),
+            "Bearer <token>"
+        );
+        // a 43-character token that starts with `re_`
+        let starts = "re_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-Ab";
+        assert_eq!(starts.len(), 43);
+        for text in [
+            starts.to_string(),
+            format!("Bearer {starts}"),
+            format!("x={starts}"),
+        ] {
+            let out = redact(&text);
+            assert!(!out.contains("AbCd") && !out.contains("0123"), "{out}");
+            assert!(out.ends_with("<token>") || out.ends_with("<key>"), "{out}");
+        }
+        // real Resend keys stay `<key>` alone
+        assert_eq!(redact("Bearer re_AbCdEf123_xyz"), "Bearer <key>");
+        assert_eq!(
+            redact(r#"{"key":"re_AbCdEf123_xyz"}"#),
+            r#"{"key":"<key>"}"#
+        );
+        assert_eq!(
+            redact("RESEND_API_KEY=re_AbCdEf123_xyz"),
+            "RESEND_API_KEY=<key>"
+        );
+        for s in [
+            "Bearer AbCdEfGhIjKlMnOpQrSt-re_Wx9z0123456789AbCdE",
+            "-re_abcdefgh",
+            "a-re_abcdefghij",
+        ] {
+            let once = redact(s);
+            assert_eq!(redact(&once), once, "{s}");
+        }
+    }
+
+    #[test]
     fn redaction_is_idempotent_and_total() {
         let samples = [
             "signed in as phu.le+test@gmail.com via email",
