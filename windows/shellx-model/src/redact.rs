@@ -2,6 +2,15 @@
 //!
 //! Hand-written scanning (no regex crate). The four passes run in this order and repeat
 //! until the text no longer changes.
+//!
+//! Known limits (kept on purpose; each would cost more readable text than it protects):
+//! - A prefix glued to a UUID (`machine-0e7a...`) is one run: it is kept when it is hex and
+//!   dashes only, hidden when the prefix has other letters and the run is 32+ characters.
+//! - Constant names such as `D3D11_CREATE_DEVICE_BGRA_SUPPORT` (32+ characters, with a
+//!   digit) read as tokens.
+//! - A code more than 24 characters away from its keyword, or split (`123 456`), is not hidden;
+//!   neither is an email written `%40` or `\u0040`.
+//! - Hex-only secrets are kept; the relay's secrets are base64url.
 
 /// Shortest run of token characters (without a trailing `=`) that counts as a secret.
 const TOKEN_MIN_CHARS: usize = 32;
@@ -160,19 +169,29 @@ fn is_base64_char(c: char) -> bool {
     is_url_safe_char(c) || c == '+' || c == '/'
 }
 
-/// A URL-safe token: at least 32 characters with a letter and a digit, and not only hex
+/// Looks random rather than like a name: a digit, or both cases well represented (at least
+/// 8 upper-case and 8 lower-case ASCII letters). Random base64url values have a digit in all
+/// but about 1 in 1 600; `SOME_LONG_CONSTANT_NAME` has no lower case and
+/// `CreateSwapChainForCompositionSurfaceHandle` has only 7 capitals.
+fn looks_random(run: &[char]) -> bool {
+    let upper = run.iter().filter(|c| c.is_ascii_uppercase()).count();
+    let lower = run.iter().filter(|c| c.is_ascii_lowercase()).count();
+    run.iter().any(char::is_ascii_digit) || (upper >= 8 && lower >= 8)
+}
+
+/// A URL-safe token: at least 32 characters with a letter, `looks_random`, and not only hex
 /// digits and dashes (machine ids, commit ids and checksums stay readable).
 fn is_url_safe_token(run: &[char]) -> bool {
     run.len() >= TOKEN_MIN_CHARS
         && run.iter().any(char::is_ascii_alphabetic)
-        && run.iter().any(char::is_ascii_digit)
+        && looks_random(run)
         && !run.iter().all(|c| c.is_ascii_hexdigit() || *c == '-')
 }
 
 /// `/` never joins a token, so a path or URL is judged piece by piece. Two kinds of secret
 /// are hidden: (a) a URL-safe run (`[A-Za-z0-9_-]`, 43 characters for the relay's tokens)
 /// that `is_url_safe_token`; (b) a standard base64 run (`[A-Za-z0-9+/_-]`, then any `=`
-/// padding) of at least 32 characters with a digit that contains `+` or ends with `=`.
+/// padding) of at least 32 characters that `looks_random` and contains `+` or ends with `=`.
 fn redact_tokens(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
@@ -192,9 +211,8 @@ fn redact_tokens(text: &str) -> String {
             k += 1;
         }
         let run = &chars[i..j];
-        let standard_base64 = run.len() >= TOKEN_MIN_CHARS
-            && run.iter().any(char::is_ascii_digit)
-            && (run.contains(&'+') || k > j);
+        let standard_base64 =
+            run.len() >= TOKEN_MIN_CHARS && looks_random(run) && (run.contains(&'+') || k > j);
         if standard_base64 {
             out.push_str("<token>");
         } else {
@@ -237,20 +255,30 @@ fn lower(c: char) -> char {
     c.to_lowercase().next().unwrap_or(c)
 }
 
-/// Whether `text[from..to]` holds one of the code words as a whole word: the characters
-/// right before and after it (even outside the window) are not letters, so `encoder`,
-/// `decode`, `Unicode` and `barcode` do not count, while `error_code` and `code=` do.
+/// Whether `text[from..to]` holds one of the code words as a whole word. A word starts after
+/// a non-letter or at a lower-to-upper case change (`signInCode`, `otpCode`), and ends before
+/// a non-letter, or before one `s`/`S` and then a non-letter (`codes`, `OTPs`). The characters
+/// just outside the window count too, so `encoder`, `decode`, `Unicode`, `barcode` and
+/// `codesign` do not match, while `error_code` and `code=` do.
 fn mentions_code(text: &[char], from: usize, to: usize) -> bool {
     (from..to).any(|a| {
         CODE_WORDS.iter().any(|word| {
             let b = a + word.len();
-            b <= to
-                && text[a..b]
+            if b > to
+                || !text[a..b]
                     .iter()
                     .zip(word.iter())
                     .all(|(c, w)| lower(*c) == *w)
-                && (a == 0 || !text[a - 1].is_alphabetic())
-                && text.get(b).is_none_or(|c| !c.is_alphabetic())
+            {
+                return false;
+            }
+            let starts = a == 0
+                || !text[a - 1].is_alphabetic()
+                || (text[a - 1].is_lowercase() && text[a].is_uppercase());
+            let ends = text.get(b).is_none_or(|c| !c.is_alphabetic())
+                || (matches!(text[b], 's' | 'S')
+                    && text.get(b + 1).is_none_or(|c| !c.is_alphabetic()));
+            starts && ends
         })
     })
 }
