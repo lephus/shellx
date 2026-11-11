@@ -3254,6 +3254,186 @@
         }
       }
     },
+    "signin.email.continue": {
+      "comment": "Button under \"or\" on the sign-in screen: opens the email step.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue with email"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếp tục với email"
+          }
+        }
+      }
+    },
+    "signin.email.or": {
+      "comment": "Between the Google and Apple buttons and \"Continue with email\".",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "or"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hoặc"
+          }
+        }
+      }
+    },
+    "signin.email.field": {
+      "comment": "Placeholder and accessibility label of the email field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email address"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Địa chỉ email"
+          }
+        }
+      }
+    },
+    "signin.email.send": {
+      "comment": "Primary button of the email step.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi mã"
+          }
+        }
+      }
+    },
+    "signin.email.sentTo %@": {
+      "comment": "Above the code field; the argument is the address as the relay normalized it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We sent a 6-digit code to %@. If it isn't there in a minute, check your spam folder."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi mã 6 chữ số tới %@. Nếu sau một phút chưa thấy, hãy xem cả thư rác."
+          }
+        }
+      }
+    },
+    "signin.email.code": {
+      "comment": "Placeholder and accessibility label of the code field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "6-digit code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã 6 chữ số"
+          }
+        }
+      }
+    },
+    "signin.email.verify": {
+      "comment": "Primary button of the code step.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xác nhận"
+          }
+        }
+      }
+    },
+    "signin.email.resend": {
+      "comment": "Text button of the code step once the 60-second lock is over.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resend code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi lại mã"
+          }
+        }
+      }
+    },
+    "signin.email.resendIn %lld": {
+      "comment": "The same row while locked; the argument is the seconds left.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resend code in %lld s"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi lại mã sau %lld giây"
+          }
+        }
+      }
+    },
+    "signin.email.change": {
+      "comment": "Text button of the code step: back to the email step.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use a different email"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng email khác"
+          }
+        }
+      }
+    },
     "signin.error.invalidCredentials": {
       "comment": "Sign-in error: the relay refused the Google or Apple sign-in.",
       "extractionState": "manual",
@@ -4766,6 +4946,96 @@
         }
       }
     },
+    "signin.error.invalidEmail": {
+      "comment": "Relay 400 invalid_email, or an address over 254 bytes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That doesn't look like an email address."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Địa chỉ email này chưa đúng."
+          }
+        }
+      }
+    },
+    "signin.error.disposableEmail": {
+      "comment": "Relay 400 disposable_email.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temporary email addresses can't be used. Try another address."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không dùng được địa chỉ email tạm thời. Hãy dùng địa chỉ khác."
+          }
+        }
+      }
+    },
+    "signin.error.invalidCode": {
+      "comment": "Relay 401 invalid_code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That code isn't right. Check the email and try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã chưa đúng. Xem lại email rồi thử lại."
+          }
+        }
+      }
+    },
+    "signin.error.codeExpired": {
+      "comment": "Relay 410 code_expired: expired, already used, or the fifth wrong try.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That code no longer works. Send a new one."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã này không còn dùng được. Hãy gửi mã mới."
+          }
+        }
+      }
+    },
+    "signin.error.emailSendFailed": {
+      "comment": "Relay 502 email_send_failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't send the email. Try again in a moment."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi được email. Thử lại sau giây lát."
+          }
+        }
+      }
+    },
     "signin.apple.linkDenied": {
       "comment": "Back on sign-in after Deny on the Mac.",
       "extractionState": "manual",
@@ -4996,6 +5266,60 @@
           "stringUnit": {
             "state": "translated",
             "value": "Đang xoá…"
+          }
+        }
+      }
+    },
+    "settings.account.method.email": {
+      "comment": "Settings › Account: label of the email row of a session that signed in with an emailed code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã qua email"
+          }
+        }
+      }
+    },
+    "settings.account.delete.codeIntro": {
+      "comment": "Delete Account for an email session, above the code field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We sent a 6-digit code to this account's email address. Enter it to delete the account."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi mã 6 chữ số tới địa chỉ email của tài khoản này. Nhập mã để xoá tài khoản."
+          }
+        }
+      }
+    },
+    "settings.account.delete.codeField": {
+      "comment": "Placeholder and accessibility label of the code field in the deletion sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code from the email"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã trong email"
           }
         }
       }

@@ -39,7 +39,7 @@
     <string name="settings_voice_server">This phone can\'t recognize %1$s on device, so your voice goes to the phone\'s speech recognition service, usually Google\'s servers. ShellX never receives your voice.</string>
     <string name="signin_error_local_wipe_pending">Couldn\'t clear the previous account\'s data on this phone. Try again.</string>
     <string name="signin_error_reauth_required">Sign in with the Google account this ShellX account uses, then try again.</string>
-    <string name="signin_subtitle">Use the Google account you use with ShellX on your Mac.</string>
+    <string name="signin_subtitle">Use the Google account or the email address you use with ShellX on your Mac.</string>
     <string name="terminal_cap_ctrl" translatable="false">ctrl</string>
     <string name="terminal_cap_esc" translatable="false">esc</string>
     <string name="terminal_cap_tab" translatable="false">tab</string>
