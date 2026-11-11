@@ -222,6 +222,44 @@ class VietnameseCatalogTests(unittest.TestCase):
             "settings.account.methods.apple": ("Apple ID", "ID Apple"),
             "settings.account.methods.addedFrom": ("Added from %@", "Thêm từ %@"),
             "settings.account.deleteAccount": ("Delete Account…", "Xóa tài khoản…"),
+            "settings.account.methods.email": ("Email code", "Mã qua email"),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+
+    def test_email_sign_in_errors_read_naturally(self):
+        expected = {  # key: (en, vi), the phone catalog's wording (the plan's String table)
+            "remote.signin.error.invalidEmail": ("That doesn't look like an email address.", "Địa chỉ email này chưa đúng."),
+            "remote.signin.error.disposableEmail": (
+                "Temporary email addresses can't be used. Try another address.",
+                "Không dùng được địa chỉ email tạm thời. Hãy dùng địa chỉ khác."),
+            "remote.signin.error.invalidCode": (
+                "That code isn't right. Check the email and try again.", "Mã chưa đúng. Xem lại email rồi thử lại."),
+            "remote.signin.error.codeExpired": (
+                "That code no longer works. Send a new one.", "Mã này không còn dùng được. Hãy gửi mã mới."),
+            "remote.signin.error.emailSendFailed": (
+                "Couldn't send the email. Try again in a moment.", "Chưa gửi được email. Thử lại sau giây lát."),
+            "remote.signin.error.unavailable": (
+                "This way of signing in isn't available in this build.", "Bản này chưa dùng được cách đăng nhập này."),
+            "remote.signin.error.rateLimited": ("Try again in a few minutes.", "Thử lại sau ít phút."),
+            "remote.signin.error.server": ("ShellX is having a problem. Try again later.", "ShellX đang gặp sự cố. Thử lại sau."),
+        }
+        for key, (en, vi) in expected.items():
+            self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
+
+    def test_email_sign_in_sheet_strings_read_naturally(self):
+        expected = {  # key: (en, vi), the phone catalog's wording (the plan's String table)
+            "remote.signin.email.field": ("Email address", "Địa chỉ email"),
+            "remote.signin.email.send": ("Send code", "Gửi mã"),
+            "remote.signin.email.or": ("or", "hoặc"),
+            "remote.signin.email.sentTo": (
+                "We sent a 6-digit code to %@. If it isn't there in a minute, check your spam folder.",
+                "Đã gửi mã 6 chữ số tới %@. Nếu sau một phút chưa thấy, hãy xem cả thư rác."),
+            "remote.signin.email.code": ("6-digit code", "Mã 6 chữ số"),
+            "remote.signin.email.verify": ("Verify", "Xác nhận"),
+            "remote.signin.email.resend": ("Resend code", "Gửi lại mã"),
+            "remote.signin.email.resendIn": ("Resend code in %@ s", "Gửi lại mã sau %@ giây"),
+            "remote.signin.email.change": ("Use a different email", "Dùng email khác"),
         }
         for key, (en, vi) in expected.items():
             self.assertEqual((self.en(key), self.vi(key)), (en, vi), key)
