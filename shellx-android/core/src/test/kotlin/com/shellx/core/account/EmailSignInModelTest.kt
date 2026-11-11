@@ -140,6 +140,26 @@ class EmailSignInModelTest {
         assertEquals(emptyList(), rig.fake.requested)
     } }
 
+    /**
+     * Gboard's Vietnamese Telex rewrites "ex" as "ẽ" even in an email field: an address with a letter outside ASCII is
+     * one the relay refuses, so Send stays off and no request is spent on it.
+     */
+    @Test fun anAddressWithALetterOutsideAsciiDoesNotLookLikeAnEmail() { runTest {
+        for (bad in listOf("phu@ẽample.com", "phú@example.com", "phu@example.cóm", "phu@ｅxample.com")) {
+            assertFalse(EmailSignInModel.looksLikeEmail(bad), bad)
+        }
+        assertTrue(EmailSignInModel.looksLikeEmail("phu@example.com"))
+
+        val rig = rig()
+        rig.model.start()
+        rig.model.setEmail("phu@ẽample.com")
+        assertFalse(rig.state.canSend)
+        rig.model.send("vi")
+        runCurrent()
+        assertEquals(Step.EMAIL, rig.state.step)
+        assertEquals(emptyList(), rig.fake.requested)
+    } }
+
     @Test fun aLongEmailIsCutAt254() { runTest {
         val rig = rig()
         rig.model.start()
