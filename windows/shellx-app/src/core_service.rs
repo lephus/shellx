@@ -18,9 +18,9 @@ use std::sync::Mutex;
 
 use shellx_model::account::{AccountAction, AccountEvent};
 use shellx_model::core_api::{
-    CoreCall, CoreConfig, CoreErr, config_set, google_begin, google_cancel, google_finish,
-    heartbeat, list_machines, list_sign_in_methods, login, logout, register_machine,
-    remove_sign_in_method, session_info,
+    CoreCall, CoreConfig, CoreErr, config_set, email_begin, email_finish, google_begin,
+    google_cancel, google_finish, heartbeat, list_machines, list_sign_in_methods, login, logout,
+    register_machine, remove_sign_in_method, session_info,
 };
 
 /// The ShellX API (K2). The relay URL is never set here: it comes from
@@ -184,6 +184,19 @@ pub fn run_account_action(
             let result = remove_sign_in_method(core, &identity_id);
             Some(AccountEvent::SignInMethodRemoved {
                 identity_id,
+                result,
+            })
+        }
+        // The relay mails a code (local refusals come back without a request).
+        AccountAction::CallEmailBegin { email, locale } => {
+            Some(AccountEvent::EmailBegun(email_begin(core, &email, &locale)))
+        }
+        // The code is moved into the call and dropped with the action.
+        AccountAction::CallEmailFinish { challenge_id, code } => {
+            let result = email_finish(core, &challenge_id, &code);
+            drop(code);
+            Some(AccountEvent::EmailFinished {
+                challenge_id,
                 result,
             })
         }
