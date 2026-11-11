@@ -21,6 +21,7 @@ import com.shellx.app.ui.signin.SignInContent
 import com.shellx.app.ui.signin.SignInGuide
 import com.shellx.app.ui.signin.SignInLogo
 import com.shellx.app.ui.signin.TypedTagline
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,6 +107,104 @@ class SignInIntroRenderTest {
         }
     }
 
+    /** The mean colour of the 5 × 5 px around ([x], [y]). */
+    private fun mean(shot: Snapshot, x: Int, y: Int): Int {
+        var r = 0
+        var g = 0
+        var b = 0
+        for (dy in -2..2) {
+            for (dx in -2..2) {
+                val argb = shot.pixel(x + dx, y + dy)
+                r += (argb shr 16) and 0xFF
+                g += (argb shr 8) and 0xFF
+                b += argb and 0xFF
+            }
+        }
+        return (0xFF shl 24) or ((r / 25) shl 16) or ((g / 25) shl 8) or (b / 25)
+    }
+
+    /**
+     * The glow 4 dp (12 px) outside the middle of each side of the 96 dp square at (72, 72): above it, right of it,
+     * below it, left of it.
+     */
+    private fun ring(shot: Snapshot): List<Int> =
+        listOf(216 to 60, 371 to 216, 216 to 371, 60 to 216).map { (x, y) -> mean(shot, x, y) }
+
+    /** A colour's hue in degrees: 0 red, 120 green, 240 blue. */
+    private fun hue(argb: Int): Float {
+        val r = ((argb shr 16) and 0xFF).toFloat()
+        val g = ((argb shr 8) and 0xFF).toFloat()
+        val b = (argb and 0xFF).toFloat()
+        val most = maxOf(r, g, b)
+        val spread = most - minOf(r, g, b)
+        if (spread == 0f) return 0f
+        val sixth = when (most) {
+            r -> (g - b) / spread
+            g -> (b - r) / spread + 2
+            else -> (r - g) / spread + 4
+        }
+        return (sixth * 60 + 360) % 360
+    }
+
+    /** How far apart two hues are round the colour wheel, in degrees. */
+    private fun apart(a: Float, b: Float): Float = abs(a - b).let { minOf(it, 360 - it) }
+
+    /** The hues among [colours] that are clearly their own: 40° or more from each one before. */
+    private fun hues(colours: List<Int>): List<Float> =
+        colours.map(::hue).fold(emptyList()) { seen, next -> if (seen.all { apart(it, next) >= 40f }) seen + next else seen }
+
+    @Test
+    fun theGlowIsARingOfColoursThatTurns() {
+        // The glow at its strongest, half a breath after the intro, and a quarter turn (1.5 s) later.
+        val first = SignInLogo.INTRO_MS + 2_000
+        val second = first + 1_500
+        val early = assertRenders("signin-logo-glow-${first}ms") { Page { SignInLogo(96.dp, pose = { SignInLogo.pose(first) }) } }
+        val late = assertRenders("signin-logo-glow-${second}ms") { Page { SignInLogo(96.dp, pose = { SignInLogo.pose(second) }) } }
+        val bare = assertRenders("signin-logo-glow-off") {
+            Page { SignInLogo(96.dp, pose = { SignInLogo.pose(first).copy(glow = 0f) }) }
+        }
+        val still = assertRenders("signin-logo-still") { Page { SignInLogo(96.dp, pose = { SignInLogo.REST }) } }
+        for (index in early.indices) {
+            val name = early[index].file.name
+            val before = ring(early[index])
+            val after = ring(late[index])
+            for (shot in listOf(early[index], late[index])) {
+                val colours = ring(shot)
+                assertTrue(
+                    "${shot.file.name}: colour on every side of the square (chroma ${colours.map(::chroma)})",
+                    colours.all { chroma(it) >= 24 },
+                )
+                assertTrue(
+                    "${shot.file.name}: three or more hues round the square (${colours.map(::hue)})",
+                    hues(colours).size >= 3,
+                )
+            }
+            assertTrue(
+                "$name: 1.5 s later the colours have moved on (above the square: ${hue(before[0])}° then ${hue(after[0])}°)",
+                apart(hue(before[0]), hue(after[0])) >= 30f,
+            )
+            assertTrue(
+                "$name: the glow is behind the square and never over it",
+                inside(early[index], 72) == inside(bare[index], 72),
+            )
+
+            // Without motion (the pose at rest) there is no glow: nothing but the page around the square.
+            val rest = still[index]
+            val page = rest.pixel(rest.width - 1, rest.height - 1)
+            val around = (0 until 432).sumOf { y ->
+                (0 until 432).count { x -> (x !in 72 until 360 || y !in 72 until 360) && rest.pixel(x, y) != page }
+            }
+            assertEquals("${rest.file.name}: no glow around the square", 0, around)
+            assertTrue("${rest.file.name}: the glow's place is the page", ring(rest).all { it == (page or (0xFF shl 24)) })
+            val lit = (0 until 432).sumOf { y ->
+                (0 until 432).count { x ->
+                    (x !in 72 until 360 || y !in 72 until 360) && early[index].pixel(x, y) != early[index].pixel(1178, 0)
+                }
+            }
+            assertTrue("$name: the glow is there, around the square ($lit px)", lit > 20_000)
+        }
+    }
+
     @Test
     fun theStepsAreUnseenUntilTheirTurnThenStay() {
         val before = assertRenders("signin-guide-before") {
@@ -165,9 +264,10 @@ class SignInIntroRenderTest {
         }
     }
 
+    /** The last two are 1.5 s apart: the glow near its strongest, then a quarter turn on and near its faintest. */
     @Test
     fun theScreenWhileTheIntroPlays() {
-        for (ms in listOf(300L, 800L, 3_000L)) {
+        for (ms in listOf(300L, 800L, 3_000L, 4_500L)) {
             assertRenders("signin-intro-${ms}ms") {
                 SignInContent(
                     expired = false, error = null, busy = false, continueWithGoogle = {}, startDemo = {},

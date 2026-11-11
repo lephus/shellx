@@ -7,7 +7,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The animated logo's geometry and timeline: the launcher's mark, a 900 ms intro, a blinking underscore, a glow. */
+/**
+ * The animated logo's geometry and timeline: the launcher's mark, a 900 ms intro, a blinking underscore, a glow of
+ * several colours that turns and breathes.
+ */
 class SignInLogoTest {
     private val slide = SignInLogo.SLIDE_MS
     private val intro = SignInLogo.INTRO_MS
@@ -108,40 +111,113 @@ class SignInLogoTest {
     }
 
     @Test
-    fun theGlowBreathesBetween25And45PercentEveryFourSecondsAfterTheIntro() {
-        assertEquals(0.25f, SignInLogo.GLOW_MIN)
-        assertEquals(0.45f, SignInLogo.GLOW_MAX)
-        assertEquals(4_000L, SignInLogo.GLOW_PERIOD_MS)
-        assertEquals("none during the intro", 0f, SignInLogo.glow(0), 0f)
-        assertEquals(0f, SignInLogo.glow(slide), 0f)
-        assertEquals("it comes up from nothing", 0f, SignInLogo.glow(intro), 1e-6f)
-        val rising = SignInLogo.glow(intro + SignInLogo.GLOW_FADE_IN_MS / 2)
-        assertTrue("coming up ($rising)", rising > 0.05f && rising < 0.25f)
-        assertEquals("brightest half way", 0.45f, SignInLogo.glow(intro + 2_000), 1e-4f)
-        assertEquals("back at the lowest", 0.25f, SignInLogo.glow(intro + 4_000), 1e-4f)
-        assertEquals(0.45f, SignInLogo.glow(intro + 6_000), 1e-4f)
-        assertEquals(0.25f, SignInLogo.glow(intro + 8_000), 1e-4f)
-        val from = intro + SignInLogo.GLOW_FADE_IN_MS
-        for (ms in from..from + 12_000 step 37) {
-            val glow = SignInLogo.glow(ms)
-            assertTrue("$glow at $ms", glow >= 0.25f - 1e-4f && glow <= 0.45f + 1e-4f)
-            assertEquals("the same one loop later", glow, SignInLogo.glow(ms + 4_000), 1e-4f)
-        }
-        val steps = (intro..intro + 2_000 step 20).map { SignInLogo.glow(it) }
-        assertTrue("no jump on the way up", steps.zipWithNext().all { (a, b) -> b >= a && b - a < 0.02f })
+    fun theGlowIsAClosedRingOfTheFiveSoftBrandColours() {
+        // Mint, blue, violet, pink, amber and mint again: the ring has no seam.
+        assertEquals(
+            listOf(0xFF4AF2A1, 0xFF60A5FA, 0xFFA78BFA, 0xFFF472B6, 0xFFFBBF24, 0xFF4AF2A1),
+            SignInLogo.GLOW_COLORS,
+        )
+        assertEquals(SignInLogo.GLOW_COLORS.first(), SignInLogo.GLOW_COLORS.last())
     }
 
     @Test
-    fun aPoseIsTheThreeAtOneMoment() {
-        assertEquals(SignInLogo.Pose(slide = 0f, underscore = 0f, glow = 0f), SignInLogo.pose(0))
+    fun theGlowsColoursTurnClockwiseOnceEverySixSeconds() {
+        assertEquals(6_000L, SignInLogo.GLOW_TURN_MS)
+        assertEquals("nothing turns during the intro", 0f, SignInLogo.turn(0), 0f)
+        assertEquals(0f, SignInLogo.turn(slide), 0f)
+        assertEquals("0 as the glow starts", 0f, SignInLogo.turn(intro), 0f)
+        assertEquals(6f, SignInLogo.turn(intro + 100), 1e-3f)
+        assertEquals("a quarter turn in 1.5 s", 90f, SignInLogo.turn(intro + 1_500), 1e-3f)
+        assertEquals(180f, SignInLogo.turn(intro + 3_000), 1e-3f)
+        assertEquals(270f, SignInLogo.turn(intro + 4_500), 1e-3f)
+        assertEquals("it wraps", 0f, SignInLogo.turn(intro + 6_000), 1e-3f)
+        assertEquals(90f, SignInLogo.turn(intro + 7_500), 1e-3f)
+        assertEquals("forever", 90f, SignInLogo.turn(intro + 6_000 * 5_000 + 1_500), 1e-3f)
+        for (ms in intro..intro + 13_000 step 41) {
+            val turn = SignInLogo.turn(ms)
+            assertTrue("$turn at $ms", turn >= 0f && turn < 360f)
+            assertEquals("the same one turn later", turn, SignInLogo.turn(ms + 6_000), 1e-3f)
+        }
+        val steps = (intro until intro + 6_000 step 20).map { SignInLogo.turn(it) }
+        assertTrue(
+            "linear: 1.2° every 20 ms, clockwise (degrees grow)",
+            steps.zipWithNext().all { (a, b) -> b - a > 1.19f && b - a < 1.21f },
+        )
+    }
+
+    @Test
+    fun theGlowIsStrongerOnADarkPageThanOnALightOne() {
+        assertEquals(0.35f..0.60f, SignInLogo.GLOW_DARK)
+        assertEquals(0.25f..0.45f, SignInLogo.GLOW_LIGHT)
+        assertEquals(SignInLogo.GLOW_DARK, SignInLogo.glowRange(dark = true))
+        assertEquals(SignInLogo.GLOW_LIGHT, SignInLogo.glowRange(dark = false))
+    }
+
+    @Test
+    fun theGlowComesUpAfterTheIntroAndBreathesEveryFourSeconds() {
+        assertEquals(4_000L, SignInLogo.GLOW_PERIOD_MS)
+        assertEquals("none during the intro", 0f, SignInLogo.glow(0), 0f)
+        assertEquals(0f, SignInLogo.glow(slide), 0f)
+        assertEquals("it comes up from nothing", 0f, SignInLogo.glow(intro), 0f)
+        assertEquals(0.5f, SignInLogo.glow(intro + SignInLogo.GLOW_FADE_IN_MS / 2), 1e-6f)
+        assertEquals("all of it", 1f, SignInLogo.glow(intro + SignInLogo.GLOW_FADE_IN_MS), 0f)
+        assertEquals(1f, SignInLogo.glow(3_600_000), 0f)
+
+        assertEquals("the breath starts at its faintest", 0f, SignInLogo.breath(0), 0f)
+        assertEquals(0f, SignInLogo.breath(intro), 0f)
+        assertEquals("strongest half way", 1f, SignInLogo.breath(intro + 2_000), 1e-6f)
+        assertEquals("back at the faintest", 0f, SignInLogo.breath(intro + 4_000), 1e-6f)
+        assertEquals(1f, SignInLogo.breath(intro + 6_000), 1e-6f)
+        assertEquals(0.5f, SignInLogo.breath(intro + 1_000), 1e-6f)
+        for (ms in intro..intro + 12_000 step 37) {
+            val breath = SignInLogo.breath(ms)
+            assertTrue("$breath at $ms", breath >= 0f && breath <= 1f)
+            assertEquals("the same one loop later", breath, SignInLogo.breath(ms + 4_000), 1e-5f)
+        }
+    }
+
+    @Test
+    fun theGlowsOpacityBreathesWithinItsRangeInDarkAndInLight() {
+        for ((dark, range) in listOf(true to 0.35f..0.60f, false to 0.25f..0.45f)) {
+            val opacity = { ms: Long -> SignInLogo.pose(ms).glowOpacity(dark) }
+            assertEquals("dark $dark: none during the intro", 0f, opacity(0), 0f)
+            assertEquals(0f, opacity(intro), 0f)
+            val rising = opacity(intro + SignInLogo.GLOW_FADE_IN_MS / 2)
+            assertTrue("dark $dark: coming up ($rising)", rising > 0.05f && rising < range.start)
+            assertEquals("dark $dark: brightest half way", range.endInclusive, opacity(intro + 2_000), 1e-4f)
+            assertEquals("dark $dark: back at the lowest", range.start, opacity(intro + 4_000), 1e-4f)
+            assertEquals(range.endInclusive, opacity(intro + 6_000), 1e-4f)
+            assertEquals(range.start, opacity(intro + 8_000), 1e-4f)
+            val from = intro + SignInLogo.GLOW_FADE_IN_MS
+            for (ms in from..from + 12_000 step 37) {
+                val now = opacity(ms)
+                assertTrue("dark $dark: $now at $ms", now >= range.start - 1e-4f && now <= range.endInclusive + 1e-4f)
+                assertEquals("the same one loop later", now, opacity(ms + 4_000), 1e-4f)
+            }
+            val steps = (intro..intro + 2_000 step 20).map { opacity(it) }
+            assertTrue("dark $dark: no jump on the way up", steps.zipWithNext().all { (a, b) -> b >= a && b - a < 0.03f })
+        }
+        assertEquals("no glow at rest, in dark", 0f, SignInLogo.REST.glowOpacity(dark = true), 0f)
+        assertEquals("and in light", 0f, SignInLogo.REST.glowOpacity(dark = false), 0f)
+    }
+
+    @Test
+    fun aPoseIsTheFiveAtOneMoment() {
+        assertEquals(SignInLogo.Pose(slide = 0f, underscore = 0f, glow = 0f, breath = 0f, turn = 0f), SignInLogo.pose(0))
         for (ms in listOf(100L, slide, intro, intro + 700, intro + 2_000, 60_000L)) {
-            val expected = SignInLogo.Pose(SignInLogo.slide(ms), SignInLogo.underscore(ms), SignInLogo.glow(ms))
+            val expected = SignInLogo.Pose(
+                slide = SignInLogo.slide(ms),
+                underscore = SignInLogo.underscore(ms),
+                glow = SignInLogo.glow(ms),
+                breath = SignInLogo.breath(ms),
+                turn = SignInLogo.turn(ms),
+            )
             assertEquals("at $ms", expected, SignInLogo.pose(ms))
         }
     }
 
     @Test
     fun withoutMotionTheLogoRestsAsTheLauncherShowsIt() {
-        assertEquals(SignInLogo.Pose(slide = 1f, underscore = 1f, glow = 0f), SignInLogo.REST)
+        assertEquals(SignInLogo.Pose(slide = 1f, underscore = 1f, glow = 0f, breath = 0f, turn = 0f), SignInLogo.REST)
     }
 }
