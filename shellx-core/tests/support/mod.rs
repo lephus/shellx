@@ -108,3 +108,10 @@ pub fn google_sign_in(core: &Core, purpose: &str) -> Result<Value, shellx_core::
     let _ = browser.join();
     done
 }
+
+/// begin, read the fake's mailbox, finish; finish's result.
+pub fn email_sign_in(core: &Core, fake: &FakeApi, email: &str) -> Result<Value, shellx_core::CoreError> {
+    let begun = core.call("auth.email.begin", json!({"email": email, "locale": "en"}))?;
+    let code = fake.email_code(begun["email"].as_str().unwrap()).expect("the fake mailed a code");
+    core.call("auth.email.finish", json!({"challenge_id": begun["challenge_id"], "code": code}))
+}

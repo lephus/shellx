@@ -6,6 +6,7 @@
 pub mod account;
 pub mod api;
 pub mod auth;
+pub mod auth_email;
 pub mod auth_google;
 pub mod config;
 pub mod envelope;
