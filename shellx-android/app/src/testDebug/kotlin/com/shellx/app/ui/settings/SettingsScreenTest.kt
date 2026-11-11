@@ -363,7 +363,8 @@ class SettingsScreenTest {
 
         assertEquals(listOf("phu@example.com" to "en"), requests)
         rule.onNodeWithTag("delete.code.intro").assertTextEquals(string(R.string.settings_account_delete_code_intro))
-        rule.onNodeWithText("phu@example.com").assertIsDisplayed()
+        // In the card: the e-mail row behind the dialog shows the address too.
+        rule.onNode(hasText("phu@example.com") and hasAnyAncestor(isDialog())).assertIsDisplayed()
         rule.onNodeWithTag("delete.code.resend").assertTextEquals("Resend code in 60 s").assertIsNotEnabled()
         rule.onNodeWithTag("delete.confirm").assertIsNotEnabled()
 

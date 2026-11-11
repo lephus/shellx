@@ -248,7 +248,7 @@ internal fun CodeStep(state: EmailSignInState, calls: EmailStepCalls, autoFocus:
 /**
  * The six-digit field (sign-in and Delete Account): one field, so a paste and an autofill land whole and TalkBack reads
  * one. It shows digits only, at most six of them, whatever is typed or pasted ("123 456", a whole sentence). [onDone] is
- * the keyboard's Done. The test tag comes with [modifier].
+ * the keyboard's Done, which also puts the keyboard down. The test tag comes with [modifier].
  *
  * The field shows what is typed at once and reports it with [onCode]. It takes [code] back when [revision] changes and
  * [code] is not what it shows: hand in the state [code] comes from, so that a code the model emptied in the same frame
@@ -279,7 +279,13 @@ fun EmailCodeField(
         textStyle = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace, letterSpacing = 4.sp),
         singleLine = true,
         keyboardOptions = EmailStepFields.CODE_KEYBOARD,
-        keyboardActions = KeyboardActions(onDone = { onDone() }),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                onDone()
+                // And the keyboard goes down, as Done does on any field.
+                defaultKeyboardAction(ImeAction.Done)
+            },
+        ),
     )
 }
 

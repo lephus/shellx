@@ -45,6 +45,7 @@ import com.shellx.app.ui.signin.EmailSignInSaver
 import com.shellx.app.ui.signin.SignInView
 import com.shellx.app.ui.workspaces.OtherSessionsView
 import com.shellx.app.ui.workspaces.WorkspaceView
+import com.shellx.core.account.AccountAuthMethod
 import com.shellx.core.account.AppPhase
 import com.shellx.core.account.EmailCodeActions
 import com.shellx.core.account.EmailSignInModel
@@ -184,7 +185,19 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
                     val phase by active.coordinator.phase.collectAsStateWithLifecycle()
                     val appearance by composition.appearance.appearance.collectAsStateWithLifecycle()
                     val account = remember(active) {
-                        if (active.isDemo) null else AccountActions({ active.coordinator.signOut() }, { active.coordinator.deleteAccount() })
+                        if (active.isDemo) {
+                            null
+                        } else {
+                            AccountActions(
+                                signOut = { active.coordinator.signOut() },
+                                deleteAccount = { active.coordinator.deleteAccount() },
+                                // The code goes to the session's own address, whatever the card hands in.
+                                emailDeletion = EmailCodeActions(
+                                    requestCode = { _, locale -> active.coordinator.requestAccountDeletionCode(locale) },
+                                    verify = { challengeId, code -> active.coordinator.deleteAccountWithEmailCode(challengeId, code) },
+                                ),
+                            )
+                        }
                     }
                     SettingsScreen(
                         email = (phase as? AppPhase.SignedIn)?.email.orEmpty(),
@@ -197,6 +210,8 @@ fun ShellXNavHost(composition: AppComposition, nav: NavHostController, modifier:
                         back = navigator::back,
                         // The real account's, as the automatic ask's (SignedInFrame).
                         settings = composition.settings,
+                        authMethod = (phase as? AppPhase.SignedIn)?.authMethod ?: AccountAuthMethod.GOOGLE,
+                        clock = composition.clock,
                     )
                 }
             }
