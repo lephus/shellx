@@ -44,6 +44,8 @@ struct SignInGuideView: View {
                 let time = context.date.timeIntervalSince(start)
                 steps(progress: (0..<Self.rows).map { Self.progress(row: $0, at: time) })
             }
+        case let .at(time):
+            steps(progress: (0..<Self.rows).map { Self.progress(row: $0, at: time) })
         case .still:
             steps(progress: Array(repeating: 1, count: Self.rows))
         }

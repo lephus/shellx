@@ -9,9 +9,10 @@ import XCTest
 /// settled), where the buttons must be in place from the first frame, the cursor must follow the typed letters
 /// and the glow must fade out by itself.
 ///
-/// A test run draws the intro still. The frames of the running intro pass `motion: .animated` and place its start
-/// in the future or the past, so what they show does not depend on how long the render takes; the typed line and
-/// its cursor are also drawn for a given frame of the typewriter, with no clock at all.
+/// A test run draws the intro still. A frame of the running intro is drawn for a given moment (`motion: .at(…)`),
+/// and the typed line for a given frame of the typewriter: no test here depends on when or how fast it runs. The
+/// one test that lets the parts read the clock places their start an hour away, where what they show no longer
+/// changes.
 @MainActor
 final class SignInRenderTests: XCTestCase {
     /// iPhone SE (3rd generation), portrait: 375 x 667 points, 20 points of status bar.
@@ -25,11 +26,28 @@ final class SignInRenderTests: XCTestCase {
         size: CGSize(width: 956, height: 440), safeArea: EdgeInsets(top: 0, leading: 62, bottom: 21, trailing: 62)
     )
 
-    private func signIn(
-        motion: SignInIntroMotion? = nil, start: Date = Date(), expired: Bool = false, error: SignInError? = nil
-    ) -> SignInView {
-        SignInView(
-            coordinator: .preview(), expired: expired, startDemo: {}, initialError: error, motion: motion, introStart: start)
+    private func signIn(motion: SignInIntroMotion? = nil, expired: Bool = false, error: SignInError? = nil) -> SignInView {
+        SignInView(coordinator: .preview(), expired: expired, startDemo: {}, initialError: error, motion: motion)
+    }
+
+    /// iPhone 16, upright: 393 x 852 points, the island above, the home indicator below.
+    private static let portrait = (size: SnapshotWriter.size, safeArea: EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0))
+
+    /// Moments of the intro, in seconds after its start.
+    private enum Moment {
+        /// The start: the chevrons are outside the square, nothing is typed, no step shows.
+        static let start: TimeInterval = 0
+        /// The 14th letter of the first tagline has just been typed; the cursor is on, as always while typing.
+        static let typing = TypedTaglineView.startDelay + 13.5 * 0.028
+        /// The underscore is on again after two blinks and the glow is near the top of its first breath.
+        static let glowing = SignInIntro.end + 4 * CursorBlink.half
+        /// The underscore is on again after four blinks and the glow near its weakest, at the start of its second breath.
+        static let faint = SignInIntro.end + 8 * CursorBlink.half
+        /// The glow at the very top of its breath.
+        static let brightest = SignInIntro.end + SignInIntro.glowBreath / 2
+
+        /// The first tagline (`letters` long) is whole and has been held for 0.2 s: its cursor is still on.
+        static func held(letters: Int) -> TimeInterval { TypedTaglineView.startDelay + Double(letters) * 0.028 + 0.2 }
     }
 
     private func bitmaps(_ images: [UIImage], file: StaticString = #filePath, line: UInt = #line) throws -> [Bitmap] {
@@ -126,29 +144,95 @@ final class SignInRenderTests: XCTestCase {
         }
     }
 
-    func testBeforeTheIntroTheChevronsAreOutsideTheSquareAndThenTheyAreInPlace() throws {
-        let side: CGFloat = 240
-        let rest = try bitmaps(SnapshotWriter().write(stage(SignInLogoView(size: side, motion: .still)), name: "signin-logo"))
-        let before = try bitmaps(SnapshotWriter().write(
-            stage(SignInLogoView(size: side, motion: .animated, start: Date().addingTimeInterval(60))), name: "signin-logo-before"))
-        let after = try bitmaps(SnapshotWriter().write(
-            stage(SignInLogoView(size: side, motion: .animated, start: Date().addingTimeInterval(-30))), name: "signin-logo-after",
-            settle: 0.2))
+    private func logo(_ motion: SignInIntroMotion, start: Date = Date(), name: String) throws -> [Bitmap] {
+        try bitmaps(SnapshotWriter().write(stage(SignInLogoView(size: 240, motion: motion, start: start)), name: name))
+    }
+
+    /// The pixels the mark lights up: the chevrons and the underscore, mint on the left, near white on the right.
+    private static let bright: (Bitmap.Colour) -> Bool = { $0.brightest > 200 }
+    /// The pixels in the glow's mint, on the black stage: also the mint chevron, the underscore and the square's
+    /// inner light, which the still logo has too.
+    private static let mint: (Bitmap.Colour) -> Bool = { $0.g > 25 && $0.g > $0.r + 10 }
+
+    func testTheChevronsAreOutsideTheSquareAtTheStartAndInPlaceOnceSettled() throws {
+        let rest = try logo(.still, name: "signin-logo")
+        let before = try logo(.at(Moment.start), name: "signin-logo-before")
+        let glowing = try logo(.at(Moment.glowing), name: "signin-logo-after")
+        let faint = try logo(.at(Moment.faint), name: "signin-logo-after-faint")
         for index in rest.indices {
             let scale = rest[index].scale
-            // The chevrons and the underscore are the only bright things on the stage: mint on the left, near white
-            // on the right. Together they cover some 8,000 square points of a 240-point logo.
-            let bright = rest[index].count { $0.brightest > 200 }
-            XCTAssertGreaterThan(bright, 6000 * scale * scale, "at rest the chevrons are drawn")
-            XCTAssertEqual(before[index].count { $0.brightest > 200 }, 0, "before the intro starts the square is empty")
-            let settled = after[index].count { $0.brightest > 200 }
-            XCTAssertGreaterThan(settled, bright * 9 / 10, "after it they are in place (the underscore may be off)")
-            XCTAssertLessThanOrEqual(settled, bright + 50 * scale * scale, "and nothing else is")
-            let mint: (Bitmap.Colour) -> Bool = { $0.g > 25 && $0.g > $0.r + 10 }
+            // Together the chevrons and the underscore cover some 8,000 square points of a 240-point logo.
+            let mark = rest[index].count(where: Self.bright)
+            XCTAssertGreaterThan(mark, 6000 * scale * scale, "at rest the chevrons are drawn")
+            XCTAssertEqual(before[index].count(where: Self.bright), 0, "at the start the square is empty")
+            // On the black stage, what is lit is the 240-point square and, once it is there, the glow around it.
+            let square = try XCTUnwrap(before[index].litBox())
+            XCTAssertEqual(square.width, CGFloat(240 * scale), accuracy: CGFloat(2 * scale), "and there is no glow yet")
+            XCTAssertEqual(square.height, CGFloat(240 * scale), accuracy: CGFloat(2 * scale))
+            XCTAssertGreaterThan(try XCTUnwrap(glowing[index].litBox()).width, CGFloat((240 + 40) * scale), "the glow reaches past the square")
+            for (settled, least) in [(glowing[index], 12000), (faint[index], 3000)] {
+                XCTAssertEqual(
+                    settled.count(where: Self.bright), mark, accuracy: 4 * scale * scale,
+                    "settled, with the underscore on, the mark is the mark at rest")
+                XCTAssertGreaterThan(
+                    settled.count(where: Self.mint) - rest[index].count(where: Self.mint), least * scale * scale,
+                    "and a mint glow lies around the square, which the still logo does not have")
+            }
             XCTAssertGreaterThan(
-                after[index].count(where: mint) - rest[index].count(where: mint), 5000 * scale * scale,
-                "and a mint glow lies around the square, which the still logo does not have")
+                glowing[index].count(where: Self.mint), faint[index].count(where: Self.mint) + 6000 * scale * scale,
+                "the glow breathes: more of it near the top of a breath")
         }
+    }
+
+    func testOnTheClockThePartsAreAsAtTheStartBeforeItAndAtRestLongAfter() throws {
+        // The running intro reads the clock. With its start an hour ahead it shows what it shows at the start, and
+        // with its start an hour back, what no longer changes: the chevrons in place, the three steps. Neither
+        // depends on when the frame is drawn.
+        let ahead = Date().addingTimeInterval(3600)
+        let back = Date().addingTimeInterval(-3600)
+
+        XCTAssertEqual(
+            try SnapshotWriter().write(stage(SignInLogoView(size: 240, motion: .animated, start: ahead)), name: "signin-logo-clock-before")
+                .map { $0.pngData() },
+            try SnapshotWriter().write(stage(SignInLogoView(size: 240, motion: .at(Moment.start))), name: "signin-logo-before").map { $0.pngData() },
+            "the logo before its start")
+        let rest = try logo(.still, name: "signin-logo")
+        let running = try logo(.animated, start: back, name: "signin-logo-clock-after")
+        for index in rest.indices {
+            let scale = rest[index].scale
+            let mark = rest[index].count(where: Self.bright)
+            let settled = running[index].count(where: Self.bright)
+            XCTAssertGreaterThan(settled, mark * 9 / 10, "the chevrons are in place (the underscore may be off)")
+            XCTAssertLessThanOrEqual(settled, mark + 4 * scale * scale, "and nothing else is lit")
+            XCTAssertGreaterThan(
+                running[index].count(where: Self.mint) - rest[index].count(where: Self.mint), 3000 * scale * scale,
+                "with the glow around the square, at any point of its breath")
+        }
+
+        func steps(_ motion: SignInIntroMotion, start: Date = Date(), name: String) throws -> [Data?] {
+            let guide = SignInGuideView(motion: motion, start: start)
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Color.appBackground)
+            return try SnapshotWriter().write(guide, name: name, size: CGSize(width: 393, height: 200), safeArea: EdgeInsets())
+                .map { $0.pngData() }
+        }
+        XCTAssertEqual(try steps(.animated, start: ahead, name: "signin-guide-clock-before"), try steps(.at(Moment.start), name: "signin-guide-before"))
+        XCTAssertEqual(try steps(.animated, start: back, name: "signin-guide-clock-after"), try steps(.still, name: "signin-guide"))
+        XCTAssertNotEqual(try steps(.at(Moment.start), name: "signin-guide-before"), try steps(.still, name: "signin-guide"))
+
+        func tagline(_ motion: SignInIntroMotion, start: Date = Date(), name: String) throws -> [Data?] {
+            let line = TypedTaglineView(motion: motion, start: start)
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Color.appBackground)
+            return try SnapshotWriter().write(line, name: name, size: CGSize(width: 393, height: 120), safeArea: EdgeInsets())
+                .map { $0.pngData() }
+        }
+        XCTAssertEqual(
+            try tagline(.animated, start: ahead, name: "signin-tagline-clock-before"), try tagline(.at(Moment.start), name: "signin-tagline-before"),
+            "the tagline before its start: no letter, the cursor waiting")
+        XCTAssertNotEqual(try tagline(.at(Moment.start), name: "signin-tagline-before"), try tagline(.still, name: "signin-tagline-still"))
     }
 
     // MARK: - The intro and the buttons
@@ -161,8 +245,7 @@ final class SignInRenderTests: XCTestCase {
 
     func testTheButtonsAreInPlaceBeforeTheIntroHasStarted() throws {
         let still = try bitmaps(SnapshotWriter().write(signIn(motion: .still), name: "signin-intro"))
-        let before = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .animated, start: Date().addingTimeInterval(60)), name: "signin-intro-before"))
+        let before = try bitmaps(SnapshotWriter().write(signIn(motion: .at(Moment.start)), name: "signin-intro-before"))
         for (still, before) in zip(still, before) {
             let buttons = try XCTUnwrap(still.firstRowWithAWhiteRun())
             XCTAssertEqual(before.firstRowWithAWhiteRun(), buttons, "the buttons are where they will stay, from the first frame")
@@ -176,24 +259,24 @@ final class SignInRenderTests: XCTestCase {
 
     func testWhileATaglineIsTypedNothingUnderItMoves() throws {
         let still = try bitmaps(SnapshotWriter().write(signIn(motion: .still), name: "signin-intro"))
-        // 0.6 s for the logo, then 0.4 s of typing: some 14 letters of the first tagline, and the cursor.
-        let typing = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .animated, start: Date().addingTimeInterval(-1.0)), name: "signin-intro-typing"))
-        let settled = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .animated, start: Date().addingTimeInterval(-2.0)), name: "signin-intro-settled", settle: 0.2))
+        let typing = try bitmaps(SnapshotWriter().write(signIn(motion: .at(Moment.typing)), name: "signin-intro-typing"))
+        let held = try bitmaps(SnapshotWriter().write(
+            signIn(motion: .at(Moment.held(letters: TypedTaglineView.lines()[0].count))), name: "signin-intro-settled"))
         for (index, style) in [UIUserInterfaceStyle.light, .dark].enumerated() {
             let buttons = try XCTUnwrap(still[index].firstRowWithAWhiteRun())
-            XCTAssertEqual(typing[index].firstRowWithAWhiteRun(), buttons)
-            XCTAssertEqual(settled[index].firstRowWithAWhiteRun(), buttons)
-            XCTAssertEqual(settled[index].differingRows(to: still[index], fromRow: buttons - 8), 0)
-
-            // The still screen has the theme's green in the steps' numbers only; while a line is typed, the cursor
-            // is on and adds a block of it (some 4 by 24 points).
+            // The still screen has the theme's green in the steps' numbers only; a typed line adds its cursor, a
+            // block of it some 4 by 27 points.
             let green = try XCTUnwrap(Bitmap.Colour(UIColor(named: "StatusDone"), style: style))
             let scale = still[index].scale
-            let cursor = typing[index].count { $0.distance(to: green) < 24 } - still[index].count { $0.distance(to: green) < 24 }
-            XCTAssertGreaterThan(cursor, 40 * scale * scale, "the cursor is drawn after the typed letters")
-            XCTAssertLessThan(cursor, 400 * scale * scale, "and it is one small block")
+            let numbers = still[index].count { $0.distance(to: green) < 24 }
+            for (frame, what) in [(typing[index], "while 14 letters are typed"), (held[index], "while the whole line is held")] {
+                XCTAssertEqual(frame.firstRowWithAWhiteRun(), buttons, "the buttons stay where they are \(what)")
+                XCTAssertEqual(
+                    frame.differingRows(to: still[index], fromRow: buttons - 8), 0, "and so does everything under them \(what)")
+                let cursor = frame.count { $0.distance(to: green) < 24 } - numbers
+                XCTAssertGreaterThan(cursor, 60 * scale * scale, "the cursor is drawn \(what)")
+                XCTAssertLessThan(cursor, 200 * scale * scale, "and it is one small block \(what)")
+            }
         }
     }
 
@@ -446,31 +529,38 @@ final class SignInRenderTests: XCTestCase {
     func testTheGlowIsNotCutWhereTheSafeAreaBegins() throws {
         // The glow lies outside the logo, in the padding around it, and reaches a little further. It must fade out
         // on its own: no step where the safe area begins (the island's side with the phone on its side, the status
-        // bar upright).
+        // bar upright). Drawn at the top of a breath, where it is strongest.
         let landscape = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .animated, start: Date().addingTimeInterval(-2.0)), name: "signin-landscape-settled",
-            size: Self.landscape.size, safeArea: Self.landscape.safeArea, settle: 0.2))
+            signIn(motion: .at(Moment.brightest)), name: "signin-landscape-settled", size: Self.landscape.size,
+            safeArea: Self.landscape.safeArea))
         for bitmap in landscape {
             let background = bitmap.at(x: 0, y: bitmap.height - 1)
             // The row through the middle of the 72-point logo, which starts 16 points right of the safe area's edge.
             let row = (24 + 36) * bitmap.scale
+            let edge = Int(Self.landscape.safeArea.leading)
             func glow(_ x: Int) -> Int { bitmap.at(x: x * bitmap.scale, y: row).distance(to: background) }
-            XCTAssertGreaterThan(glow(59 + 14), 12, "the glow is there beside the logo")
-            XCTAssertGreaterThanOrEqual(glow(59 + 1), 3, "and still just inside the safe area's edge")
-            XCTAssertGreaterThanOrEqual(glow(59 - 2) * 2, glow(59 + 1), "it goes on past that edge: no step down to nothing")
-            XCTAssertLessThanOrEqual(glow(59 - 12), 3, "until it has faded out by itself")
+            // How far the pixel is from the background, of 255, in the light / the dark appearance: 27 / 45 beside
+            // the logo, 6 / 10 just inside the safe area's edge, 3 / 6 two points outside it, 1 / 1 twelve points
+            // outside.
+            XCTAssertGreaterThan(glow(edge + 14), 15, "the glow is there beside the logo")
+            XCTAssertGreaterThanOrEqual(glow(edge + 1), 4, "and still just inside the safe area's edge")
+            XCTAssertGreaterThanOrEqual(glow(edge - 2) * 3, glow(edge + 1), "it goes on past that edge: no step down to nothing")
+            XCTAssertLessThanOrEqual(glow(edge - 12), 3, "until it has faded out by itself")
         }
         let portrait = try bitmaps(SnapshotWriter().write(
-            signIn(motion: .animated, start: Date().addingTimeInterval(-2.0)), name: "signin-intro-settled", settle: 0.2))
+            signIn(motion: .at(Moment.brightest)), name: "signin-intro-glow", size: Self.portrait.size, safeArea: Self.portrait.safeArea))
         for bitmap in portrait {
             let background = bitmap.at(x: 0, y: bitmap.height - 1)
             // The column through the middle of the 96-point logo, which starts 24 points under the status bar.
             let column = (16 + 48) * bitmap.scale
+            let edge = Int(Self.portrait.safeArea.top)
             func glow(_ y: Int) -> Int { bitmap.at(x: column, y: y * bitmap.scale).distance(to: background) }
-            XCTAssertGreaterThan(glow(59 + 22), 12)
-            XCTAssertGreaterThanOrEqual(glow(59 + 1), 3)
-            XCTAssertGreaterThanOrEqual(glow(59 - 2) * 2, glow(59 + 1))
-            XCTAssertLessThanOrEqual(glow(59 - 12), 3)
+            // Light / dark: 28 / 46 beside the logo, 7 / 12 six points inside the edge, 4 / 7 just inside it, 3 / 4
+            // two points outside, 1 / 1 twelve points outside.
+            XCTAssertGreaterThan(glow(edge + 22), 15)
+            XCTAssertGreaterThanOrEqual(glow(edge + 6), 4)
+            XCTAssertGreaterThanOrEqual(glow(edge - 2) * 3, glow(edge + 1))
+            XCTAssertLessThanOrEqual(glow(edge - 12), 3)
         }
     }
 }
@@ -616,6 +706,11 @@ private struct Bitmap {
     func differingBox(to other: Bitmap) -> CGRect? {
         guard width == other.width, height == other.height else { return nil }
         return box { x, y in at(x: x, y: y).distance(to: other.at(x: x, y: y)) > 2 }
+    }
+
+    /// The box, in pixels, around everything that is not black; nil on an all-black image.
+    func litBox() -> CGRect? {
+        box { x, y in at(x: x, y: y).brightest > 6 }
     }
 
     /// The box, in pixels, around what is drawn over the background (the colour of the bottom left corner) in the

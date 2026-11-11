@@ -40,6 +40,9 @@ struct TypedTaglineView: View {
                     let time = context.date.timeIntervalSince(typingStart)
                     line(schedule.frame(at: time), cursorIsOn: schedule.cursorIsOn(at: time))
                 }
+            case let .at(time):
+                let schedule = TypewriterSchedule(lines: lines)
+                line(schedule.frame(at: time - Self.startDelay), cursorIsOn: schedule.cursorIsOn(at: time - Self.startDelay))
             case .still:
                 line(TypewriterSchedule.Frame(line: 0, text: lines.first ?? "", phase: .holding, nextChange: .infinity), cursorIsOn: false)
             }

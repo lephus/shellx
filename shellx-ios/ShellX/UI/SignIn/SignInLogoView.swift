@@ -35,6 +35,9 @@ struct SignInLogoView: View {
                     let time = context.date.timeIntervalSince(start)
                     mark(chevron: SignInIntro.chevronOffset(at: time), underscore: SignInIntro.underscoreOpacity(at: time))
                 }
+            case let .at(time):
+                glow.opacity(SignInIntro.glowOpacity(at: time))
+                mark(chevron: SignInIntro.chevronOffset(at: time), underscore: SignInIntro.underscoreOpacity(at: time))
             case .still:
                 mark(chevron: 0, underscore: 1)
             }

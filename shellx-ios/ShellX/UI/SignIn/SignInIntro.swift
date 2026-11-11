@@ -5,6 +5,9 @@ import SwiftUI
 enum SignInIntroMotion: Equatable, Sendable {
     case animated
     case still
+    /// The intro as it is so many seconds after it began, held there: one moment of it, drawn without a clock
+    /// (render tests).
+    case at(TimeInterval)
 
     /// Still with Reduce Motion on, and in a test or screenshot run (so every render there is the same).
     static func decide(reduceMotion: Bool, underTest: Bool) -> SignInIntroMotion {

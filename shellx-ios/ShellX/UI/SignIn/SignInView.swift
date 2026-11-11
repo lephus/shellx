@@ -15,13 +15,14 @@ struct SignInView: View {
     let expired: Bool
     let notice: SignInNotice?
     let startDemo: (() -> Void)?
-    /// The intro's motion when the caller fixes it (tests); nil: decided from Reduce Motion and the kind of run.
+    /// The intro's motion when the caller fixes it (render tests); nil: decided from Reduce Motion and the kind of
+    /// run.
     private let fixedMotion: SignInIntroMotion?
 
     @State private var error: SignInError?
     @State private var running: Provider?
     /// When this screen appeared: the intro plays once from then, however often the view is drawn or turned.
-    @State private var introStart: Date
+    @State private var introStart = Date()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -29,7 +30,7 @@ struct SignInView: View {
 
     init(
         coordinator: AppCoordinator, expired: Bool, notice: SignInNotice? = nil, startDemo: (() -> Void)? = nil,
-        initialError: SignInError? = nil, motion: SignInIntroMotion? = nil, introStart: Date = Date()
+        initialError: SignInError? = nil, motion: SignInIntroMotion? = nil
     ) {
         self.coordinator = coordinator
         self.expired = expired
@@ -37,7 +38,6 @@ struct SignInView: View {
         self.startDemo = startDemo
         fixedMotion = motion
         _error = State(initialValue: initialError)
-        _introStart = State(initialValue: introStart)
     }
 
     private var motion: SignInIntroMotion {
