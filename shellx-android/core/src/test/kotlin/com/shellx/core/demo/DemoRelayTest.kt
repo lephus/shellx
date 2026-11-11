@@ -48,6 +48,9 @@ class DemoRelayTest {
             "nonce" to { relay.nonce() },
             "signInWithGoogle" to { relay.signInWithGoogle("i", "n", "p", key) },
             "deleteAccount" to { relay.deleteAccount("i", "n", "t") },
+            "requestEmailCode" to { relay.requestEmailCode("a@b.c", "en") },
+            "signInWithEmailCode" to { relay.signInWithEmailCode("c", "123456", "p", key) },
+            "deleteAccountWithEmailCode" to { relay.deleteAccountWithEmailCode("c", "123456", "t") },
         )
         for ((name, call) in calls) {
             assertSameCase(DemoRelay.REFUSAL, assertFails(name) { call() }, name)
