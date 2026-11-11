@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
 import { revokeAppleTokens } from "../auth/apple-rest.js";
+import { redeemEmailCode } from "../auth/email-codes.js";
 import { REAUTH_MAX_AGE_SEC } from "../auth/id-token.js";
 import { consumeNonce } from "../auth/nonces.js";
 import { isOverlongPassword } from "../auth/password-policy.js";
@@ -12,11 +13,17 @@ import { logMeta } from "../log.js";
 export const accountRoutes = new Hono<AppEnv>();
 
 /**
- * DELETE /v1/account — any signed-in device (spec §5.2, App Store 5.1.1(v)). Confirmed by a fresh Google
- * or Apple ID token of one of the account's own sign-ins `{id_token, nonce}` (iat at most 300 s old), or,
- * only while PASSWORD_LOGIN is on and the account still has a password, by `{password}`. Deletes the user
- * (devices, tokens, identities and pairings go with it, ON DELETE CASCADE), asks Apple to revoke the stored
- * refresh tokens, then closes every device's socket with 4002. Confirmations share the 5/email/60 s budget.
+ * DELETE /v1/account — any signed-in device (spec §5.2, App Store 5.1.1(v)). Confirmed in one of three ways,
+ * tried in this order:
+ * - `{id_token, nonce}`: a fresh Google or Apple ID token of one of the account's own sign-ins (iat at most
+ *   300 s old);
+ * - `{challenge_id, code}`: a code of POST /v1/auth/email/code that was mailed to the account's own address
+ *   (spec 2026-11-10 §4). A wrong code is a counted guess (401 `invalid_code`, the fifth 410 `code_expired`);
+ *   a right code for another address is spent and answers 401 `reauth_required`;
+ * - `{password}`: only while PASSWORD_LOGIN is on and the account still has a password.
+ * Deletes the user (devices, tokens, identities and pairings go with it, ON DELETE CASCADE), asks Apple to
+ * revoke the stored refresh tokens, then closes every device's socket with 4002. Confirmations share the
+ * 5/email/60 s budget, counted before any of them is checked.
  */
 accountRoutes.delete("/", requireAuth, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
@@ -38,6 +45,12 @@ accountRoutes.delete("/", requireAuth, jsonBodyLimit, async (c) => {
     if (verified === null || !(await consumeNonce(db, body.nonce, now))) return denied(Errors.invalidCredentials);
     const owner = db.get<{ user_id: string }>("SELECT user_id FROM identities WHERE provider = ? AND subject = ?", verified.provider, verified.subject);
     if (owner?.user_id !== auth.userId) return denied(Errors.invalidCredentials);
+  } else if (typeof body.challenge_id === "string") {
+    const redeemed = await redeemEmailCode(db, body.challenge_id, body.code, c.get("now")());
+    if (!redeemed.ok) return denied(redeemed.reason === "invalid_code" ? Errors.invalidCode : Errors.codeExpired);
+    // The account's address as it is now, not as it was before the await (it changes on /google/link).
+    const current = db.get<{ email: string }>("SELECT email FROM users WHERE id = ?", auth.userId);
+    if (current === undefined || redeemed.email !== current.email) return denied(Errors.reauthRequired);
   } else if (typeof body.password === "string" && c.get("config").passwordLogin && user.password_hash !== null) {
     // Over 128 code points can never match; refuse it before argon2 sees it (final review I2).
     if (isOverlongPassword(body.password) || !(await c.get("passwords").verify(body.password, user.password_hash))) {
