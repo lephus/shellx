@@ -185,4 +185,110 @@ final class EmailSignInViewTests: XCTestCase {
         XCTAssertEqual(field.text, "phu@example.com", "the address stays")
         XCTAssertEqual(model.step, .email)
     }
+
+    // MARK: - The box takes the tap (review fix round 1, finding 1)
+
+    /// Whether a tap at `point` (window points) reaches `field`.
+    private func tapReaches(_ field: UITextField, at point: CGPoint, in window: UIWindow) -> Bool {
+        guard let hit = window.hitTest(point, with: nil) else { return false }
+        return hit === field || hit.isDescendant(of: field)
+    }
+
+    /// The 50-point box drawn around `field`, as wide as its column: a tap near its top or bottom edge or in its left
+    /// margin must reach the field, as one in its middle does. Nothing takes the keyboard on arrival, so the whole box is
+    /// what the user aims at.
+    private func assertTheWholeBoxTakesATap(
+        _ field: UITextField, column: ClosedRange<CGFloat>, in window: UIWindow, _ what: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) async {
+        _ = await WorkspaceRig.eventually { field.window != nil && field.bounds.height > 0 }
+        try? await Task.sleep(for: .milliseconds(200))
+        let frame = field.convert(field.bounds, to: window)
+        let box = CGRect(x: column.lowerBound, y: frame.midY - 25, width: column.upperBound - column.lowerBound, height: 50)
+        let places = [
+            (CGPoint(x: box.midX, y: box.midY), "in its middle"), (CGPoint(x: box.midX, y: box.minY + 3), "near its top edge"),
+            (CGPoint(x: box.midX, y: box.maxY - 3), "near its bottom edge"), (CGPoint(x: box.minX + 6, y: box.midY), "in its left margin"),
+        ]
+        for (point, place) in places {
+            XCTAssertTrue(
+                tapReaches(field, at: point, in: window), "\(what): a tap \(place) reaches the field (field \(frame), box \(box))",
+                file: file, line: line)
+        }
+    }
+
+    func testATapAnywhereInTheBoxOfTheEmailOrTheCodeFieldReachesIt() async throws {
+        let coordinator = AppCoordinator.preview()
+        let host = host(coordinator)
+        let fields = await textFields(host)
+        let email = try XCTUnwrap(fields.first as? EmailAddressTextField)
+        await assertTheWholeBoxTakesATap(email, column: 16...377, in: host.window, "the email field")
+
+        let model = coordinator.emailSignIn
+        model.email = "phu@example.com"
+        await model.sendCode()
+        let code = try await codeField(host)
+        await assertTheWholeBoxTakesATap(code, column: 16...377, in: host.window, "the code field")
+    }
+
+    func testATapAnywhereInTheBoxOfTheDeletionCodeFieldReachesIt() async throws {
+        let coordinator = AppCoordinator.preview()
+        addTeardownBlock { @MainActor in await coordinator.hub?.stopAll() }
+        try await coordinator.signInWithEmailCode(challengeID: "challenge-0", code: "123456")
+        let model = coordinator.makeDeleteAccountCode()
+        await model.sendCode()
+        XCTAssertEqual(model.step, .code)
+        let host = WindowHost(DeleteAccountSheet(code: model, close: {}), size: CGSize(width: 393, height: 852), in: self)
+        let code = try await codeField(host)
+        await assertTheWholeBoxTakesATap(code, column: 20...373, in: host.window, "the deletion sheet's code field")
+    }
+
+    // MARK: - While the code is asked for (review fix round 1, finding 2)
+
+    func testWhileTheCodeIsAskedForTheFieldTakesNoEditsAndKeepsTheKeyboard() async throws {
+        let relay = FakeRelayAccount()
+        let latch = Latch()
+        await relay.setHook({ await latch.wait() }, for: .requestEmailCode)
+        let coordinator = AppCoordinator.preview(relay: relay)
+        let model = coordinator.emailSignIn
+        let host = host(coordinator)
+        let fields = await textFields(host)
+        let field = try XCTUnwrap(fields.first as? EmailAddressTextField)
+        XCTAssertTrue(field.becomeFirstResponder())
+        field.insertText("phu@example.com")
+        let typed = await WorkspaceRig.eventually { model.canSend }
+        XCTAssertTrue(typed)
+        _ = field.delegate?.textFieldShouldReturn?(field)
+        let held = await WorkspaceRig.eventually { await latch.waiting == 1 }
+        XCTAssertTrue(held)
+        XCTAssertEqual(model.step, .sending)
+
+        field.insertText("x")
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(field.text, "phu@example.com", "the field takes no edit while the code is asked for")
+        XCTAssertEqual(model.email, "phu@example.com")
+        XCTAssertTrue(field.isFirstResponder, "and it keeps the keyboard")
+
+        await latch.release()
+        let sent = await WorkspaceRig.eventually { model.step == .code }
+        XCTAssertTrue(sent)
+    }
+}
+
+/// Holds the relay's answer until the test releases it.
+private actor Latch {
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var released = false
+
+    var waiting: Int { waiters.count }
+
+    func wait() async {
+        guard !released else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        for waiter in waiters { waiter.resume() }
+        waiters = []
+    }
 }
