@@ -103,8 +103,11 @@ struct EmailSignInSection: View {
             }
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let wait = model.resendWait(at: context.date)
+                // VoiceOver: one name, the wait as the value, so the countdown does not rename it every second.
                 Self.linkButton(
                     wait > 0 ? texts.resendIn(seconds: wait) : texts.resend,
+                    spokenName: texts.resend,
+                    spokenValue: wait > 0 ? Self.spokenWait(seconds: wait) : "",
                     isEnabled: wait == 0 && model.step == .code
                 ) {
                     _ = model.resend()
@@ -118,12 +121,31 @@ struct EmailSignInSection: View {
 
     /// A failure under its control: 11 pt in the error colour, every line of it. Four lines cut the German switch
     /// sentence (204 characters), whose end says what to do.
+    /// VoiceOver hears it when it appears and when its text changes; a redraw with the same text says nothing.
     static func failureText(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 11))
             .foregroundColor(ShellXPalette.error.color)
             .fixedSize(horizontal: false, vertical: true)
             .frame(width: contentWidth, alignment: .leading)
+            .onChange(of: text, initial: true) { _, shown in
+                announce(shown)
+            }
+    }
+
+    /// Asks VoiceOver to read a failure that just appeared; never an empty one.
+    private static func announce(_ failure: String) {
+        guard !failure.isEmpty else { return }
+        AccessibilityNotification.Announcement(failure).post()
+    }
+
+    /// The resend wait as VoiceOver reads it ("42 seconds"), in the app's language. Foundation formats it, so it
+    /// needs no string of its own.
+    static func spokenWait(seconds: Int) -> String {
+        let language = Bundle.main.preferredLocalizations.first ?? "en"
+        return Duration.seconds(seconds).formatted(
+            .units(allowed: [.seconds], width: .wide).locale(Locale(identifier: language))
+        )
     }
 
     /// A full-width primary button and the sheet's default action (Return), with a small spinner beside its title
@@ -147,11 +169,18 @@ struct EmailSignInSection: View {
     }
 
     /// A text-only button on its own line, centred.
-    private static func linkButton(_ title: String, isEnabled: Bool, action: @escaping @MainActor () -> Void) -> some View {
+    /// A text-only button on its own line, centred. VoiceOver reads `spokenName` (the title when nil) and
+    /// `spokenValue`.
+    private static func linkButton(
+        _ title: String, spokenName: String? = nil, spokenValue: String = "", isEnabled: Bool,
+        action: @escaping @MainActor () -> Void
+    ) -> some View {
         Button(action: action) {
             Text(title).monospacedDigit()
         }
         .buttonStyle(ShellXSheetButtonStyle(kind: .link))
+        .accessibilityLabel(spokenName ?? title)
+        .accessibilityValue(spokenValue)
         .disabled(!isEnabled)
         .frame(width: contentWidth)
     }
