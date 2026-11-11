@@ -147,17 +147,18 @@ private fun WaitingButton(
 }
 
 /**
- * The email step (EMAIL, SENDING), 12 dp between its rows: the address field, a failure under it, Send code (a spinner
- * while the relay is asked), and with [startDemo] "Try without an account" as on the first step. With [autoFocus] the
- * field takes the focus once, when the step appears: a tap outside can still put the keyboard down.
+ * The email step (IDLE, EMAIL, SENDING: the sign-in screen's first screen), 12 dp between its rows: the address field,
+ * a failure under it, and Send code (a spinner while the relay is asked). [enabled] false turns the field and Send code
+ * off (Google signs in). With [autoFocus] the field takes the focus once, when the step appears: a tap outside can
+ * still put the keyboard down.
  */
 @Composable
 internal fun EmailStep(
     state: EmailSignInState,
     calls: EmailStepCalls,
-    startDemo: (() -> Unit)?,
     autoFocus: Boolean,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val sending = state.step == EmailSignInState.Step.SENDING
     val field = remember { FieldText(state.email, state) }
@@ -174,29 +175,20 @@ internal fun EmailStep(
                 .focusRequester(focus)
                 .testTag("signin.email.field")
                 .semantics { contentType = EmailStepFields.EMAIL_CONTENT },
-            enabled = state.step == EmailSignInState.Step.EMAIL,
+            enabled = enabled && (state.step == EmailSignInState.Step.EMAIL || state.step == EmailSignInState.Step.IDLE),
             label = { Text(stringResource(R.string.signin_email_field)) },
             singleLine = true,
             keyboardOptions = EmailStepFields.EMAIL_KEYBOARD,
-            keyboardActions = KeyboardActions(onSend = { calls.send() }),
+            keyboardActions = KeyboardActions(onSend = { if (enabled) calls.send() }),
         )
         StepFailure(state.error, "signin.email.error")
         WaitingButton(
             label = stringResource(R.string.signin_email_send),
             waits = sending,
-            enabled = state.canSend,
+            enabled = enabled && state.canSend,
             onClick = calls.send,
             modifier = Modifier.testTag("signin.email.send"),
         )
-        if (startDemo != null) {
-            TextButton(
-                onClick = startDemo,
-                enabled = !sending,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("signin.demo"),
-            ) {
-                Text(stringResource(R.string.signin_demo), color = if (sending) LocalContentColor.current else ShellXTheme.colors.accentText)
-            }
-        }
     }
 }
 

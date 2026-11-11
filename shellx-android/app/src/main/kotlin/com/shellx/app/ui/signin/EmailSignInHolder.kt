@@ -10,10 +10,11 @@ import com.shellx.core.platform.Clock
 /**
  * The sign-in screen's email steps, kept across a rotation or a theme or language change: the step, the address, the
  * digits and a request on the relay all stay, and nothing is asked or sent again. [restored] is what a killed process
- * left ([EmailSignInSaver]); it is read once, when the holder is made.
+ * left ([EmailSignInSaver]); it is read once, when the holder is made. The steps start on the email step: it is the
+ * screen's first screen.
  */
 internal class EmailSignInHolder(actions: EmailCodeActions, clock: Clock, restored: EmailSignInModel.Saved?) : ViewModel() {
-    val model = EmailSignInModel(actions, clock, viewModelScope, restored = restored)
+    val model = EmailSignInModel(actions, clock, viewModelScope, restored = restored).also { it.start() }
 }
 
 /**

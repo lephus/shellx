@@ -104,7 +104,7 @@ class AppCoordinator(
     }
 
     /**
-     * Continue with email, step 1: asks the relay to mail a 6-digit sign-in code to [email], written in [locale] ("en"
+     * Sign-in by email, step 1 (Send code): asks the relay to mail a 6-digit sign-in code to [email], written in [locale] ("en"
      * or "vi"). Refuses with [SignInException.LocalWipePending] before any relay call while a local wipe is owed. Runs
      * detached; a second call is a second request (the relay keeps only the newest code). Throws [SignInException].
      */
