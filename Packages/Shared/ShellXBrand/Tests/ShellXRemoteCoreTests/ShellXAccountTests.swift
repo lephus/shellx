@@ -338,6 +338,25 @@ import Testing
     #expect(account.identity?.authMethod == "google")
 }
 
+@MainActor @Test func aSecondEmailCodeIsRefusedWhileOneIsVerified() async throws {
+    let rig = ServiceRig(gate: false, signedIn: false)
+    let account = ShellXAccount(service: rig.service)
+    let challenge = try await account.requestEmailCode(email: "Foo@Bar.com", locale: "en")
+    // The sheet was closed during a slow verify, and a reopened sheet verifies a code (maybe for another address).
+    rig.core.holdNext.with { $0 = "auth.email.finish" }
+    let first = Task { await errorCode { _ = try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "004217") } }
+    #expect(await until { rig.core.isHoldingCall })
+    let second = await errorCode { _ = try await account.signInWithEmailCode(challengeID: "ch-2", code: "123456") }
+    #expect(second == "email_sign_in_in_progress")
+    rig.core.releaseHeldCall()
+    #expect(await first.value == nil)
+    #expect(rig.core.count("auth.email.finish") == 1)
+    #expect(account.identity?.authMethod == "email")
+    // Once the first verify has ended, a verify runs again.
+    try await account.signInWithEmailCode(challengeID: challenge.challengeID, code: "004217")
+    #expect(rig.core.count("auth.email.finish") == 2)
+}
+
 @MainActor @Test func cancelBeforeBeginAnswersEndsTheFlowWithoutOpeningTheBrowser() async {
     let rig = ServiceRig(gate: false, signedIn: false)
     let opened = Opened()
