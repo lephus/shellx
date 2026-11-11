@@ -2,6 +2,7 @@ package com.shellx.core.demo
 
 import com.shellx.core.account.RelayAccountCalling
 import com.shellx.link.account.AccountSignIn
+import com.shellx.link.account.EmailChallenge
 import com.shellx.link.account.PairedMachine
 import com.shellx.link.account.PairedMachineListing
 import com.shellx.link.account.RelayApiException
@@ -14,8 +15,8 @@ import kotlinx.coroutines.delay
  * ("grant-<machineId>", "macos", online, its linkSlot, fingerprint "demo"); [unpair] removes by grantId. [pair] parses
  * the offer (its error is thrown); a machine outside `pairableMachineIds` is `Http(404, "machine_not_found")`;
  * otherwise it waits `approvalDelay` with `sleep`, lists the Mac and returns the offer's PairedMachine. [logout],
- * [setPushToken] and [unsetPushToken] do nothing; [nonce], [signInWithGoogle] and [deleteAccount] throw [REFUSAL].
- * Thread-safe.
+ * [setPushToken] and [unsetPushToken] do nothing; [nonce], [signInWithGoogle], [deleteAccount] and the three email-code
+ * calls throw [REFUSAL]. Thread-safe.
  */
 class DemoRelay(
     paired: List<PairedMachine>,
@@ -60,6 +61,15 @@ class DemoRelay(
         throw REFUSAL
 
     override suspend fun deleteAccount(idToken: String, nonce: String, token: String) {
+        throw REFUSAL
+    }
+
+    override suspend fun requestEmailCode(email: String, locale: String): EmailChallenge = throw REFUSAL
+
+    override suspend fun signInWithEmailCode(challengeId: String, code: String, deviceName: String, clientKey: ByteArray): AccountSignIn =
+        throw REFUSAL
+
+    override suspend fun deleteAccountWithEmailCode(challengeId: String, code: String, token: String) {
         throw REFUSAL
     }
 
