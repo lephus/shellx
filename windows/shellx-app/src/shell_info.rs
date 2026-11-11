@@ -79,6 +79,11 @@ pub const SHELL_STRINGS: &[Str] = &[
     Str::SendingRequest,
     Str::NoOtherMachines,
     Str::AddMachine,
+    // the "+" list's sentences (design §4.5) and the sign-in-again notice
+    Str::MacCannotHostYet,
+    Str::SignInOnYourMac,
+    Str::SessionExpired,
+    Str::SignInAgain,
     // remote panes (Task 13b): overlay pill and the input-paused flash
     Str::Connecting,
     Str::Reconnecting,

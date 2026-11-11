@@ -86,6 +86,7 @@ Environment variables:
 | `SHELLX_LANG` | Overrides the UI language: a value starting with `en` is English, one starting with `vi` is Vietnamese. Anything else or unset follows the Windows display language (Vietnamese on a Vietnamese Windows, English otherwise, and English on a Mac) |
 | `SHELLX_SHELL` | Program to start in new local panes instead of the default PowerShell, which runs as `powershell.exe -NoLogo -NoExit -Command <prompt hook>` (the hook wraps your `prompt` and reports the working directory with OSC 7). The override gets no arguments and no hook, so sidebar cards show no directory or branch for it |
 | `SHELLX_API_BASE` | API base URL for `config.set`; honored in debug builds only. Release builds always use `https://relay.shellx.pro` |
+| `SHELLX_OFFER_ALL_MACS` | `1` offers "Request access" for every Mac in the account, also one the relay does not mark as able to host (`can_host`). Only for trying Part 2 with a test Mac build (design §4.5); never for a Windows PC. Read once at start |
 
 ## State directories
 

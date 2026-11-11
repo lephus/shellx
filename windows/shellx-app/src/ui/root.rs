@@ -66,7 +66,10 @@ use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::modal::{Panel, Panels, RootKey};
 use shellx_model::palette::Status;
-use shellx_model::sidebar::{MachineInfo, build_groups};
+use shellx_model::sidebar::{
+    Access, MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_panel_notes,
+    request_targets,
+};
 use shellx_model::strings::Lang;
 use shellx_model::tabs::{CloseOutcome, PaneTarget, RespawnGuard, Tab, TabId, Tabs};
 use shellx_model::update::{UpdateStatus, download_url};
@@ -77,7 +80,7 @@ use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
 use super::settings::{SettingsEvent, SettingsPanel};
-use super::sidebar::{self, PickerEntry, SessionRow};
+use super::sidebar::{self, Picker, PickerEntry, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
@@ -127,6 +130,9 @@ pub struct RootView {
     help_open: bool,
     /// Each region's tab strip scroll, and the terminal it last showed.
     tab_strips: HashMap<SlotId, (ScrollHandle, PaneId)>,
+    /// Which Macs are offered "Request access" (design §4.5): only those the relay says can host,
+    /// or every Mac with `SHELLX_OFFER_ALL_MACS=1` (read once at start, for trying Part 2).
+    offer_rule: OfferRule,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -210,6 +216,7 @@ impl RootView {
             new_menu_open: false,
             help_open: false,
             tab_strips: HashMap::new(),
+            offer_rule: offer_rule_from_env(std::env::var("SHELLX_OFFER_ALL_MACS").ok().as_deref()),
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
@@ -1038,22 +1045,31 @@ impl Render for RootView {
             let local_id = this_machine_id(&machines).to_string();
             let utc_offset = self.account.read(cx).utc_offset_secs();
             let pairing = self.pairing.read(cx);
-            let groups = build_groups(
+            let groups = build_groups_with(
                 &machines,
                 &|id: &str| pairing.access_for(id),
                 utc_offset,
                 lang,
+                self.offer_rule,
             );
-            let picker: Option<Vec<PickerEntry>> = pairing.picker_open().then(|| {
-                machines
-                    .iter()
-                    .filter(|m| !m.is_this_machine && !pairing.has_link(&m.machine_id))
-                    .map(|m| PickerEntry {
-                        machine_id: m.machine_id.clone(),
-                        name: m.name.clone(),
-                        online: m.online,
-                    })
-                    .collect()
+            // The "+" list: only Macs that may be asked and have no link yet (granted or pending), and
+            // the sentences that say why it is short or empty (design §4.5; review M7).
+            let picker = pairing.picker_open().then(|| {
+                // A saved link, or a request waiting for the Mac's answer.
+                let has_link = |id: &str| {
+                    pairing.has_link(id) || matches!(pairing.access_for(id), Access::Pending { .. })
+                };
+                Picker {
+                    entries: request_targets(&machines, &has_link, self.offer_rule)
+                        .into_iter()
+                        .map(|m| PickerEntry {
+                            machine_id: m.machine_id.clone(),
+                            name: m.name.clone(),
+                            online: m.online,
+                        })
+                        .collect(),
+                    notes: request_panel_notes(&machines, &has_link, self.offer_rule),
+                }
             });
             let active = self.tabs.active().id;
             // A tab is listed under the machine its panes run on (a Mac tab
@@ -1085,7 +1101,7 @@ impl Render for RootView {
                 &groups,
                 &rows,
                 &local_id,
-                picker.as_deref(),
+                picker.as_ref(),
                 &self.account,
                 self.help_open,
                 lang,

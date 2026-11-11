@@ -61,11 +61,18 @@ pub struct SessionRow {
     pub branch: Option<String>,
 }
 
-/// A machine in the machines-header "+" list (another machine, no link).
+/// A machine in the machines-header "+" list (a Mac that may be asked, no link yet).
 pub struct PickerEntry {
     pub machine_id: String,
     pub name: String,
     pub online: bool,
+}
+
+/// The machines-header "+" list: its machines (`sidebar::request_targets`) and the sentences under them
+/// (`sidebar::request_panel_notes`: why none or none else can be asked).
+pub struct Picker {
+    pub entries: Vec<PickerEntry>,
+    pub notes: &'static [Str],
 }
 
 /// `local_id`: this PC's group (its server id when signed in).
@@ -77,7 +84,7 @@ pub fn render(
     groups: &[MachineGroup],
     sessions: &[SessionRow],
     local_id: &str,
-    picker: Option<&[PickerEntry]>,
+    picker: Option<&Picker>,
     account: &Entity<AccountService>,
     help_open: bool,
     lang: Lang,
@@ -200,7 +207,7 @@ fn brand(lang: Lang) -> Div {
 /// pressing the "+" again toggles it instead of closing and reopening it.
 /// The press still reaches what it hit (a terminal click focuses the pane).
 fn machines_block(
-    picker: Option<&[PickerEntry]>,
+    picker: Option<&Picker>,
     signed_in: bool,
     lang: Lang,
     cx: &mut Context<RootView>,
@@ -211,8 +218,8 @@ fn machines_block(
         .flex_none()
         .child(machines_header(signed_in, lang, cx));
     match picker {
-        Some(entries) => block
-            .child(machine_picker(entries, lang, cx))
+        Some(picker) => block
+            .child(machine_picker(picker, lang, cx))
             .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 this.close_machine_picker(window, cx);
             })),
@@ -270,10 +277,11 @@ fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> D
         )
 }
 
-/// The "+" list: the account's other machines without a link. Online ones
+/// The "+" list: the Macs that may be asked and have no link yet. Online ones
 /// request access on click; offline ones are dimmed (approval needs the
-/// other machine).
-fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView>) -> Div {
+/// other machine). Under them, the sentences saying why none (or none else)
+/// can be asked, so the list is never empty and silent.
+fn machine_picker(picker: &Picker, lang: Lang, cx: &mut Context<RootView>) -> Div {
     // Not a panel: no focus handle, so the keyboard stays where it was.
     let mut list = div()
         .flex()
@@ -286,16 +294,7 @@ fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView
         .border_color(theme::border())
         .bg(theme::raise())
         .text_size(theme::SMALL_SIZE);
-    if entries.is_empty() {
-        list = list.child(
-            div()
-                .px(px(10.0))
-                .py(px(6.0))
-                .text_color(theme::muted())
-                .child(t(lang, Str::NoOtherMachines)),
-        );
-    }
-    for (ix, entry) in entries.iter().enumerate() {
+    for (ix, entry) in picker.entries.iter().enumerate() {
         let dot = if entry.online {
             theme::done()
         } else {
@@ -328,6 +327,15 @@ fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView
             row.opacity(0.5)
         };
         list = list.child(row);
+    }
+    for note in picker.notes {
+        list = list.child(
+            div()
+                .px(px(10.0))
+                .py(px(6.0))
+                .text_color(theme::muted())
+                .child(t(lang, *note)),
+        );
     }
     list
 }
