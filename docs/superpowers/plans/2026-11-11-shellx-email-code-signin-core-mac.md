@@ -320,7 +320,7 @@ What each RPC writes and needs:
   - keeps `device.key`;
   - drops `machine.json` only when the account changed (`auth::save_session`).
 
-  `auth.session` then reports `auth_method: "email"`. On any error nothing is written.
+  `auth.session` then reports `auth_method: "email"`. On any error no session or machine file is written; `device.key` may be created before the request, as `auth.google.finish` and `auth.login` do, because the relay must receive the public key (review of Tasks 1–3, Minor 1).
 - Neither sends a bearer, and neither needs a session.
 - A later call may answer 401 `unauthorized`, for example after the email sign-in is removed on another device or after a Google link to another address. That is handled as for any session.
 
@@ -338,6 +338,7 @@ What each RPC writes and needs:
 | `invalid_device` | finish | The relay's 400 (not expected: the core builds the device) | server sentence |
 | `bad_request` | either | The relay's 400 for a body that is not a JSON object (`relay/src/http/errors.ts:73-75`; not expected: the core builds the body) | server sentence |
 | `network` | either | No answer: offline, DNS, TLS, or the 20 s timeout | the network sentence. A failed Resend keeps the challenge (the relay may or may not have replaced it; a later 410 will tell); a failed verify keeps the digits |
+| `internal_error`, `payload_too_large` | either | relay 500 / 413 with a JSON error code; the core passes the code through unchanged (review of Tasks 1–3) | server sentence |
 | `http_<status>` | either | A non-2xx answer without a JSON error code, for example a 502/503/504 from the proxy while the relay is being deployed | server sentence; a failed Resend keeps the challenge |
 | `server` | either | A 2xx body the core cannot use: a 202 without `challenge_id`, or a 200 without `token`, `user_id`, `device_id` or `email` | server sentence |
 | `not_configured` | either | `config.set` never ran | server sentence |
