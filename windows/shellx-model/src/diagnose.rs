@@ -226,6 +226,64 @@ pub fn format_report(r: &DiagnosticsReport) -> String {
     out
 }
 
+/// What GPUI's vsync thread does with this PC's DWM timing (report `[gpu]`, patch (b)).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VsyncCheck {
+    /// The sleep the patched GPUI uses when `DwmFlush` returns early, in µs (truncated).
+    pub interval_us: u64,
+    /// Whether unpatched GPUI 0.2.2 would divide by zero on this PC (its vsync thread then
+    /// panics and the window stops repainting, R1 F6).
+    pub unpatched_divides_by_zero: bool,
+}
+
+/// GPUI's `VSYNC_INTERVAL_THRESHOLD` and `DEFAULT_VSYNC_INTERVAL` (`vsync.rs`).
+const VSYNC_THRESHOLD_US: u64 = 1_000;
+const DEFAULT_VSYNC_US: u64 = 16_666;
+
+/// Mirrors `get_dwm_interval` in `vendor/gpui-0.2.2/src/platform/windows/vsync.rs`: the flag
+/// with the unpatched arithmetic, the interval with the patched one (3b §3). The inputs are
+/// `DWM_TIMING_INFO.qpcRefreshPeriod`, `QueryPerformanceFrequency` and `rateRefresh`.
+pub fn vsync_check(
+    qpc_refresh_period: u64,
+    qpc_frequency: u64,
+    rate_numerator: u32,
+    rate_denominator: u32,
+) -> VsyncCheck {
+    let ticks_per_us = qpc_frequency / 1_000_000;
+    // Patched `retrieve_duration`: 0 for a QPC under 1 MHz, which sends it to the rate.
+    let measured_us = qpc_refresh_period.checked_div(ticks_per_us).unwrap_or(0);
+    let falls_back = measured_us < VSYNC_THRESHOLD_US;
+    // Unpatched: `counts / (ticks_per_second / 1_000_000)` in the first call, then the
+    // fallback passes the rate (Hz, far below 1 000 000) as ticks per second.
+    let unpatched_divides_by_zero =
+        ticks_per_us == 0 || (falls_back && u64::from(rate_numerator) / 1_000_000 == 0);
+    let interval_us = if falls_back {
+        refresh_rate_interval_us(rate_numerator, rate_denominator)
+    } else {
+        measured_us
+    };
+    VsyncCheck {
+        interval_us,
+        unpatched_divides_by_zero,
+    }
+}
+
+/// Patched `refresh_rate_interval`: denominator / numerator seconds, the default when either
+/// is 0 or the period is under 1 ms or over 1 s.
+fn refresh_rate_interval_us(numerator: u32, denominator: u32) -> u64 {
+    if numerator == 0 || denominator == 0 {
+        return DEFAULT_VSYNC_US;
+    }
+    let interval =
+        std::time::Duration::from_secs_f64(f64::from(denominator) / f64::from(numerator));
+    let us = interval.as_micros();
+    if us < u128::from(VSYNC_THRESHOLD_US) || interval > std::time::Duration::from_secs(1) {
+        DEFAULT_VSYNC_US
+    } else {
+        us as u64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
