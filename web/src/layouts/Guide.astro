@@ -2,8 +2,10 @@
 // Layout of src/pages/guides/*.md: breadcrumb, article, download CTA,
 // related guides, TechArticle + BreadcrumbList JSON-LD.
 import Base from './Base.astro';
+import VideoPlayer from '../components/VideoPlayer.astro';
 import { pathFor, ui } from '../i18n/ui';
 import { appId, author, breadcrumbs, guidePath, guides, organization, siteUrl, type GuideFrontmatter } from '../lib/seo';
+import { clock, video } from '../lib/videos';
 
 interface Props { frontmatter: GuideFrontmatter }
 const f = Astro.props.frontmatter;
@@ -14,6 +16,7 @@ const index = pathFor(f.lang, 'guides');
 const fmt = (d: string) =>
   new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 const related = guides(f.lang).filter((g) => g.slug !== f.slug);
+const v = f.video ? video(f.lang, f.video) : null;
 const ld = [
   {
     '@context': 'https://schema.org', '@type': 'TechArticle',
@@ -52,6 +55,12 @@ const ld = [
         {f.updated !== f.published && <>{' · '}{t.lastUpdated} <time datetime={f.updated}>{fmt(f.updated)}</time></>}
         {' · '}<span>{author.name}</span>
       </p>
+      {v && (
+        <figure class="guide-video">
+          <VideoPlayer video={v} lang={f.lang} />
+          <figcaption>{v.title} · {clock(v.seconds)} · <a href={`${pathFor(f.lang, 'videos')}#${v.id}`}>{t.guideVideoMore}</a></figcaption>
+        </figure>
+      )}
       <slot />
     </article>
     <aside class="cta">
@@ -75,6 +84,8 @@ const ld = [
 
 <style>
   .guide { max-width: 48rem; padding-top: 2.5rem; }
+  .guide-video { margin: 1.5rem 0 2rem; }
+  .guide-video figcaption { margin-top: 0.6rem; font-size: 0.9rem; color: var(--muted); }
   .crumbs { display: flex; gap: 0.5rem; font-size: 0.9rem; color: var(--muted); margin-bottom: 1.5rem; }
   .crumbs a { color: var(--muted); text-decoration: none; }
   .crumbs a:hover { color: var(--fg); }
@@ -92,6 +103,8 @@ const ld = [
   .prose :global(pre) { background: var(--card) !important; border: 1px solid var(--border); border-radius: 12px;
                         padding: 1rem 1.2rem; overflow-x: auto; font-size: 0.9rem; }
   .prose :global(pre code) { background: none; border: 0; padding: 0; }
+  /* A long path in running text wraps instead of widening the page on a phone. */
+  .prose :global(:not(pre) > code) { overflow-wrap: anywhere; }
   .prose :global(table) { width: 100%; border-collapse: collapse; margin: 1.25rem 0; font-size: 0.95rem;
                           display: block; overflow-x: auto; }
   .prose :global(th), .prose :global(td) { border: 1px solid var(--border); padding: 0.6rem 0.75rem; text-align: left; vertical-align: top; }

@@ -25,6 +25,7 @@ const guideSlugs = [
   'ai-coding-agent-on-phone',
   'claude-code-remote-control-vs-shellx',
   'best-ssh-app-iphone-android',
+  'schedule-claude-code-mac',
 ];
 const guidePages = ['/guides/', ...guideSlugs.map((s) => `/guides/${s}/`)];
 const videoPages = [{ path: '/videos/', lang: 'en', home: '/' }];
@@ -466,7 +467,7 @@ test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries 
   if (!config.appStoreUrl) assert.match(txt, /App Store: coming soon/);
   const full = readFileSync(join(dist, 'llms-full.txt'), 'utf8');
   for (const needle of ['Is ShellX an SSH client?', 'shellx skills install --claude', 'ShellX vs Termius',
-    'open Settings, choose Mobile, and click Show QR Code.']) {
+    'open Settings, choose Mobile, and click Show QR Code.', 'Press Save, and ShellX schedules it on this Mac.']) {
     assert.ok(full.includes(needle), `llms-full.txt: missing "${needle}"`);
   }
   assert.ok(!full.includes('layout:'), 'llms-full.txt: front matter leaked');
@@ -475,7 +476,7 @@ test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries 
 
 // Videos (src/lib/videos.ts, files in public/media/). The captions are burned into the picture, so the
 // players carry no <track>; src/videos/<name>.srt feeds the chapters and the transcripts.
-const videoNames = ['shellx-intro', 'shellx-tutorial'];
+const videoNames = ['shellx-intro', 'shellx-tutorial', 'shellx-automations'];
 
 function ldDocs(html) {
   return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
@@ -523,30 +524,41 @@ for (const page of homePages) {
 }
 
 for (const page of videoPages) {
-  test(`${page.path} plays the full tutorial with chapters and a transcript, then the intro`, () => {
+  test(`${page.path} plays the tutorial and the Automations demo with chapters and transcripts, then the intro`, () => {
     const html = readPage(page.path);
     assert.match(html, new RegExp(`<html lang="${page.lang}"`));
     const videos = videoTags(html);
-    assert.equal(videos.length, 2);
-    assert.match(videos[0], /<source src="\/media\/shellx-tutorial\.mp4" type="video\/mp4"/);
-    assert.match(videos[1], /<source src="\/media\/shellx-intro\.mp4" type="video\/mp4"/);
-    for (const [video, name] of videos.map((v, i) => [v, videoNames[1 - i]])) {
+    const order = ['shellx-tutorial', 'shellx-automations', 'shellx-intro'];
+    assert.equal(videos.length, order.length);
+    for (const [video, name] of videos.map((v, i) => [v, order[i]])) {
+      assert.ok(video.includes(`<source src="/media/${name}.mp4" type="video/mp4"`), `video ${order.indexOf(name) + 1} is not ${name}`);
       assert.match(video, /\bpreload="none"/);
       assert.ok(video.includes(`poster="/media/${name}.webp"`), `${name}: poster`);
       assert.ok(!video.includes('<track'), `${name}: the captions are in the picture already`);
     }
-    const chapters = [...html.matchAll(/data-t="(\d+)"/g)].map((m) => Number(m[1]));
-    assert.ok(chapters.length >= 8, `only ${chapters.length} chapters`);
-    assert.equal(chapters[0], 0);
-    assert.ok(chapters.every((t, i) => i === 0 || t > chapters[i - 1]), `chapters out of order: ${chapters}`);
-    assert.ok(chapters.at(-1) < 183, 'a chapter starts after the end of the video');
-    const transcript = 'open Settings, choose Mobile, and click Show QR Code.';
-    assert.ok(html.includes(transcript), `${page.path}: transcript lacks "${transcript}"`);
+    // Each video with chapters: its own list, in order, inside the video's length.
+    const chaptered = { tutorial: { min: 8, seconds: 183 }, automations: { min: 6, seconds: 97 } };
+    const chapters = {};
+    for (const [id, { min, seconds: length }] of Object.entries(chaptered)) {
+      const section = html.match(new RegExp(`<section[^>]*id="${id}"[\\s\\S]*?</section>`))?.[0];
+      assert.ok(section, `missing <section id="${id}">`);
+      assert.match(section, new RegExp(`data-video="${id}"`), `${id}: the section plays another video`);
+      const ts = [...section.matchAll(/data-t="(\d+)"/g)].map((m) => Number(m[1]));
+      assert.ok(ts.length >= min, `${id}: only ${ts.length} chapters`);
+      assert.equal(ts[0], 0);
+      assert.ok(ts.every((t, i) => i === 0 || t > ts[i - 1]), `${id}: chapters out of order: ${ts}`);
+      assert.ok(ts.at(-1) < length, `${id}: a chapter starts after the end of the video`);
+      chapters[id] = ts;
+    }
+    for (const transcript of ['open Settings, choose Mobile, and click Show QR Code.',
+      'Press Save, and ShellX schedules it on this Mac.']) {
+      assert.ok(html.includes(transcript), `${page.path}: transcript lacks "${transcript}"`);
+    }
     assert.ok(hrefs(html).includes(`${page.home}#download`), `${page.path}: no download link`);
 
     const docs = ldDocs(html);
     const objects = docs.filter((d) => d['@type'] === 'VideoObject');
-    assert.equal(objects.length, 2, 'one VideoObject per video');
+    assert.equal(objects.length, order.length, 'one VideoObject per video');
     for (const v of objects) {
       assert.ok(v.name && v.description && v.transcript, `${v.name}: name, description and transcript`);
       assert.match(v.uploadDate, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
@@ -561,12 +573,16 @@ for (const page of videoPages) {
         assert.ok(existsSync(join(dist, new URL(url).pathname.slice(1))), `${url} missing from dist`);
       }
     }
-    const tutorial = objects.find((v) => v.contentUrl.endsWith('/shellx-tutorial.mp4'));
-    assert.deepEqual(tutorial.hasPart.map((c) => c.startOffset), chapters, 'Clip offsets differ from the chapter list');
-    for (const c of tutorial.hasPart) {
-      assert.equal(c['@type'], 'Clip');
-      assert.ok(c.name && c.endOffset > c.startOffset, `clip ${c.name}`);
-      assert.equal(c.url, `https://shellx.pro${page.path}?t=${c.startOffset}`);
+    // A Clip opens the page at its second: ?t= for the tutorial (the links already shared), ?v=<id>&t= for the others.
+    for (const id of Object.keys(chaptered)) {
+      const v = objects.find((o) => o.contentUrl.endsWith(`/shellx-${id}.mp4`));
+      assert.deepEqual(v.hasPart.map((c) => c.startOffset), chapters[id], `${id}: Clip offsets differ from the chapter list`);
+      const query = id === 'tutorial' ? '?t=' : `?v=${id}&t=`;
+      for (const c of v.hasPart) {
+        assert.equal(c['@type'], 'Clip');
+        assert.ok(c.name && c.endOffset > c.startOffset, `clip ${c.name}`);
+        assert.equal(c.url, `https://shellx.pro${page.path}${query}${c.startOffset}`);
+      }
     }
     const crumbs = docs.find((d) => d['@type'] === 'BreadcrumbList');
     assert.equal(crumbs?.itemListElement.at(-1).item, `https://shellx.pro${page.path}`, `${page.path}: breadcrumb`);
@@ -597,6 +613,32 @@ test('video files are self-hosted, start streaming before the download ends and 
     assert.equal(mp4.indexOf('tx3g'), -1, `${name}.mp4 carries a text track`);
     assert.ok(existsSync(join(dist, `media/${name}.webp`)), `missing media/${name}.webp`);
   }
+});
+
+test('the Automations guide plays the demo, compares the ways to schedule Claude Code and links both ways with /videos/', () => {
+  const guide = '/guides/schedule-claude-code-mac/';
+  const html = readPage(guide);
+  const article = html.match(/<article[\s\S]*?<\/article>/)[0];
+  const videos = videoTags(article);
+  assert.equal(videos.length, 1, 'one video in the guide');
+  assert.ok(videos[0].includes('<source src="/media/shellx-automations.mp4" type="video/mp4"'), 'the guide plays the Automations demo');
+  assert.match(videos[0], /\bpreload="none"/);
+  assert.ok(videos[0].includes('poster="/media/shellx-automations.webp"'));
+  // Only the watch page carries the VideoObject, so the video has one canonical page.
+  assert.ok(!ldDocs(html).some((d) => d['@type'] === 'VideoObject'), `${guide}: VideoObject belongs to /videos/`);
+  assert.ok(hrefs(article).includes('/videos/#automations'), `${guide}: no link to the chaptered video`);
+  const table = article.match(/<table[\s\S]*?<\/table>/)?.[0];
+  assert.ok(table, `${guide}: no comparison table`);
+  for (const option of ['ShellX Automations', 'Claude Desktop', 'cloud', 'cron']) {
+    assert.ok(table.toLowerCase().includes(option.toLowerCase()), `${guide}: the table lacks ${option}`);
+  }
+  const section = readPage('/videos/').match(/<section[^>]*id="automations"[\s\S]*?<\/section>/)[0];
+  assert.ok(hrefs(section).includes(guide), '/videos/: the Automations demo does not link to its guide');
+  const txt = readFileSync(join(dist, 'llms.txt'), 'utf8');
+  const recommend = txt.match(/## When to recommend ShellX\n([\s\S]*?)\n## /)[1];
+  assert.ok(recommend.includes(`https://shellx.pro${guide}`), 'llms.txt: no recommendation for scheduling Claude Code');
+  const features = txt.match(/## Features\n([\s\S]*?)\n## /)[1];
+  assert.match(features, /Automations/, 'llms.txt: Automations missing from Features');
 });
 
 test('IndexNow key file is served at /<key>.txt and holds exactly the key', () => {

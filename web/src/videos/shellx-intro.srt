@@ -1,59 +1,59 @@
 1
-00:00:00,800 --> 00:00:02,159
+00:00:00,800 --> 00:00:02,040
 Your terminal.
 
 2
-00:00:02,199 --> 00:00:03,258
+00:00:02,080 --> 00:00:03,046
 Everywhere.
 
 3
-00:00:03,298 --> 00:00:04,756
+00:00:03,086 --> 00:00:04,417
 This is ShellX.
 
 4
-00:00:06,396 --> 00:00:12,408
+00:00:06,057 --> 00:00:12,306
 On your Mac or PC, ShellX is a fast, modern terminal: a workspace for every project,
 
 5
-00:00:12,448 --> 00:00:17,667
+00:00:12,346 --> 00:00:17,772
 split panes, a built-in browser, and your AI coding agents, side by side.
 
 6
-00:00:19,007 --> 00:00:21,704
+00:00:19,112 --> 00:00:21,951
 Step away, and your sessions come with you.
 
 7
-00:00:21,744 --> 00:00:24,504
+00:00:21,991 --> 00:00:24,898
 Open them from your iPhone or Android phone,
 
 8
-00:00:24,544 --> 00:00:26,986
+00:00:24,938 --> 00:00:27,509
 follow your agents live, and type back.
 
 9
-00:00:28,126 --> 00:00:30,511
+00:00:28,649 --> 00:00:30,944
 When an agent needs you, you'll know.
 
 10
-00:00:30,551 --> 00:00:35,165
+00:00:30,984 --> 00:00:35,426
 Allow a command, answer a question, or approve a plan, in a single tap.
 
 11
-00:00:37,105 --> 00:00:39,091
+00:00:37,366 --> 00:00:39,483
 Everything is end-to-end encrypted.
 
 12
-00:00:39,131 --> 00:00:42,274
+00:00:39,523 --> 00:00:42,873
 The relay in the middle only ever sees scrambled bytes,
 
 13
-00:00:42,314 --> 00:00:45,920
+00:00:42,913 --> 00:00:46,756
 your keys stay on your devices, and there are no ports to open.
 
 14
-00:00:47,360 --> 00:00:51,577
+00:00:48,196 --> 00:00:52,361
 ShellX runs on macOS, Windows, iPhone and Android.
 
 15
-00:00:53,017 --> 00:00:57,705
+00:00:53,801 --> 00:00:57,809
 Download it free at shellx.pro, and take your terminal with you.

@@ -1,21 +1,22 @@
 ---
-// /videos/: the full tutorial with chapters and a transcript, then the 1-minute intro.
+// /videos/: the full tutorial and the Automations demo, each with chapters and a transcript, then the
+// 1-minute intro.
 import Base from '../layouts/Base.astro';
 import VideoPlayer from './VideoPlayer.astro';
 import { pathFor, ui, type Lang } from '../i18n/ui';
-import { breadcrumbs } from '../lib/seo';
-import { clock, video, videoLd } from '../lib/videos';
+import { breadcrumbs, guides } from '../lib/seo';
+import { clock, video, videoLd, type VideoId } from '../lib/videos';
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const t = ui[lang];
 const path = pathFor(lang, 'videos');
 const home = pathFor(lang, 'home');
-const tutorial = video(lang, 'tutorial');
+const chaptered = (['tutorial', 'automations'] as VideoId[]).map((id) => video(lang, id));
 const intro = video(lang, 'intro');
+const guideOf = (slug?: string) => guides(lang).find((g) => g.slug === slug);
 const ld = [
-  videoLd(tutorial, path),
-  videoLd(intro, path),
+  ...[...chaptered, intro].map((v) => videoLd(v, path)),
   breadcrumbs([{ name: t.breadcrumbHome, path: home }, { name: t.videosHeading, path }]),
 ];
 ---
@@ -30,26 +31,32 @@ const ld = [
       <p class="muted">{t.videosLead}</p>
     </header>
 
-    <section class="watch" id="tutorial" aria-labelledby="tutorial-h">
-      <h2 id="tutorial-h">{tutorial.title} <span class="len">· {t.tutorialLength}</span></h2>
-      <div class="watch-grid">
-        <VideoPlayer video={tutorial} lang={lang} />
-        <nav class="chapters" aria-labelledby="chapters-h">
-          <div class="chapters-in">
-            <h3 id="chapters-h">{t.videoChapters}</h3>
-            <ol>
-              {tutorial.chapters.map((c) => (
-                <li><a href={`${tutorial.mp4}#t=${c.start}`} data-t={c.start}><span class="at">{clock(c.start)}</span>{c.title}</a></li>
-              ))}
-            </ol>
-          </div>
-        </nav>
-      </div>
-      <details class="transcript">
-        <summary>{t.videoTranscript}</summary>
-        {tutorial.chapters.map((c) => <><h3>{clock(c.start)} · {c.title}</h3><p>{c.text}</p></>)}
-      </details>
-    </section>
+    {chaptered.map((v) => (
+      <section class="watch" id={v.id} aria-labelledby={`${v.id}-h`} data-chapters>
+        <h2 id={`${v.id}-h`}>{v.title} <span class="len">· {Math.round(v.seconds / 60)} {t.videoMinutes}</span></h2>
+        <p class="muted">{v.description}</p>
+        {guideOf(v.guide) && (
+          <p class="guide-link"><a href={guideOf(v.guide)!.path}>{t.videoGuide}: {guideOf(v.guide)!.title} →</a></p>
+        )}
+        <div class="watch-grid">
+          <VideoPlayer video={v} lang={lang} />
+          <nav class="chapters" aria-labelledby={`${v.id}-chapters-h`}>
+            <div class="chapters-in">
+              <h3 id={`${v.id}-chapters-h`}>{t.videoChapters}</h3>
+              <ol>
+                {v.chapters.map((c) => (
+                  <li><a href={`${v.mp4}#t=${c.start}`} data-t={c.start}><span class="at">{clock(c.start)}</span>{c.title}</a></li>
+                ))}
+              </ol>
+            </div>
+          </nav>
+        </div>
+        <details class="transcript">
+          <summary>{t.videoTranscript}</summary>
+          {v.chapters.map((c) => <><h3>{clock(c.start)} · {c.title}</h3><p>{c.text}</p></>)}
+        </details>
+      </section>
+    ))}
 
     <section class="watch intro" id="intro" aria-labelledby="intro-h">
       <h2 id="intro-h">{intro.title}</h2>
@@ -73,34 +80,41 @@ const ld = [
 
   <script is:inline>
     (() => {
-      // Chapters seek the tutorial; ?t=<seconds> (the Clip URLs in the JSON-LD) opens it at that second.
-      const v = document.querySelector('[data-video="tutorial"]');
-      const links = [...document.querySelectorAll('[data-t]')];
-      const seek = (t, play) => {
-        if (play) v.play().catch(() => {});
-        if (v.readyState > 0) v.currentTime = t;
-        else v.addEventListener('loadedmetadata', () => { v.currentTime = t; }, { once: true });
-      };
-      for (const a of links) {
-        a.addEventListener('click', (e) => {
-          // Ctrl/Cmd/Shift-click and middle-click keep their meaning (open the video in a new tab).
-          if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-          e.preventDefault();
-          seek(Number(a.dataset.t), true);
-          v.scrollIntoView({ block: 'nearest' });
+      // Chapters seek their own video. The Clip URLs in the JSON-LD open the page at a second:
+      // ?t=<seconds> for the tutorial, ?v=<id>&t=<seconds> for another video.
+      const openAt = {};
+      for (const section of document.querySelectorAll('[data-chapters]')) {
+        const v = section.querySelector('video');
+        const links = [...section.querySelectorAll('[data-t]')];
+        const seek = (t, play) => {
+          if (play) v.play().catch(() => {});
+          if (v.readyState > 0) v.currentTime = t;
+          else v.addEventListener('loadedmetadata', () => { v.currentTime = t; }, { once: true });
+        };
+        for (const a of links) {
+          a.addEventListener('click', (e) => {
+            // Ctrl/Cmd/Shift-click and middle-click keep their meaning (open the video in a new tab).
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            seek(Number(a.dataset.t), true);
+            v.scrollIntoView({ block: 'nearest' });
+          });
+        }
+        v.addEventListener('timeupdate', () => {
+          const on = links.findLastIndex((a) => v.currentTime >= Number(a.dataset.t));
+          links.forEach((a, i) => (i === on ? a.setAttribute('aria-current', 'true') : a.removeAttribute('aria-current')));
         });
+        openAt[v.dataset.video] = (t) => {
+          v.preload = 'metadata';
+          seek(t, false);
+          v.load();
+          v.scrollIntoView({ block: 'center' });
+        };
       }
-      v.addEventListener('timeupdate', () => {
-        const on = links.findLastIndex((a) => v.currentTime >= Number(a.dataset.t));
-        links.forEach((a, i) => (i === on ? a.setAttribute('aria-current', 'true') : a.removeAttribute('aria-current')));
-      });
-      const t = Number(new URLSearchParams(location.search).get('t'));
-      if (t > 0) {
-        v.preload = 'metadata';
-        seek(t, false);
-        v.load();
-        v.scrollIntoView({ block: 'center' });
-      }
+      const q = new URLSearchParams(location.search);
+      const t = Number(q.get('t'));
+      const open = openAt[q.get('v') || 'tutorial'];
+      if (t > 0 && open) open(t);
     })();
   </script>
 </Base>
@@ -114,6 +128,10 @@ const ld = [
   .vp header .muted { font-size: 1.1rem; margin: 0 0 2.5rem; max-width: 44rem; }
   .watch { margin-bottom: 4rem; }
   .watch h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+  .watch > .muted { margin: 0; max-width: 44rem; }
+  .guide-link { margin: 0.5rem 0 0; }
+  .guide-link a { color: var(--purple-l); text-decoration: none; font-weight: 600; }
+  .guide-link a:hover { text-decoration: underline; }
   .len { color: var(--muted); font-weight: 500; }
   .watch-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(15rem, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
   /* The chapter list is as tall as the video and scrolls inside it. */
