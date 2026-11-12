@@ -314,6 +314,8 @@ struct State {
     choice: ShellChoice,
     /// The newest lookup's result; never goes back to `None`.
     computed: Option<Computed>,
+    /// The number of the lookup whose shells `computed` holds (0: none yet).
+    found_at: u64,
     /// Numbers the lookups; only the newest one's result is kept.
     generation: u64,
     /// Lookups started and not ended.
@@ -367,16 +369,37 @@ impl Inner {
 fn end_lookup(inner: &Arc<Inner>, generation: u64, computed: Option<Computed>) {
     let mut state = inner.lock();
     state.running -= 1;
-    if let Some(computed) = computed
-        && state.generation == generation
-    {
-        state.computed = Some(computed);
+    if let Some(computed) = computed {
+        if state.generation == generation {
+            state.computed = Some(computed);
+            state.found_at = generation;
+        } else if generation > state.found_at {
+            keep_catalogue(inner, &mut state, computed.found, generation);
+        }
     }
     if state.again && state.running == 0 {
         state.again = false;
         spawn_lookup(inner, &mut state);
     }
     inner.ended.notify_all();
+}
+
+/// A lookup that a later choice made out of date: the shells it found are still right (they
+/// do not depend on the choice), only its plan is not (review m3). Automatic and a known
+/// shell are planned again from them at once, checking no file; a custom line or
+/// `SHELLX_SHELL` keeps the cached plan, if any, until the newest lookup ends.
+fn keep_catalogue(inner: &Inner, state: &mut State, found: Vec<ShellLaunch>, generation: u64) {
+    let replan =
+        inner.env_override.is_none() && !matches!(state.choice, ShellChoice::Custom { .. });
+    if replan {
+        let plan = launch_plan(&state.choice, None, &found, &inner.probe, &|_| false);
+        state.computed = Some(Computed { found, plan });
+    } else if let Some(cached) = state.computed.as_mut() {
+        cached.found = found;
+    } else {
+        return;
+    }
+    state.found_at = generation;
 }
 
 /// A lookup on a thread of its own.
@@ -454,6 +477,7 @@ impl Shells {
                 state: Mutex::new(State {
                     choice,
                     computed: None,
+                    found_at: 0,
                     generation: 0,
                     running: 0,
                     again: false,
