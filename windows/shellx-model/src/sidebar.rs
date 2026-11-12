@@ -599,6 +599,47 @@ mod tests {
         }
     }
 
+    /// Review chunk 2 M-B: what the "+" list offers is decided here, from each machine's access: a Mac
+    /// with a saved link (Granted) or a request waiting (Pending) is not offered again.
+    #[test]
+    fn the_request_picker_skips_macs_with_access_or_a_request_waiting() {
+        use OfferRule::{AnyMac, RelayCanHost};
+        let ms = vec![
+            host(m("me", "PC", "macos", true, 0, true)),
+            host(m("a", "MacBook", "macos", true, 0, false)),
+            host(m("b", "Mac mini", "macos", true, 0, false)),
+            host(m("c", "iMac", "macos", false, 0, false)),
+            m("d", "Studio", "macos", true, 0, false),
+            host(m("pc", "Bếp-PC", "windows", true, 0, false)),
+        ];
+        let access = |id: &str| match id {
+            "a" => Access::Granted,
+            "b" => Access::Pending {
+                code: "123456".into(),
+            },
+            _ => Access::None,
+        };
+        let ids = |v: &[&MachineInfo]| v.iter().map(|m| m.machine_id.clone()).collect::<Vec<_>>();
+        let (targets, notes) = request_picker(&ms, &access, RelayCanHost);
+        assert_eq!(ids(&targets), ["c"]);
+        assert!(notes.is_empty());
+        let (targets, notes) = request_picker(&ms, &access, AnyMac);
+        assert_eq!(ids(&targets), ["c", "d"]);
+        assert!(notes.is_empty());
+        // Every Mac that may be asked has access or a request waiting.
+        let all_asked = |id: &str| match id {
+            "c" => Access::Pending { code: "1".into() },
+            other => access(other),
+        };
+        let (targets, notes) = request_picker(&ms, &all_asked, RelayCanHost);
+        assert!(targets.is_empty());
+        assert_eq!(notes, [Str::NoOtherMachines]);
+        // No Mac besides this machine.
+        let (targets, notes) = request_picker(&ms[..1], &access, RelayCanHost);
+        assert!(targets.is_empty());
+        assert_eq!(notes, [Str::MacCannotHostYet, Str::SignInOnYourMac]);
+    }
+
     #[test]
     fn can_host_reads_true_only_for_json_true() {
         let item = |extra: &str| -> MachineInfo {
