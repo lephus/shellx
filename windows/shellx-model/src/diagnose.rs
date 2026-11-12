@@ -372,12 +372,13 @@ pub fn probe_script(kind: Option<ShellKind>) -> Option<ProbeScript> {
         }),
         ShellKind::Cmd => Some(ProbeScript {
             steps: vec![
-                // `call` expands %x% after the assignment; the typed text holds `%x%`, never
-                // `shellx-ok-42`, and the banner or a prompt cannot hold it either (m5).
+                // `call` expands the variable after the assignment; the typed text holds
+                // `%SHELLX_PROBE_7f3a%`, never `shellx-ok-42`, and the banner or a prompt cannot
+                // hold it either (m5). The name is one no environment holds (m-b).
                 step(
                     "echo",
                     None,
-                    "set /a x=6*7 >nul & call echo shellx-ok-%x%",
+                    "set /a SHELLX_PROBE_7f3a=6*7 >nul & call echo shellx-ok-%SHELLX_PROBE_7f3a%",
                     "shellx-ok-42",
                     1,
                 ),
