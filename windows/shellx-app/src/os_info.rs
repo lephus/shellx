@@ -3,6 +3,8 @@
 // The window (cfg(windows)) is the main user; the Mac build only tests it.
 #![cfg_attr(not(windows), allow(dead_code))]
 
+use shellx_model::first_window::{FirstWindow, WorkArea, first_window};
+
 /// Windows version like `10.0.26100`, `"unknown"` when unreadable or off Windows.
 pub fn os_version() -> String {
     #[cfg(windows)]
@@ -89,6 +91,76 @@ pub fn screen_reader_running() -> bool {
     #[cfg(not(windows))]
     {
         false
+    }
+}
+
+/// The primary monitor's work area (the screen without the taskbar) as `(width px, height
+/// px, scale)`: physical pixels and the monitor's effective DPI / 96. `None` when any call
+/// fails (the first window then opens maximized) and off Windows.
+pub fn primary_work_area() -> Option<(f32, f32, f32)> {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::{POINT, S_OK};
+        use windows_sys::Win32::Graphics::Gdi::{
+            GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
+        };
+        use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+        // SAFETY: plain value arguments. The primary monitor contains (0, 0), and with
+        // MONITOR_DEFAULTTOPRIMARY the call returns that monitor rather than null.
+        let monitor = unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
+        if monitor.is_null() {
+            return None;
+        }
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: `info` is a live MONITORINFO whose cbSize is set, as the call requires.
+        if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+            return None;
+        }
+        let (mut dpi_x, mut dpi_y) = (0u32, 0u32);
+        // SAFETY: both out-pointers point at live u32s.
+        if unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) } != S_OK {
+            return None;
+        }
+        let r = info.rcWork;
+        work_area_from_rect(r.left, r.top, r.right, r.bottom, dpi_x)
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// `rcWork` (physical pixels) and the monitor's DPI -> `(width px, height px, scale)`; `None`
+/// for an empty or inverted rectangle. Only the size counts: GPUI places windows in workspace
+/// coordinates, whose (0, 0) is the work area's corner whatever side the taskbar is on.
+fn work_area_from_rect(
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    dpi: u32,
+) -> Option<(f32, f32, f32)> {
+    let width = i64::from(right) - i64::from(left);
+    let height = i64::from(bottom) - i64::from(top);
+    (width > 0 && height > 0).then(|| (width as f32, height as f32, dpi as f32 / 96.0))
+}
+
+/// Where the first window opens: the foundations' rule on the primary monitor's work area,
+/// maximized when the work area is unknown.
+pub fn first_window_placement(work: Option<(f32, f32, f32)>) -> FirstWindow {
+    match work {
+        Some((width, height, scale)) => {
+            first_window(WorkArea::primary_workspace(width, height, scale))
+        }
+        None => first_window(WorkArea {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }),
     }
 }
 

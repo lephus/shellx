@@ -4,6 +4,8 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+#[cfg(windows)]
+use gpui::point;
 use gpui::{
     App, Application, Bounds, Global, TitlebarOptions, WindowBounds, WindowOptions, prelude::*, px,
     size,
@@ -42,6 +44,28 @@ fn background_requested(value: Option<&str>) -> bool {
     value == Some("1")
 }
 
+/// The first window: on Windows 1200x760 shrunk to the primary monitor's work area (R1 F2),
+/// maximized when it would be smaller than 720x420 or the work area is unknown; on a Mac
+/// (development) 1200x760 centred.
+#[cfg(windows)]
+fn first_window_bounds(_cx: &App) -> WindowBounds {
+    let fw = os_info::first_window_placement(os_info::primary_work_area());
+    let bounds = Bounds {
+        origin: point(px(fw.x), px(fw.y)),
+        size: size(px(fw.width), px(fw.height)),
+    };
+    if fw.maximized {
+        WindowBounds::Maximized(bounds)
+    } else {
+        WindowBounds::Windowed(bounds)
+    }
+}
+
+#[cfg(not(windows))]
+fn first_window_bounds(cx: &App) -> WindowBounds {
+    WindowBounds::Windowed(Bounds::centered(None, size(px(1200.0), px(760.0)), cx))
+}
+
 pub fn run() {
     Application::new().with_assets(Assets).run(|cx: &mut App| {
         if let Err(error) = cx
@@ -59,11 +83,13 @@ pub fn run() {
         });
 
         let background = dev_background();
-        let bounds = Bounds::centered(None, size(px(1200.0), px(760.0)), cx);
+        let window_bounds = first_window_bounds(cx);
         let window = cx
             .open_window(
                 WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    window_bounds: Some(window_bounds),
+                    // The primary monitor (GPUI places in its workspace coordinates).
+                    display_id: None,
                     // `appears_transparent` hides the Windows caption; the
                     // title bar in ui/titlebar.rs marks its drag area and
                     // caption buttons for hit-testing (snap layouts work).
