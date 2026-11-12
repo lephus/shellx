@@ -271,9 +271,13 @@ fn create_new_in(dir: &Path, name: &str, text: &str) -> Option<PathBuf> {
     None
 }
 
-/// A new file in the logs folder, else the same name in the temp folder.
-fn write_new_file(dir: &Path, name: &str, text: &str) -> Option<PathBuf> {
-    create_new_in(dir, name, text).or_else(|| create_new_in(&std::env::temp_dir(), name, text))
+/// A new file in `dir`, else the same name in `fallback` (the temp folder). `Err` holds the
+/// intended path in `dir` when neither could be written, so a dialog can still name it
+/// (review m8).
+fn write_new_file(dir: &Path, fallback: &Path, name: &str, text: &str) -> Result<PathBuf, PathBuf> {
+    create_new_in(dir, name, text)
+        .or_else(|| create_new_in(fallback, name, text))
+        .ok_or_else(|| dir.join(name))
 }
 
 fn append_text(path: &Path, text: &str) {
@@ -323,7 +327,7 @@ pub(crate) fn handle_panic(
         message: parts.message.clone(),
         backtrace: String::new(),
     });
-    let written = write_new_file(&ctx.logs_dir, &name, &head);
+    let written = write_new_file(&ctx.logs_dir, &std::env::temp_dir(), &name, &head).ok();
     match &written {
         Some(path) => {
             remember_last_file(path);
@@ -342,12 +346,14 @@ pub(crate) fn handle_panic(
 }
 
 /// The start-failure file `start-failed.<utc>.<pid>.txt`: the crash header, `render` (one
-/// more line, as given, when `Some`), `error:` and the chain; every line redacted.
+/// more line, as given, when `Some`), `error:` and the chain; every line redacted. `Ok` is
+/// the file written (in the logs folder or the temp folder); `Err` is the intended path when
+/// it could not be written anywhere, for the dialog to name (review m8).
 pub fn write_window_failure(
     ctx: &CrashContext,
     error: &anyhow::Error,
     render: Option<&str>,
-) -> Option<PathBuf> {
+) -> Result<PathBuf, PathBuf> {
     let utc = compact_utc(now_secs());
     let report = crash_report::window_failure_report(&WindowFailureFacts {
         utc: utc.clone(),
@@ -360,7 +366,7 @@ pub fn write_window_failure(
         errors: error.chain().map(|e| e.to_string()).collect(),
     });
     let name = crash_report::crash_file_name(CrashFileKind::WindowFailed, &utc, std::process::id());
-    write_new_file(&ctx.logs_dir, &name, &report)
+    write_new_file(&ctx.logs_dir, &std::env::temp_dir(), &name, &report)
 }
 
 fn spawn_reporter(ctx: &CrashContext, kind: DialogKind, file: &Path) -> bool {

@@ -350,9 +350,9 @@ pub fn window_failed(error: &anyhow::Error) -> ! {
     let ctx = crash::context()
         .cloned()
         .unwrap_or_else(crash::CrashContext::this_process);
-    let file = crash::write_window_failure(&ctx, error, Some(&start_guard::start_line(&plan)));
-    // A file that could not be written anywhere: the dialog names the logs folder.
-    let named = file.unwrap_or_else(|| ctx.logs_dir.clone());
+    // The file written, or the intended path when it could not be written anywhere (m8).
+    let (Ok(named) | Err(named)) =
+        crash::write_window_failure(&ctx, error, Some(&start_guard::start_line(&plan)));
     crash::start_reporter(&ctx, DialogKind::WindowFailed, &named);
     std::process::exit(1);
 }
