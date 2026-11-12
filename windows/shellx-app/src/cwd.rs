@@ -321,23 +321,51 @@ mod tests {
         assert_eq!(git_branch(tmp.path()), None);
     }
 
+    fn found(branch: Option<&str>, read: bool) -> BranchLookup {
+        BranchLookup {
+            branch: branch.map(String::from),
+            read,
+        }
+    }
+
     #[test]
-    fn branch_cache_rereads_after_two_seconds() {
-        let tmp = repo_with_head("ref: refs/heads/main\n");
-        let cwd = tmp.path().to_str().unwrap();
+    fn a_new_folder_is_read_once_in_the_background() {
         let mut cache = BranchCache::new();
         let t0 = Instant::now();
-        assert_eq!(cache.get(cwd, t0).as_deref(), Some("main"));
+        assert_eq!(cache.lookup(r"C:\work", t0), found(None, true));
+        // the read is running: nobody starts another
+        assert_eq!(cache.lookup(r"C:\work", t0), found(None, false));
+        cache.store(r"C:\work", Some("main".into()), t0);
+        assert_eq!(cache.lookup(r"C:\work", t0), found(Some("main"), false));
+        // another folder has its own read
+        assert_eq!(cache.lookup(r"C:\other", t0), found(None, true));
+    }
 
-        fs::write(tmp.path().join(".git/HEAD"), "ref: refs/heads/dev\n").unwrap();
-        assert_eq!(
-            cache.get(cwd, t0 + Duration::from_millis(1999)).as_deref(),
-            Some("main")
-        );
-        assert_eq!(
-            cache.get(cwd, t0 + Duration::from_secs(2)).as_deref(),
-            Some("dev")
-        );
+    #[test]
+    fn a_stale_branch_shows_while_it_is_read_again() {
+        let mut cache = BranchCache::new();
+        let t0 = Instant::now();
+        cache.lookup(r"C:\work", t0);
+        cache.store(r"C:\work", Some("main".into()), t0);
+        let fresh = t0 + Duration::from_millis(1999);
+        assert_eq!(cache.lookup(r"C:\work", fresh), found(Some("main"), false));
+        // after 2 s: read again, and show the last known branch meanwhile
+        let stale = t0 + Duration::from_secs(2);
+        assert_eq!(cache.lookup(r"C:\work", stale), found(Some("main"), true));
+        assert_eq!(cache.lookup(r"C:\work", stale), found(Some("main"), false));
+        cache.store(r"C:\work", Some("dev".into()), stale);
+        assert_eq!(cache.lookup(r"C:\work", stale), found(Some("dev"), false));
+    }
+
+    #[test]
+    fn a_hung_read_is_never_started_twice() {
+        let mut cache = BranchCache::new();
+        let t0 = Instant::now();
+        let reads = (0..=100)
+            .map(|step| cache.lookup(r"\\server\share", t0 + Duration::from_millis(step * 100)))
+            .filter(|lookup| lookup.read)
+            .count();
+        assert_eq!(reads, 1);
     }
 
     #[test]
