@@ -1,1 +1,1 @@
-ShellX: AI Agents & Terminal
+ShellX - AI coding agents
