@@ -7,7 +7,8 @@
 //! from Settings -> Account) draws over Settings. The dropdowns (the title
 //! bar "+ ▾" menu, the "?" help menu, the machines "+" list) are not panels:
 //! they never hold the keyboard, but a plain Esc while one is open closes
-//! them and goes nowhere else (`Panels::esc_closes_dropdowns`).
+//! them and goes nowhere else (`Panels::esc_closes_dropdowns`); so does a
+//! right or middle press (`press_only_closes_dropdowns`).
 //!
 //! Typed text is never swallowed (`Panels::root_key`): on Windows a key-down
 //! that was handled is not translated, so no WM_CHAR follows and the field
@@ -144,6 +145,16 @@ impl Panels {
             },
         }
     }
+}
+
+/// Whether a mouse press only closes the open dropdowns and goes nowhere
+/// else: a button other than the left one while a dropdown shows. A
+/// dropdown leaves the keyboard on the terminal, so a right click that
+/// dismisses it would otherwise also paste there. The root asks in the
+/// CAPTURE phase, before the terminal sees the press. A left press keeps
+/// its way: the dropdown closes itself and the click lands.
+pub fn press_only_closes_dropdowns(left_button: bool, dropdown_open: bool) -> bool {
+    dropdown_open && !left_button
 }
 
 #[cfg(test)]

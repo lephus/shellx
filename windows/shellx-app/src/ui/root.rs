@@ -55,8 +55,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render, ScrollHandle,
-    Subscription, Window, div, prelude::*, relative,
+    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton,
+    MouseDownEvent, Render, ScrollHandle, Subscription, Window, div, prelude::*, relative,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
@@ -64,7 +64,7 @@ use shellx_model::history::FocusHistory;
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
-use shellx_model::modal::{Panel, Panels, RootKey};
+use shellx_model::modal::{Panel, Panels, RootKey, press_only_closes_dropdowns};
 use shellx_model::palette::Status;
 use shellx_model::sidebar::{
     MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_picker,
@@ -1154,6 +1154,15 @@ impl Render for RootView {
             .text_size(theme::UI_SIZE)
             .line_height(relative(1.4))
             .capture_key_down(cx.listener(Self::on_key_down_capture))
+            // A right or middle press that dismisses a dropdown goes no
+            // further, so the terminal under it does not paste (review I2).
+            .capture_any_mouse_down(cx.listener(|this, event: &MouseDownEvent, _, cx| {
+                let left = event.button == MouseButton::Left;
+                if press_only_closes_dropdowns(left, this.dropdown_open(cx)) {
+                    this.close_menus(cx);
+                    cx.stop_propagation();
+                }
+            }))
             .on_key_down(cx.listener(Self::on_key_down))
             .child(titlebar)
             .child(
