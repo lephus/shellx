@@ -351,6 +351,15 @@ class AndroidShTest(unittest.TestCase):
         self.assertEqual(0, r.returncode, r.stdout + r.stderr)
         self.assertIn("note: VERSION_NAME 1.2.3 is not the iPhone's MARKETING_VERSION 1.3.0", r.stdout)
 
+    def test_refuses_stale_fallback_licence_notices(self):
+        write(self.f.repo / "shellx-android/app/src/main/assets/licenses/third_party_licenses.txt", "old\n")
+        write(self.f.repo / "shellx-android/scripts/generate-licences.py",
+              "import sys\nprint('generate-licences: stale; run python3 shellx-android/scripts/generate-licences.py')\n"
+              "sys.exit(1)\n")
+        self.f.commit_and_push("stale licence notices")
+        self.assertRefused(self.f.run(), "the licence notices are stale")
+        self.assertFalse((self.f.tmp / "gradle.log").exists())
+
     def test_usage_and_no_upload_path(self):
         r = self.f.run("--help")
         self.assertEqual(0, r.returncode)

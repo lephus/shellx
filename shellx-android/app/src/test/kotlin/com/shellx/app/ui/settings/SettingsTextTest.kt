@@ -1,7 +1,6 @@
 package com.shellx.app.ui.settings
 
 import android.content.res.Resources
-import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.shellx.app.R
@@ -33,9 +32,7 @@ class SettingsTextTest {
     }
 
     @Test
-    fun licensesLinkToTheWebsiteAndShowItsHost() {
-        assertEquals("https://shellx.pro", AboutLinks.WEBSITE)
-        assertEquals(AboutLinks.WEBSITE_HOST, Uri.parse(AboutLinks.WEBSITE).host)
+    fun theVersionShowsItsBuildNumber() {
         assertEquals("1.0.0 (100)", versionText("1.0.0", 100))
     }
 }

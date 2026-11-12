@@ -82,6 +82,10 @@ run_checks() {
   bash "$REPO_ROOT/scripts/shellx/check-android-license.sh"
   note "strings"
   python3 "$ANDROID_DIR/scripts/import-strings.py" --check
+  if [ -f "$ANDROID_DIR/app/src/main/assets/licenses/third_party_licenses.txt" ]; then
+    note "licence notices"
+    python3 "$ANDROID_DIR/scripts/generate-licences.py" --check
+  fi
   note "version catalogs"
   local key a b
   for key in kotlin junit; do

@@ -211,6 +211,10 @@ cmd_build() {
     die "the licence check failed (scripts/shellx/check-android-license.sh)"
   note "source checks"
   run_checker sources --lockfile shellx-android/app/gradle.lockfile || die "the source checks failed (above)"
+  if [ -f "$ANDROID_DIR/app/src/main/assets/licenses/third_party_licenses.txt" ]; then
+    python3 -I "$ANDROID_DIR/scripts/generate-licences.py" --check ||
+      die "the licence notices are stale; run python3 shellx-android/scripts/generate-licences.py"
+  fi
 
   local dirs=() dir cleartext
   for dir in shellx-android/app/src/main shellx-android/app/src/release; do
