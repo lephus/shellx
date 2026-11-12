@@ -16,6 +16,7 @@ mod icons;
 mod ime;
 mod links_store;
 mod local_pty;
+mod logger;
 mod os_info;
 mod pairing_service;
 mod paths;

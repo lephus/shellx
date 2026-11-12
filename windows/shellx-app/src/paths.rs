@@ -100,6 +100,21 @@ mod tests {
     }
 
     #[test]
+    fn logs_live_under_native_else_under_temp() {
+        let native = PathBuf::from("/n/ShellX/native");
+        assert_eq!(
+            logs_dir_from(Ok(native.clone()), PathBuf::from("/t")),
+            native.join("logs")
+        );
+        let missing = io::Error::new(io::ErrorKind::NotFound, "LOCALAPPDATA is not set");
+        assert_eq!(
+            logs_dir_from(Err(missing), PathBuf::from("/t")),
+            PathBuf::from("/t").join("ShellX").join("logs")
+        );
+        assert!(logs_dir().ends_with("logs"));
+    }
+
+    #[test]
     fn windows_layout_and_missing_local_app_data() {
         let base = if cfg!(windows) {
             r"C:\Users\a\AppData\Local"

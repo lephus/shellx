@@ -11,6 +11,7 @@ pub mod history;
 pub mod keys;
 pub mod layout;
 pub mod links;
+pub mod log_file;
 pub mod modal;
 pub mod mouse;
 pub mod palette;
