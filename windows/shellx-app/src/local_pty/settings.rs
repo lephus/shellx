@@ -303,6 +303,8 @@ struct State {
     generation: u64,
     /// Lookups started and not ended.
     running: usize,
+    /// A lookup was asked for while one ran: start it when they have ended.
+    again: bool,
     /// The first pane already asked (only it ever waits).
     asked: bool,
 }
@@ -343,16 +345,54 @@ impl Inner {
         );
         Computed { found, plan }
     }
+}
 
-    fn end(&self, generation: u64, computed: Option<Computed>) {
-        let mut state = self.lock();
+/// Counts a lookup as ended and keeps its result if it is the newest; then starts the one
+/// asked for meanwhile (`request_lookup`), and wakes a first pane that waits.
+fn end_lookup(inner: &Arc<Inner>, generation: u64, computed: Option<Computed>) {
+    let mut state = inner.lock();
+    state.running -= 1;
+    if let Some(computed) = computed
+        && state.generation == generation
+    {
+        state.computed = Some(computed);
+    }
+    if state.again && state.running == 0 {
+        state.again = false;
+        spawn_lookup(inner, &mut state);
+    }
+    inner.ended.notify_all();
+}
+
+/// A lookup on a thread of its own.
+fn spawn_lookup(inner: &Arc<Inner>, state: &mut State) {
+    let (generation, choice) = inner.begin(state);
+    let thread_inner = inner.clone();
+    let spawned = std::thread::Builder::new()
+        .name("shell-lookup".into())
+        .spawn(move || {
+            let mut lookup = Lookup {
+                inner: thread_inner,
+                generation,
+                result: None,
+            };
+            lookup.result = Some(lookup.inner.compute(&choice));
+        });
+    if spawned.is_err() {
+        // no thread: the panes keep what they have
         state.running -= 1;
-        if let Some(computed) = computed
-            && state.generation == generation
-        {
-            state.computed = Some(computed);
-        }
-        self.ended.notify_all();
+    }
+}
+
+/// A new lookup for the current choice. While one runs, its result is now out of date and
+/// one more starts when it ends: changing the choice quickly on a PC with a slow PATH
+/// never piles up threads.
+fn request_lookup(inner: &Arc<Inner>, state: &mut State) {
+    if state.running > 0 {
+        state.generation += 1;
+        state.again = true;
+    } else {
+        spawn_lookup(inner, state);
     }
 }
 
@@ -367,7 +407,7 @@ struct Lookup {
 
 impl Drop for Lookup {
     fn drop(&mut self) {
-        self.inner.end(self.generation, self.result.take());
+        end_lookup(&self.inner, self.generation, self.result.take());
     }
 }
 
@@ -401,6 +441,7 @@ impl Shells {
                     computed: None,
                     generation: 0,
                     running: 0,
+                    again: false,
                     asked: false,
                 }),
                 ended: Condvar::new(),
@@ -439,7 +480,7 @@ impl Shells {
         }
         let mut state = inner.lock();
         if state.computed.is_none() && state.running == 0 {
-            self.spawn_lookup(&mut state);
+            spawn_lookup(inner, &mut state);
         }
         if !state.asked {
             state.asked = true;
@@ -467,25 +508,6 @@ impl Shells {
         let found = self.snapshot().found;
         pane_start(plan, &found, &self.inner.probe)
     }
-
-    fn spawn_lookup(&self, state: &mut State) {
-        let (generation, choice) = self.inner.begin(state);
-        let inner = self.inner.clone();
-        let spawned = std::thread::Builder::new()
-            .name("shell-lookup".into())
-            .spawn(move || {
-                let mut lookup = Lookup {
-                    inner,
-                    generation,
-                    result: None,
-                };
-                lookup.result = Some(lookup.inner.compute(&choice));
-            });
-        if spawned.is_err() {
-            // no thread: the panes keep the startup plan
-            state.running -= 1;
-        }
-    }
 }
 
 impl Shells {
@@ -511,7 +533,7 @@ impl Shells {
         state.choice = choice;
         // Under the same lock: a lookup already running for the old choice gets an older
         // number now, so it can no longer overwrite the plan made above (review M2).
-        self.spawn_lookup(&mut state);
+        request_lookup(&self.inner, &mut state);
         Ok(())
     }
 
@@ -519,7 +541,7 @@ impl Shells {
     #[allow(dead_code)] // in the A1 seam; no caller yet
     pub fn refresh(&self) {
         let mut state = self.inner.lock();
-        self.spawn_lookup(&mut state);
+        request_lookup(&self.inner, &mut state);
     }
 
     /// Looks shells up on this thread and returns what it found. Blocks for as long as the
