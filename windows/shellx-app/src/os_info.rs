@@ -5,20 +5,53 @@
 
 use shellx_model::first_window::{FirstWindow, WorkArea, first_window};
 
-/// Windows version like `10.0.26100`, `"unknown"` when unreadable or off Windows.
+/// Windows version like `10.0.26100` (Ruling 28): `RtlGetVersion`, then the registry, then
+/// `10.0`; never `unknown`, which the relay refuses. `10.0` off Windows.
 pub fn os_version() -> String {
     #[cfg(windows)]
     {
-        windows_version().unwrap_or_else(|| "unknown".to_string())
+        os_version_from(rtl_version(), registry_version())
     }
     #[cfg(not(windows))]
     {
-        "unknown".to_string()
+        os_version_from(None, None)
     }
 }
 
+/// `major.minor.build` from `RtlGetVersion` when it answered, else the registry's value when
+/// it is not blank, else `10.0`.
+fn os_version_from(rtl: Option<(u32, u32, u32)>, registry: Option<String>) -> String {
+    if let Some((major, minor, build)) = rtl {
+        return format!("{major}.{minor}.{build}");
+    }
+    registry
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "10.0".to_string())
+}
+
+/// `RtlGetVersion`: the real version, whatever the manifest says (unlike `GetVersionEx`);
+/// `None` when it does not return `STATUS_SUCCESS` (0) or reports major 0.
 #[cfg(windows)]
-fn windows_version() -> Option<String> {
+fn rtl_version() -> Option<(u32, u32, u32)> {
+    use windows_sys::Wdk::System::SystemServices::RtlGetVersion;
+    use windows_sys::Win32::System::SystemInformation::OSVERSIONINFOW;
+    let mut info = OSVERSIONINFOW {
+        dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `info` is a live OSVERSIONINFOW whose size field is set, as the call requires.
+    let status = unsafe { RtlGetVersion(&mut info) };
+    (status == 0 && info.dwMajorVersion != 0).then_some((
+        info.dwMajorVersion,
+        info.dwMinorVersion,
+        info.dwBuildNumber,
+    ))
+}
+
+/// The registry's `CurrentMajorVersionNumber.CurrentMinorVersionNumber.CurrentBuildNumber`.
+#[cfg(windows)]
+fn registry_version() -> Option<String> {
     use winreg::RegKey;
     use winreg::enums::HKEY_LOCAL_MACHINE;
     let key = RegKey::predef(HKEY_LOCAL_MACHINE)
@@ -276,7 +309,10 @@ mod tests {
             os_version_from(Some((10, 0, 26100)), Some("10.0.19045".into())),
             "10.0.26100"
         );
-        assert_eq!(os_version_from(None, Some("10.0.19045".into())), "10.0.19045");
+        assert_eq!(
+            os_version_from(None, Some("10.0.19045".into())),
+            "10.0.19045"
+        );
         assert_eq!(os_version_from(None, Some("  ".into())), "10.0");
         assert_eq!(os_version_from(None, None), "10.0");
     }

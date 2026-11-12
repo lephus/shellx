@@ -90,6 +90,17 @@ pub enum HookMode {
     FileOnly,
 }
 
+/// The panic hook's mode for this process (3b §5 step 5; plan review M-13): `FileOnly` for the
+/// console flags (`--version`, `--smoke*`) and for `--diagnose --no-open` (CI, where a dialog
+/// would wait on a desktop nobody sees); `Dialog` for the window and for `--diagnose`.
+pub fn hook_mode(console_flag: bool, diagnose: bool, no_open: bool) -> HookMode {
+    if console_flag || (diagnose && no_open) {
+        HookMode::FileOnly
+    } else {
+        HookMode::Dialog
+    }
+}
+
 /// The once-per-process reporter flag. The hook uses one static `HookState`; each test its
 /// own, so parallel tests do not share it.
 pub struct HookState {

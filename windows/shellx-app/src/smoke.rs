@@ -26,12 +26,15 @@ use shellx_model::tabs::{CloseOutcome, PaneTarget, Tabs};
 use crate::cwd::cwd_from_osc7;
 use crate::fonts;
 use crate::icons::{self, Icon};
-use crate::local_pty::{ExitProbe, LocalPty, default_shell, spawn_reader};
+use crate::local_pty::settings::{probe_from_system, startup_plan};
+use crate::local_pty::{ExitProbe, LocalPty, PanePlan, ShellCmd, dev_bash, spawn_reader};
 use crate::shell_info::SHELL_STRINGS;
 use crate::term_core::{PtyLink, TermCore, rgb};
-use crate::workspace::{PaneHost, model_panes, spawn_local_pane};
+use crate::workspace::{PaneHost, model_panes, spawn_local_pane_with, spawn_reason};
+use shellx_model::diagnose::{Check, probe_script};
 use shellx_model::palette::TERM_BG;
 use shellx_model::selection::to_crlf;
+use shellx_model::shell::ShellProbe;
 use shellx_model::strings::{Lang, t};
 
 const TIMEOUT: Duration = Duration::from_secs(45);
@@ -109,6 +112,24 @@ fn smoke_shell_args(program: &str) -> Vec<&'static str> {
     } else {
         Vec::new()
     }
+}
+
+/// The shell `--smoke` starts (Ruling 39), whatever the stored choice and `SHELLX_SHELL` say:
+/// on Windows, Windows PowerShell by its System32 path with the prompt hook (the startup
+/// plan's first shell, no fallback); on the Mac, the development bash. The smoke's prompt
+/// matcher and steps are PowerShell's, so a person's stored Command Prompt, Git Bash, WSL or
+/// custom line must not turn it red.
+pub fn smoke_shell_for(windows: bool, probe: &ShellProbe) -> ShellCmd {
+    if windows {
+        startup_plan(probe).first
+    } else {
+        dev_bash(None)
+    }
+}
+
+/// `smoke_shell_for` on this machine.
+pub fn smoke_shell() -> ShellCmd {
+    smoke_shell_for(cfg!(windows), &probe_from_system())
 }
 
 /// Cross-platform, no GPUI: the icon table and the shell strings.
@@ -366,7 +387,11 @@ pub fn run() -> Result<()> {
     remote_tabs()?;
     input_paths()?;
     let started = Instant::now();
-    let shell = default_shell();
+    let shell = smoke_shell();
+    println!(
+        "smoke: shell {} ({}); the stored choice and SHELLX_SHELL are not used",
+        shell.label, shell.program
+    );
     let (link, reader) = shell.spawn(&smoke_shell_args(&shell.program), 100, 30)?;
     let mut session = TermCore::new(link.clone(), 100, 30)?;
     let (tx, rx) = mpsc::channel();
@@ -419,8 +444,8 @@ pub fn run() -> Result<()> {
     // 2b. Windows: the PowerShell hook (the window's command line, with
     //     -NoProfile) reported the working directory with OSC 7 through
     //     ConPTY; the workspace cards read it. Elsewhere the smoke is
-    //     unchanged.
-    if cfg!(windows) && std::env::var_os("SHELLX_SHELL").is_none() {
+    //     unchanged. (SHELLX_SHELL no longer changes the shell, Ruling 39.)
+    if cfg!(windows) {
         let cwd = osc7_cwd(&mut pump, &mut session)?;
         println!("smoke: OSC 7 working directory {cwd:?}");
     }
@@ -484,6 +509,98 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
+/// `--diagnose`'s check of a shell, the one new tabs start (Ruling 30): it starts, it prints,
+/// then its `probe_script` steps (PowerShell and Command Prompt). Each step waits at most
+/// `step_timeout` and is timed. The shell runs as new tabs run it (its profile included) and
+/// is ended (killed) afterwards. The check names start with the shell's label.
+pub fn shell_checks(cmd: &ShellCmd, step_timeout: Duration) -> Vec<Check> {
+    let mut checks = Vec::new();
+    let check = |name: &str, ok: bool, since: Instant, detail: String| Check {
+        name: format!("{} {name}", cmd.label),
+        ok,
+        millis: Some(since.elapsed().as_millis().try_into().unwrap_or(u64::MAX)),
+        detail,
+    };
+    let started = Instant::now();
+    let (link, reader) = match cmd.spawn(&[], 100, 30) {
+        Ok(spawned) => spawned,
+        Err(error) => {
+            checks.push(check("start", false, started, spawn_reason(&error)));
+            return checks;
+        }
+    };
+    checks.push(check("start", true, started, String::new()));
+    let mut session = match TermCore::new(link.clone(), 100, 30) {
+        Ok(session) => session,
+        Err(error) => {
+            checks.push(check("terminal", false, started, format!("{error:#}")));
+            return checks;
+        }
+    };
+    let (tx, rx) = mpsc::channel();
+    spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
+    let mut pump = Pump { rx, closed: false };
+
+    // Waits (fed) until `done` holds or `step_timeout` passes.
+    let mut wait = |session: &mut TermCore, done: &mut dyn FnMut(&[String]) -> bool| -> bool {
+        let deadline = Instant::now() + step_timeout;
+        loop {
+            if session.text_lines().is_ok_and(|lines| done(&lines)) {
+                return true;
+            }
+            if Instant::now() > deadline || pump.closed {
+                return false;
+            }
+            pump.feed(session);
+        }
+    };
+
+    let first = Instant::now();
+    let printed = wait(&mut session, &mut |lines| {
+        lines.iter().any(|l| !l.trim().is_empty())
+    });
+    checks.push(check(
+        "first output",
+        printed,
+        first,
+        if printed {
+            String::new()
+        } else {
+            format!("nothing within {} s", step_timeout.as_secs())
+        },
+    ));
+    if printed && let Some(script) = probe_script(cmd.kind) {
+        for step in script.steps {
+            let at = Instant::now();
+            if let Some(columns) = step.columns
+                && let Err(error) = session.resize(columns, 30, 8, 16)
+            {
+                checks.push(check(step.name, false, at, format!("{error:#}")));
+                continue;
+            }
+            session.send_text(step.input);
+            session.send_chord("enter");
+            let seen = wait(&mut session, &mut |lines| {
+                lines.iter().filter(|l| l.contains(step.expect)).count() >= step.lines
+            });
+            let detail = if seen {
+                String::new()
+            } else {
+                format!(
+                    "{} not seen within {} s",
+                    step.expect,
+                    step_timeout.as_secs()
+                )
+            };
+            checks.push(check(step.name, seen, at, detail));
+        }
+    }
+    // The shell is not needed any more: dropping the last handle kills it.
+    drop(session);
+    drop(link);
+    checks
+}
+
 /// The working directory the shell reported with OSC 7 (`TermCore::pwd`),
 /// read the way the window reads it (`cwd_from_osc7`). The hook writes
 /// OSC 7 before the prompt text, so it is normally there already; this
@@ -519,14 +636,20 @@ struct ShellPane {
 
 impl ShellPane {
     fn spawn(_pane: PaneId, _target: &PaneTarget) -> Result<ShellPane> {
-        let program = default_shell().program;
-        let started = spawn_local_pane(80, 24, &smoke_shell_args(&program))?;
+        let plan = PanePlan {
+            first: smoke_shell(),
+            fallback: None,
+        };
+        let args = smoke_shell_args(&plan.first.program);
+        let started = spawn_local_pane_with(&plan, 80, 24, &args)
+            .map_err(|failure| anyhow::anyhow!("{failure}"))?;
+        let pane = started.pane;
         let (tx, rx) = mpsc::channel();
-        spawn_reader(started.reader, move |bytes| tx.send(bytes).is_ok());
+        spawn_reader(pane.reader, move |bytes| tx.send(bytes).is_ok());
         Ok(ShellPane {
-            probe: started.link.exit_probe(),
-            core: started.core,
-            link: started.link,
+            probe: pane.link.exit_probe(),
+            core: pane.core,
+            link: pane.link,
             rx,
         })
     }

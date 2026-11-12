@@ -261,9 +261,9 @@ pub(crate) fn dev_bash(override_shell: Option<&str>) -> ShellCmd {
     }
 }
 
-/// What a new tab starts first (`--smoke` runs it): the first shell of
-/// `shells().plan_for_new_pane()`, or Windows PowerShell by its System32
-/// path when the plan is an error. On the Mac: bash.
+/// What a new tab starts first (`--diagnose` checks it; `--smoke` no longer runs it, Ruling
+/// 39): the first shell of `shells().plan_for_new_pane()`, or Windows PowerShell by its
+/// System32 path when the plan is an error. On the Mac: bash.
 pub fn default_shell() -> ShellCmd {
     let shells = settings::shells();
     match shells.plan_for_new_pane() {

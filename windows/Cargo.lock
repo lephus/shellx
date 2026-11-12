@@ -4938,6 +4938,7 @@ dependencies = [
  "shellx-model",
  "shellx-remote",
  "tempfile",
+ "windows",
  "windows-sys 0.61.2",
  "winreg 0.55.0",
 ]

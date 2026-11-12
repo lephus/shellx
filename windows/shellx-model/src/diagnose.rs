@@ -5,6 +5,7 @@
 //! reaches any field still does not reach the text.
 
 use crate::redact::redact;
+use crate::shell::ShellKind;
 
 /// How many of the newest log lines the report carries.
 pub const LOG_TAIL_LINES: usize = 200;
@@ -63,6 +64,12 @@ pub struct DiagnosticsReport {
     pub relay: Check,
     pub crash_files: Vec<String>,
     pub log_tail: Vec<String>,
+    /// The last "Application Error" events Windows recorded for ShellX (Ruling 38): `None`
+    /// off Windows (no line), `Some(Err(reason))` when they could not be read.
+    pub windows_error_events: Option<Result<Vec<String>, String>>,
+    /// The first of the two writes (Ruling 30): the probes that can hang on a driver, the
+    /// network or a shell have not run yet, and their lines say so.
+    pub slow_checks_pending: bool,
 }
 
 /// One value on one line: blank reads `unknown`.
@@ -157,15 +164,31 @@ pub fn format_report(r: &DiagnosticsReport) -> String {
     displays.push(format!("first window: {}", value(&r.first_window)));
     section("displays", displays);
 
+    let pending = r.slow_checks_pending;
+    let slow = |line: String, label: &str| {
+        if pending {
+            format!("{label}: {NOT_RUN_YET}")
+        } else {
+            line
+        }
+    };
     let mut gpu = vec![
-        format!("chosen gpu: {}", value(&r.chosen_gpu)),
+        slow(
+            format!("chosen gpu: {}", value(&r.chosen_gpu)),
+            "chosen gpu",
+        ),
         format!("render mode: {}", value(&r.render_mode)),
-        format!("dwm timing: {}", value(&r.dwm_timing)),
+        slow(
+            format!("dwm timing: {}", value(&r.dwm_timing)),
+            "dwm timing",
+        ),
     ];
-    if r.gpus.is_empty() {
+    if pending {
+        gpu.push(format!("gpus: {NOT_RUN_YET}"));
+    } else if r.gpus.is_empty() {
         gpu.push("gpus: none".to_string());
     }
-    for (i, g) in r.gpus.iter().enumerate() {
+    for (i, g) in r.gpus.iter().enumerate().filter(|_| !pending) {
         gpu.push(format!(
             "gpu {}: {}, driver {}, feature level {}",
             i + 1,
@@ -186,26 +209,47 @@ pub fn format_report(r: &DiagnosticsReport) -> String {
     );
 
     let mut shells = vec![
-        format!("found: {}", list(&r.shells_found)),
-        format!("chosen: {}", value(&r.shell_chosen)),
+        slow(format!("found: {}", list(&r.shells_found)), "found"),
+        slow(format!("chosen: {}", value(&r.shell_chosen)), "chosen"),
     ];
-    if r.shell_checks.is_empty() {
+    if pending {
+        shells.push(format!("checks: {NOT_RUN_YET}"));
+    } else if r.shell_checks.is_empty() {
         shells.push("checks: none".to_string());
     }
-    for c in &r.shell_checks {
+    for c in r.shell_checks.iter().filter(|_| !pending) {
         shells.push(check_line(&value(&c.name), c));
     }
     section("shells", shells);
 
     section("state", vec![check_line("state dir", &r.state_dir)]);
     section("account", vec![format!("sign-in: {}", value(&r.sign_in))]);
-    section("relay", vec![check_line("version check", &r.relay)]);
+    section(
+        "relay",
+        vec![slow(check_line("version check", &r.relay), "version check")],
+    );
 
-    let crash = if r.crash_files.is_empty() {
+    let mut crash: Vec<String> = if r.crash_files.is_empty() {
         vec!["none".to_string()]
     } else {
         r.crash_files.iter().map(|f| value(f)).collect()
     };
+    match &r.windows_error_events {
+        None => {}
+        Some(_) if pending => crash.push(format!("windows error events: {NOT_RUN_YET}")),
+        Some(Ok(events)) if events.is_empty() => {
+            crash.push("windows error events: none found".to_string())
+        }
+        Some(Ok(events)) => crash.extend(
+            events
+                .iter()
+                .map(|e| format!("windows error event: {}", value(e))),
+        ),
+        Some(Err(reason)) => crash.push(format!(
+            "windows error events: unavailable ({})",
+            value(reason)
+        )),
+    }
     section("crash files", crash);
 
     let tail = &r.log_tail[r.log_tail.len().saturating_sub(LOG_TAIL_LINES)..];
@@ -224,6 +268,232 @@ pub fn format_report(r: &DiagnosticsReport) -> String {
         out.push('\n');
     }
     out
+}
+
+/// What a slow probe's line reads in the first write.
+const NOT_RUN_YET: &str = "not run yet";
+
+/// The typing tools whose process is running (`[keyboard]`): the names from `exe_names` that
+/// are Unikey, EVKey, OpenKey or GoTiengViet, compared without case, each once, in order.
+/// No other process name is ever kept.
+pub fn typing_tools(exe_names: &[String]) -> Vec<String> {
+    const TOOLS: [&str; 9] = [
+        "unikeynt.exe",
+        "unikey.exe",
+        "evkey64.exe",
+        "evkey32.exe",
+        "evkey.exe",
+        "openkey64.exe",
+        "openkey32.exe",
+        "openkey.exe",
+        "gotiengviet.exe",
+    ];
+    let mut found: Vec<String> = Vec::new();
+    for name in exe_names {
+        let lower = name.to_lowercase();
+        if TOOLS.contains(&lower.as_str()) && !found.iter().any(|f| f.to_lowercase() == lower) {
+            found.push(name.clone());
+        }
+    }
+    found
+}
+
+/// The adapter GPUI chose in the last start the log shows (Ruling 36): the last
+/// `Using GPU: <name>` line before the last `Created device with Direct3D` line. GPUI logs
+/// every adapter it tries (`directx_devices.rs:121-131`), then the device it created.
+pub fn chosen_gpu_from_log(lines: &[String]) -> Option<String> {
+    let created = lines
+        .iter()
+        .rposition(|l| l.contains("Created device with Direct3D"))?;
+    lines[..created].iter().rev().find_map(|l| {
+        l.split_once("Using GPU: ")
+            .map(|(_, name)| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+    })
+}
+
+/// One step of a shell check: resize to `columns` first when set, type `input` and Enter,
+/// then wait until `lines` lines of the grid contain `expect`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProbeStep {
+    pub name: &'static str,
+    pub columns: Option<u16>,
+    pub input: &'static str,
+    pub expect: &'static str,
+    pub lines: usize,
+}
+
+/// What `--diagnose` types into a shell after it started and printed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProbeScript {
+    pub steps: Vec<ProbeStep>,
+}
+
+/// The script for a kind of shell: PowerShell (7 and Windows) and Command Prompt have one;
+/// the others (Git Bash, WSL, a custom line, the Mac's bash) are checked for start and first
+/// output only. The computed value (`6*7`) proves the command ran: the typed text never holds
+/// it; the Vietnamese text must appear twice (typed, then echoed).
+pub fn probe_script(kind: Option<ShellKind>) -> Option<ProbeScript> {
+    let step = |name, columns, input, expect, lines| ProbeStep {
+        name,
+        columns,
+        input,
+        expect,
+        lines,
+    };
+    match kind? {
+        ShellKind::Pwsh | ShellKind::WindowsPowerShell => Some(ProbeScript {
+            steps: vec![
+                step(
+                    "echo",
+                    None,
+                    "Write-Output ('shellx-ok-' + (6*7))",
+                    "shellx-ok-42",
+                    1,
+                ),
+                step(
+                    "unicode",
+                    None,
+                    "Write-Output 'tiếng Việt'",
+                    "tiếng Việt",
+                    2,
+                ),
+                step(
+                    "resize",
+                    Some(120),
+                    "Write-Output ('cols-' + $Host.UI.RawUI.WindowSize.Width)",
+                    "cols-120",
+                    1,
+                ),
+            ],
+        }),
+        ShellKind::Cmd => Some(ProbeScript {
+            steps: vec![
+                step("echo", None, "set /a 6*7", "42", 1),
+                step("unicode", None, "echo tiếng Việt", "tiếng Việt", 2),
+            ],
+        }),
+        ShellKind::GitBash | ShellKind::Wsl => None,
+    }
+}
+
+/// Longest Windows error event line, in characters.
+const EVENT_LINE_MAX_CHARS: usize = 300;
+
+/// `&amp; &lt; &gt; &quot; &apos; &#N; &#xH;` decoded; anything else kept as written.
+fn decode_entities(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('&') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at..];
+        let decoded = after.find(';').and_then(|end| {
+            let name = &after[1..end];
+            let c = match name {
+                "amp" => Some('&'),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "quot" => Some('"'),
+                "apos" => Some('\''),
+                _ => {
+                    let number = if let Some(hex) =
+                        name.strip_prefix("#x").or_else(|| name.strip_prefix("#X"))
+                    {
+                        u32::from_str_radix(hex, 16).ok()
+                    } else {
+                        name.strip_prefix('#').and_then(|d| d.parse::<u32>().ok())
+                    };
+                    number.and_then(char::from_u32)
+                }
+            };
+            c.map(|c| (c, end + 1))
+        });
+        match decoded {
+            Some((c, len)) => {
+                out.push(c);
+                rest = &after[len..];
+            }
+            None => {
+                out.push('&');
+                rest = &after[1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The value of attribute `name` in the first tag `<tag ...>` of `xml`, quoted with `'` or `"`.
+fn attribute(xml: &str, tag: &str, name: &str) -> Option<String> {
+    let start = xml.find(&format!("<{tag}"))?;
+    let tag_text = &xml[start..start + xml[start..].find('>')?];
+    let at = tag_text.find(&format!("{name}="))? + name.len() + 1;
+    let quote = tag_text[at..].chars().next()?;
+    if quote != '\'' && quote != '"' {
+        return None;
+    }
+    let value = &tag_text[at + 1..];
+    let end = value.find(quote)?;
+    Some(decode_entities(&value[..end]))
+}
+
+/// The text of every `<Data …>…</Data>` element (an empty `<Data/>` is skipped), decoded, on
+/// one line.
+fn data_values(event: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut rest = event;
+    while let Some(at) = rest.find("<Data") {
+        let after = &rest[at + "<Data".len()..];
+        // `<DataItem>` or similar is not a Data element.
+        if !after.starts_with(['>', ' ', '/', '\t', '\r', '\n']) {
+            rest = after;
+            continue;
+        }
+        let Some(close) = after.find('>') else { break };
+        if after[..close].ends_with('/') {
+            rest = &after[close + 1..];
+            continue;
+        }
+        let body = &after[close + 1..];
+        let Some(end) = body.find("</Data>") else {
+            break;
+        };
+        let text = decode_entities(&body[..end]);
+        let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !text.is_empty() {
+            values.push(text);
+        }
+        rest = &body[end + "</Data>".len()..];
+    }
+    values
+}
+
+/// `wevtutil qe … /f:xml` output → one line per complete `<Event>`, in the order given (newest
+/// first with `/rd:true`): `<TimeCreated SystemTime> <the Data values, comma-separated>`, at
+/// most 300 characters. Only the time and the event data are read (never `<Computer>`).
+pub fn windows_error_summaries(xml: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<Event") {
+        let after = &rest[at..];
+        // `<Event>` or `<Event xmlns=…>`, not `<EventData>` or `<EventID>`.
+        if !after["<Event".len()..].starts_with(['>', ' ', '\t', '\r', '\n']) {
+            rest = &after["<Event".len()..];
+            continue;
+        }
+        let Some(end) = after.find("</Event>") else {
+            break;
+        };
+        let event = &after[..end];
+        let time = attribute(event, "TimeCreated", "SystemTime").unwrap_or_default();
+        let values = data_values(event).join(", ");
+        let line = format!("{time} {values}").trim().to_string();
+        if !line.is_empty() {
+            lines.push(line.chars().take(EVENT_LINE_MAX_CHARS).collect());
+        }
+        rest = &after[end + "</Event>".len()..];
+    }
+    lines
 }
 
 /// What GPUI's vsync thread does with this PC's DWM timing (report `[gpu]`, patch (b)).
@@ -494,7 +764,14 @@ mod tests {
             assert_eq!(typing_tools(std::slice::from_ref(&upper)), vec![upper]);
         }
         // Only the tools: no other process name, and one line per tool.
-        assert!(typing_tools(&strings(&["shellx-desktop.exe", "unikey.exe.bak", "myunikey.exe"])).is_empty());
+        assert!(
+            typing_tools(&strings(&[
+                "shellx-desktop.exe",
+                "unikey.exe.bak",
+                "myunikey.exe"
+            ]))
+            .is_empty()
+        );
         assert_eq!(
             typing_tools(&strings(&["UniKeyNT.exe", "unikeynt.exe"])),
             strings(&["UniKeyNT.exe"])
@@ -507,7 +784,8 @@ mod tests {
         let lines = vec![
             "T INFO shellx_desktop: ShellX 1.7.0 starting on Windows 10.0.26100".to_string(),
             format!("{DEV} Using GPU: Microsoft Basic Render Driver"),
-            "T ERROR gpui: Required feature StructuredBuffer is not supported by GPU/driver".to_string(),
+            "T ERROR gpui: Required feature StructuredBuffer is not supported by GPU/driver"
+                .to_string(),
             format!("{DEV} Using GPU: Intel(R) UHD Graphics 620"),
             format!("{DEV} Created device with Direct3D 11.1 feature level."),
         ];
@@ -519,7 +797,9 @@ mod tests {
         // after the last one that did does not.
         let mut later = lines.clone();
         later.push(format!("{DEV} Using GPU: NVIDIA GeForce RTX 3050"));
-        later.push(format!("{DEV} Created device with Direct3D 11.0 feature level."));
+        later.push(format!(
+            "{DEV} Created device with Direct3D 11.0 feature level."
+        ));
         later.push(format!("{DEV} Using GPU: Broken Adapter"));
         assert_eq!(
             chosen_gpu_from_log(&later).as_deref(),
@@ -538,14 +818,20 @@ mod tests {
             assert_eq!(script.steps[0].input, "Write-Output ('shellx-ok-' + (6*7))");
             assert_eq!(script.steps[0].expect, "shellx-ok-42");
             assert_eq!(script.steps[1].input, "Write-Output 'tiếng Việt'");
-            assert_eq!((script.steps[1].expect, script.steps[1].lines), ("tiếng Việt", 2));
+            assert_eq!(
+                (script.steps[1].expect, script.steps[1].lines),
+                ("tiếng Việt", 2)
+            );
             assert_eq!(script.steps[2].columns, Some(120));
             assert_eq!(script.steps[2].expect, "cols-120");
         }
         let cmd = probe_script(Some(ShellKind::Cmd)).unwrap();
         let names: Vec<&str> = cmd.steps.iter().map(|s| s.name).collect();
         assert_eq!(names, ["echo", "unicode"]);
-        assert_eq!((cmd.steps[0].input, cmd.steps[0].expect), ("set /a 6*7", "42"));
+        assert_eq!(
+            (cmd.steps[0].input, cmd.steps[0].expect),
+            ("set /a 6*7", "42")
+        );
         assert_eq!(
             (cmd.steps[1].input, cmd.steps[1].expect, cmd.steps[1].lines),
             ("echo tiếng Việt", "tiếng Việt", 2)
@@ -614,7 +900,10 @@ mod tests {
         };
         let text = format_report(&base);
         assert!(!text.contains("windows error event"), "{text}");
-        assert_eq!(section_after(&text, "[crash files]"), ["crash.20261112-081530.1.txt"]);
+        assert_eq!(
+            section_after(&text, "[crash files]"),
+            ["crash.20261112-081530.1.txt"]
+        );
         let with = |events| {
             format_report(&DiagnosticsReport {
                 windows_error_events: Some(events),
@@ -624,7 +913,10 @@ mod tests {
         let text = with(Ok(vec![]));
         assert_eq!(
             section_after(&text, "[crash files]"),
-            ["crash.20261112-081530.1.txt", "windows error events: none found"]
+            [
+                "crash.20261112-081530.1.txt",
+                "windows error events: none found"
+            ]
         );
         assert_eq!(headers(&text), HEADERS);
         let text = with(Ok(strings(&["a", "b"])));
@@ -640,7 +932,10 @@ mod tests {
         let text = with(Err("x".to_string()));
         assert_eq!(
             section_after(&text, "[crash files]"),
-            ["crash.20261112-081530.1.txt", "windows error events: unavailable (x)"]
+            [
+                "crash.20261112-081530.1.txt",
+                "windows error events: unavailable (x)"
+            ]
         );
         assert_eq!(headers(&text), HEADERS);
         // No crash files: `none`, then the events.
@@ -674,11 +969,22 @@ mod tests {
             assert!(lines.contains(&pending), "{pending:?} missing:\n{text}");
         }
         assert!(!lines.iter().any(|l| l.starts_with("gpu 1:")), "{text}");
-        assert!(!lines.iter().any(|l| l.starts_with("windows error event:")), "{text}");
+        assert!(
+            !lines.iter().any(|l| l.starts_with("windows error event:")),
+            "{text}"
+        );
         // The fast sections keep their values.
-        for kept in ["render mode: ", "display 1: ", "sign-in: ", "state dir: ok", "layouts: "] {
+        for kept in [
+            "render mode: ",
+            "display 1: ",
+            "sign-in: ",
+            "state dir: ok",
+            "layouts: ",
+        ] {
             assert!(
-                lines.iter().any(|l| l.starts_with(kept) && !l.ends_with("not run yet")),
+                lines
+                    .iter()
+                    .any(|l| l.starts_with(kept) && !l.ends_with("not run yet")),
                 "{kept:?}:\n{text}"
             );
         }

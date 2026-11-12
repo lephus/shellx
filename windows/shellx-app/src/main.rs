@@ -5,10 +5,13 @@
 //! headless (after the `--smoke-ui-assets` checks) and exits;
 //! `--smoke-ui-assets` checks the embedded icons and shell strings only;
 //! `--smoke-panes` runs only the tabs/splits pane checks of `--smoke`;
-//! `--version` prints the version and exits.
+//! `--version` prints the version and exits; `--diagnose [--no-open]` writes the
+//! diagnostics report (and shows it in Explorer unless `--no-open`). These flags print to
+//! the parent's console (Ruling 29).
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod build_info;
+mod console;
 mod core_bridge;
 mod core_service;
 mod crash;
@@ -38,6 +41,7 @@ mod workspace;
 #[cfg(any(windows, target_os = "macos"))]
 mod ui;
 
+use std::io::Write;
 use std::path::PathBuf;
 
 use shellx_model::crash_report::DialogKind;
@@ -57,21 +61,31 @@ fn main() {
         }
     }
 
-    // Every panic from here on leaves a crash file; the window's also starts the reporter.
-    let console = ["--version", "--smoke-ui-assets", "--smoke-panes", "--smoke"]
+    // The console flags print to the parent's console (Ruling 29), attached before anything
+    // else can print (3b §5 step 3).
+    let console_flag = ["--version", "--smoke-ui-assets", "--smoke-panes", "--smoke"]
         .iter()
         .any(|flag| has(flag));
+    let diagnose = has("--diagnose");
+    let no_open = has("--no-open");
+    if console_flag || diagnose {
+        console::attach_parent_console();
+    }
+
+    // Every panic from here on leaves a crash file; the window's and --diagnose's also start
+    // the reporter (FileOnly for --diagnose --no-open, as in CI: plan review M-13).
     let ctx = crash::CrashContext::this_process();
-    let mode = if console {
-        crash::HookMode::FileOnly
-    } else {
-        crash::HookMode::Dialog
-    };
+    let mode = crash::hook_mode(console_flag, diagnose, no_open);
     crash::install_panic_hook(ctx.clone(), mode);
     crash::set_crash_test(crash::crash_test_from(&args));
 
     if has("--version") {
-        println!("shellx-desktop {}", shellx_model::VERSION);
+        // `writeln!` with the error ignored: a closed console or pipe must not panic.
+        let _ = writeln!(
+            std::io::stdout(),
+            "shellx-desktop {}",
+            shellx_model::VERSION
+        );
         std::process::exit(0);
     }
 
@@ -103,6 +117,13 @@ fn main() {
                 std::process::exit(1);
             }
         }
+    }
+
+    if diagnose {
+        // 3b §5 step 8: the native filter follows the hook's mode; no log is written.
+        #[cfg(windows)]
+        crash_native::install(&ctx, mode);
+        std::process::exit(diagnose_run::run(!no_open));
     }
 
     #[cfg(any(windows, target_os = "macos"))]

@@ -20,7 +20,7 @@ use anyhow::Result;
 use shellx_model::layout::{PaneId, Rect};
 use shellx_model::tabs::{PaneTarget, Tabs};
 
-use crate::local_pty::{LocalPty, PanePlan, ShellCmd, default_shell};
+use crate::local_pty::{LocalPty, PanePlan, ShellCmd};
 use crate::term_core::TermCore;
 
 /// Width of the line between split panes (`Layout::rects` divider), in px.
@@ -226,19 +226,6 @@ pub fn spawn_local_pane_with(
         }
     }
     Err(StartFailure { attempts })
-}
-
-/// Starts the default shell (`local_pty::default_shell`) with `extra_args`
-/// added, on a `cols` x `rows` pseudoconsole, without a fallback (`--smoke`
-/// checks that shell itself).
-pub fn spawn_local_pane(cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
-    let plan = PanePlan {
-        first: default_shell(),
-        fallback: None,
-    };
-    spawn_local_pane_with(&plan, cols, rows, extra_args)
-        .map(|started| started.pane)
-        .map_err(|failure| anyhow::anyhow!("{failure}"))
 }
 
 #[cfg(test)]
