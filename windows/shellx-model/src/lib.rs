@@ -3,6 +3,7 @@
 pub mod account;
 pub mod account_view;
 pub mod core_api;
+pub mod crash_report;
 pub mod diagnose;
 pub mod email_sign_in;
 pub mod first_window;

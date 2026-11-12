@@ -8,8 +8,10 @@
 //! `--version` prints the version and exits.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+mod build_info;
 mod core_bridge;
 mod core_service;
+mod crash;
 mod cwd;
 mod fonts;
 mod icons;
