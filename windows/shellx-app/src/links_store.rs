@@ -151,7 +151,12 @@ fn quarantine(path: &Path) -> io::Result<PathBuf> {
 /// What the log may say about a `links.json` that did not parse. serde_json's own text can
 /// quote the offending value (a machine name, say), so only fixed text and the position go in.
 fn load_error_text(e: &serde_json::Error) -> String {
-    e.to_string()
+    format!(
+        "{:?} error at line {} column {}",
+        e.classify(),
+        e.line(),
+        e.column()
+    )
 }
 
 #[cfg(test)]
