@@ -740,7 +740,7 @@ mod tests {
     fn the_start_failure_file_is_redacted() {
         let tmp = tempfile::tempdir().unwrap();
         let ctx = ctx(tmp.path());
-        let error = anyhow::anyhow!("the relay refused token {T43}")
+        let error = anyhow::anyhow!("the relay refused token {T43}, code 123456")
             .context("signed in as a@b.co")
             .context("could not open the window");
         let file =
@@ -761,6 +761,7 @@ mod tests {
             "{text}"
         );
         assert!(!text.contains("a@b.co") && !text.contains(T43), "{text}");
+        assert!(!text.contains("123456"), "{text}");
     }
 
     #[test]

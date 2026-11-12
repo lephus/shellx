@@ -862,7 +862,7 @@ mod tests {
             render: Some("render mode: standard (default)".into()),
             errors: vec![
                 "could not open the window".into(),
-                format!("signed in as a@b.co\nwith {T43}"),
+                format!("signed in as a@b.co\nwith {T43} and the code 123456"),
             ],
         });
         let lines: Vec<&str> = text.lines().collect();
@@ -880,6 +880,7 @@ mod tests {
             "{text}"
         );
         assert!(!text.contains("a@b.co") && !text.contains(T43), "{text}");
+        assert!(!text.contains("123456"), "{text}");
         let none = window_failure_report(&WindowFailureFacts {
             render: None,
             errors: vec![],
