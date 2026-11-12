@@ -146,10 +146,29 @@ fn head_file(dir: &Path) -> Option<PathBuf> {
     Some(dir.join(target.trim()).join("HEAD"))
 }
 
-/// `git_branch` per working directory, reused for `TTL` so a sidebar that
-/// redraws many times a second reads `.git/HEAD` about once.
+/// What a card shows for a folder's branch, and whether the caller must start a background
+/// read of it (`git_branch`, then `BranchCache::store`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BranchLookup {
+    pub branch: Option<String>,
+    pub read: bool,
+}
+
+/// The last branch read per working directory (Ruling 23). `.git/HEAD` is never read on the
+/// UI thread: `lookup` says when a read is due, the caller reads in the background and
+/// `store`s the answer. One read per folder at a time; an answer is kept for `TTL`; a card
+/// shows the last known branch while a new read runs; a read that hangs blocks only re-reads
+/// of its own folder.
 pub struct BranchCache {
-    entries: HashMap<String, (Instant, Option<String>)>,
+    entries: HashMap<String, BranchEntry>,
+}
+
+struct BranchEntry {
+    branch: Option<String>,
+    /// When the last answer arrived; `None` before the first.
+    read_at: Option<Instant>,
+    /// A read is running.
+    reading: bool,
 }
 
 /// How long a branch read is reused.
@@ -162,15 +181,36 @@ impl BranchCache {
         }
     }
 
-    pub fn get(&mut self, cwd: &str, now: Instant) -> Option<String> {
-        if let Some((read_at, branch)) = self.entries.get(cwd)
-            && now.saturating_duration_since(*read_at) < TTL
-        {
-            return branch.clone();
+    /// The branch to show for `cwd` now, and whether to start a read.
+    pub fn lookup(&mut self, cwd: &str, now: Instant) -> BranchLookup {
+        let entry = self.entries.entry(cwd.to_string()).or_insert(BranchEntry {
+            branch: None,
+            read_at: None,
+            reading: false,
+        });
+        let fresh = entry
+            .read_at
+            .is_some_and(|at| now.saturating_duration_since(at) < TTL);
+        let read = !entry.reading && !fresh;
+        if read {
+            entry.reading = true;
         }
-        let branch = git_branch(Path::new(cwd));
-        self.entries.insert(cwd.to_string(), (now, branch.clone()));
-        branch
+        BranchLookup {
+            branch: entry.branch.clone(),
+            read,
+        }
+    }
+
+    /// A background read of `cwd` answered.
+    pub fn store(&mut self, cwd: &str, branch: Option<String>, now: Instant) {
+        self.entries.insert(
+            cwd.to_string(),
+            BranchEntry {
+                branch,
+                read_at: Some(now),
+                reading: false,
+            },
+        );
     }
 }
 

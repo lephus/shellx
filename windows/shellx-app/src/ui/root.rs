@@ -1011,7 +1011,13 @@ impl RootView {
     /// The path and git branch lines of a workspace card: a local pane's
     /// directory (from its shell's OSC 7) and the branch checked out there;
     /// a Mac pane shows the Mac's name and no branch (`cwd::row_lines`).
-    fn card_lines(&mut self, pane: PaneId, cx: &App) -> (Option<String>, Option<String>) {
+    /// The branch is read in the background, never here: the card shows the
+    /// last one known and redraws when a read answers (Ruling 23).
+    fn card_lines(
+        &mut self,
+        pane: PaneId,
+        cx: &mut Context<Self>,
+    ) -> (Option<String>, Option<String>) {
         let remote = self
             .pane_machine(pane)
             .map(|machine| self.machine_name(machine, cx));
@@ -1022,10 +1028,25 @@ impl RootView {
             .and_then(|url| cwd_from_osc7(&url));
         let (path, wants_branch) =
             row_lines(cwd.as_deref(), remote.as_deref(), self.home.as_deref());
-        let branch = cwd
-            .filter(|_| wants_branch)
-            .and_then(|cwd| self.branches.get(&cwd, Instant::now()));
-        (path, branch)
+        let Some(dir) = cwd.filter(|_| wants_branch) else {
+            return (path, None);
+        };
+        let lookup = self.branches.lookup(&dir, Instant::now());
+        if lookup.read {
+            cx.spawn(async move |this, cx| {
+                let read_dir = dir.clone();
+                let branch = cx
+                    .background_executor()
+                    .spawn(async move { crate::cwd::git_branch(std::path::Path::new(&read_dir)) })
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    this.branches.store(&dir, branch, Instant::now());
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
+        (path, lookup.branch)
     }
 }
 
