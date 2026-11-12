@@ -537,8 +537,8 @@ impl SettingsPanel {
                 ))
             })
             .collect();
-        let check = if cfg!(target_os = "macos") {
-            Some(Self::muted(MAC_PREVIEW_NOTE))
+        let check = if let Some(note) = mac_preview_note() {
+            Some(Self::muted(note))
         } else {
             match &self.shell_check {
                 Some(Err(error)) => Some(
@@ -729,9 +729,21 @@ impl Render for SettingsPanel {
 }
 
 /// The Mac development build always starts bash (Ruling 19): its custom line
-/// is not checked, and this says why. Development text, not shipped.
+/// is not checked, and this says why. Development text: only the Mac build has it.
+#[cfg(target_os = "macos")]
 const MAC_PREVIEW_NOTE: &str =
     "Mac development build: new terminals always run bash; this line applies on Windows.";
+
+/// `MAC_PREVIEW_NOTE` on the Mac, nothing elsewhere.
+#[cfg(target_os = "macos")]
+fn mac_preview_note() -> Option<&'static str> {
+    Some(MAC_PREVIEW_NOTE)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn mac_preview_note() -> Option<&'static str> {
+    None
+}
 
 /// The stable part of a shell row's id.
 fn kind_id(kind: ShellKind) -> &'static str {
