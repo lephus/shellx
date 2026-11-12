@@ -1,3 +1,4 @@
+// Modified by ShellX: the vsync thread no longer divides by zero when DWM reports a refresh period under 1 ms. See windows/vendor/README.md.
 use std::{
     sync::LazyLock,
     time::{Duration, Instant},
@@ -65,17 +66,35 @@ fn get_dwm_interval() -> Result<Duration> {
     // Check for interval values that are impossibly low. A 29 microsecond
     // interval was seen (from a qpcRefreshPeriod of 60).
     if interval < VSYNC_INTERVAL_THRESHOLD {
-        Ok(retrieve_duration(
-            timing_info.rateRefresh.uiDenominator as u64,
-            timing_info.rateRefresh.uiNumerator as u64,
+        Ok(refresh_rate_interval(
+            timing_info.rateRefresh.uiNumerator,
+            timing_info.rateRefresh.uiDenominator,
         ))
     } else {
         Ok(interval)
     }
 }
 
+/// ShellX: one refresh period from DWM's rate in Hz (numerator / denominator). Passing the rate
+/// to `retrieve_duration` divided by `rate / 1_000_000`, which is 0 for every real rate.
+fn refresh_rate_interval(numerator: u32, denominator: u32) -> Duration {
+    if numerator == 0 || denominator == 0 {
+        return DEFAULT_VSYNC_INTERVAL;
+    }
+    let interval = Duration::from_secs_f64(f64::from(denominator) / f64::from(numerator));
+    if interval < VSYNC_INTERVAL_THRESHOLD || interval > Duration::from_secs(1) {
+        DEFAULT_VSYNC_INTERVAL
+    } else {
+        interval
+    }
+}
+
 #[inline]
 fn retrieve_duration(counts: u64, ticks_per_second: u64) -> Duration {
     let ticks_per_microsecond = ticks_per_second / 1_000_000;
+    if ticks_per_microsecond == 0 {
+        // ShellX: a QPC frequency under 1 MHz; 0 sends the caller to the refresh rate.
+        return Duration::ZERO;
+    }
     Duration::from_micros(counts / ticks_per_microsecond)
 }
