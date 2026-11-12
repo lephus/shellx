@@ -66,12 +66,15 @@ use shellx_model::mouse::{
     secondary_click, wheel_action,
 };
 use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
+use shellx_model::paste::{ConfirmKey, confirm_key, needs_paste_confirmation, paste_line_count};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
 use shellx_model::shell::ShellError;
-use shellx_model::strings::{Lang, Str, save_link_failed, shell_fell_back, shell_plan_error, t};
+use shellx_model::strings::{
+    Lang, Str, paste_lines_prompt, save_link_failed, shell_fell_back, shell_plan_error, t,
+};
 
 use super::app::Services;
 use super::button::{Kind, button};
@@ -260,6 +263,9 @@ pub(super) struct TermView {
     /// ngừng nhập"), cleared after `FLASH`.
     flash: Option<String>,
     flash_seq: u64,
+    /// Clipboard text of several lines waiting for "Dán" (Enter) or "Hủy"
+    /// (Esc): the bar at the bottom of the pane asks.
+    pending_paste: Option<String>,
     /// IME composition text (preedit), shown inline at the cursor and never
     /// sent to the PTY until committed.
     marked: Option<String>,
@@ -301,6 +307,7 @@ impl TermView {
             failed: None,
             flash: None,
             flash_seq: 0,
+            pending_paste: None,
             marked: None,
             marked_selection: None,
             selection: None,
@@ -321,6 +328,11 @@ impl TermView {
     pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
         view.start_local(shells().pane_start(), cx);
+        // Development only (Ruling 24): every new pane asks about a 3-line paste.
+        #[cfg(target_os = "macos")]
+        if std::env::var("SHELLX_DEV_PREVIEW").as_deref() == Ok("paste") {
+            view.pending_paste = Some("echo 1\necho 2\necho 3\n".to_string());
+        }
         view
     }
 
@@ -626,18 +638,40 @@ impl TermView {
         self.clear_selection(cx);
     }
 
-    /// Clipboard text as data: `TermCore::paste` normalizes newlines, strips
-    /// embedded `ESC[200~` / `ESC[201~` and brackets only under mode 2004.
-    /// A remote pane that is not attached refuses it (never queued).
+    /// The one way a paste starts (Ctrl+Shift+V, Shift+Insert, right click,
+    /// RootView's fallback; Ruling 20). Text of more than one line for a
+    /// shell without bracketed paste waits for the person to confirm it
+    /// (R2 F18); anything else is pasted at once. A remote pane that is not
+    /// attached refuses it (never queued).
     fn paste_clipboard(&mut self, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             return;
         };
+        if self.backend.input_refused() {
+            self.flash_input_paused(cx);
+            return;
+        }
+        let Some(bracketed) = self.backend.core().map(|core| core.bracketed_paste()) else {
+            return;
+        };
+        if needs_paste_confirmation(&text, bracketed) {
+            self.pending_paste = Some(text);
+            cx.notify();
+        } else {
+            self.paste_now(&text, cx);
+        }
+    }
+
+    /// Clipboard text as data: `TermCore::paste` normalizes newlines, strips
+    /// embedded `ESC[200~` / `ESC[201~` and brackets only under mode 2004.
+    fn paste_now(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.pending_paste = None;
+        cx.notify();
         match &mut self.backend {
             Backend::None => {}
-            Backend::Local { core, .. } => core.paste(&text),
+            Backend::Local { core, .. } => core.paste(text),
             // Refused whole when not attached or over 8 MiB encoded.
-            Backend::Remote(remote) => match remote.mirror.paste(&text) {
+            Backend::Remote(remote) => match remote.mirror.paste(text) {
                 Paste::Sent => {}
                 Paste::Refused => {
                     self.flash_input_paused(cx);
@@ -651,6 +685,11 @@ impl TermView {
             },
         }
         self.clear_selection(cx);
+        cx.notify();
+    }
+
+    fn cancel_paste(&mut self, cx: &mut Context<Self>) {
+        self.pending_paste = None;
         cx.notify();
     }
 
@@ -852,6 +891,25 @@ impl TermView {
             }
             return;
         }
+        // A paste waits for Enter or Esc; any other key drops it and goes on.
+        // While the IME composes, the question stays.
+        if let Some(text) = self.pending_paste.clone()
+            && !ctx.composing
+        {
+            match confirm_key(&key) {
+                ConfirmKey::Confirm => {
+                    self.paste_now(&text, cx);
+                    cx.stop_propagation();
+                    return;
+                }
+                ConfirmKey::Cancel => {
+                    self.cancel_paste(cx);
+                    cx.stop_propagation();
+                    return;
+                }
+                ConfirmKey::CancelAndPass => self.cancel_paste(cx),
+            }
+        }
         match map_key(&key, &ctx) {
             KeyAction::App(command @ (AppCommand::Copy | AppCommand::Paste)) => {
                 self.clipboard_command(command, cx);
@@ -1041,6 +1099,69 @@ fn start_message(lang: Lang, why: String, tried: Vec<String>, cx: &mut Context<T
         )
 }
 
+/// The multi-line paste question at the bottom of a pane (R2 F18): how many
+/// lines would run, "Dán" and "Hủy", and the keys that answer. It occludes
+/// the grid, so a click on it never starts a selection.
+fn paste_bar(lang: Lang, lines: usize, cx: &mut Context<TermView>) -> Div {
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .bottom(px(12.0))
+        .flex()
+        .justify_center()
+        .child(
+            div()
+                .id("paste-bar")
+                .occlude()
+                .flex()
+                .flex_col()
+                .gap(px(8.0))
+                .mx(px(16.0))
+                .px(px(14.0))
+                .py(px(10.0))
+                .rounded(px(10.0))
+                .border_1()
+                .border_color(theme::border())
+                .bg(theme::raise())
+                .font(theme::ui_font())
+                .text_size(theme::UI_SIZE)
+                .child(
+                    div()
+                        .text_color(theme::text_hi())
+                        .child(paste_lines_prompt(lang, lines)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(8.0))
+                        .child(
+                            button("paste-confirm", t(lang, Str::Paste), Kind::Primary, false)
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    if let Some(text) = this.pending_paste.clone() {
+                                        this.paste_now(&text, cx);
+                                    }
+                                })),
+                        )
+                        .child(
+                            button("paste-cancel", t(lang, Str::Cancel), Kind::Secondary, false)
+                                .on_click(
+                                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        this.cancel_paste(cx)
+                                    }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_size(theme::SMALL_SIZE)
+                                .text_color(theme::muted())
+                                .child(t(lang, Str::PasteConfirmKeys)),
+                        ),
+                ),
+        )
+}
+
 /// The short status line at the bottom of a pane (`TermView::flash`).
 fn flash_line(text: String) -> Div {
     div()
@@ -1076,6 +1197,7 @@ impl Render for TermView {
             _ => self.failed.clone(),
         };
         let flash = self.flash.clone();
+        let pending = self.pending_paste.as_deref().map(paste_line_count);
         let root = div()
             .relative()
             .size_full()
@@ -1118,7 +1240,10 @@ impl Render for TermView {
             None => root.child(TermElement { view: cx.entity() }),
         };
         root.children(pill.map(|pill| status_pill(&pill, lang)))
-            .children(flash.map(flash_line))
+            .children(match pending {
+                Some(lines) => Some(paste_bar(lang, lines, cx)),
+                None => flash.map(flash_line),
+            })
     }
 }
 

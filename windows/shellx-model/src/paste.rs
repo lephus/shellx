@@ -1,4 +1,7 @@
-//! Safe paste encoding: clipboard text always arrives as data.
+//! Safe paste encoding: clipboard text always arrives as data. A paste of several lines into
+//! a shell without bracketed paste asks first (`needs_paste_confirmation`, `confirm_key`).
+
+use crate::keys::KeyIn;
 
 const START: &str = "\x1b[200~";
 const END: &str = "\x1b[201~";
@@ -45,6 +48,40 @@ pub fn needs_paste_confirmation(text: &str, bracketed: bool) -> bool {
     match text.find(['\n', '\r']) {
         Some(i) => text[i..].chars().any(|c| !c.is_whitespace()),
         None => false,
+    }
+}
+
+/// How many command lines `text` holds, as the confirmation counts them: segments split at
+/// `\r\n`, `\n` or `\r`, less one empty segment at the end (a final newline ends the last
+/// line, it does not start a new one).
+pub fn paste_line_count(text: &str) -> usize {
+    let segments = text
+        .split("\r\n")
+        .flat_map(|s| s.split(['\n', '\r']))
+        .count();
+    let trailing_newline = text.ends_with(['\n', '\r']);
+    segments - usize::from(trailing_newline && segments > 1)
+}
+
+/// What a key does while the paste confirmation shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfirmKey {
+    /// Enter: paste.
+    Confirm,
+    /// Esc: drop the paste.
+    Cancel,
+    /// Any other key: drop the paste, then the key does what it always does.
+    CancelAndPass,
+}
+
+/// Enter or Esc without a modifier answer the confirmation; every other key cancels it and
+/// goes on.
+pub fn confirm_key(k: &KeyIn) -> ConfirmKey {
+    let plain = !(k.ctrl || k.alt || k.shift || k.win);
+    match k.key.to_lowercase().as_str() {
+        "enter" if plain => ConfirmKey::Confirm,
+        "escape" if plain => ConfirmKey::Cancel,
+        _ => ConfirmKey::CancelAndPass,
     }
 }
 

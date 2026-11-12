@@ -137,6 +137,8 @@ pub enum Str {
     OpenCommandPrompt,
     /// Automatic found no shell at all.
     NoShellFound,
+    /// Under the multi-line paste question (`paste_lines_prompt`).
+    PasteConfirmKeys,
     /// Title of the sign-in dialog.
     SignInTitle,
     /// Label over the dialog's email field.
@@ -290,6 +292,7 @@ impl Str {
         Str::ShellCannotStart,
         Str::OpenCommandPrompt,
         Str::NoShellFound,
+        Str::PasteConfirmKeys,
         Str::SignInTitle,
         Str::EmailAddress,
         Str::SignInEllipsis,
@@ -433,6 +436,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             }
             Str::OpenCommandPrompt => "Mở Command Prompt",
             Str::NoShellFound => "Không tìm thấy shell nào trên máy này.",
+            Str::PasteConfirmKeys => "Enter để dán, Esc để hủy",
             Str::SignInTitle => "Đăng nhập ShellX",
             Str::EmailAddress => "Địa chỉ email",
             Str::SignInEllipsis => "Đăng nhập…",
@@ -587,6 +591,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             }
             Str::OpenCommandPrompt => "Open Command Prompt",
             Str::NoShellFound => "No shell was found on this PC.",
+            Str::PasteConfirmKeys => "Enter to paste, Esc to cancel",
             Str::SignInTitle => "Sign in to ShellX",
             Str::EmailAddress => "Email address",
             Str::SignInEllipsis => "Sign In…",
@@ -698,6 +703,14 @@ pub fn shell_fell_back(lang: Lang, tried: &str, used: &str) -> String {
     match lang {
         Lang::Vi => format!("Không khởi động được {tried}, đang dùng {used}."),
         Lang::En => format!("{tried} couldn't start, so {used} is running instead."),
+    }
+}
+
+/// The multi-line paste question: each line runs as a command at once (R2 F18).
+pub fn paste_lines_prompt(lang: Lang, n: usize) -> String {
+    match lang {
+        Lang::Vi => format!("Dán {n} dòng? Mỗi dòng sẽ chạy ngay như một lệnh."),
+        Lang::En => format!("Paste {n} lines? Each line will run as a command right away."),
     }
 }
 
