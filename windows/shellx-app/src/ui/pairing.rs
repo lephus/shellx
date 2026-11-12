@@ -166,10 +166,6 @@ impl PairingPanel {
         self.snap.access_for(machine_id)
     }
 
-    pub fn has_link(&self, machine_id: &str) -> bool {
-        self.snap.links.get(machine_id).is_some()
-    }
-
     /// The saved links (links.json) as last loaded or saved.
     pub fn links(&self) -> &Links {
         &self.snap.links

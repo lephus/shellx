@@ -60,6 +60,30 @@ fn begin_requires_a_known_purpose_and_a_client_id() {
     assert!(fake.requests().is_empty());
 }
 
+/// Windows plan B Ruling 28: the app draws "Continue with Google" only when the build can finish a Google sign-in.
+#[test]
+fn google_available_needs_a_client_id_and_secret() {
+    let fake = support::fake();
+    let dir = support::state_dir();
+    let core = shellx_core::Core::new();
+    assert_eq!(core.call("auth.google.available", json!({})).unwrap_err().code, "not_configured");
+    for (id, secret, want) in [
+        ("", "", false),
+        ("fake-desktop-client", "", false),
+        ("", "fake-desktop-secret", false),
+        ("fake-desktop-client", "fake-desktop-secret", true),
+    ] {
+        // Explicit values, so neither the environment nor the build decides.
+        let mut extra = support::google(&fake);
+        extra["google_client_id"] = json!(id);
+        extra["google_client_secret"] = json!(secret);
+        support::configure(&core, &fake.base_url, &dir, extra);
+        assert_eq!(core.call("auth.google.available", json!({})), Ok(json!({"available": want})), "{id:?} {secret:?}");
+    }
+    assert!(fake.requests().is_empty());
+    assert!(!dir.join("session.json").exists());
+}
+
 #[test]
 fn link_needs_a_session() {
     let (core, fake, _dir) = support::google_logged_out();

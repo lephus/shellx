@@ -85,9 +85,15 @@ pub fn request_targets<'a>(
         .collect()
 }
 
-/// The sentences the "+" picker and an empty machine list show: no Mac besides this machine → why none
-/// can be reached and what to do; some Mac but none offered → why; otherwise none.
-pub fn request_panel_notes(machines: &[MachineInfo], rule: OfferRule) -> &'static [Str] {
+/// The sentences the "+" picker shows: no Mac besides this machine → why none can be reached and what
+/// to do; some Mac but none offered → why; every offered Mac already linked (`has_link`: granted or
+/// pending) → that nothing is left to ask (review M7); otherwise none. So the picker is never empty
+/// without a sentence.
+pub fn request_panel_notes(
+    machines: &[MachineInfo],
+    has_link: &dyn Fn(&str) -> bool,
+    rule: OfferRule,
+) -> &'static [Str] {
     let mut macs = machines
         .iter()
         .filter(|m| !m.is_this_machine && m.platform == "macos")
@@ -96,9 +102,26 @@ pub fn request_panel_notes(machines: &[MachineInfo], rule: OfferRule) -> &'stati
         &[Str::MacCannotHostYet, Str::SignInOnYourMac]
     } else if !macs.any(|m| can_offer_access(m, rule)) {
         &[Str::MacCannotHostYet]
+    } else if request_targets(machines, has_link, rule).is_empty() {
+        &[Str::NoOtherMachines]
     } else {
         &[]
     }
+}
+
+/// The machines-header "+" list (design §4.5): the Macs that may be asked and have no access yet (no saved
+/// link, no request waiting: `access` is `None`), and the sentences that say why the list is short or
+/// empty (`request_panel_notes`). The window only draws it (review chunk 2 M-B).
+pub fn request_picker<'a>(
+    machines: &'a [MachineInfo],
+    access: &dyn Fn(&str) -> Access,
+    rule: OfferRule,
+) -> (Vec<&'a MachineInfo>, &'static [Str]) {
+    let has_access = |id: &str| access(id) != Access::None;
+    (
+        request_targets(machines, &has_access, rule),
+        request_panel_notes(machines, &has_access, rule),
+    )
 }
 
 fn null_as_zero<'de, D: serde::Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
@@ -135,7 +158,9 @@ pub enum RowAction {
     ShowCode(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// `Debug` (hand-written) shows the title's length only: other machines' names never reach a log
+/// (review M1).
+#[derive(Clone, PartialEq, Eq)]
 pub struct MachineGroup {
     pub machine_id: String,
     pub title: String,
@@ -228,6 +253,25 @@ pub fn build_groups_with(
         });
     }
     out
+}
+
+impl std::fmt::Debug for MachineGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MachineGroup")
+            .field("machine_id", &self.machine_id)
+            .field(
+                "title",
+                &format_args!("<{} chars>", self.title.chars().count()),
+            )
+            .field("note", &self.note)
+            .field("icon", &self.icon)
+            .field("online", &self.online)
+            .field("dimmed", &self.dimmed)
+            .field("subtitle", &self.subtitle)
+            .field("action", &self.action)
+            .field("sessions_visible", &self.sessions_visible)
+            .finish()
+    }
 }
 
 fn offline_text(m: &MachineInfo, utc_offset_secs: i32, lang: Lang) -> String {
@@ -505,19 +549,110 @@ mod tests {
         let pc = host(m("pc", "Bếp-PC", "windows", true, 0, false));
         let mac = m("mac", "MacBook", "macos", true, 0, false);
         let both = [Str::MacCannotHostYet, Str::SignInOnYourMac];
-        assert_eq!(request_panel_notes(&[me.clone()], RelayCanHost), both);
-        assert_eq!(request_panel_notes(&[], RelayCanHost), both);
+        let none = |_: &str| false;
         assert_eq!(
-            request_panel_notes(&[me.clone(), pc.clone()], RelayCanHost),
+            request_panel_notes(std::slice::from_ref(&me), &none, RelayCanHost),
+            both
+        );
+        assert_eq!(request_panel_notes(&[], &none, RelayCanHost), both);
+        assert_eq!(
+            request_panel_notes(&[me.clone(), pc.clone()], &none, RelayCanHost),
             both
         );
         assert_eq!(
-            request_panel_notes(&[me.clone(), pc.clone(), mac.clone()], RelayCanHost),
+            request_panel_notes(&[me.clone(), pc.clone(), mac.clone()], &none, RelayCanHost),
             [Str::MacCannotHostYet]
         );
-        assert!(request_panel_notes(&[me.clone(), host(mac.clone())], RelayCanHost).is_empty());
-        assert!(request_panel_notes(&[me.clone(), mac.clone()], AnyMac).is_empty());
-        assert_eq!(request_panel_notes(&[me], AnyMac), both);
+        assert!(
+            request_panel_notes(&[me.clone(), host(mac.clone())], &none, RelayCanHost).is_empty()
+        );
+        assert!(request_panel_notes(&[me.clone(), mac.clone()], &none, AnyMac).is_empty());
+        assert_eq!(request_panel_notes(&[me], &none, AnyMac), both);
+    }
+
+    /// Review M7: the "+" panel is never empty without a sentence, also when every Mac that can be
+    /// asked already has access or a request waiting.
+    #[test]
+    fn the_request_panel_always_says_why_it_is_empty() {
+        use OfferRule::{AnyMac, RelayCanHost};
+        let me = m("me", "PC", "windows", true, 0, true);
+        let a = host(m("a", "MacBook", "macos", true, 0, false));
+        let b = host(m("b", "Mac mini", "macos", false, 0, false));
+        let c = m("c", "iMac", "macos", true, 0, false);
+        let pc = host(m("pc", "Bếp-PC", "windows", true, 0, false));
+        let ms = [me.clone(), a.clone(), b.clone(), c.clone(), pc.clone()];
+        assert!(request_panel_notes(&ms, &|_| false, RelayCanHost).is_empty());
+        assert!(request_panel_notes(&ms, &|id| id == "a", RelayCanHost).is_empty());
+        assert_eq!(
+            request_panel_notes(&ms, &|id| id == "a" || id == "b", RelayCanHost),
+            [Str::NoOtherMachines]
+        );
+        assert!(request_panel_notes(&ms, &|id| id == "a" || id == "b", AnyMac).is_empty());
+        assert_eq!(
+            request_panel_notes(&ms, &|id| id != "pc", AnyMac),
+            [Str::NoOtherMachines]
+        );
+        // Whatever the list, the links and the rule: something to click, or a sentence.
+        let lists: [&[MachineInfo]; 5] = [
+            &[],
+            std::slice::from_ref(&me),
+            &[me.clone(), pc.clone()],
+            &[me.clone(), c.clone()],
+            &ms,
+        ];
+        let links: [&dyn Fn(&str) -> bool; 3] = [&|_| false, &|id| id == "a", &|_| true];
+        for list in lists {
+            for has_link in links {
+                for rule in [RelayCanHost, AnyMac] {
+                    assert!(
+                        !request_targets(list, has_link, rule).is_empty()
+                            || !request_panel_notes(list, has_link, rule).is_empty(),
+                        "{list:?} {rule:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Review chunk 2 M-B: what the "+" list offers is decided here, from each machine's access: a Mac
+    /// with a saved link (Granted) or a request waiting (Pending) is not offered again.
+    #[test]
+    fn the_request_picker_skips_macs_with_access_or_a_request_waiting() {
+        use OfferRule::{AnyMac, RelayCanHost};
+        let ms = vec![
+            host(m("me", "PC", "macos", true, 0, true)),
+            host(m("a", "MacBook", "macos", true, 0, false)),
+            host(m("b", "Mac mini", "macos", true, 0, false)),
+            host(m("c", "iMac", "macos", false, 0, false)),
+            m("d", "Studio", "macos", true, 0, false),
+            host(m("pc", "Bếp-PC", "windows", true, 0, false)),
+        ];
+        let access = |id: &str| match id {
+            "a" => Access::Granted,
+            "b" => Access::Pending {
+                code: "123456".into(),
+            },
+            _ => Access::None,
+        };
+        let ids = |v: &[&MachineInfo]| v.iter().map(|m| m.machine_id.clone()).collect::<Vec<_>>();
+        let (targets, notes) = request_picker(&ms, &access, RelayCanHost);
+        assert_eq!(ids(&targets), ["c"]);
+        assert!(notes.is_empty());
+        let (targets, notes) = request_picker(&ms, &access, AnyMac);
+        assert_eq!(ids(&targets), ["c", "d"]);
+        assert!(notes.is_empty());
+        // Every Mac that may be asked has access or a request waiting.
+        let all_asked = |id: &str| match id {
+            "c" => Access::Pending { code: "1".into() },
+            other => access(other),
+        };
+        let (targets, notes) = request_picker(&ms, &all_asked, RelayCanHost);
+        assert!(targets.is_empty());
+        assert_eq!(notes, [Str::NoOtherMachines]);
+        // No Mac besides this machine.
+        let (targets, notes) = request_picker(&ms[..1], &access, RelayCanHost);
+        assert!(targets.is_empty());
+        assert_eq!(notes, [Str::MacCannotHostYet, Str::SignInOnYourMac]);
     }
 
     #[test]

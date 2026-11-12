@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::sidebar::Access;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// `Debug` (hand-written) shows the Mac's name length only, never the name (review M1).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RemoteLink {
     pub machine_id: String,
     pub machine_name: String,
@@ -19,6 +20,23 @@ pub struct RemoteLink {
     pub daemon_fingerprint: String,
     #[serde(default)]
     pub enrolled: bool,
+}
+
+impl std::fmt::Debug for RemoteLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteLink")
+            .field("machine_id", &self.machine_id)
+            .field(
+                "machine_name",
+                &format_args!("<{} chars>", self.machine_name.chars().count()),
+            )
+            .field("relay_route", &self.relay_route)
+            .field("relay_slot", &self.relay_slot)
+            .field("invite_path", &self.invite_path)
+            .field("daemon_fingerprint", &self.daemon_fingerprint)
+            .field("enrolled", &self.enrolled)
+            .finish()
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

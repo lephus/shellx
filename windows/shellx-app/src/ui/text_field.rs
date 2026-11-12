@@ -85,6 +85,19 @@ impl TextField {
         }
     }
 
+    /// An IME composition is open: its text is not final yet, so nothing may act on it or rewrite it.
+    pub fn composing(&self) -> bool {
+        self.edit.marked_range().is_some()
+    }
+
+    /// Mac development build only (the sign-in previews): replaces the text.
+    #[cfg(target_os = "macos")]
+    pub fn dev_set_text(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.edit.set_text(text);
+        self.scroll_x = px(0.0);
+        cx.notify();
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;

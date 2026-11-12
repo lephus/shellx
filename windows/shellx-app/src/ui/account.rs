@@ -5,24 +5,27 @@
 //! The sidebar (machines), Settings -> Account and the sign-in dialog
 //! observe it.
 //!
-//! Sign-in is Google only: the dialog calls `google_sign_in`; `OpenBrowser` opens the system
-//! browser and `CallGoogleFinish` (which blocks until the browser answers) runs on its own
-//! background task, never on the serial worker, so a cancel can still be sent. The account
-//! token stays inside shellx-core.
+//! Sign-in is email first: the dialog sends the address (`email_send_code`) and the mailed code
+//! (`email_submit_code`); both calls run on the serial worker. "Continue with Google" shows only when
+//! the core says this build has a Google client (`check_google`, `google_available`): the dialog
+//! calls `google_sign_in`, `OpenBrowser` opens the system browser and `CallGoogleFinish` (which blocks
+//! until the browser answers) runs on its own background task, never on the serial worker, so a
+//! cancel can still be sent. The account token stays inside shellx-core.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui::{Context, prelude::*};
 use shellx_model::account::{AccountAction, AccountEvent, AccountFlow, AccountState};
+use shellx_model::account_view::{AccountView, SignInNotice, account_view, sign_in_notice};
 use shellx_model::core_api::{CoreCall, CoreErr, GooglePurpose, SignInMethod};
+use shellx_model::email_sign_in::EmailStep;
 use shellx_model::sidebar::MachineInfo;
+use shellx_model::strings::Lang;
 use shellx_model::update::{CHECK_INTERVAL_SECS, UpdateStatus};
 
 use super::update_banner::open_https;
-use crate::core_service::{
-    GOOGLE_SWITCH_MARKER, MachineFacts, run_account_action, run_version_check, take_once,
-};
+use crate::core_service::{MachineFacts, run_account_action, run_google_check, run_version_check};
 use crate::os_info;
 
 /// What the one worker runs. `version.check` shares the worker with the
@@ -30,11 +33,15 @@ use crate::os_info;
 enum Job {
     Account(AccountAction),
     VersionCheck,
+    /// `auth.google.available` (local).
+    GoogleCheck,
 }
 
 enum Done {
     Account(AccountEvent),
     Version(UpdateStatus),
+    /// `None`: the core could not answer.
+    Google(Option<bool>),
 }
 
 pub struct AccountService {
@@ -50,6 +57,13 @@ pub struct AccountService {
     checking: bool,
     /// A check has finished since the app started.
     checked: bool,
+    /// The core's answer to `auth.google.available`; `None` until it answered.
+    google: Option<bool>,
+    /// A `Job::GoogleCheck` is queued and has not answered.
+    google_checking: bool,
+    /// Mac development build only: the `google` preview's answer, which the core's never replaces.
+    #[cfg(target_os = "macos")]
+    dev_google: Option<bool>,
 }
 
 impl AccountService {
@@ -65,6 +79,7 @@ impl AccountService {
                         run_account_action(core.as_ref(), &facts, action).map(Done::Account)
                     }
                     Job::VersionCheck => Some(Done::Version(run_version_check(core.as_ref()))),
+                    Job::GoogleCheck => Some(Done::Google(run_google_check(core.as_ref()))),
                 };
                 if let Some(done) = done
                     && result_tx.send(done).await.is_err()
@@ -79,6 +94,7 @@ impl AccountService {
                 let applied = this.update(cx, |svc, cx| match done {
                     Done::Account(event) => svc.apply(event, cx),
                     Done::Version(status) => svc.apply_update(status, cx),
+                    Done::Google(answer) => svc.apply_google(answer, cx),
                 });
                 if applied.is_err() {
                     return;
@@ -110,7 +126,16 @@ impl AccountService {
             update: UpdateStatus::Unknown,
             checking: false,
             checked: false,
+            google: None,
+            google_checking: false,
+            #[cfg(target_os = "macos")]
+            dev_google: None,
         };
+        // First on the worker (review chunk 1 M7): `auth.google.available` reads only the configuration
+        // (`ConfiguredCore` sends `config.set` before it), so the Google button never waits behind the
+        // startup list, which can take the core's 20 s timeout offline. The answer depends on the build,
+        // not on a session, so nothing it enables changes with a sign-in or a sign-out.
+        svc.check_google(cx);
         svc.apply(AccountEvent::Started, cx);
         // Startup check: queued behind the first account call, so
         // `config.set` has already gone out.
@@ -133,14 +158,10 @@ impl AccountService {
         self.flow.accepts_login()
     }
 
-    /// A failed logout (the session stays); the settings panel shows it.
+    /// A failed logout or Google switch (the session stays); the switch dialog words it, Settings shows
+    /// it through `view`.
     pub fn notice(&self) -> Option<&CoreErr> {
         self.flow.notice()
-    }
-
-    /// The notice is a failed sign-in-methods list or removal.
-    pub fn notice_is_methods(&self) -> bool {
-        self.flow.notice_is_methods()
     }
 
     /// Local UTC offset for "lần cuối HH:MM", refreshed with every list.
@@ -153,6 +174,11 @@ impl AccountService {
         self.flow.google_in_flight()
     }
 
+    /// Why the last Google sign-in attempt failed, for the dialog's line under the Google button.
+    pub fn google_failure(&self) -> Option<&CoreErr> {
+        self.flow.google_failure()
+    }
+
     /// "Continue with Google" (`SignIn`) or the switch from a password session (`Link`).
     pub fn google_sign_in(&mut self, purpose: GooglePurpose, cx: &mut Context<Self>) {
         self.apply(AccountEvent::GoogleRequested(purpose), cx);
@@ -161,6 +187,145 @@ impl AccountService {
     /// Cancel / Esc while a Google flow waits for the browser.
     pub fn cancel_google(&mut self, cx: &mut Context<Self>) {
         self.apply(AccountEvent::GoogleCancelRequested, cx);
+    }
+
+    /// "Send code": the trimmed address and the mail's language (`Lang::locale`).
+    pub fn email_send_code(&mut self, email: String, locale: &'static str, cx: &mut Context<Self>) {
+        self.apply(
+            AccountEvent::EmailCodeRequested {
+                email,
+                locale: locale.to_string(),
+            },
+            cx,
+        );
+    }
+
+    /// The email field's text changed.
+    pub fn email_edited(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailEdited, cx);
+    }
+
+    /// "Resend code".
+    pub fn email_resend(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailResendRequested, cx);
+    }
+
+    /// Verify, Enter or six digits typed: the code field's text (the flow takes its digits).
+    pub fn email_submit_code(&mut self, code: String, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailCodeSubmitted(code), cx);
+    }
+
+    /// "Use a different email".
+    pub fn email_change(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailChangeRequested, cx);
+    }
+
+    /// The dialog closed: a run that is not verifying ends; one that is still applies its answer.
+    pub fn email_cancel(&mut self, cx: &mut Context<Self>) {
+        self.apply(AccountEvent::EmailCancelled, cx);
+    }
+
+    pub fn email_step(&self) -> Option<EmailStep> {
+        self.flow.email_step()
+    }
+
+    pub fn email_sent_to(&self) -> Option<&str> {
+        self.flow.email_sent_to()
+    }
+
+    pub fn email_error(&self) -> Option<&CoreErr> {
+        self.flow.email_error()
+    }
+
+    /// The address for the code step's "We sent a 6-digit code to …" line, while that code can still
+    /// be verified.
+    pub fn email_code_sent_to(&self) -> Option<&str> {
+        self.flow.email_code_sent_to()
+    }
+
+    pub fn email_can_verify(&self) -> bool {
+        self.flow.email_can_verify()
+    }
+
+    /// Seconds until "Resend code" can be pressed, at this service's clock.
+    pub fn email_resend_wait_secs(&self) -> u64 {
+        self.flow.email_resend_wait_secs(self.now_ms())
+    }
+
+    pub fn email_code_epoch(&self) -> u64 {
+        self.flow.email_code_epoch()
+    }
+
+    /// A sign-in is under way (a code is checked, or this PC is being registered).
+    pub fn signing_in(&self) -> bool {
+        *self.flow.state() == AccountState::LoggingIn
+    }
+
+    /// Mac development build only (screenshots): "code" puts the flow on the code step with a made-up
+    /// challenge for "you@example.com" (resend_in 60); "switch" goes on to `EmailCodeSubmitted("123456")`
+    /// and a 409 (`switch_from_signed_in_device`); "expired" signs that code in, lists this PC, then
+    /// has the server refuse the session (the "Sign in again" notice). It feeds the flow directly and
+    /// drops the returned actions, so no core call is made; any other value does nothing.
+    #[cfg(target_os = "macos")]
+    pub fn dev_preview_email(&mut self, preview: &str, cx: &mut Context<Self>) {
+        use shellx_model::core_api::EmailChallenge;
+        let now = self.now_ms();
+        let mut events = Vec::new();
+        if matches!(preview, "code" | "switch" | "expired") {
+            events.push(AccountEvent::EmailCodeRequested {
+                email: "you@example.com".into(),
+                locale: "en".into(),
+            });
+            events.push(AccountEvent::EmailBegun(Ok(EmailChallenge {
+                challenge_id: "preview".into(),
+                email: "you@example.com".into(),
+                expires_in: 600,
+                resend_in: 60,
+            })));
+        }
+        if preview == "switch" {
+            events.push(AccountEvent::EmailCodeSubmitted("123456".into()));
+            events.push(AccountEvent::EmailFinished {
+                challenge_id: "preview".into(),
+                result: Err(CoreErr::new("switch_from_signed_in_device", "")),
+            });
+        }
+        if preview == "expired" {
+            events.push(AccountEvent::EmailCodeSubmitted("123456".into()));
+            events.push(AccountEvent::EmailFinished {
+                challenge_id: "preview".into(),
+                result: Ok(shellx_model::core_api::GoogleSignIn {
+                    user_id: "preview".into(),
+                    device_id: "preview".into(),
+                    device_public_key_b64: String::new(),
+                    fingerprint: String::new(),
+                    email: "you@example.com".into(),
+                    auth_method: "email".into(),
+                }),
+            });
+            events.push(AccountEvent::ListResult(Ok(vec![
+                crate::shell_info::this_machine(None),
+            ])));
+            events.push(AccountEvent::ListResult(Err(CoreErr::new(
+                "unauthorized",
+                "",
+            ))));
+        }
+        if events.is_empty() {
+            return;
+        }
+        for event in events {
+            let _ = self.flow.on(event, now);
+        }
+        cx.notify();
+    }
+
+    /// Mac development build only: the `google` preview shows the Google button although this build
+    /// has no client.
+    #[cfg(target_os = "macos")]
+    pub fn dev_set_google_available(&mut self, on: bool, cx: &mut Context<Self>) {
+        self.dev_google = Some(on);
+        cx.notify();
     }
 
     pub fn refresh_sign_in_methods(&mut self, cx: &mut Context<Self>) {
@@ -201,16 +366,44 @@ impl AccountService {
         self.flow.removing_sign_in_method()
     }
 
-    /// True once after the server ended the session (the window shows sign-in).
-    pub fn take_signed_out_by_server(&mut self) -> bool {
-        self.flow.take_signed_out_by_server()
+    /// The sidebar's "Sign in again" notice after a server sign-out, until the next sign-in. It is the
+    /// only prompt outside Settings: no dialog opens by itself (Ruling 29).
+    pub fn sign_in_notice(&self) -> Option<SignInNotice> {
+        sign_in_notice(&self.flow)
     }
 
-    /// Once ever (a marker file in the native data dir): a password account is offered the switch to Google.
-    pub fn take_google_switch_offer(&mut self) -> bool {
-        self.flow.needs_google_switch()
-            && crate::paths::native_dir()
-                .is_ok_and(|dir| take_once(&dir.join(GOOGLE_SWITCH_MARKER)))
+    /// What Settings › Account draws, in `lang`.
+    pub fn view(&self, lang: Lang) -> AccountView {
+        account_view(&self.flow, self.google_available(), lang)
+    }
+
+    /// The core said this build has a Google client (Ruling 28). False until it answered yes: the dialog
+    /// and Settings draw nothing Google-related meanwhile.
+    pub fn google_available(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        if let Some(on) = self.dev_google {
+            return on;
+        }
+        self.google == Some(true)
+    }
+
+    /// Asks the core whether this build has a Google client, when the answer is unknown (no answer yet,
+    /// or the last call failed) and no check is queued. `new` calls it once; the dialog calls it on open.
+    pub fn check_google(&mut self, cx: &mut Context<Self>) {
+        if self.google.is_some() || self.google_checking {
+            return;
+        }
+        self.google_checking = true;
+        let _ = self.jobs.try_send(Job::GoogleCheck);
+        cx.notify();
+    }
+
+    fn apply_google(&mut self, answer: Option<bool>, cx: &mut Context<Self>) {
+        if answer.is_some() {
+            self.google = answer;
+        }
+        self.google_checking = false;
+        cx.notify();
     }
 
     pub fn update_status(&self) -> &UpdateStatus {
