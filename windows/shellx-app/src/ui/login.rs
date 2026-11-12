@@ -32,7 +32,7 @@ use shellx_model::account::AccountState;
 use shellx_model::core_api::GooglePurpose;
 use shellx_model::email_sign_in::{
     DialogFocus, DialogKey, SignInScreen, auto_submit, code_digits, dialog_key, email_looks_valid,
-    email_text_refused, sign_in_screen, tab_order, tab_target,
+    email_text_refused, keep_keyboard, sign_in_screen, tab_order, tab_target, take_keyboard,
 };
 use shellx_model::palette;
 use shellx_model::strings::{
@@ -195,8 +195,15 @@ impl SignInDialog {
             (DialogFocus::Cancel, buttons.cancel.clone()),
         ];
         for (control, handle) in controls {
-            subscriptions.push(cx.on_focus(&handle, window, move |this, _, cx| {
-                this.focused = control;
+            subscriptions.push(cx.on_focus(&handle, window, move |this, window, cx| {
+                // A click on a disabled control never takes the keyboard (review chunk 2 I-A).
+                let c = this.controls(cx);
+                let to = take_keyboard(c.screen, c.google, this.focused, control, |f| c.enabled(f));
+                this.focused = to;
+                if to != control {
+                    let handle = this.handle_of(to, cx);
+                    window.focus(&handle);
+                }
                 cx.notify();
             }));
         }
@@ -410,8 +417,12 @@ impl SignInDialog {
             self.focused = Self::first_control(c.screen);
             moved = true;
         }
-        if !c.google && self.focused == DialogFocus::Google {
-            self.focused = DialogFocus::EmailField;
+        // A holder that turned disabled (Resend, Verify, Send code pressed) or left the screen gives
+        // the keyboard to the screen's field, so the next code typed or pasted reaches it (review
+        // chunk 2 I-A); Google's holder leaves when the build has no Google client.
+        let kept = keep_keyboard(c.screen, c.google, self.focused, |f| c.enabled(f));
+        if kept != self.focused {
+            self.focused = kept;
             moved = true;
         }
         self.shown = c.screen;
@@ -628,12 +639,16 @@ impl SignInDialog {
     ) -> Stateful<Div> {
         let handle = self.handle_of(control, cx);
         let focused = handle.is_focused(window);
-        let element = element.track_focus(&handle).when(focused, |el| {
+        let element = element.when(focused, |el| {
             el.border_2()
                 .border_color(theme::hsla(palette::PRIMARY_LINE))
         });
+        // A disabled button takes no focus handle: a click on it never takes the keyboard (the card's
+        // handle gets it and gives it back), and it has no click handler.
         if enabled {
-            element.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| on_click(this, cx)))
+            element
+                .track_focus(&handle)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| on_click(this, cx)))
         } else {
             element
         }

@@ -192,6 +192,57 @@ pub fn tab_target(
         .unwrap_or(from)
 }
 
+/// Where the keyboard belongs on `screen` while `focused` holds it (review chunk 2 I-A): `focused`
+/// while it is on this screen and either a field (a disabled field takes typing again once it is
+/// enabled) or `enabled`; otherwise the screen's field (Cancel on `SigningIn`). A button that was pressed
+/// and turned disabled (Resend, Verify, Send code) so gives the keyboard back, and the next code typed or
+/// pasted reaches the field: a button has no text input, so text sent to it is lost. Google keeps it
+/// while "Waiting for Google…" replaces its button (Escape still closes the dialog from the window).
+pub fn keep_keyboard(
+    screen: SignInScreen,
+    google: bool,
+    focused: DialogFocus,
+    enabled: impl Fn(DialogFocus) -> bool,
+) -> DialogFocus {
+    let waiting_for_google = focused == DialogFocus::Google
+        && google
+        && matches!(
+            screen,
+            SignInScreen::Start {
+                google_waiting: true,
+                ..
+            }
+        );
+    let field = matches!(focused, DialogFocus::EmailField | DialogFocus::CodeField);
+    if waiting_for_google
+        || (tab_order(screen, google).contains(&focused) && (field || enabled(focused)))
+    {
+        return focused;
+    }
+    match screen {
+        SignInScreen::Start { .. } => DialogFocus::EmailField,
+        SignInScreen::Code { .. } => DialogFocus::CodeField,
+        SignInScreen::SigningIn => DialogFocus::Cancel,
+    }
+}
+
+/// Where the keyboard goes when a click gives it to `to` while `from` holds it: `to` when `keep_keyboard`
+/// keeps it there, else back where it was (as `keep_keyboard` keeps `from`). A click on a disabled
+/// control never takes the keyboard (review chunk 2 I-A).
+pub fn take_keyboard(
+    screen: SignInScreen,
+    google: bool,
+    from: DialogFocus,
+    to: DialogFocus,
+    enabled: impl Fn(DialogFocus) -> bool,
+) -> DialogFocus {
+    if keep_keyboard(screen, google, to, &enabled) == to {
+        to
+    } else {
+        keep_keyboard(screen, google, from, enabled)
+    }
+}
+
 /// What the dialog card's own key-down listener does with a key that reached it (Ruling 30).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DialogKey {
