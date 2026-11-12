@@ -31,7 +31,7 @@ use shellx_model::palette;
 use shellx_model::remote_state::PairState;
 use shellx_model::sidebar::Access;
 use shellx_model::strings::{
-    Lang, Str, pairing_code_display, pairing_failure_sentence, request_access_to, save_link_failed,
+    Lang, Str, access_not_saved, pairing_code_display, pairing_failure_sentence, request_access_to,
     t, your_device_code,
 };
 
@@ -399,11 +399,12 @@ impl Render for PairingPanel {
                     t(lang, Str::Approved),
                     theme::done(),
                 ))
-                .children(self.snap.save_error.as_deref().map(|e| {
+                // The sentence alone, never the system's text (review m9).
+                .children(self.snap.save_error.as_ref().map(|_| {
                     div()
                         .text_size(theme::SMALL_SIZE)
                         .text_color(error)
-                        .child(save_link_failed(lang, e))
+                        .child(access_not_saved(lang))
                 }))
                 .child(
                     buttons

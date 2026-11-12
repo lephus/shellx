@@ -1001,6 +1001,13 @@ pub fn your_device_code(lang: Lang, fingerprint: &str) -> String {
     )
 }
 
+/// The pairing panel's line when an approved access could not be written to `links.json`:
+/// the sentence alone. The system's own text (in Windows' language) never reaches the panel
+/// (review m9); it belongs in the log.
+pub fn access_not_saved(lang: Lang) -> String {
+    t(lang, Str::SaveLinkFailed).to_string()
+}
+
 /// "Không lưu được quyền truy cập: <error>" (just the label without one).
 pub fn save_link_failed(lang: Lang, message: &str) -> String {
     let message = message.trim();
