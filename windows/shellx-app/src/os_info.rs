@@ -142,6 +142,54 @@ mod tests {
     }
 
     #[test]
+    fn the_first_window_is_placed_for_the_screens_of_r1() {
+        use shellx_model::first_window::FirstWindow;
+        let fw = |x, y, width, height, maximized| FirstWindow {
+            x,
+            y,
+            width,
+            height,
+            maximized,
+        };
+        // 1920x1080 @150 %, taskbar at the bottom: rcWork 1920x1008 physical pixels
+        assert_eq!(
+            first_window_placement(Some((1920.0, 1008.0, 1.5))),
+            fw(40.0, 0.0, 1200.0, 672.0, false)
+        );
+        // 1366x768 @100 %
+        assert_eq!(
+            first_window_placement(Some((1366.0, 720.0, 1.0))),
+            fw(83.0, 0.0, 1200.0, 720.0, false)
+        );
+        // 2160x1440 @200 %
+        assert_eq!(
+            first_window_placement(Some((2160.0, 1344.0, 2.0))),
+            fw(0.0, 0.0, 1080.0, 672.0, false)
+        );
+        // 2256x1504 @200 %
+        assert_eq!(
+            first_window_placement(Some((2256.0, 1408.0, 2.0))),
+            fw(0.0, 0.0, 1128.0, 704.0, false)
+        );
+        // Taskbar on top: rcWork (0, 72)-(1920, 1080) at 144 dpi gives the first case; the
+        // origin stays (0, 0) because GPUI places in workspace coordinates.
+        let top = work_area_from_rect(0, 72, 1920, 1080, 144);
+        assert_eq!(top, Some((1920.0, 1008.0, 1.5)));
+        assert_eq!(
+            first_window_placement(top),
+            fw(40.0, 0.0, 1200.0, 672.0, false)
+        );
+        // An empty or inverted rectangle is no work area.
+        assert_eq!(work_area_from_rect(0, 0, 0, 1080, 96), None);
+        assert_eq!(work_area_from_rect(0, 1080, 1920, 0, 96), None);
+        // Unknown: maximized.
+        assert!(first_window_placement(None).maximized);
+        if cfg!(not(windows)) {
+            assert_eq!(primary_work_area(), None);
+        }
+    }
+
+    #[test]
     fn os_version_is_never_empty() {
         let v = os_version();
         assert!(!v.is_empty());
