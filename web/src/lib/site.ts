@@ -18,6 +18,14 @@ export const windowsSha256: string | null = (() => {
 })();
 export const appStoreUrl: string | null = config.appStoreUrl;
 export const googlePlayUrl: string | null = config.googlePlayUrl;
+/**
+ * A temporary way to install the Android app before it is on Google Play: a Firebase App Distribution
+ * invitation link. Shown only while `googlePlayUrl` is null; set it to null once the store listing is live.
+ */
+export const androidPreviewUrl: string | null = (() => {
+  const value: unknown = config.androidPreviewUrl;
+  return typeof value === 'string' && /^https:\/\/appdistribution\.firebase\.(dev|google\.com)\//.test(value) ? value : null;
+})();
 /** Origin of the ShellX API that mints share-viewer tickets (`POST /v2/shares/:id/ticket`). */
 export const shareApiBase: string = config.shareApiBase;
 

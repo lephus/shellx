@@ -148,6 +148,8 @@ const en = {
   appStoreRequirement: 'iOS 15 or later',
   googlePlay: 'Google Play',
   googlePlayRequirement: 'Android 8.0 or later',
+  androidPreview: 'Android (early access)',
+  androidPreviewRequirement: 'Android 8.0 or later · test build, Google Play coming soon',
   comingSoon: 'Coming soon',
   footerTagline: `Your computer's terminal, right on your phone.`,
   footerCredit: 'Built on and extended from the open-source cmux:',

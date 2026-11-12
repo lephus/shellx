@@ -2,7 +2,7 @@
 // assistants and AI search can read and cite. Built from the same strings and guides as the pages,
 // so it never drifts from the site.
 import { pathFor, ui, type Lang } from '../i18n/ui';
-import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from './site';
+import { androidPreviewUrl, appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from './site';
 import { author, capabilities, featureList, guidePath, guides, siteUrl } from './seo';
 import { clock, video } from './videos';
 
@@ -40,7 +40,7 @@ ShellX is not a general mobile SSH client: to connect from a phone straight to a
 
 - Price: free (currently).
 - Desktop app: macOS 14 or later, Windows 10 (version 1809) or later. Version ${desktopVersion}. Downloads: [macOS .dmg](${macDownloadUrl()}), [Windows .exe](${windowsDownloadUrl()}).
-- Phone app: iOS 15 or later, Android 8.0 or later. ${store(appStoreUrl, 'App Store')}; ${store(googlePlayUrl, 'Google Play')}.
+- Phone app: iOS 15 or later, Android 8.0 or later. ${store(appStoreUrl, 'App Store')}; ${store(googlePlayUrl, 'Google Play')}${!googlePlayUrl && androidPreviewUrl ? `; Android test build: ${androidPreviewUrl}` : ''}.
 - Security: end-to-end encryption (Noise protocol), QR-code pairing, private keys never leave the device, passwords hashed with argon2id, no terminal-content logs, no analytics, no cookies.
 - Reconnect: the computer keeps the latest 256 KiB of output per session and replays it when the phone reconnects.
 - Notifications: shell hooks (command finished, exit code, duration), OSC 9 / OSC 777 / OSC 99 sequences, and \`shellx notify "text"\`.

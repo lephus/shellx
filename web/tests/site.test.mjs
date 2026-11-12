@@ -73,6 +73,8 @@ test('site config is valid', () => {
   assert.match(config.shareApiBase, /^https:\/\/[a-z0-9.-]+$/, 'shareApiBase is an https origin without a path');
   assert.ok(config.appStoreUrl === null || config.appStoreUrl.startsWith('https://apps.apple.com/'));
   assert.ok(config.googlePlayUrl === null || config.googlePlayUrl.startsWith('https://play.google.com/'));
+  assert.ok(config.androidPreviewUrl === null
+    || /^https:\/\/appdistribution\.firebase\.(dev|google\.com)\//.test(config.androidPreviewUrl));
 });
 
 for (const page of homePages) {
@@ -92,6 +94,11 @@ for (const page of homePages) {
     ]) {
       if (url) {
         assert.ok(hrefs(html).includes(url), `missing ${store} link ${url}`);
+      } else if (store === 'google-play' && config.androidPreviewUrl) {
+        // Before the store listing exists, the Android row is the test build, not a Google Play placeholder.
+        assert.ok(hrefs(html).includes(config.androidPreviewUrl), `missing the Android test build link`);
+        assert.match(html, /<a [^>]*data-store="android-preview"/);
+        assert.ok(!html.includes('data-store="google-play"'), 'a Google Play row is shown beside the test build');
       } else {
         assert.match(html, new RegExp(`data-store="${store}" aria-disabled="true"`));
       }
@@ -465,6 +472,7 @@ test('llms.txt follows llmstxt.org and lists every guide; llms-full.txt carries 
   assert.ok(txt.includes(macUrl) && txt.includes(winUrl), 'llms.txt: download links');
   for (const p of videoPages) assert.ok(txt.includes(`https://shellx.pro${p.path}`), `llms.txt: missing ${p.path}`);
   if (!config.appStoreUrl) assert.match(txt, /App Store: coming soon/);
+  if (!config.googlePlayUrl && config.androidPreviewUrl) assert.ok(txt.includes(config.androidPreviewUrl), 'llms.txt: the Android test build');
   const full = readFileSync(join(dist, 'llms-full.txt'), 'utf8');
   for (const needle of ['Is ShellX an SSH client?', 'shellx skills install --claude', 'ShellX vs Termius',
     'open Settings, choose Mobile, and click Show QR Code.', 'Press Save, and ShellX schedules it on this Mac.']) {
