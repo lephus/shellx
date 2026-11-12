@@ -299,4 +299,49 @@ mod tests {
             );
         }
     }
+
+    /// Review chunk 2 M-B (Ruling 29): outside Settings the window asks for a sign-in only with this
+    /// notice, after the server ended a session; the dialog never opens by itself.
+    #[test]
+    fn a_server_sign_out_prompts_with_the_notice_never_the_dialog() {
+        let notice = Some(SignInNotice {
+            line: Str::SessionExpired,
+            button: Str::SignInAgain,
+        });
+        assert_eq!(sign_in_notice(&AccountFlow::new()), None, "starting");
+        let mut f = logged_in();
+        assert_eq!(sign_in_notice(&f), None, "signed in");
+        // A password session (which once got the Google-switch dialog by itself): nothing.
+        f.on(
+            AccountEvent::SessionResult(Ok(SessionInfo {
+                user_id: "u".into(),
+                device_id: "d".into(),
+                email: Some("a@b.c".into()),
+                auth_method: "password".into(),
+            })),
+            2,
+        );
+        assert_eq!(sign_in_notice(&f), None, "password session");
+        f.on(AccountEvent::Tick(16_000), 16_000);
+        f.on(
+            AccountEvent::ListResult(Err(CoreErr::new("unauthorized", ""))),
+            16_000,
+        );
+        assert_eq!(sign_in_notice(&f), notice, "server sign-out");
+        sign_in_with_google(&mut f, 17_000);
+        assert_eq!(sign_in_notice(&f), None, "signed in again");
+        // The person signed out: nothing.
+        let mut g = logged_in();
+        g.on(AccountEvent::LogoutRequested, 2);
+        g.on(AccountEvent::LogoutResult(Ok(())), 3);
+        assert_eq!(sign_in_notice(&g), None, "signed out by the person");
+        // A stored session the server refuses at start: the notice.
+        let mut h = AccountFlow::new();
+        h.on(AccountEvent::Started, 0);
+        h.on(
+            AccountEvent::ListResult(Err(CoreErr::new("unauthorized", ""))),
+            1,
+        );
+        assert_eq!(sign_in_notice(&h), notice, "refused at start");
+    }
 }
