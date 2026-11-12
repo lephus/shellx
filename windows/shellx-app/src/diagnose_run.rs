@@ -504,7 +504,7 @@ pub fn run(open_folder: bool) -> i32 {
     report.crash_files = list_or_reason(crash_files.wait_until(deadline, PROBE_BOUND));
     report.log_tail = list_or_reason(log_tail.wait_until(deadline, PROBE_BOUND));
     // A hang or a native crash in phase 2 still leaves this report.
-    let _ = write_report(&path, &report);
+    let first_written = write_report(&path, &report).is_ok();
 
     // Phase 2: GPU, DWM, shells, relay, Windows error events, together.
     let deadline = Instant::now() + PROBE_BOUND;
@@ -571,6 +571,15 @@ pub fn run(open_folder: bool) -> i32 {
                 format_args!("Diagnostics report: {}\n", path.display()),
             );
         }
+        Err(error) if first_written => {
+            let _ = std::io::Write::write_fmt(
+                &mut out,
+                format_args!(
+                    "Diagnostics report not completed ({error}); the first pass is {}\n",
+                    path.display()
+                ),
+            );
+        }
         Err(error) => {
             let _ = std::io::Write::write_fmt(
                 &mut out,
@@ -578,10 +587,26 @@ pub fn run(open_folder: bool) -> i32 {
             );
         }
     }
-    if written.is_ok() && open_folder {
-        show_in_folder(&path);
+    // A run from the Start menu has no console: it always shows something (B-2 review m6).
+    if open_folder {
+        show_in_folder(&shown_after_writes(written.is_ok(), first_written, &path, &logs));
     }
     if written.is_ok() { 0 } else { 1 }
+}
+
+/// What Explorer shows after the two writes: the report when either write left it on disk
+/// (the first pass says `not run yet` for what is missing), else the logs folder.
+pub(crate) fn shown_after_writes(
+    final_written: bool,
+    first_written: bool,
+    report: &Path,
+    logs: &Path,
+) -> PathBuf {
+    if final_written || first_written {
+        report.to_path_buf()
+    } else {
+        logs.to_path_buf()
+    }
 }
 
 /// Starts `<this exe> --diagnose`: the help menu's "Tạo báo cáo chẩn đoán" (A10), the same
