@@ -340,6 +340,11 @@ Google's test robot reaches only the sign-in screen and the demo. Note the warni
 
 ### Play 10. USER — testing tracks and the path to production
 
+Gate: internal testing (Play 7) may take the build as it is. Before closed testing or production, the in-app licence
+notices must carry the licence texts: MIT, BSD-3-Clause and Bouncy Castle with their copyright lines, the Apache-2.0
+text, any NOTICE file, and the notices Google's AARs embed. Today they list only each library's name and licence URL.
+This is an open item (see "Google Play: facts"); don't open either track until it is closed.
+
 Choose the path from Play 1:
 
 - **Path A** (an organization account, or a personal account created on or before 2023-11-13, and no **Apply for
@@ -491,3 +496,4 @@ Not secret. SHA-1s and OAuth client IDs live in `docs/superpowers/ledgers/shellx
 | App signing key certificate SHA-256 | pending (USER, Play 8) | Play 8 |
 | Internal testing opt-in link | pending (USER, Play 7) | Play 7 |
 | Closed test: day the 12th tester opted in (path B) | pending (USER, Play 10) | Play 10 |
+| Licence texts in the in-app notices (needed before closed testing or production) | open | Play 10 |
