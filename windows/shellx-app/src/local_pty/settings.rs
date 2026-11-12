@@ -760,6 +760,61 @@ mod tests {
     }
 
     #[test]
+    fn a_new_choice_reaches_the_next_pane_before_the_lookup_ends() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let (_dir, path) = settings_path();
+        let files = exists_in(&[PWSH, WINPS, CMD]);
+        // while the gate is shut every file check waits: no lookup can end
+        let gate_open = Arc::new(AtomicBool::new(true));
+        let exists: Exists = {
+            let gate_open = gate_open.clone();
+            Arc::new(move |p: &str| {
+                while !gate_open.load(Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                files(p)
+            })
+        };
+        let shells = windows(&path, exists, None, Duration::ZERO);
+        shells.refresh_now();
+        gate_open.store(false, Ordering::SeqCst);
+
+        // Auto and a known shell are planned from the cached catalogue at once
+        shells
+            .set_choice(ShellChoice::Known {
+                shell: ShellKind::Cmd,
+            })
+            .unwrap();
+        let plan = shells.plan_for_new_pane().unwrap();
+        assert_eq!(plan.first.label, "Command Prompt");
+        assert_eq!(plan.fallback.unwrap().label, "PowerShell 7");
+        shells.set_choice(ShellChoice::Auto).unwrap();
+        assert_eq!(
+            shells.plan_for_new_pane().unwrap().first.label,
+            "PowerShell 7"
+        );
+
+        // a custom line needs file checks: it waits for the lookup
+        shells
+            .set_choice(ShellChoice::Custom {
+                command_line: CMD.into(),
+            })
+            .unwrap();
+        assert_eq!(
+            shells.plan_for_new_pane().unwrap().first.label,
+            "PowerShell 7"
+        );
+        gate_open.store(true, Ordering::SeqCst);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while shells.plan_for_new_pane().unwrap().first.kind.is_some() {
+            assert!(Instant::now() < deadline, "the custom line never applied");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(shells.plan_for_new_pane().unwrap().first.program, CMD);
+    }
+
+    #[test]
     fn a_lookup_that_panics_does_not_stop_the_next_one() {
         use std::sync::atomic::{AtomicBool, Ordering};
 
