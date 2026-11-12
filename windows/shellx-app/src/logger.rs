@@ -15,13 +15,19 @@ use shellx_model::log_file::{self, LOG_FILE_MAX_BYTES, LOG_FILES_KEPT, LineDedup
 
 const FILE_NAME: &str = "shellx.log";
 
-/// The open log: its folder, the current file (None when it cannot be opened), the bytes
-/// in it, and the repeat folding.
+/// The open log: its folder, the current file (None when it cannot be opened, tried again on
+/// the next write), the bytes in it, the size that triggers the next rotation, and the repeat
+/// folding.
 pub(crate) struct LogState {
     dir: PathBuf,
     file: Option<File>,
     size: u64,
+    /// A write that would take the file past this rotates it first: 1 MiB, or 1 MiB more
+    /// than the size at which a rotation last failed (review m1).
+    rotate_at: u64,
     dedup: LineDedup,
+    /// `std::fs::rename`; tests put a failing one here.
+    rename: fn(&Path, &Path) -> std::io::Result<()>,
 }
 
 impl LogState {
@@ -33,7 +39,9 @@ impl LogState {
             dir: dir.to_path_buf(),
             file: None,
             size: 0,
+            rotate_at: LOG_FILE_MAX_BYTES,
             dedup: LineDedup::default(),
+            rename: |from, to| std::fs::rename(from, to),
         };
         state.reopen();
         state
@@ -61,25 +69,40 @@ impl LogState {
             .map_or(0, |m| m.len());
     }
 
-    /// Close, remove `.2`, rename `.1` to `.2` and the current file to `.1`, reopen. Every
-    /// error is ignored: rotation is best effort and never stops a write (another ShellX
-    /// may hold the file).
+    /// Close; move the current file aside (`shellx.log.rotating`); only once that worked,
+    /// remove `.2`, move `.1` to `.2` and the moved file to `.1`; reopen. When the current
+    /// file cannot be moved (on Windows, another program holds it open without delete
+    /// sharing), nothing older is touched, writing goes on in the same file, and the next try
+    /// waits for another MiB (review m1). Every error is ignored: rotation never stops a write.
     fn rotate(&mut self) {
         self.file = None;
-        let _ = std::fs::remove_file(self.path(LOG_FILES_KEPT - 1));
-        for n in (1..LOG_FILES_KEPT).rev() {
-            let _ = std::fs::rename(self.path(n - 1), self.path(n));
+        let aside = self.dir.join(format!("{FILE_NAME}.rotating"));
+        let _ = std::fs::remove_file(&aside);
+        if (self.rename)(&self.path(0), &aside).is_err() {
+            self.reopen();
+            self.rotate_at = self.size.saturating_add(LOG_FILE_MAX_BYTES);
+            return;
         }
+        let _ = std::fs::remove_file(self.path(LOG_FILES_KEPT - 1));
+        for n in (2..LOG_FILES_KEPT).rev() {
+            let _ = (self.rename)(&self.path(n - 1), &self.path(n));
+        }
+        let _ = (self.rename)(&aside, &self.path(1));
         self.reopen();
+        self.rotate_at = LOG_FILE_MAX_BYTES;
     }
 
-    /// One `write_all` of `text`, rotating first when it would pass the size limit.
+    /// One `write_all` of `text`, rotating first when it would pass the size limit. A file
+    /// that could not be opened is tried again here.
     fn write_text(&mut self, text: &str) {
         if text.is_empty() {
             return;
         }
+        if self.file.is_none() {
+            self.reopen();
+        }
         let len = text.len() as u64;
-        if self.size > 0 && self.size.saturating_add(len) > LOG_FILE_MAX_BYTES {
+        if self.size > 0 && self.size.saturating_add(len) > self.rotate_at {
             self.rotate();
         }
         if let Some(file) = self.file.as_mut()
