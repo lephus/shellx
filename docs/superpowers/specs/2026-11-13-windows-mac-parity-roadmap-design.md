@@ -244,7 +244,7 @@ Không đổi: bộ màu khung app (trùng `ShellXPalette` của Mac), phông Je
 
 - **Nguồn theme:** 464 file theme Ghostty trong `Resources/ghostty/themes` (1,8 MB), gồm `ShellX`. Chúng được đóng vào file exe lúc build bằng build script, không chép thành bản thứ hai trong repo **[người viết]**. Các script build chéo hiện chỉ đóng gói `windows`, `cmux-tui` và `shellx-core`, nên phải thêm thư mục theme vào gói. App còn đọc thêm thư mục `themes` trong thư mục native của người dùng; tên trùng thì file của người dùng thắng.
 - **Một nguồn cho màu terminal:** file theme `ShellX` là nguồn duy nhất của màu terminal mặc định. Bảng `ANSI`, `TERM_*` trong `palette.rs` bị bỏ; một test canh rằng theme ShellX được đóng vào exe khớp file trong `Resources/`.
-- **Một theme định nghĩa:** `background`, `foreground`, `cursor-color`, `cursor-text`, `selection-background`, `selection-foreground`, `palette` 0–15. Khoá thiếu thì lấy giá trị của theme ShellX.
+- **Một theme định nghĩa:** `background`, `foreground`, `cursor-color`, `cursor-text`, `selection-background`, `selection-foreground`, `palette` 0–15. Khoá thiếu: `cursor-color` lấy `foreground`, `cursor-text` lấy `background`, màu vùng chọn đảo nền và chữ (như mặc định của Ghostty), còn lại lấy giá trị của theme ShellX.
 - **Sáng hay tối:** độ sáng `0,299R + 0,587G + 0,114B` của `background` dưới 0,5 là tối; không có `background` là tối.
 - **Cặp sáng/tối:** lưu hai tên. Appearance quyết định phía nào đang dùng. Bấm một thẻ chỉ đổi phía của nhóm chứa thẻ đó.
 - **Terminal** lấy nền, chữ, con trỏ, vùng chọn và 16 màu ANSI từ theme đang dùng. Mọi ô terminal đang mở vẽ lại ngay.
