@@ -481,4 +481,21 @@ mod tests {
         assert!(!marker_written_by(Some("garbage"), 42));
         assert!(!marker_written_by(None, 42));
     }
+
+    #[test]
+    fn a_remembered_compatible_mode_that_cannot_open_is_forgotten() {
+        // B-1b review m-5: otherwise every start is compatible and fails, with no way back
+        // from inside the app.
+        assert!(forget_remembered_after_report(&plan(Compatible, Remembered, true)));
+        assert!(forget_remembered_after_report(&plan(Compatible, Remembered, false)));
+        for p in [
+            plan(Standard, Default, true),
+            plan(Compatible, RetryAfterOpenFailed, true),
+            plan(Compatible, UserEnvironment, true),
+            plan(Compatible, PreviousStartDied, true),
+            plan(Standard, PreviousStartDied, true),
+        ] {
+            assert!(!forget_remembered_after_report(&p), "{p:?}");
+        }
+    }
 }

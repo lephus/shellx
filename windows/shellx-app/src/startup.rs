@@ -601,4 +601,24 @@ mod tests {
         orderly_quit_in(&state);
         assert_eq!(read(&p.marker), theirs);
     }
+
+    #[test]
+    fn a_remembered_compatible_start_that_cannot_open_resets_render_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = paths(tmp.path());
+        std::fs::write(&p.render, r#"{"mode":"compatible"}"#).unwrap();
+        let state = start_in(Some(&p), false, false, false);
+        assert_eq!(state.plan.reason, StartReason::Remembered);
+        after_report_in(&state);
+        assert_eq!(read(&p.render), r#"{"mode":"standard"}"#);
+        orderly_quit_in(&state);
+        let next = start_in(Some(&p), false, false, false);
+        assert_eq!(next.plan.mode, RenderMode::Standard);
+        // A standard start's report leaves render.json alone.
+        let tmp = tempfile::tempdir().unwrap();
+        let p = paths(tmp.path());
+        let state = start_in(Some(&p), false, false, false);
+        after_report_in(&state);
+        assert!(!p.render.exists());
+    }
 }
