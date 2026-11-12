@@ -61,6 +61,7 @@ use std::sync::Arc;
 
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
+use shellx_model::modal::{StoppedPaneKey, stopped_pane_key};
 use shellx_model::mouse::{
     PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, cap_to_screen,
     secondary_click, wheel_action,
@@ -872,22 +873,20 @@ impl TermView {
             // The IME owns keys while composing (map_key ignores them).
             composing: self.composing(),
         };
-        // No shell runs (held, or it could not start): any key retries.
-        // Window commands keep working (closing this pane among them), and
-        // Alt+F4 / Alt+Space go on to Windows (`Ignore`).
+        // No shell runs (held, or it could not start): a fresh key retries
+        // (`modal::stopped_pane_key`; never its auto-repeat).
         if self.held || self.failure.is_some() {
-            match map_key(&key, &ctx) {
-                KeyAction::App(command)
-                    if !matches!(command, AppCommand::Copy | AppCommand::Paste) =>
-                {
+            match stopped_pane_key(&key, &ctx, event.is_held) {
+                StoppedPaneKey::Command(command) => {
                     cx.emit(TermEvent::Command(command));
                     cx.stop_propagation();
                 }
-                KeyAction::Ignore => {}
-                _ => {
+                StoppedPaneKey::Pass => {}
+                StoppedPaneKey::Retry => {
                     self.retry(cx);
                     cx.stop_propagation();
                 }
+                StoppedPaneKey::Swallow => cx.stop_propagation(),
             }
             return;
         }

@@ -14,7 +14,7 @@
 //! that was handled is not translated, so no WM_CHAR follows and the field
 //! (or the terminal) would never see the letter.
 
-use crate::keys::{AppCommand, KeyAction};
+use crate::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 
 /// A panel, topmost first in drawing order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -155,6 +155,40 @@ impl Panels {
 /// its way: the dropdown closes itself and the click lands.
 pub fn press_only_closes_dropdowns(left_button: bool, dropdown_open: bool) -> bool {
     dropdown_open && !left_button
+}
+
+/// What a key-down does in a pane without a shell (held by the respawn guard, or its shell
+/// could not start).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StoppedPaneKey {
+    /// A window command (close this pane, open a tab): it runs as in any pane.
+    Command(AppCommand),
+    /// Not the pane's: Alt+F4 and Alt+Space (Windows'), the Windows key, a modifier alone, a
+    /// key while the IME composes.
+    Pass,
+    /// Start the shell again.
+    Retry,
+    /// The auto-repeat of a held key: stopped, without a retry, so holding a key does not
+    /// start a shell thirty times a second (review m1).
+    Swallow,
+}
+
+/// The key-down rule of a pane without a shell: any fresh key retries, except window
+/// commands, the keys that are not the pane's and auto-repeats (`repeat`, GPUI's `is_held`).
+pub fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
+    let modifier_alone = matches!(
+        k.key.to_lowercase().as_str(),
+        "shift" | "control" | "ctrl" | "alt" | "platform" | "cmd" | "win" | "function" | "capslock"
+    );
+    match map_key(k, ctx) {
+        KeyAction::App(command) if !matches!(command, AppCommand::Copy | AppCommand::Paste) => {
+            StoppedPaneKey::Command(command)
+        }
+        KeyAction::Ignore => StoppedPaneKey::Pass,
+        _ if modifier_alone => StoppedPaneKey::Pass,
+        _ if repeat => StoppedPaneKey::Swallow,
+        _ => StoppedPaneKey::Retry,
+    }
 }
 
 #[cfg(test)]
