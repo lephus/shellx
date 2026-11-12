@@ -1,7 +1,7 @@
 # ShellX for Windows (native MVP)
 
 A native Windows terminal for ShellX: GPUI window (Direct3D 11 + DirectWrite), libghostty-vt
-grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.7.0
+grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.7.1
 (unsigned). Dark theme only; the UI language follows the Windows display language
 (Vietnamese on a Vietnamese Windows, English otherwise; `SHELLX_LANG` overrides it, see
 [Command line](#command-line)).
@@ -31,7 +31,7 @@ uploads artifacts (kept for 14 days; the run ids are in `G1-G3-CHECKLIST.md`, se
 
 ```
 gh run download <run-id> -R lephus/shellx -n shellx-desktop            # shellx-desktop.exe (portable)
-gh run download <run-id> -R lephus/shellx -n ShellX-Setup-1.7.0 # ShellX-Setup-1.7.0.exe
+gh run download <run-id> -R lephus/shellx -n ShellX-Setup-1.7.1 # ShellX-Setup-1.7.1.exe
 ```
 
 The installer is unsigned and per-user (no UAC):
@@ -47,7 +47,7 @@ The installer is unsigned and per-user (no UAC):
 - The installer names the running ShellX and asks to close it before it updates or uninstalls it
   (`AppMutex`); ShellX itself still opens as many windows as you like.
 - The exe carries version information (File description ShellX, product ShellX, version
-  `1.7.0.0`), visible in Properties › Details; Explorer does not show the company, so use
+  `1.7.1.0`), visible in Properties › Details; Explorer does not show the company, so use
   `(Get-Item "$env:LOCALAPPDATA\Programs\ShellX Native\shellx-desktop.exe").VersionInfo | Format-List *` in
   PowerShell to see every field.
 - Needs Windows 10 1809 (build 17763) or later.
@@ -222,7 +222,7 @@ and while the Windows key is held. `Ctrl+Alt` combinations are treated as AltGr 
   tương thích" / "Compatible display mode", see [Display and the compatible mode](#display-and-the-compatible-mode).
 - **Account**: signed-in state, "Đăng nhập…" / "Đăng nhập lại" and sign-out (also available when the
   account state shows an error).
-- **About**: `ShellX 1.7.0`, or `ShellX 1.7.0 (<label> <commit>)` on a test installer.
+- **About**: `ShellX 1.7.1`, or `ShellX 1.7.1 (<label> <commit>)` on a test installer.
 
 The help menu (`?` in the sidebar footer) lists Cài đặt…, Kiểm tra cập nhật, Tạo báo cáo chẩn đoán
 (creates the [diagnostics report](#the-diagnostics-report), the window stays usable while it runs),
@@ -271,7 +271,7 @@ Everything is in `%LOCALAPPDATA%\ShellX\native\logs`:
 
 | File | What it is |
 |---|---|
-| `shellx.log` | The log of the app, GPUI (GPU name, feature level, device loss, font errors) and the core. First line of a start: `ShellX 1.7.0 starting on Windows 10.0.<build>` (`ShellX 1.7.0 (<label> <commit10>) starting on Windows …` on a test installer), then `render mode: …`, decided before GPUI starts, then GPUI's `Using GPU:` lines. Rotated at 1 MB, 3 files kept |
+| `shellx.log` | The log of the app, GPUI (GPU name, feature level, device loss, font errors) and the core. First line of a start: `ShellX 1.7.1 starting on Windows 10.0.<build>` (`ShellX 1.7.1 (<label> <commit10>) starting on Windows …` on a test installer), then `render mode: …`, decided before GPUI starts, then GPUI's `Using GPU:` lines. Rotated at 1 MB, 3 files kept |
 | `crash.<time>.<pid>.txt` | A panic: message, location, thread, backtrace, version, commit, Windows build. The last line `then: panic in a function that cannot unwind (the process aborts)` means the process was then ended by Windows (a panic inside a window procedure ends in a fast fail, exit code `0xC0000409`) |
 | `crash-native.<time>.<pid>.txt` | A crash that is not a panic (for example `0xC0000005`, a bad memory access): exception code, address, module, thread. No minidump |
 | `start-failed.<time>.<pid>.txt` | ShellX could not open its window and had no other display mode left to try |
@@ -389,7 +389,7 @@ SHELLX_BUILD_LABEL=test scripts/shellx/release/build-windows-cross.sh <output fo
   build may start.
 - `SHELLX_BUILD_LABEL` is a lower-case letter followed by up to nine lower-case letters or digits. The installer is then
   `ShellX-Setup-<version>-<label>-<commit10>.exe`; About and the report show
-  `ShellX 1.7.0 (<label> <commit10>)`. The version inside the exe and the installer stays `1.7.0`. Without a
+  `ShellX 1.7.1 (<label> <commit10>)`. The version inside the exe and the installer stays `1.7.1`. Without a
   label the name is `ShellX-Setup-<version>.exe`. `SHELLX_VPS_SSH_OPTS` and `SHELLX_WINBUILD_DIR` are the
   other variables; the header of the script lists them.
 - The output folder gets the installer, its `.sha256`, `SHA256SUMS.remote`, and a folder
