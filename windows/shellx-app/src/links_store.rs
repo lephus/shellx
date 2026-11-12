@@ -80,7 +80,7 @@ impl LinksStore {
         match std::fs::read(path) {
             Ok(bytes) => match std::str::from_utf8(&bytes)
                 .map_err(|e| e.to_string())
-                .and_then(|s| Links::load_from_str(s).map_err(|e| e.to_string()))
+                .and_then(|s| Links::load_from_str(s).map_err(|e| load_error_text(&e)))
             {
                 Ok(links) => Ok(links),
                 Err(e) => {
@@ -148,10 +148,35 @@ fn quarantine(path: &Path) -> io::Result<PathBuf> {
     Ok(bad)
 }
 
+/// What the log may say about a `links.json` that did not parse. serde_json's own text can
+/// quote the offending value (a machine name, say), so only fixed text and the position go in.
+fn load_error_text(e: &serde_json::Error) -> String {
+    e.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use shellx_model::links::RemoteLink;
+
+    #[test]
+    fn a_bad_links_file_is_logged_without_any_value_from_it() {
+        let bad = [
+            r#"{"links":[{"machine_id":"m","machine_name":"Phus-MacBook-Pro","relay_route":"r","relay_slot":"s","daemon_fingerprint":"f","enrolled":"Phus-MacBook-Pro"}]}"#,
+            r#"{"links":[{"machine_id":"m","machine_name":"Phus-MacBook-Pro","relay_route":"r","relay_slot":"s","daemon_fingerprint":"f","enrolled":"phu@example.com"}]}"#,
+            r#"{"links":"Phus-MacBook-Pro phu@example.com"}"#,
+        ];
+        for text in bad {
+            let e = Links::load_from_str(text).unwrap_err();
+            let line = load_error_text(&e);
+            assert!(!line.contains("Phus-MacBook-Pro"), "{line}");
+            assert!(
+                !line.contains("phu@example.com") && !line.contains('@'),
+                "{line}"
+            );
+            assert!(line.contains("line 1") && line.contains("column"), "{line}");
+        }
+    }
 
     fn tmp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("shellx-links-{name}-{}", std::process::id()));
