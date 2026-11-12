@@ -13,13 +13,13 @@ BẠN LÀM ĐƯỢC GÌ
 
 CÁCH HOẠT ĐỘNG
 1. Cài ShellX trên Mac (miễn phí, tại shellx.pro).
-2. Đăng nhập Google trên Mac và trên điện thoại.
+2. Đăng nhập bằng email hoặc Google trên Mac và trên điện thoại.
 3. Trên Mac, chọn Ghép cặp điện thoại… rồi dùng điện thoại quét mã QR.
 
 Điện thoại và Mac nói chuyện với nhau qua relay của ShellX bằng một kênh mã hoá đầu cuối (giao thức Noise). Relay chỉ chuyển tiếp dữ liệu đã mã hoá và không đọc được phiên làm việc của bạn. Không cần mở cổng, không cần VPN, không cần IP tĩnh.
 
 QUYỀN RIÊNG TƯ
-• Đăng nhập bằng Google. ShellX chỉ lưu những gì cần để chạy tài khoản, như email, thiết bị và các lần ghép cặp của bạn.
+• Đăng nhập bằng email hoặc Google. ShellX chỉ lưu những gì cần để chạy tài khoản, như email, thiết bị và các lần ghép cặp của bạn.
 • Cuộc trò chuyện với agent, tệp đính kèm và nội dung terminal được mã hoá đầu cuối giữa điện thoại và chính Mac của bạn.
 • Thông báo chỉ mang tên agent và tên workspace, không bao giờ mang nội dung agent hỏi.
 • Không quảng cáo, không phân tích, không theo dõi.

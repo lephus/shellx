@@ -13,13 +13,13 @@ WHAT YOU CAN DO
 
 HOW IT WORKS
 1. Install ShellX on your Mac (free, from shellx.pro).
-2. Sign in with Google on the Mac and on your phone.
+2. Sign in with your email or Google on the Mac and on your phone.
 3. On the Mac, choose Pair Phone… and scan the QR code with your phone.
 
 Your phone and your Mac talk through the ShellX relay over an end-to-end encrypted channel (the Noise protocol). The relay only forwards encrypted data and cannot read your sessions. No ports to open, no VPN, no static IP.
 
 PRIVACY
-• Sign in with Google. ShellX stores only what it needs to run your account, such as your email, your devices and your pairings.
+• Sign in with your email or Google. ShellX stores only what it needs to run your account, such as your email, your devices and your pairings.
 • Agent conversations, attachments and terminal content are end-to-end encrypted between your phone and your own Mac.
 • Notifications carry only the names of the agent and the workspace, never what the agent asks.
 • No ads, no analytics, no tracking.
