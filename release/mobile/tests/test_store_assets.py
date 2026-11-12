@@ -137,9 +137,9 @@ class GraphicsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             src = Path(tmp) / "src"
             src.mkdir()
-            (src / "store-01-home-dark-en.png").write_bytes(svg_png(1179, 2556))
+            (src / "store-01-home-dark-vi.png").write_bytes(svg_png(1179, 2556))
             _written, problems = sa.prepare_screenshots(src, Path(tmp) / "out")
-            self.assertIn("store-01-home-dark-en.png is 1179x2556, expected 1080x1920", problems)
+            self.assertIn("store-01-home-dark-vi.png is 1179x2556, expected 1080x1920", problems)
             self.assertIn("missing store-02-permission-dark-en.png", problems)
             self.assertIn("dark/en-US has 0 screenshots, Google Play needs 4 to 8 (store promotion needs 4)", problems)
 

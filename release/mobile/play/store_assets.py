@@ -45,7 +45,7 @@ QUOTED_LABELS = {
 }
 # (NN, slug, listing locales). Shots 04 and 05 show the demo's Vietnamese chat and plan text.
 SHOTS = (
-    ("01", "home", ("en-US", "vi")),
+    ("01", "home", ("vi",)),
     ("02", "permission", ("en-US", "vi")),
     ("03", "terminal", ("en-US", "vi")),
     ("04", "agent", ("vi",)),
