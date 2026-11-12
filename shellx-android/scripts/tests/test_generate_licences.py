@@ -36,8 +36,8 @@ def make_zip(entries):
     return buffer.getvalue()
 
 
-def pom(name=None, licences=(), parent=None):
-    parts = ['<project xmlns="http://maven.apache.org/POM/4.0.0">']
+def pom(name=None, licences=(), parent=None, packaging="pom"):
+    parts = ['<project xmlns="http://maven.apache.org/POM/4.0.0">', "<packaging>%s</packaging>" % packaging]
     if parent:
         parts.append("<parent><groupId>%s</groupId><artifactId>%s</artifactId><version>%s</version></parent>" % parent)
     if name:
@@ -205,6 +205,113 @@ class GenerateLicencesTest(unittest.TestCase):
         self.out.unlink()
         self.assertEqual(first, self.generate())
         self.assertNotIn(str(self.tmp), first)
+
+    def test_the_header_counts_the_libraries(self):
+        self.assertTrue(self.generate().startswith("Open-source software in ShellX for Android\n\nLibraries: 2\n\n"))
+
+    def test_a_template_without_a_holder_is_not_a_licence_text(self):
+        self.lock_only("org.example:bare:1.0")
+        bare = ("MIT License\n\nCopyright (c) <year> <copyright holders>\n\nPermission is hereby granted. "
+                "The above copyright notice and this permission notice shall be included.\n")
+        self.put("org.example", "bare", "1.0", pom("Bare", [MIT], packaging="jar"), {"META-INF/LICENSE": bare})
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("org.example:bare:1.0", r.stderr)
+        (self.texts / "org.example_bare.txt").write_text(bare, encoding="utf-8")
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("names no holder", r.stderr)
+
+    def test_a_copyright_line_with_a_name_but_no_year_counts(self):
+        self.lock_only("org.example:named:1.0")
+        self.put("org.example", "named", "1.0", pom("Named", [MIT], packaging="jar"),
+                 {"META-INF/LICENSE": "Copyright (c) The Example Authors\n\nPermission is hereby granted.\n"})
+        self.assertIn("Copyright (c) The Example Authors", self.generate())
+
+    def test_an_artifact_missing_from_the_cache_is_an_error(self):
+        self.lock_only("org.example:half:1.0")
+        self.put("org.example", "half", "1.0", pom("Half", [APACHE], packaging="jar"))
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("no jar or aar for org.example:half:1.0", r.stderr)
+        self.assertIn("run shellx-android/scripts/dev.sh lock and a build first", r.stderr)
+        (self.cache / "org.example" / "half" / "1.0" / "0123abcd" / "half-1.0.module").write_text("{}", encoding="utf-8")
+        self.generate()
+
+    def test_a_notice_file_over_the_size_limit_is_an_error(self):
+        self.lock_only("org.example:big:1.0")
+        self.put("org.example", "big", "1.0", pom("Big", [APACHE], packaging="jar"),
+                 {"META-INF/NOTICE.txt": "n" * 400_001})
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("META-INF/NOTICE.txt", r.stderr)
+        self.assertIn("org.example:big:1.0", r.stderr)
+
+    def test_a_big_licence_file_that_equals_the_embedded_notices_is_not_an_error(self):
+        self.lock_only("com.google.android.play:core-common:2.0.3")
+        files = self.embedded([("Big component", "t" * 450_000)])
+        files["LICENSE"] = files["third_party_licenses.txt"]
+        self.put("com.google.android.play", "core-common", "2.0.3", pom("Core common", [SDK], packaging="aar"), (".aar", files))
+        self.assertEqual(1, self.generate().count("EMBEDDED NOTICE TEXT E1"))
+
+    def bundled(self, entries, **kw):
+        self.lock_only("org.example:data:1.0")
+        self.put("org.example", "data", "1.0", pom("Data lib", [APACHE], packaging="aar"), (".aar", entries))
+        return kw
+
+    def test_bundled_data_in_assets_stops_the_generator_naming_it(self):
+        self.bundled({"assets/list.dat": "x", "classes.jar": make_zip({"a/B.class": "c"})})
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("org.example:data:1.0", r.stderr)
+        self.assertIn("assets/list.dat", r.stderr)
+        self.assertIn("bundled-files-allowlist.txt", r.stderr)
+
+    def test_native_libraries_raw_resources_and_big_resources_are_flagged_but_metadata_is_not(self):
+        self.bundled({"jni/arm64-v8a/libx.so": "s", "res/raw/keep.xml": "k", "libs/inner.jar": "j" * 20_000,
+                      "res/values/values.xml": "v" * 30_000, "baseline-prof.txt": "b" * 30_000,
+                      "META-INF/proguard/x.pro": "p" * 30_000, "META-INF/MANIFEST.MF": "m" * 30_000,
+                      "AndroidManifest.xml": "<m/>", "R.txt": "r" * 30_000, "annotations.zip": "z" * 30_000,
+                      "classes.jar": make_zip({"a/B.class": "c" * 30_000, "META-INF/x.kotlin_module": "k" * 30_000,
+                                               "data/table.bin": "d" * 20_000})})
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        for flagged in ("jni/arm64-v8a/libx.so", "res/raw/keep.xml", "libs/inner.jar", "classes.jar!/data/table.bin"):
+            self.assertIn(flagged, r.stderr)
+        for fine in ("values.xml", "baseline-prof", "x.pro", "MANIFEST.MF", "R.txt", "annotations.zip", "B.class", "kotlin_module"):
+            self.assertNotIn(fine, r.stderr)
+
+    def test_a_reviewed_allowlist_row_with_a_reason_lets_a_bundled_file_pass(self):
+        self.bundled({"assets/list.dat": "x"})
+        allow = self.texts / "bundled-files-allowlist.txt"
+        allow.write_text("# reviewed\norg.example:data | assets/*.dat | the project's own data, Apache-2.0\n", encoding="utf-8")
+        self.generate()
+        allow.write_text("org.example:data | assets/*.dat |\n", encoding="utf-8")
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("needs a reason", r.stderr)
+
+    def test_an_extra_notice_covers_the_bundled_files_and_names_a_shared_text(self):
+        self.bundled({"assets/list.dat": "x"})
+        (self.texts / "MPL-2.0.txt").write_text("Mozilla Public License Version 2.0\n\nfull terms\n", encoding="utf-8")
+        (self.texts / "org.example_data.extra.txt").write_text(
+            "@licence-text: MPL-2.0\nThe artifact includes list.dat, subject to the terms of the Mozilla Public License, v. 2.0.\n",
+            encoding="utf-8")
+        text = self.generate()
+        self.assertIn("Additional notice for Data lib (vendored shellx-android/scripts/licence-texts/org.example_data.extra.txt):\n\n"
+                      "The artifact includes list.dat, subject to the terms of the Mozilla Public License, v. 2.0.\n", text)
+        self.assertNotIn("@licence-text", text)
+        self.assertIn("Licence text: Mozilla Public License, Version 2.0 (full text in the section \"Licence texts\" below)", text)
+        self.assertEqual(1, text.count("full terms"))
+        self.assertIn("LICENCE TEXT: Mozilla Public License, Version 2.0\n\nMozilla Public License Version 2.0\n\nfull terms\n", text)
+        self.assertLess(text.index("LICENCE TEXT: Apache"), text.index("LICENCE TEXT: Mozilla"))
+
+    def test_an_extra_notice_naming_an_unknown_shared_text_is_an_error(self):
+        self.bundled({"classes.jar": make_zip({"a/B.class": "c"})})
+        (self.texts / "org.example_data.extra.txt").write_text("@licence-text: GPL-9\nHello\n", encoding="utf-8")
+        r = self.run_script()
+        self.assertEqual(1, r.returncode)
+        self.assertIn("GPL-9", r.stderr)
 
     def test_a_licence_from_the_parent_pom(self):
         self.put("androidx", "parent", "1", pom(licences=[("Some Permissive Licence", "https://example.org/l")]))
