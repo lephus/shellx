@@ -1,0 +1,33 @@
+ShellX puts the AI coding agents and terminals running on your Mac in your pocket. When Claude Code, Codex or another command-line agent needs your permission, an answer or a decision on its plan, your phone tells you, and you reply in a few taps, without walking back to your desk.
+
+WHAT YOU CAN DO
+• See every workspace on your Macs at a glance: what needs you, what is running, what just finished.
+• Answer permission requests: Allow, Deny or Always allow.
+• Answer an agent's questions: pick one of its options or type your own answer.
+• Review a plan, then approve it, send it back with feedback or reject it.
+• Chat with an agent: read its replies, its thinking and each tool step; send messages, photos and files; stop it.
+• Hold the mic and talk instead of typing, in English or Vietnamese.
+• Open the real terminal of a workspace and type with your phone's keyboard, Vietnamese Telex included.
+• Get a notification the moment an agent needs you.
+• Rename and close workspaces and tabs, start a new workspace, and manage your paired Macs.
+
+HOW IT WORKS
+1. Install ShellX on your Mac (free, from shellx.pro).
+2. Sign in with Google on the Mac and on your phone.
+3. On the Mac, choose Pair Phone… and scan the QR code with your phone.
+
+Your phone and your Mac talk through the ShellX relay over an end-to-end encrypted channel (the Noise protocol). The relay only forwards encrypted data and cannot read your sessions. No ports to open, no VPN, no static IP.
+
+PRIVACY
+• Sign in with Google. ShellX stores only what it needs to run your account, such as your email, your devices and your pairings.
+• Agent conversations, attachments and terminal content are end-to-end encrypted between your phone and your own Mac.
+• Notifications carry only the names of the agent and the workspace, never what the agent asks.
+• No ads, no analytics, no tracking.
+• Delete your account at any time: Settings › Account › Delete Account…
+
+TRY IT WITHOUT A MAC
+Tap “Try without an account” on the first screen to explore a sample Mac with workspaces, agents and requests waiting for you. Nothing is sent anywhere.
+
+REQUIREMENTS
+• A Mac with ShellX installed (macOS 14 or later).
+• Android 8.0 or later.

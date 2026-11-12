@@ -1,0 +1,1 @@
+First release of ShellX for Android: pair with your Mac, answer your AI agents, chat, talk and use the terminal from your phone.

@@ -1,0 +1,33 @@
+ShellX đưa các agent lập trình AI và terminal đang chạy trên Mac vào túi của bạn. Khi Claude Code, Codex hay một agent dòng lệnh khác cần bạn cho phép, cần câu trả lời hay cần bạn quyết định về kế hoạch của nó, điện thoại sẽ báo cho bạn, và bạn trả lời chỉ bằng vài lần chạm, không cần quay lại bàn làm việc.
+
+BẠN LÀM ĐƯỢC GÌ
+• Xem nhanh mọi workspace trên các Mac: việc gì cần bạn, việc gì đang chạy, việc gì vừa xong.
+• Trả lời yêu cầu xin quyền: Cho phép, Từ chối hoặc Luôn cho phép.
+• Trả lời câu hỏi của agent: chọn một phương án của nó hoặc tự gõ câu trả lời.
+• Xem kế hoạch rồi duyệt, gửi lại kèm góp ý hoặc từ chối.
+• Trò chuyện với agent: đọc câu trả lời, phần suy nghĩ và từng bước dùng tool; gửi tin nhắn, ảnh và file; dừng agent.
+• Giữ mic để nói thay vì gõ, bằng tiếng Việt hoặc tiếng Anh.
+• Mở terminal thật của một workspace và gõ bằng bàn phím điện thoại, kể cả kiểu gõ Telex.
+• Nhận thông báo ngay khi agent cần bạn.
+• Đổi tên, đóng workspace và tab, mở workspace mới, quản lý các Mac đã ghép cặp.
+
+CÁCH HOẠT ĐỘNG
+1. Cài ShellX trên Mac (miễn phí, tại shellx.pro).
+2. Đăng nhập Google trên Mac và trên điện thoại.
+3. Trên Mac, chọn Ghép cặp điện thoại… rồi dùng điện thoại quét mã QR.
+
+Điện thoại và Mac nói chuyện với nhau qua relay của ShellX bằng một kênh mã hoá đầu cuối (giao thức Noise). Relay chỉ chuyển tiếp dữ liệu đã mã hoá và không đọc được phiên làm việc của bạn. Không cần mở cổng, không cần VPN, không cần IP tĩnh.
+
+QUYỀN RIÊNG TƯ
+• Đăng nhập bằng Google. ShellX chỉ lưu những gì cần để chạy tài khoản, như email, thiết bị và các lần ghép cặp của bạn.
+• Cuộc trò chuyện với agent, tệp đính kèm và nội dung terminal được mã hoá đầu cuối giữa điện thoại và chính Mac của bạn.
+• Thông báo chỉ mang tên agent và tên workspace, không bao giờ mang nội dung agent hỏi.
+• Không quảng cáo, không phân tích, không theo dõi.
+• Xoá tài khoản bất cứ lúc nào: Cài đặt › Tài khoản › Xoá tài khoản…
+
+XEM THỬ KHÔNG CẦN MAC
+Chạm “Xem thử không cần tài khoản” ở màn hình đầu tiên để xem một Mac mẫu với workspace, agent và các yêu cầu đang chờ bạn. Không có gì được gửi đi.
+
+YÊU CẦU
+• Một Mac đã cài ShellX (macOS 14 trở lên).
+• Android 8.0 trở lên.

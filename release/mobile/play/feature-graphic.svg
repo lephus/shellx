@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 500" width="1024" height="500">
+  <!-- Google Play feature graphic (1024 x 500). release/mobile/play/store_assets.py replaces __TAGLINE__. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C1438"/>
+      <stop offset="1" stop-color="#0B0716"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.2" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4AF2A1" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#4AF2A1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7DF7BE"/>
+      <stop offset="1" stop-color="#2FD98A"/>
+    </linearGradient>
+    <linearGradient id="lilac" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#CFC8EE"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="500" fill="url(#bg)"/>
+  <rect width="1024" height="500" fill="url(#glow)"/>
+  <g transform="translate(64 116) scale(0.52)">
+    <polyline points="384,122 290,234 384,346" fill="none" stroke="url(#lilac)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="128,122 222,234 128,346" fill="none" stroke="url(#mint)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="300" y="398" width="84" height="26" rx="8" fill="url(#mint)"/>
+  </g>
+  <text x="340" y="245" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="100" font-weight="700" fill="#FFFFFF">ShellX</text>
+  <text x="344" y="305" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="30" fill="#CFC8EE">__TAGLINE__</text>
+</svg>
