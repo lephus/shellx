@@ -804,4 +804,89 @@ mod tests {
             PathBuf::from(r"C:\Windows").join("explorer.exe")
         );
     }
+
+    /// The child half of `the_installed_hook_writes_one_file_and_starts_one_reporter`: does
+    /// nothing unless the parent set `SHELLX_HOOK_CHILD`, so the hook is never installed in a
+    /// normal test run.
+    #[cfg(unix)]
+    #[test]
+    fn hook_child_process() {
+        let Some(dir) = std::env::var_os("SHELLX_HOOK_CHILD") else {
+            return;
+        };
+        let dir = PathBuf::from(dir);
+        install_panic_hook(
+            CrashContext {
+                logs_dir: dir.join("logs"),
+                exe: dir.join("reporter.sh"),
+                version: "1.7.0".into(),
+                commit: "unknown".into(),
+                build: "release".into(),
+                windows: "10.0".into(),
+                exe_base: None,
+                main_thread_id: None,
+            },
+            HookMode::Dialog,
+        );
+        extern "C" fn cannot_unwind() {
+            panic!("the child's panic for a@b.co with {T43} and code 123456");
+        }
+        cannot_unwind();
+    }
+
+    /// Review m5: the installed hook end to end (run_hook, panic_parts, `{:#}`, the chain to
+    /// the previous hook, the follow-up after the guard was reset), in a child process.
+    #[cfg(unix)]
+    #[test]
+    fn the_installed_hook_writes_one_file_and_starts_one_reporter() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let calls = tmp.path().join("reporter.calls");
+        let script = tmp.path().join("reporter.sh");
+        std::fs::write(
+            &script,
+            format!("#!/bin/sh\necho \"$1\" >> '{}'\n", calls.display()),
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "crash::tests::hook_child_process",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("SHELLX_HOOK_CHILD", tmp.path())
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(!out.status.success(), "the child should abort:\n{stderr}");
+        let logs = tmp.path().join("logs");
+        let files = files_in(&logs);
+        assert_eq!(files.len(), 1, "{files:?}\n{stderr}");
+        let text = std::fs::read_to_string(logs.join(&files[0])).unwrap();
+        for marker in ["<email>", "<token>", "<code>"] {
+            assert!(text.contains(marker), "{marker} missing:\n{text}");
+        }
+        for secret in ["a@b.co", T43, "123456"] {
+            assert!(!text.contains(secret), "{secret} leaked:\n{text}");
+        }
+        assert!(
+            text.lines().any(|l| l.contains(": ") && l.contains("0x") && l.contains(" - ")),
+            "no address line:\n{text}"
+        );
+        assert_eq!(
+            text.lines().last(),
+            Some("then: panic in a function that cannot unwind (the process aborts)"),
+            "{text}"
+        );
+        // The stand-in reporter may still be running when the child has aborted.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !calls.exists() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let calls = std::fs::read_to_string(&calls).unwrap_or_default();
+        assert_eq!(calls, "--report-crash\n", "one reporter call:\n{stderr}");
+    }
 }
