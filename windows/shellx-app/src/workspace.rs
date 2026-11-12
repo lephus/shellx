@@ -129,10 +129,12 @@ impl<P> PaneHost<P> {
         self.panes.iter_mut().map(|(pane, value)| (*pane, value))
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.panes.len()
     }
 
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.panes.is_empty()
     }
