@@ -20,6 +20,13 @@
 # The script never prints a password: keytool reads the store password from the environment.
 set -euo pipefail
 
+# Refuse to run under xtrace (bash -x, set -x, SHELLOPTS=xtrace): it would print the upload key passwords, both
+# where they are read and wherever a later line expands them. Refusing leaves no traced line, unlike set +x after
+# the fact. Nothing exports SHELLOPTS to a child, and no child receives a password except keytool (by environment).
+case $- in
+  *x*) echo "android.sh: refusing to run with xtrace on (bash -x, set -x or SHELLOPTS=xtrace): it would print the upload key passwords. Run it without tracing." >&2; exit 1 ;;
+esac
+
 APP_ID=com.shellx.prod
 MIN_BUNDLETOOL=1.17.0
 
