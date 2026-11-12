@@ -1155,3 +1155,252 @@ different email" returns to the address with the email keyboard.
 **Not verified on a device**: everything on a real iPhone (no device here): a real relay and mail, autofill of the code
 from Mail, a third-party or Vietnamese keyboard in the email field (the simulator has only English), VoiceOver, the
 keyboard after coming back from the mail app.
+
+## 32. Additions from the email-code sign-in plan, core and Mac part
+
+Spec S4; plan `2026-11-11-shellx-email-code-signin-core-mac.md` (the core RPCs landed in `d847812117`, the Mac sheet in
+`dac0579ee7`). The relay API is §29's. Owner: shellx-core and the Mac; consumer: the Windows part (§33). Amends §3 (K3):
+two new RPCs; `auth.session` and `session.json` may carry `auth_method: "email"`. Names checked against `develop`.
+
+**Core RPCs (`shellx-core/src/auth_email.rs`)**
+
+| Call | Params | Result | Writes |
+| --- | --- | --- | --- |
+| `auth.email.begin` | `{email, locale?}` | `{challenge_id, expires_in, resend_in, email}` (`email` is the relay's normalized address: show it, not the typed text) | nothing |
+| `auth.email.finish` | `{challenge_id, code}` | `{user_id, device_id, device_public_key_b64, fingerprint, email, auth_method: "email"}`, never a token | `session.json` with `auth_method: "email"` and `email`; `device.key` kept; `machine.json` dropped only when the account changed |
+
+- Neither call sends a bearer or needs a session. On an error no session or machine file is written (`device.key` may
+  have been created first, as for `auth.google.finish`). The address, the code and the challenge id never reach a
+  result, an error message or a `Debug`.
+- `begin` refuses without a request (code `invalid_email`, so no per-IP budget is spent): an address that is empty after
+  trimming, holds a character outside ASCII, or is longer than 254 bytes. `locale`: a value starting with `vi` (any
+  case) is sent as `vi`, anything else as `en`.
+- `finish` removes whitespace and maps every Unicode decimal digit (`auth_email::DECIMAL_ZEROS`, Unicode 13) to ASCII;
+  anything but six digits is `invalid_code` with no request and no guess spent. Leading zeros are kept.
+- A relay without the feature (404 `not_found`, a body-less `http_404`, or 503 `email_sign_in_disabled`) reaches the
+  caller as `email_sign_in_disabled`, on both calls. Every other relay code passes through; a non-2xx answer without a
+  code is `http_<status>`; no answer is `network`; a 2xx the core cannot use is `server`.
+
+| Code | What the sheet does (the Windows dialog mirrors it, §33) |
+| --- | --- |
+| `invalid_email`, `disposable_email` | their sentence under the email field; stay on the email step |
+| `rate_limited` | its sentence; Send code and Resend can be pressed again at once (no new lock) |
+| `email_send_failed` | its sentence; on Resend the challenge is dropped (the relay holds no live code) and Resend unlocks |
+| `email_sign_in_disabled` | "not available"; on Resend the challenge is dropped; on verify the challenge and digits stay |
+| `invalid_code` | the code field is emptied, the challenge stays |
+| `code_expired` | the field is emptied and off, Verify off, Resend unlocked at once |
+| `switch_from_signed_in_device` | back to the email step with the address kept; challenge, digits and lock dropped |
+| `network` | the network sentence; a failed Resend or verify keeps the challenge and the digits |
+| anything else | the server sentence |
+
+**Swift (`Packages/Shared/ShellXBrand`)**
+- `ShellXRemoteCore`: `EmailCodeChallenge(challengeID, email, expiresIn, resendIn)` (600 and 60 when the reply omits
+  them); `ShellXCoreClient.beginEmailSignIn(email:locale:)`, `finishEmailSignIn(challengeID:code:)`;
+  `ShellXAccount.requestEmailCode(email:locale:)` and `signInWithEmailCode(challengeID:code:) -> Identity`
+  (`authMethod: "email"`). One sign-in runs at a time, both ways: `google_in_progress` while a Google flow waits,
+  `email_sign_in_in_progress` while a code is being verified (Google then refuses with the same code, and so does a
+  second verify). `AccountSignInMethod.Kind` is `google`, `apple` or `email` (provider `email`).
+- `ShellXRemoteUI`: `EmailSignInModel` (steps `email`, `sending`, `code`, `verifying`, `done(email:)`), `EmailSignInTexts`,
+  `SignInSheetFlows`, `SignInErrorLabels` (16 sentences), `SignInErrorMessage.text(forCode:labels:)` (Google path) and
+  `.emailText(forCode:labels:)`. Resend asks again for the kept, trimmed address; its lock is `resend_in` rounded up.
+  The code field keeps the first six decimal digits as ASCII and the sixth digit verifies by itself. A non-ASCII address
+  keeps Send off and shows the invalid-email sentence at once. Closing the sheet cancels no request: a code verified
+  after the close still signs in.
+
+**No failure reaches the screen as a raw code, on any sign-in path.** This overrides the plan's Rulings 5 and 24. On the
+Google path: `rate_limited` reads as the rate sentence; `not_found` and `http_404` (a relay without the routes) as "not
+available"; `email_sign_in_in_progress` and `google_in_progress` as "Sign-in didn't finish. Try again."; every other code
+without a sentence of its own as the server sentence (the email path already did).
+
+**The text fields.** `SignInTextField` (with `PlainLayoutLocales`, `PlainLayoutFieldEditor`) is an AppKit field. While it
+has the keyboard it allows one input language for each of the person's own plain keyboard layouts: enabled, ASCII-capable
+keyboard layouts; input modes and methods never count; a layout whose primary language an enabled mode also lists gives
+another language of its own list, `en` first; with no plain layout there is no restriction. The system's all-Roman
+filter still offers Apple's Vietnamese Telex, so it is not used. Paste and third-party typing tools are covered only by
+the ASCII rule.
+
+**Sheet (`Sources/ShellX/Remote/UI/SignInSheet.swift`)**
+- Order: title, email field with Send code, "or", Continue with Google, Cancel; 340 pt wide. No "Continue with email"
+  button. The email field has the keyboard when the sheet opens and again after a Google attempt fails or is cancelled.
+  Return sends the code (the Google button is not the default action); in the code field Return verifies; Cancel and
+  Escape close both flows. While Google waits the email field is off, and Continue with Google is off outside the email
+  step. After a sign-in the sheet shows "Signed in as …" with Done (Windows closes at once).
+- "Switch to Google sign-in" (`.link`) stays Google only. Settings › Account titles an `email` sign-in method "Email
+  code". Delete Account still opens the web page; the Mac has no delete by code.
+
+**Strings (Mac keys)**: `remote.signin.email.{field,send,or,sentTo,code,verify,resend,resendIn,change}`,
+`remote.signin.error.{invalidEmail,disposableEmail,invalidCode,codeExpired,emailSendFailed,unavailable,rateLimited,server}`
+and `settings.account.methods.email`: 18, in all ten Mac languages. en and vi equal the phone catalog's wording. `%@` of
+`sentTo` is the relay's address; `%@` of `resendIn` is the whole seconds as text. `remote.signin.email` stays unused.
+
+**Test support**: `shellx-fake-api` answers both routes in the relay's check order and follows §29 on identity removal,
+on a Google link to another address and on delete by code; it counts no rate limits. Names: `FakeOptions.email_sign_in`
+and `email_routes` (an old relay's 404), `email_code`, `email_locale`, `set_next_email_code` (leading zeros),
+`expire_email_codes` (a relay restart), `fail_next_mail` (the relay's 502, which drops the live code), `fail_next`,
+`add_user`; constants `EMAIL_CODE_TTL_SECS`, `EMAIL_RESEND_SECS`, `EMAIL_CODE_MAX_ATTEMPTS`; its disposable domain is
+`mailinator.com`; a desktop device needs platform `macos` or `windows`. Only a DEBUG Mac build reads `SHELLX_API_BASE`.
+
+**Not verified**: a mailed code on a real Mac (a relay without §29 answers 404, so Send code reads "not available");
+Telex staying hidden in a real key window; the VoiceOver announcements and Resend's value; the sheet in ar, zh, ja, ko.
+
+## 33. Additions from the email-code sign-in plan, Windows part
+
+Spec S4; plan `2026-11-11-shellx-email-code-signin-windows.md` (landed in `e4b6291906`). The relay API is §29's; the core
+RPCs are §32's. Owner: the Windows app (`windows/shellx-model`, `windows/shellx-app`) and one core method. Names checked
+against `develop`.
+
+**shellx-core (amends §3, K3)**: `auth.google.available {} -> {available: bool}`. It is local: no request, no session, no
+state folder opened. True only when the core's config has a non-empty Google desktop client id and secret. Before
+`config.set` it answers `not_configured`. `auth.google.begin` is unchanged. The Mac may call it; nothing requires it.
+
+**Model (`windows/shellx-model`)**
+- `core_api`: `EmailChallenge { challenge_id, email, expires_in, resend_in }` (`Debug` shows the two numbers only),
+  `email_begin(core, email, locale)`, `email_finish(core, challenge_id, code) -> GoogleSignIn`, `google_available(core)`,
+  `SignInMethod::is_email`.
+- `email_sign_in`: `CODE_LEN`, `EMAIL_MAX_LEN` (254), `DECIMAL_ZEROS` (the core's table), `EmailStep` (`Email`, `Sending`,
+  `Code`, `Verifying`), `email_looks_valid`, `email_text_refused`, `code_digits`, `auto_submit`, `SignInScreen` (`Start`,
+  `Code`, `SigningIn`) and `sign_in_screen`, `DialogFocus`, `tab_order`, `tab_target`, `DialogKey` and `dialog_key`,
+  `keep_keyboard`, `take_keyboard`.
+- `account`: the eight events `EmailCodeRequested`, `EmailEdited`, `EmailResendRequested`, `EmailBegun`,
+  `EmailCodeSubmitted`, `EmailFinished`, `EmailChangeRequested`, `EmailCancelled`; the actions `CallEmailBegin` and
+  `CallEmailFinish` (their `Debug` hides address, challenge and code); `AccountFlow::{email_step, email_sent_to,
+  email_code_sent_to, email_error, email_can_verify, email_resend_wait_secs, email_code_epoch, google_failure,
+  session_ended_by_server}`. `take_signed_out_by_server` and the one-time Google-switch offer are gone.
+- `account_view`: `AccountView`, `account_view(flow, google_available, lang)`, `SignInNotice`, `sign_in_notice(flow)`.
+  `sidebar::request_picker`. `strings`: `Lang::locale`, `sent_code_to`, `resend_code_in`, `email_error`,
+  `sign_in_method_label`, and the `Str` variants `FirstSignInCreatesAccount`, `OrDivider`, `SendCode`, `CodePlaceholder`,
+  `VerifyCode`, `ResendCode`, `UseDifferentEmail`, `InvalidEmail`, `DisposableEmail`, `InvalidCode`, `CodeExpired`,
+  `EmailSendFailed`, `EmailCodeMethod`, `SessionExpired`, `SignInAgain`. `Str::EmailAddress` reads "Email address". The
+  email sentences equal the phone catalog's en and vi (a test pins 15 pairs). Window: `TextField::composing`.
+
+**Rules**
+- **A failed attempt returns the account flow to the state it started from.** A failed email verify and a failed Google
+  attempt end so: an `Error` that holds a session comes back with its sign-out and its list retry (a new tick is armed);
+  without a session the flow is signed out. A failed Send code or Resend leaves the account state as it was.
+- **The dialog never opens by itself.** After the server ends a session, `account_view::sign_in_notice` is the only
+  prompt outside Settings ("Your session expired." and a "Sign in again" button in the sidebar footer, until the next
+  sign-in); the dialog opens when the person presses it. A refused list (`unauthorized`, `http_401`) signs out in any
+  state and shows the notice.
+- **Google is drawn only when the core says the build has a client** (`auth.google.available`). The window asks before
+  the first list answer and again while the answer is unknown.
+- **Who holds the keyboard** is decided by `email_sign_in::{keep_keyboard, take_keyboard}`. A pressed button that turns
+  disabled (Resend, Verify, Send code) gives the keyboard back to the screen's field (Cancel on `SigningIn`), so the next
+  pasted code is not lost. A click on a disabled control leaves the keyboard where it was. Google keeps it while
+  "Waiting for Google…" shows. Disabled buttons have no focus handle; the focus ring is a permanent 2 px border that only
+  changes colour.
+- **The "+" list** comes from `sidebar::request_picker(machines, access, rule)`, which returns the Macs that may be asked
+  and the sentences that say why the list is short or empty. A Mac with a saved link or a waiting request is not offered
+  again.
+- Code field: `code_digits` takes every Unicode decimal digit of the whole text and needs exactly six, so "123 456" and
+  the mail's subject line work, and the mail's whole body (which also says "10 minutes") does not. The iPhone and the Mac
+  keep the first six digits instead. A paste of six digits verifies by itself, once per new six digits.
+- Every account, sign-in and email failure reads as a sentence: `email_error` for the email path (eight sentences, `network`
+  as the relay-unreachable sentence, anything else the server sentence); `account_view` words a Google failure like the
+  dialog does and any other code with `strings::failure_sentence` (§34).
+
+**Shared with the other apps**: email first; a 409 on verify goes back to the email step; a 410 opens Resend at once; a
+401 empties the code; any other failed verify, `email_sign_in_disabled` included, keeps the challenge and the digits; a
+failed Resend drops the challenge for `email_send_failed` and `email_sign_in_disabled` and keeps it otherwise; editing the
+address clears the failure under it; Cancel and Escape close the dialog; one sign-in flow runs at a time. **Windows only**:
+the dialog closes at once after a code sign-in (the Mac keeps "Signed in as … / Done"); Google only with a client; access
+can be requested only from a Mac that can host (§34).
+
+**Development**: on the Mac build of the window, `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch|expired` opens the
+dialog on that screen with a made-up address and no core call: `start` (no Google, a Mac build has no client), `google`
+(with its button), `code` (the code step), `invalid` (an address with a non-ASCII letter), `switch` (the first screen
+after a 409). `expired` opens no dialog and shows the notice. With a stored session the dialog closes at once, so move
+`session.json` aside first. Tests: the real core through `shellx-app` (`core_service.rs`) with the fake relay, §32's names.
+
+**Not verified**: anything on a real Windows PC (typing, Ctrl+V, Unikey, EVKey and Windows Telex in both fields, Tab,
+the focus ring, a touchpad tap on Resend, 100 / 125 / 150 % scaling), a live relay with a mailbox, and any screenshot of
+the dialog (this Mac cannot capture the window). The keyboard rules are proved in the model and by reading GPUI's source.
+`DECIMAL_ZEROS` is Unicode 13: digits of later scripts keep Verify off.
+
+## 34. Additions from the Windows foundations plan
+
+Plan `2026-11-12-shellx-windows-usable-1-foundations.md` (landed in `00e7560fa7`; the Mac development switch in
+`157efb7222`). Owner: the Windows app's model crate, the core's machine list, the fake relay and the build tooling;
+consumers: the later Windows plans and every client of `GET /v2/machines`. Names checked against `develop`.
+
+**The relay's machine list (amends §3, K3 `machines.list`)**
+- `GET /v2/machines` answers `{machines: [{machine_id, name, platform, online, last_seen_unix (integer or null),
+  fingerprint}]}`. It has no `noise_public_key_b64` and no `can_host` today.
+- The core's `machines.list` never shows the relay's own `fingerprint`: it computes one from `noise_public_key_b64` when
+  the relay sends a decodable 32-byte key, else `"fingerprint": null`. Against the relay it is always null. Each item
+  also carries `is_this_machine` and `can_host`; `can_host` is true only for JSON `true`, and absent, null or any other
+  value is false and never fails the list.
+- **Clients never require `fingerprint`.** `MachineInfo.fingerprint` (Windows model) reads null, absent or a non-string
+  as `""`, and decides nothing. The Mac decodes the list with an optional fingerprint and ignores `can_host`.
+- When the relay gains `can_host` (Part 2), add it to the contract file first, with the relay change and its test, then
+  to the fake.
+
+**One source of relay shapes**: `relay/contract/desktop-api.json` lists the answers the desktop apps rely on (status,
+keys, types, null) and the request rules (machine name, platform `macos` or `windows`, key, version patterns, email
+address). `relay/test/desktop-contract.test.ts` holds the real relay to it; `shellx-core/tests/relay_contract.rs` holds
+the fake relay to it. Order of change: the relay, then the file, then the fake. When the relay test fails, the file is
+wrong: correct the file, never the relay. The core reads the file at run time; `shellx-fake-api` does not compile it in.
+The fake answers like the relay: 201 for a first `POST /v2/machines`, 204 and no body for a heartbeat; its list carries no
+key unless `FakeApi::set_list_machine_keys(true)` and no `can_host` unless `set_machine_can_host`. Known gap:
+`os_info::os_version()` returns `"unknown"` when unreadable, which the relay refuses.
+
+**Windows model (`windows/shellx-model`)**
+- Sentences, never codes: `strings::failure_sentence(Lang, code)` words every account, sign-in and pairing error line:
+  `network` as the relay-unreachable sentence, `rate_limited`, `switch_from_signed_in_device`; `not_found`, `http_404`,
+  `not_configured`, `email_sign_in_disabled` and `password_sign_in_removed` as "not available in this build";
+  `unauthorized` and `http_401` as "Your session expired."; anything else as the server sentence. `google_error` falls back
+  to it, and is `None` only for `google_cancelled`. The UI never draws a code or `CoreErr.message`.
+- `AccountFlow::can_sign_out()`: true in `LoggedIn`, and in an `Error` once a session is known to exist.
+- `Debug` hides personal data: `AccountFlow`, `MachineInfo`, `MachineGroup`, `RemoteLink` and `SignInMethod` print no
+  email and no machine or device name (names appear as `<n chars>`); the account events and actions hide address, password,
+  challenge and code.
+- Request rule: `sidebar::{OfferRule::{RelayCanHost, AnyMac}, offer_rule_from_env, can_offer_access, request_targets,
+  request_panel_notes(machines, has_link, rule), build_groups_with}`. A Mac is offered "Request access" only when the relay
+  says it can host. `SHELLX_OFFER_ALL_MACS=1` (read once at start) offers every Mac, for trying Part 2 only, never for a PC.
+  The notes `MacCannotHostYet`, `SignInOnYourMac` and `NoOtherMachines` say why the list is empty.
+- First window: `first_window::{WorkArea, FirstWindow, first_window, PREFERRED (1200 x 760), MINIMUM (720 x 420)}`. GPUI
+  0.2.2 reads the frame in workspace coordinates ((0, 0) is the top-left of the primary monitor's work area), so the first
+  window opens on the primary monitor (`display_id: None`) with `WorkArea::primary_workspace(width_px, height_px, scale)`:
+  size `rcWork` divided by the scale (a scale that is not finite or not above zero counts as 1.0), origin (0, 0). Never pass
+  `rcWork` in screen coordinates: a top or left taskbar then moves the window. Another monitor is out of scope. The
+  window does not use it yet.
+- Rule modules: `keys::is_window_system_key`; `mouse::{ScrollAccumulator, wheel_action, secondary_click}`;
+  `paste::needs_paste_confirmation`; `redact::redact`; `diagnose::{format_report, LOG_TAIL_LINES}`. The report formatter
+  redacts every line.
+- Shell: `shell::{ShellProbe, find_shells, launch_plan, custom_launch, parse_command_line, resolve_program,
+  POWERSHELL_PROMPT_HOOK, osc7_url}`; the stored choice is `{"kind":"auto"}`, `{"kind":"known","shell":"pwsh|windows_powershell|cmd|git_bash|wsl"}`
+  or `{"kind":"custom","command_line":"…"}`, and a value that does not parse means Auto. Lookup rules: only absolute `PATH`
+  entries count (empty, `.`, relative, `C:x` and a bare `\\` are skipped); a program is a bare name or an absolute path,
+  and a relative path is not found; `SystemRoot`, `ProgramFiles`, the Git path and `ComSpec` are used only when absolute;
+  Auto considers only PowerShell 7, Windows PowerShell and Command Prompt (none installed: no shell found; Git Bash and WSL
+  are a choice only), and its fallback is the next of those, once; the `SHELLX_SHELL` override is read like a custom line.
+
+**The redactor (`redact.rs`)** hides emails (`<email>`), Resend keys (`re_` and 8+ key characters, `<key>`), tokens
+(`<token>`) and a six-digit number within 24 characters of the whole word `code`, `otp` or `mã` on the same line (`<code>`).
+A token is a run of 32+ characters of `[A-Za-z0-9_-]` with a letter, that looks random (a digit, or 8+ capitals and 8+
+lower-case letters) and is not hex and dashes only; or a standard-base64 run (`+`, `/`) of 32+ that looks random and has a
+`+` or trailing `=`. `/` never joins a token, so paths, machine ids, commit ids and checksums stay readable. The passes
+repeat until the text is stable. Known limits (the comment at the top of the file lists them): a prefix glued to a UUID
+is hidden; constant names of 32+ characters with a digit are hidden; a code more than 24 characters from its keyword or
+split (`123 456`) is not; `%40` emails are not; hex-only secrets are kept; a CamelCase name with 8+ capitals and 8+
+lower-case letters is hidden; `OTPCode` is not recognised; a Windows SID is hidden.
+
+**Tooling**
+- `scripts/shellx/check-windows-build.sh` compiles the committed HEAD of `shellx-model`, `shellx-remote` and `shellx-app`
+  (all targets) for `x86_64-pc-windows-msvc` in local Docker: no installer, no exe. `--release` does it in the release
+  profile with a stand-in shader compiler, so release-only code is type-checked; nothing built that way may run or ship.
+  Run it before review of any branch with `cfg(windows)` code.
+- `windows/vendor/gpui-0.2.2/` is the published crate, patched, behind `[patch.crates-io]` in `windows/Cargo.toml`
+  (`vendor` is excluded from the workspace). `windows/vendor/check-gpui.sh` must pass: the files that differ from the
+  crate are exactly the files whose first line is the Apache-2.0 notice. Each patch is its own commit with a row in the
+  table of `windows/vendor/README.md`; today only patch (d), `build.rs` (shaders compile for a Windows target on any host).
+- `scripts/shellx/release/build-windows-cross.sh --preflight` (read-only) checks the VPS guards: free disk (default 14
+  GiB, `SHELLX_WINBUILD_MIN_FREE_GIB`), no build container, no held lock. A build takes an owned lock (`.lock/owner`: host,
+  pid, start, commit) and removes only its own; `--unlock` removes a stale one and refuses while a build runs or the owner
+  is a live pid here. Exit 2 for an unknown option or a bad `SHELLX_WINBUILD_DIR`. VPS builds run from `develop`, never from
+  a branch cut before `00e7560fa7`.
+- **Mac development switch**: `SHELLX_DEV_BACKGROUND=1` opens the built window unfocused and never activates the app
+  (Mac builds only; Windows ignores it). Every automated start of the built window on a Mac uses it together with a scratch
+  `HOME`, because the window holds a real shell and must not catch a person's keystrokes.
+
+**Not verified**: the cross build with the vendored GPUI has not run (it needs the VPS), nothing ran on Windows, and the
+shell lookup, the prompt hook and the first-window frame follow GPUI's source and the Windows documentation, not a run.
