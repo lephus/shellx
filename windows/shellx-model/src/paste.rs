@@ -137,6 +137,58 @@ mod tests {
     }
 
     #[test]
+    fn paste_line_count_counts_what_the_shell_will_run() {
+        for (text, lines) in [
+            ("a\nb", 2),
+            ("a\r\nb\r\n", 2),
+            ("a\rb", 2),
+            ("\nb", 2),
+            ("echo 1\necho 2\necho 3\n", 3),
+            ("a\n\n\nb", 4),
+            ("a\nb\n\n", 3),
+            ("x", 1),
+            // a line copied from Notepad keeps its CRLF: still one line
+            ("dir\r\n", 1),
+        ] {
+            assert_eq!(paste_line_count(text), lines, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn confirm_keys_paste_cancel_or_pass() {
+        use crate::keys::KeyIn;
+        let key = |key, ctrl, alt, shift| KeyIn {
+            key,
+            ctrl,
+            alt,
+            shift,
+            win: false,
+        };
+        assert_eq!(
+            confirm_key(&key("enter", false, false, false)),
+            ConfirmKey::Confirm
+        );
+        assert_eq!(
+            confirm_key(&key("escape", false, false, false)),
+            ConfirmKey::Cancel
+        );
+        for k in [
+            key("enter", true, false, false),
+            key("enter", false, false, true),
+            key("a", false, false, false),
+            key("space", false, false, false),
+            key("c", true, false, false),
+            key("f4", false, true, false),
+            KeyIn {
+                win: true,
+                ..key("enter", false, false, false)
+            },
+        ] {
+            assert_eq!(confirm_key(&k), ConfirmKey::CancelAndPass, "{k:?}");
+        }
+    }
+
+    #[test]
     fn a_bracketed_paste_never_asks() {
         assert!(!needs_paste_confirmation("a\nb", true));
         assert!(!needs_paste_confirmation("echo 1\necho 2", true));

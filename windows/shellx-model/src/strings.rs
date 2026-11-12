@@ -914,7 +914,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 132);
+        assert_eq!(Str::ALL.len(), 133);
     }
 
     #[test]
@@ -1282,6 +1282,26 @@ mod tests {
                 format!("SHELLX_SHELL: {}", custom_shell_error(lang, &missing))
             );
         }
+    }
+
+    #[test]
+    fn paste_prompt_strings() {
+        assert_eq!(
+            paste_lines_prompt(Lang::Vi, 3),
+            "Dán 3 dòng? Mỗi dòng sẽ chạy ngay như một lệnh."
+        );
+        assert_eq!(
+            paste_lines_prompt(Lang::En, 3),
+            "Paste 3 lines? Each line will run as a command right away."
+        );
+        assert_eq!(
+            t(Lang::Vi, Str::PasteConfirmKeys),
+            "Enter để dán, Esc để hủy"
+        );
+        assert_eq!(
+            t(Lang::En, Str::PasteConfirmKeys),
+            "Enter to paste, Esc to cancel"
+        );
     }
 
     #[test]
