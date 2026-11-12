@@ -24,7 +24,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use shellx_model::crash_report::{self, CrashFileKind, DialogKind, NativeFacts};
 use shellx_model::log_file::compact_utc;
 use windows_sys::Win32::Foundation::{
-    CloseHandle, GENERIC_WRITE, HANDLE, HMODULE, INVALID_HANDLE_VALUE, SYSTEMTIME,
+    CloseHandle, GENERIC_WRITE, HANDLE, HMODULE, INVALID_HANDLE_VALUE, SYSTEMTIME, WAIT_OBJECT_0,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     CREATE_ALWAYS, CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FlushFileBuffers, WriteFile,
@@ -151,7 +151,11 @@ fn start_watchdog(ctx: &CrashContext, file: &Path) -> (usize, usize) {
         .name("crash-reporter-watch".into())
         .spawn(move || {
             // SAFETY: the events stay open for the whole process once the filter is set.
-            unsafe { WaitForSingleObject(go_handle as HANDLE, INFINITE) };
+            // Anything but the event's signal (WAIT_FAILED) must not start a crash dialog in a
+            // healthy app (B-1b review m-7).
+            if unsafe { WaitForSingleObject(go_handle as HANDLE, INFINITE) } != WAIT_OBJECT_0 {
+                return;
+            }
             let startup = STARTUPINFOW {
                 cb: std::mem::size_of::<STARTUPINFOW>() as u32,
                 ..Default::default()
