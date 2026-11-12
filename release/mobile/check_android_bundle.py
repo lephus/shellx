@@ -198,12 +198,16 @@ def elf_problems(entry: str, data: bytes) -> list:
     for h in headers:
         if h[t] != PT_GNU_RELRO:
             continue
-        end = h[vaddr] + h[memsz]
-        if end % PAGE_16K == 0:
-            continue
-        if any(l[vaddr] <= h[vaddr] < l[vaddr] + l[memsz] and l[vaddr] + l[memsz] == end for l in loads):
-            continue
-        found.append("%s: GNU_RELRO ends at %#x, inside a 16 KB page that also holds writable data" % (entry, end))
+        start, end = h[vaddr], h[vaddr] + h[memsz]
+        lo, hi = start - start % PAGE_16K, -(-end // PAGE_16K) * PAGE_16K
+        # On a 16 KB device the linker makes [lo, hi) read-only: no other loaded byte may share those pages.
+        for l in loads:
+            first, last = l[vaddr], l[vaddr] + l[memsz]
+            for from_, to in ((end, hi), (lo, start)):
+                low, high = max(first, from_), min(last, to)
+                if low < high:
+                    found.append("%s: GNU_RELRO %#x-%#x shares its 16 KB pages with other loaded data at %#x-%#x"
+                                 % (entry, start, end, low, high))
     return found
 
 
