@@ -1,0 +1,5 @@
+@licence-text: MPL-2.0
+The artifact includes the Public Suffix List (https://publicsuffix.org/) as the file assets/PublicSuffixDatabase.list.
+The list is subject to the terms of the Mozilla Public License, v. 2.0. Its source form is at
+https://publicsuffix.org/list/public_suffix_list.dat (and in the repository https://github.com/publicsuffix/list).
+The text of the Mozilla Public License, v. 2.0 is included below, in the section "Licence texts".

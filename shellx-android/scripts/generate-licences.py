@@ -9,13 +9,28 @@ its POM in the Gradle cache (or from a parent POM). The file carries, offline an
   copyright line, from the artifact (META-INF/LICENSE*, LICENSE*, also inside an aar's classes.jar) or else from
   scripts/licence-texts/<group>_<artifact>.txt; when neither exists the generator stops naming the library;
 - the contents of any META-INF/NOTICE* file of an artifact (Apache-2.0 section 4(d));
+- an extra notice, when scripts/licence-texts/<group>_<artifact>.extra.txt exists, for data or code the artifact
+  bundles under terms its POM does not name (OkHttp's Public Suffix List, MPL-2.0). The file may start with lines
+  "@licence-text: <id>" naming a shared full text (MPL-2.0, Apache-2.0) that is then included once below;
 - the third-party notices that Google's aars embed (third_party_licenses.json/.txt, or the metadata form), each
   component's text once, attributed to the aar it came from.
+Every artifact is also scanned for bundled files that may carry their own terms, and the generator stops naming
+them until a maintainer vendors an extra notice (above) or lists the path in scripts/licence-texts/
+bundled-files-allowlist.txt ("group:artifact | entry glob | reason", one reviewed row each). The heuristic is modest.
+It flags, in a jar or aar and in an aar's classes.jar: anything under assets/ or res/raw/, native libraries (*.so),
+and any other file of 20,000 bytes or more. It skips class files and Kotlin metadata, signatures and manifests,
+META-INF build metadata (services, versions, proguard, androidx, maven, com/android), the other Android resources
+(res/ outside raw/), AndroidManifest.xml, R.txt, public.txt, proguard files, baseline profiles, aidl, annotations.zip,
+lint.jar, and the licence, notice and embedded-notice files this script reads.
+A file read as a licence or notice that is over 400,000 bytes stops the generator too, except a root LICENSE that is
+byte for byte the aar's own third_party_licenses.txt (Play Core). A library with no jar or aar in the cache stops it
+unless its POM packaging is "pom" or a Gradle .module file is present.
 Without --check the notice file is written; with --check it is only compared with what would be written.
 """
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import io
 import json
 import re
@@ -32,11 +47,14 @@ SECTION_TEXTS = "== Licence texts =="
 SECTION_EMBEDDED = "== Notices embedded in Google libraries =="
 APACHE_TITLE = "Apache License, Version 2.0"
 APACHE_TEXT_HEADER = "LICENCE TEXT: " + APACHE_TITLE
-APACHE_FILE = "Apache-2.0.txt"
+# Shared full texts, included once in the section "Licence texts" and referenced from each library that uses them.
+SHARED_TEXTS = {"Apache-2.0": APACHE_TITLE, "MPL-2.0": "Mozilla Public License, Version 2.0"}
+ALLOWLIST_FILE = "bundled-files-allowlist.txt"
+BIG_RESOURCE_BYTES = 20_000
 VENDORED_DIR = "shellx-android/scripts/licence-texts"
 TERMS_OF_USE = ("android software development kit license", "play core software development kit terms of service")
 MAX_TEXT_BYTES = 400_000
-COPYRIGHT_RE = re.compile(r"copyright|\(c\)|\u00a9", re.IGNORECASE)
+HOLDER_LINE_RE = re.compile(r"\s*(?:copyright|\(c\)|\u00a9)\s*(?:\(c\)|\u00a9)?(.*)", re.IGNORECASE)
 HINT = "run shellx-android/scripts/dev.sh lock and a build first"
 
 
@@ -122,7 +140,27 @@ def artifact_files(cache: Path, group: str, artifact: str, version: str) -> list
     folder = cache / group / artifact / version
     found = [p for p in folder.glob("*/*") if p.suffix in (".jar", ".aar")
              and not p.name.endswith(("-sources.jar", "-javadoc.jar"))]
+    if not found and not any(folder.glob("*/*.module")) and packaging_of(cache, group, artifact, version) != "pom":
+        raise SystemExit("generate-licences: no jar or aar for %s:%s:%s in %s: %s"
+                         % (group, artifact, version, cache, HINT))
     return sorted(found, key=lambda p: p.name)
+
+
+def packaging_of(cache: Path, group: str, artifact: str, version: str) -> str:
+    pom = find_pom(cache, group, artifact, version)
+    return child_text(ET.parse(pom).getroot(), "packaging") if pom else ""
+
+
+def has_holder(text: str) -> bool:
+    """True when a line starts with Copyright, (c) or a copyright sign and then gives a year or a capitalised name."""
+    for line in text.splitlines():
+        match = HOLDER_LINE_RE.match(line)
+        if not match or "<" in match.group(1):
+            continue
+        rest = match.group(1)
+        if re.search(r"\d{4}", rest) or re.match(r"[\s:,.]*[A-Z][A-Za-z]", rest):
+            return True
+    return False
 
 
 def decode(data: bytes) -> str:
@@ -138,20 +176,44 @@ def wanted(name: str) -> bool:
     return bool(file_kind(name)) or name in EMBEDDED_NAMES
 
 
-def zip_entries(data: bytes, nested_label: str) -> list[tuple[str, str, bytes]]:
-    """(label, entry name, bytes) of the licence, notice and embedded-notice files of a jar or aar, and of an aar's
-    classes.jar (labelled nested_label)."""
+METADATA_PREFIXES = ("META-INF/androidx/", "META-INF/com/android/", "META-INF/com.android.tools/", "META-INF/services/",
+                     "META-INF/versions/", "META-INF/maven/", "META-INF/proguard/", "aidl/")
+METADATA_SUFFIXES = (".class", ".kotlin_module", ".kotlin_builtins", ".kotlin_metadata", ".version", ".mf", ".sf", ".rsa",
+                     ".dsa", ".ec", ".pro")
+METADATA_NAMES = ("classes.jar", "AndroidManifest.xml", "R.txt", "public.txt", "proguard.txt", "baseline-prof.txt",
+                  "annotations.zip", "lint.jar")
+
+
+def looks_bundled(name: str, size: int) -> bool:
+    """The scan's heuristic (module docstring): true for a file that may carry terms of its own."""
+    if name.endswith("/") or name in METADATA_NAMES or name.lower().endswith(METADATA_SUFFIXES) or wanted(name):
+        return False
+    if name.startswith(METADATA_PREFIXES) or (name.startswith("res/") and not name.startswith("res/raw/")):
+        return False
+    return name.startswith(("assets/", "res/raw/")) or name.endswith(".so") or size >= BIG_RESOURCE_BYTES
+
+
+def zip_entries(data: bytes, nested_label: str) -> tuple[list[tuple[str, str, bytes]], list[tuple[str, int]]]:
+    """((label, entry name, bytes) of the licence, notice and embedded-notice files of a jar or aar and of an aar's
+    classes.jar (labelled nested_label), (path, size) of the bundled files the scan flags)."""
     out: list[tuple[str, str, bytes]] = []
+    flagged: list[tuple[str, int]] = []
     with zipfile.ZipFile(io.BytesIO(data)) as z:
-        for name in sorted(z.namelist()):
+        for info in sorted(z.infolist(), key=lambda i: i.filename):
+            name = info.filename
             if name == "classes.jar":
                 with zipfile.ZipFile(io.BytesIO(z.read(name))) as inner:
-                    for inner_name in sorted(inner.namelist()):
+                    for inner_info in sorted(inner.infolist(), key=lambda i: i.filename):
+                        inner_name = inner_info.filename
                         if wanted(inner_name) and inner_name not in EMBEDDED_NAMES:
                             out.append((nested_label, inner_name, inner.read(inner_name)))
+                        elif looks_bundled(inner_name, inner_info.file_size):
+                            flagged.append(("%s!/%s" % (name, inner_name), inner_info.file_size))
             elif wanted(name) and not name.endswith("/"):
                 out.append(("", name, z.read(name)))
-    return out
+            elif looks_bundled(name, info.file_size):
+                flagged.append((name, info.file_size))
+    return out, flagged
 
 
 def file_kind(entry: str) -> str:
@@ -171,17 +233,24 @@ def file_kind(entry: str) -> str:
     return ""
 
 
-def from_artifacts(files: list[Path]) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, list[tuple[str, str]]]]]:
-    """(licence texts, notice files, embedded notices per aar) found in a library's artifacts."""
+def from_artifacts(files: list[Path], coordinate: str):
+    """(licence texts, notice files, embedded notices per aar, flagged bundled files) of a library's artifacts."""
     licences: list[tuple[str, str]] = []
     notices: list[tuple[str, str]] = []
     embedded: list[tuple[str, list[tuple[str, str]]]] = []
+    flagged: list[tuple[str, int]] = []
     for path in files:
-        entries = zip_entries(path.read_bytes(), "classes.jar")
+        entries, found_flagged = zip_entries(path.read_bytes(), "classes.jar")
+        flagged.extend(found_flagged)
         raw = {name: data for label, name, data in entries if not label}
         for label, name, data in entries:
-            kind = file_kind(name) if len(data) <= MAX_TEXT_BYTES else ""
+            kind = file_kind(name)
             where = "%s in %s of the library" % (name, label) if label else "%s in the library" % name
+            if kind and len(data) > MAX_TEXT_BYTES:
+                if kind == "licence" and not label and data == raw.get("third_party_licenses.txt"):
+                    continue    # Play Core's root LICENSE repeats the embedded notices, which are included below
+                raise SystemExit("generate-licences: %s of %s (%s) is over %d bytes: include it by hand as an extra "
+                                 "notice, or raise MAX_TEXT_BYTES after reading it" % (name, coordinate, path.name, MAX_TEXT_BYTES))
             if kind == "licence":
                 licences.append((where, decode(data)))
             elif kind == "notice":
@@ -190,7 +259,7 @@ def from_artifacts(files: list[Path]) -> tuple[list[tuple[str, str]], list[tuple
             found = embedded_notices(raw)
             if found:
                 embedded.append((path.name, found))
-    return licences, notices, embedded
+    return licences, notices, embedded, flagged
 
 
 def embedded_notices(raw: dict[str, bytes]) -> list[tuple[str, str]]:
@@ -229,13 +298,17 @@ def own_text(lib: Library, candidates: list[tuple[str, str]], texts_dir: Path, h
     """The library's own licence text(s) for its non-Apache, non-terms licences, with a copyright line."""
     usable: list[tuple[str, str]] = []
     for where, text in candidates:
-        if "Apache License" not in text and COPYRIGHT_RE.search(text) and (where, text) not in usable:
+        if "Apache License" not in text and has_holder(text) and (where, text) not in usable:
             usable.append((where, text))
     if usable:
         return usable
     vendored = texts_dir / ("%s_%s.txt" % (lib.group, lib.artifact))
     if vendored.is_file():
-        return [("vendored %s/%s" % (VENDORED_DIR, vendored.name), decode(vendored.read_bytes()))]
+        text = decode(vendored.read_bytes())
+        if not has_holder(text):
+            raise SystemExit("generate-licences: %s/%s names no holder: it needs a Copyright line with a year or a "
+                             "name, as the project publishes it" % (VENDORED_DIR, vendored.name))
+        return [("vendored %s/%s" % (VENDORED_DIR, vendored.name), text)]
     needing = ", ".join(n for n, u in lib.licences if kind_of(n, u) == "own")
     raise SystemExit("generate-licences: no licence text with a copyright line for %s (%s): its artifact ships none; "
                      "add the project's own licence text as %s/%s_%s.txt%s"
@@ -247,18 +320,66 @@ def block(title: str, text: str) -> str:
     return "%s\n\n%s\n\n" % (title, text)
 
 
+def read_allowlist(texts_dir: Path) -> list[tuple[str, str]]:
+    """Rows (group:artifact, entry glob) of the reviewed allowlist; a row without a reason is an error."""
+    path = texts_dir / ALLOWLIST_FILE
+    rows: list[tuple[str, str]] = []
+    if not path.is_file():
+        return rows
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        cells = [c.strip() for c in line.split("|", 2)]
+        if len(cells) != 3 or not all(cells):
+            raise SystemExit("generate-licences: %s line %d needs 'group:artifact | entry glob | reason' (a row "
+                             "needs a reason)" % (ALLOWLIST_FILE, number))
+        rows.append((cells[0], cells[1]))
+    return rows
+
+
+def extra_notice(lib: Library, texts_dir: Path) -> tuple[str, list[str]] | None:
+    """(text, shared text ids) of scripts/licence-texts/<group>_<artifact>.extra.txt, or None."""
+    path = texts_dir / ("%s_%s.extra.txt" % (lib.group, lib.artifact))
+    if not path.is_file():
+        return None
+    ids: list[str] = []
+    body: list[str] = []
+    for line in decode(path.read_bytes()).splitlines():
+        if line.startswith("@licence-text:") and not body:
+            shared = line.split(":", 1)[1].strip()
+            if shared not in SHARED_TEXTS:
+                raise SystemExit("generate-licences: %s names the unknown shared text %s (known: %s)"
+                                 % (path.name, shared, ", ".join(sorted(SHARED_TEXTS))))
+            ids.append(shared)
+        else:
+            body.append(line)
+    return "\n".join(body).strip("\n"), ids
+
+
+def shared_text_file(shared: str) -> str:
+    return "%s.txt" % shared
+
+
 def notice_text(libs: list[tuple[str, str, str]], cache: Path, texts_dir: Path) -> str:
-    apache_used = False
+    used_shared: set = set()
+    allowlist = read_allowlist(texts_dir)
     entries: list[str] = []
     embedded_ids: dict[str, int] = {}
     embedded_names: dict[int, set] = {}
     embedded_bodies: list[str] = []
     embedded_sections: list[str] = []
+    unexplained: list[str] = []
     for group, artifact, version in libs:
         name, licences = describe(cache, group, artifact, version)
         lib = Library(group, artifact, version, name, licences)
         files = artifact_files(cache, group, artifact, version)
-        found_licences, found_notices, found_embedded = from_artifacts(files)
+        found_licences, found_notices, found_embedded, flagged = from_artifacts(files, lib.coordinate)
+        extra = extra_notice(lib, texts_dir)
+        if extra is None:
+            for path, size in flagged:
+                if not any(row == "%s:%s" % (group, artifact) and fnmatch.fnmatchcase(path, glob)
+                           for row, glob in allowlist):
+                    unexplained.append("%s: %s (%d bytes)" % (lib.coordinate, path, size))
         out = ["%s (%s)\n" % (name, lib.coordinate)]
         kinds = []
         for licence_name, url in licences:
@@ -268,15 +389,21 @@ def notice_text(libs: list[tuple[str, str, str]], cache: Path, texts_dir: Path) 
             if kind == "terms":
                 line += " (terms of use, not an open-source licence: no licence text is reproduced here)"
             out.append(line + "\n")
-        if "apache" in kinds:
-            apache_used = True
-            out.append('Licence text: %s (full text in the section "Licence texts" below)\n' % APACHE_TITLE)
+        shared_ids = ["Apache-2.0"] if "apache" in kinds else []
+        if extra is not None:
+            shared_ids += [i for i in extra[1] if i not in shared_ids]
+        for shared in shared_ids:
+            used_shared.add(shared)
+            out.append('Licence text: %s (full text in the section "Licence texts" below)\n' % SHARED_TEXTS[shared])
         entry = "".join(out)
         if "own" in kinds:
             for where, text in own_text(lib, found_licences, texts_dir, bool(files)):
                 entry += block("Licence text of %s (%s):" % (name, where), text)
         for where, text in found_notices:
             entry += block("Notice of %s (%s):" % (name, where), text)
+        if extra is not None:
+            entry += block("Additional notice for %s (vendored %s/%s_%s.extra.txt):" % (name, VENDORED_DIR, group, artifact),
+                           extra[0])
         entries.append(entry if entry.endswith("\n\n") else entry + "\n")
         for aar_name, components in found_embedded:
             lines = ["Embedded in %s\n" % lib.coordinate]
@@ -288,13 +415,20 @@ def notice_text(libs: list[tuple[str, str, str]], cache: Path, texts_dir: Path) 
                 embedded_names.setdefault(number, set()).add(component)
                 lines.append("  %s (text E%d)\n" % (component, number))
             embedded_sections.append("".join(lines) + "\n")
-    out = [HEADER, SECTION_LIBRARIES + "\n\n"] + entries
-    if apache_used:
-        apache = decode((texts_dir / APACHE_FILE).read_bytes()) if (texts_dir / APACHE_FILE).is_file() else None
-        if apache is None:
-            raise SystemExit("generate-licences: %s/%s is missing" % (VENDORED_DIR, APACHE_FILE))
+    if unexplained:
+        raise SystemExit("generate-licences: bundled files that may carry their own terms and are not covered:\n  %s\n"
+                         "Read their licence, then vendor %s/<group>_<artifact>.extra.txt for the artifact or add a row "
+                         "'group:artifact | entry glob | reason' to %s/%s."
+                         % ("\n  ".join(unexplained), VENDORED_DIR, VENDORED_DIR, ALLOWLIST_FILE))
+    out = [HEADER, "Libraries: %d\n\n" % len(libs), SECTION_LIBRARIES + "\n\n"] + entries
+    if used_shared:
         out.append(SECTION_TEXTS + "\n\n")
-        out.append(block(APACHE_TEXT_HEADER, apache))
+        for shared in SHARED_TEXTS:
+            if shared in used_shared:
+                path = texts_dir / shared_text_file(shared)
+                if not path.is_file():
+                    raise SystemExit("generate-licences: %s/%s is missing" % (VENDORED_DIR, path.name))
+                out.append(block("LICENCE TEXT: " + SHARED_TEXTS[shared], decode(path.read_bytes())))
     if embedded_sections:
         out.append(SECTION_EMBEDDED + "\n\n")
         out.extend(embedded_sections)
