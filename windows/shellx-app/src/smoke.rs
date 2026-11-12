@@ -16,6 +16,7 @@
 //! `--smoke-ui-assets` (also run first by `--smoke`): every icon the window
 //! loads is embedded and is an SVG, and every shell string exists in vi + en.
 
+use std::io::Write as _;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -388,9 +389,12 @@ pub fn run() -> Result<()> {
     input_paths()?;
     let started = Instant::now();
     let shell = smoke_shell();
-    println!(
+    // `writeln!` with the error ignored: a closed console must not panic (Ruling 29).
+    let _ = writeln!(
+        std::io::stdout(),
         "smoke: shell {} ({}); the stored choice and SHELLX_SHELL are not used",
-        shell.label, shell.program
+        shell.label,
+        shell.program
     );
     let (link, reader) = shell.spawn(&smoke_shell_args(&shell.program), 100, 30)?;
     let mut session = TermCore::new(link.clone(), 100, 30)?;
