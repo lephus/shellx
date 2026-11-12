@@ -55,7 +55,7 @@ class ListingTest(unittest.TestCase):
 
     def test_refuses_decomposed_text_emoji_banned_words_and_missing_files(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = make_listing(Path(tmp), **{"vi/title.txt": "Việt",
+            root = make_listing(Path(tmp), **{"vi/title.txt": "Vie\u0323\u0302t",  # decomposed: e + dot below + circumflex,
                                               "en-US/short-description.txt": "The best terminal \U0001F680",
                                               "vi/short-description.txt": "Ứng dụng miễn phí"})
             (root / "en-US" / "release-notes.txt").unlink()
