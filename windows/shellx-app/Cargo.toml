@@ -33,11 +33,21 @@ winreg = "0.55"
 # language); 0.61 is already in the tree through gpui's dependencies.
 # MonitorFromPoint, GetMonitorInfoW and GetDpiForMonitor (the first window fits
 # the primary monitor's work area). GetModuleHandleW and GetCurrentThreadId
-# (crash files); MessageBoxW (the crash reporter).
+# (crash files); MessageBoxW (the crash reporter). The native crash filter:
+# SetUnhandledExceptionFilter and EXCEPTION_POINTERS (Diagnostics_Debug,
+# Kernel), CreateFileW/WriteFile (Storage_FileSystem, Security; WriteFile is
+# gated by System_IO), CreateEventW/CreateProcessW (Security), GetSystemTime
+# (SystemInformation).
 windows-sys = { version = "0.61", features = [
     "Win32_Globalization",
     "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_IO",
+    "Win32_System_Kernel",
     "Win32_System_LibraryLoader",
+    "Win32_System_SystemInformation",
     "Win32_System_Threading",
     "Win32_System_Time",
     "Win32_UI_HiDpi",

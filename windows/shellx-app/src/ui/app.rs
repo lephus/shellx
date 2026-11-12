@@ -137,14 +137,27 @@ pub fn run() {
                 }
             })
             .ok();
-        if crash::crash_test() == Some(CrashTest::Panic) {
-            // `--crash-test panic` (Ruling 31): a foreground task runs inside GPUI's window
-            // procedure (on a Mac its dispatcher trampoline), which cannot unwind, so the hook
-            // runs twice and the process aborts: the path a real UI-thread panic takes.
-            cx.spawn(async move |_| -> () {
-                panic!("crash test: a panic on the UI thread (--crash-test panic)")
-            })
-            .detach();
+        // `--crash-test panic|native` (Ruling 31): a foreground task runs inside GPUI's window
+        // procedure (on a Mac its dispatcher trampoline), the path a real UI-thread crash takes.
+        match crash::crash_test() {
+            Some(CrashTest::Panic) => {
+                // The procedure cannot unwind: the hook writes the file, then the process
+                // aborts.
+                cx.spawn(async move |_| -> () {
+                    panic!("crash test: a panic on the UI thread (--crash-test panic)")
+                })
+                .detach();
+            }
+            Some(CrashTest::Native) => {
+                cx.spawn(async move |_| {
+                    // SAFETY: none; this is the deliberate access violation of `--crash-test
+                    // native`: a write into the first page, which is never mapped. Address 8,
+                    // not null, so debug builds' null-pointer check cannot turn it into a panic.
+                    unsafe { std::ptr::without_provenance_mut::<u8>(8).write_volatile(1) }
+                })
+                .detach();
+            }
+            _ => {}
         }
         cx.on_window_closed(|cx| {
             if cx.windows().is_empty() {

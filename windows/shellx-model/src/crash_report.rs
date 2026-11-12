@@ -217,6 +217,175 @@ pub fn window_failure_report(f: &WindowFailureFacts) -> String {
     redacted_text(&lines)
 }
 
+/// The first seven lines of the native crash file (3b §2), each redacted, each ending in
+/// `\n`: the same header as the panic file, without the `time:` line, which the filter writes
+/// with the crash's own time. Built once at start-up, when allocating is allowed.
+pub fn native_report_header(
+    version: &str,
+    commit: &str,
+    build: &str,
+    windows: &str,
+    exe_base: Option<u64>,
+) -> String {
+    let mut lines = header(
+        "native exception",
+        "",
+        version,
+        commit,
+        build,
+        windows,
+        exe_base,
+    );
+    lines.pop(); // the time line
+    redacted_text(&lines)
+}
+
+/// What the unhandled-exception filter knows about a native crash, all of it borrowed or on
+/// the stack: `utc` is `[year, month, day, hour, minute, second]` (`GetSystemTime`), `header`
+/// the bytes of `native_report_header`, `module` the UTF-16 name from `GetModuleFileNameW`
+/// (empty when unknown).
+#[derive(Clone, Copy, Debug)]
+pub struct NativeFacts<'a> {
+    pub utc: [u16; 6],
+    pub header: &'a [u8],
+    pub code: u32,
+    pub address: u64,
+    pub module: &'a [u16],
+    pub module_offset: Option<u64>,
+    pub thread_id: u32,
+}
+
+/// A writer over a fixed buffer for the exception filter: no allocation, no formatting
+/// machinery, no slicing that can panic. Once something does not fit, it writes nothing more,
+/// so the output is always a prefix of the whole report, cut on a character boundary.
+struct FixedWriter<'b> {
+    out: &'b mut [u8],
+    len: usize,
+    full: bool,
+}
+
+impl FixedWriter<'_> {
+    /// Copies `bytes` (valid UTF-8) or the longest prefix of it that ends on a character
+    /// boundary and fits; a cut marks the writer full.
+    fn utf8(&mut self, bytes: &[u8]) {
+        if self.full {
+            return;
+        }
+        let room = self.out.len().saturating_sub(self.len);
+        let mut n = bytes.len();
+        if n > room {
+            self.full = true;
+            n = room;
+            // Back up to a character boundary: a UTF-8 continuation byte is 0b10xx_xxxx.
+            while n > 0 && bytes.get(n).is_some_and(|b| b & 0xC0 == 0x80) {
+                n -= 1;
+            }
+        }
+        if let (Some(dst), Some(src)) = (self.out.get_mut(self.len..), bytes.get(..n)) {
+            for (d, s) in dst.iter_mut().zip(src) {
+                *d = *s;
+            }
+            self.len += n;
+        }
+    }
+
+    /// One character, whole or not at all.
+    fn char(&mut self, c: char) {
+        let mut scratch = [0u8; 4];
+        let encoded = c.encode_utf8(&mut scratch);
+        if self.out.len().saturating_sub(self.len) < encoded.len() {
+            self.full = true;
+        }
+        self.utf8(encoded.as_bytes());
+    }
+
+    /// `value` in decimal, at least `width` digits (zero-padded).
+    fn decimal(&mut self, value: u64, width: usize) {
+        let mut digits = [b'0'; 20];
+        let mut i = digits.len();
+        let mut v = value;
+        loop {
+            i -= 1;
+            if let Some(d) = digits.get_mut(i) {
+                *d = b'0' + (v % 10) as u8;
+            }
+            v /= 10;
+            if v == 0 || i == 0 {
+                break;
+            }
+        }
+        let start = i.min(digits.len().saturating_sub(width));
+        self.utf8(digits.get(start..).unwrap_or(&[]));
+    }
+
+    /// `0x` and `value` in upper-case hex: exactly `width` digits when `width` > 0, else as
+    /// few as needed.
+    fn hex(&mut self, value: u64, width: usize) {
+        const HEX: &[u8; 16] = b"0123456789ABCDEF";
+        let mut digits = [b'0'; 16];
+        for (i, d) in digits.iter_mut().enumerate() {
+            let shift = (15 - i) * 4;
+            *d = HEX[((value >> shift) & 0xF) as usize];
+        }
+        let start = if width > 0 {
+            16usize.saturating_sub(width)
+        } else {
+            let leading = (value.leading_zeros() / 4) as usize;
+            leading.min(15)
+        };
+        self.utf8(b"0x");
+        self.utf8(digits.get(start..).unwrap_or(&[]));
+    }
+}
+
+/// Writes the native crash file into `out` and returns the bytes written: `header`, then
+/// `time:`, `exception:` (8 hex digits), `address:` (16), `module: <path> +0x<offset>`
+/// (`unknown` without a name, no offset when unknown) and `thread:`. Upper-case hex. No
+/// allocation and no panic: the exception filter calls it. Output that does not fit is cut on
+/// a character boundary, never past `out`. UTF-16 is decoded with `char::decode_utf16`; a
+/// lone surrogate becomes U+FFFD.
+pub fn write_native_report(out: &mut [u8], f: &NativeFacts) -> usize {
+    let mut w = FixedWriter {
+        out,
+        len: 0,
+        full: false,
+    };
+    w.utf8(f.header);
+    let [year, month, day, hour, minute, second] = f.utc;
+    w.utf8(b"time: ");
+    w.decimal(u64::from(year), 4);
+    w.utf8(b"-");
+    w.decimal(u64::from(month), 2);
+    w.utf8(b"-");
+    w.decimal(u64::from(day), 2);
+    w.utf8(b" ");
+    w.decimal(u64::from(hour), 2);
+    w.utf8(b":");
+    w.decimal(u64::from(minute), 2);
+    w.utf8(b":");
+    w.decimal(u64::from(second), 2);
+    w.utf8(b" UTC\nexception: ");
+    w.hex(u64::from(f.code), 8);
+    w.utf8(b"\naddress: ");
+    w.hex(f.address, 16);
+    w.utf8(b"\nmodule: ");
+    if f.module.is_empty() {
+        w.utf8(b"unknown");
+    } else {
+        for c in char::decode_utf16(f.module.iter().copied()) {
+            w.char(c.unwrap_or(char::REPLACEMENT_CHARACTER));
+        }
+        if let Some(offset) = f.module_offset {
+            w.utf8(b" +");
+            w.hex(offset, 0);
+        }
+    }
+    w.utf8(b"\nthread: ");
+    w.decimal(u64::from(f.thread_id), 0);
+    w.utf8(b"\n");
+    w.len
+}
+
 /// Which dialog the reporter shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DialogKind {
@@ -625,17 +794,17 @@ mod tests {
         // boundary.
         for unit in [utf16("é"), utf16("😀")] {
             let long: Vec<u16> = unit.iter().copied().cycle().take(4_000).collect();
-            let f = NativeFacts {
-                module: &long,
-                ..f
-            };
+            let f = NativeFacts { module: &long, ..f };
             let mut guarded = vec![0xAAu8; 1_536 + 16];
             let n = write_native_report(&mut guarded[..1_536], &f);
             assert!(n <= 1_536 && n > header.len(), "{n}");
             assert!(guarded[1_536..].iter().all(|&b| b == 0xAA));
             let text = std::str::from_utf8(&guarded[..n]).unwrap();
             assert!(text.starts_with(&header));
-            assert!(!text.contains("thread:"), "the line after the cut is not written");
+            assert!(
+                !text.contains("thread:"),
+                "the line after the cut is not written"
+            );
         }
         // The longest report the filter can make fits its 1 536-byte buffer: the longest
         // build kind, a 260-unit module path of three-byte characters (GetModuleFileNameW

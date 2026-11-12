@@ -12,6 +12,8 @@ mod build_info;
 mod core_bridge;
 mod core_service;
 mod crash;
+#[cfg(windows)]
+mod crash_native;
 mod cwd;
 mod fonts;
 mod icons;
@@ -110,6 +112,10 @@ fn main() {
             build_info::about_version(),
             ctx.windows
         );
+        // Native crashes (access violations, illegal instructions) leave a file and the same
+        // dialog (Ruling 10).
+        #[cfg(windows)]
+        crash_native::install(&ctx, crash::HookMode::Dialog);
         ui::run();
     }
 
