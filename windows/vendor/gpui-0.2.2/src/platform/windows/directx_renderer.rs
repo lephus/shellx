@@ -229,8 +229,10 @@ impl DirectXRenderer {
                 log::error!(
                     "DirectXRenderer failed to recover from device lost after multiple attempts"
                 );
-                // Do something here?
-                // At this point, the device loss is considered unrecoverable.
+                // ShellX (patch (c)): the device loss is unrecoverable. Upstream panics here too:
+                // the app's crash hook then leaves a file and a dialog instead of a window that
+                // stays blank until it is closed (B-1b review m-2). Fixed text only.
+                panic!("the GPU device was lost and the window could not recover it");
             },
         );
     }
