@@ -48,12 +48,15 @@ step "test shellx-model (Linux host, as the CI model job)"
 cargo test --locked -p shellx-model
 python3 -I -m unittest discover -s /src/windows/installer -v
 
-step "build shellx-desktop.exe ($TARGET)"
-# A PDB for this exe (line tables), archived next to it in /out and never put in the installer:
+# A PDB for the exe (line tables), archived next to it in /out and never put in the installer:
 # crash files carry the exe base and every frame's address (Ruling 11), which only the PDB of
-# the same build maps to code. Scoped to this build; the Mac and CI builds are unchanged.
-CARGO_PROFILE_RELEASE_DEBUG=line-tables-only \
-  cargo xwin build --release --locked -p shellx-app --target "$TARGET"
+# the same build maps to code. Set for both builds below, so shellx-remote (which shellx-app
+# depends on) is built once, not twice with two debuginfo settings (B-2 review m7). Only this
+# container build; the Mac and CI builds are unchanged.
+export CARGO_PROFILE_RELEASE_DEBUG=line-tables-only
+
+step "build shellx-desktop.exe ($TARGET)"
+cargo xwin build --release --locked -p shellx-app --target "$TARGET"
 
 step "build shellx-remote ($TARGET)"
 cargo xwin build --release --locked -p shellx-remote --target "$TARGET"
