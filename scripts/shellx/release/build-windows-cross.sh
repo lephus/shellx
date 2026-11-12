@@ -28,8 +28,9 @@
 #
 # Output in OUT_DIR: the installer, its .sha256 and SHA256SUMS.remote, and a folder
 # <installer name without .exe>-symbols holding shellx-desktop.exe and shellx_desktop.pdb of the
-# same build (to map a crash file's addresses later, Ruling 11). The PDB is never in the
-# installer.
+# same build (to map a crash file's addresses later, Ruling 11), each checked against the
+# remote sums. The PDB is never in the installer. A failed symbols download is a warning; the
+# last line names what the folder holds.
 #
 # The VPS is shared with a production service. Guards (the preflight), checked before every
 # build and alone with --preflight (read-only; exit 0 = a build may start, 1 = it must not):
@@ -301,33 +302,48 @@ vssh "set -euo pipefail
     | grep -E '^(==|error)|^test .* FAILED|test result|Successful compile' || true
   test -f out/$setup_name || { tail -60 build.log; exit 1; }"
 
-# 4. Download.
+# 4. Download the installer (the deliverable).
 mkdir -p "$out_dir"
 vssh "cat ~/$remote/out/$setup_name" > "$out_dir/$setup_name"
 vssh "cat ~/$remote/out/SHA256SUMS" > "$out_dir/SHA256SUMS.remote"
 (cd "$out_dir" && shasum -a 256 "$setup_name" | tee "$setup_name.sha256")
 grep -q "$(cut -d' ' -f1 "$out_dir/$setup_name.sha256")" "$out_dir/SHA256SUMS.remote" \
   || { echo "checksum mismatch after download" >&2; exit 1; }
-# The exe and its PDB, side by side, outside the installer (Ruling 11).
-mkdir -p "$out_dir/$symbols_dir"
-vssh "cat ~/$remote/out/shellx-desktop.exe" > "$out_dir/$symbols_dir/shellx-desktop.exe"
-if vssh "test -f ~/$remote/out/shellx_desktop.pdb" </dev/null; then
-  vssh "cat ~/$remote/out/shellx_desktop.pdb" > "$out_dir/$symbols_dir/shellx_desktop.pdb"
-else
-  echo "warning: the build produced no shellx_desktop.pdb" >&2
-fi
-for f in shellx-desktop.exe shellx_desktop.pdb; do
-  [[ -f "$out_dir/$symbols_dir/$f" ]] || continue
-  sum="$(shasum -a 256 "$out_dir/$symbols_dir/$f" | cut -d' ' -f1)"
-  grep -q "$sum  $f" "$out_dir/SHA256SUMS.remote" || { echo "checksum mismatch for $f after download" >&2; exit 1; }
-done
 
 # 5. Free the big intermediates; keep the registry, xwin and zig caches for the next run.
+# Before the symbols download: those files are in ~/<build dir>/out, not in the volume, and a
+# failure below must not leave the target in the volume (B-2 review m8).
 if [[ "${SHELLX_WINBUILD_KEEP_TARGET:-0}" != 1 ]]; then
   vssh "docker run --rm --name shellx-winbuild-run -v $volume:/cache $image rm -rf /cache/target /cache/zig-local"
 fi
 
-# 6. Disk: when under the minimum, remove older shellx-winbuild image tags (only those).
+# 6. The exe and its PDB, side by side, outside the installer (Ruling 11). Best effort: the
+# installer is the deliverable, so a failure here is a warning, never an exit. The folder is
+# emptied first, so a file from an earlier build is never taken for this build's.
+rm -rf "${out_dir:?}/$symbols_dir"
+mkdir -p "$out_dir/$symbols_dir"
+# <file in out/>: downloaded into the symbols folder, and its sum is in SHA256SUMS.remote.
+fetch_checked() {
+  local f="$1" sum
+  vssh "cat ~/$remote/out/$f" > "$out_dir/$symbols_dir/$f" </dev/null || return 1
+  sum="$(shasum -a 256 "$out_dir/$symbols_dir/$f" | cut -d' ' -f1)"
+  grep -q "$sum  $f" "$out_dir/SHA256SUMS.remote"
+}
+symbols=""
+if fetch_checked shellx-desktop.exe; then
+  symbols="exe"
+  if vssh "test -f ~/$remote/out/shellx_desktop.pdb" </dev/null && fetch_checked shellx_desktop.pdb; then
+    symbols="exe and PDB"
+  else
+    rm -f "$out_dir/$symbols_dir/shellx_desktop.pdb"
+    echo "warning: no intact shellx_desktop.pdb from this build; crash files cannot be mapped to code" >&2
+  fi
+else
+  rm -rf "${out_dir:?}/$symbols_dir"
+  echo "warning: the exe for the symbols folder did not download intact (the installer is fine)" >&2
+fi
+
+# 7. Disk: when under the minimum, remove older shellx-winbuild image tags (only those).
 free_after="$(vps_free_gib </dev/null || true)"
 echo "VPS: ${free_after:-?} GiB free after the build"
 if [[ "$free_after" =~ ^[0-9]+$ ]] && (( free_after < min_free )); then
@@ -342,4 +358,4 @@ if [[ "$free_after" =~ ^[0-9]+$ ]] && (( free_after < min_free )); then
   done
   echo "VPS: $(vps_free_gib </dev/null) GiB free"
 fi
-echo "Built $out_dir/$setup_name (unsigned); exe and PDB in $out_dir/$symbols_dir"
+echo "Built $out_dir/$setup_name (unsigned)${symbols:+; $symbols in $out_dir/$symbols_dir}"
