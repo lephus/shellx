@@ -181,10 +181,23 @@ fn region_view(
                 .min_h_0()
                 .w_full()
                 .overflow_hidden()
-                // TermView focuses itself on click; this keeps the model in
-                // step. (Clicks on the tab bar act on their own.)
+                // TermView focuses itself on a click of any button; this
+                // keeps the model in step (R2 F4). (Clicks on the tab bar act
+                // on their own.)
                 .on_mouse_down(
                     MouseButton::Left,
+                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                        this.focus_pane(pane, window, cx);
+                    }),
+                )
+                .on_mouse_down(
+                    MouseButton::Right,
+                    cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                        this.focus_pane(pane, window, cx);
+                    }),
+                )
+                .on_mouse_down(
+                    MouseButton::Middle,
                     cx.listener(move |this, _: &MouseDownEvent, window, cx| {
                         this.focus_pane(pane, window, cx);
                     }),

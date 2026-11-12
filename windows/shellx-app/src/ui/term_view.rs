@@ -61,7 +61,10 @@ use std::sync::Arc;
 
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
-use shellx_model::mouse::{ScreenModes, ScrollAccumulator, WheelAction, wheel_action};
+use shellx_model::mouse::{
+    PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, secondary_click,
+    wheel_action,
+};
 use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
@@ -747,6 +750,25 @@ impl TermView {
         self.drag = None;
     }
 
+    /// Right and middle clicks as in the Windows console (`mouse::secondary_click`,
+    /// R2 F4, F10). "Focused" is read before anything moves the keyboard: GPUI
+    /// runs this listener before its own focus-on-click (Ruling 21), so a first
+    /// click on another pane only focuses it.
+    fn secondary_click(
+        &mut self,
+        button: SecondaryButton,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focused = self.focus_handle.is_focused(window);
+        match secondary_click(button, focused, self.has_selection()) {
+            PaneClick::FocusOnly => window.focus(&self.focus_handle),
+            PaneClick::Paste => self.paste_clipboard(cx),
+            PaneClick::CopySelection => self.copy_selection(cx),
+            PaneClick::Nothing => {}
+        }
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         if self.held {
             cx.emit(TermEvent::Retry);
@@ -992,6 +1014,18 @@ impl Render for TermView {
                 MouseButton::Left,
                 cx.listener(|this, _: &MouseDownEvent, window, _| {
                     window.focus(&this.focus_handle);
+                }),
+            )
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    this.secondary_click(SecondaryButton::Right, window, cx);
+                }),
+            )
+            .on_mouse_down(
+                MouseButton::Middle,
+                cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    this.secondary_click(SecondaryButton::Middle, window, cx);
                 }),
             );
         let root = match &self.error {
