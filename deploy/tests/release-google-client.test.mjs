@@ -64,8 +64,14 @@ test('the binary check needs both values in the built bytes and prints nothing',
   const dir = mkdtempSync(join(tmpdir(), 'shellx-bin-'));
   writeFileSync(join(dir, 'both'), Buffer.concat([Buffer.from([0, 1]), Buffer.from(ID), Buffer.from([0]), Buffer.from(SECRET), Buffer.from([255])]));
   writeFileSync(join(dir, 'id-only'), Buffer.concat([Buffer.from(ID), Buffer.from([0])]));
-  const run = (f) => sourced(`shellx_binary_has_google_desktop_client "${join(dir, f)}"`, GOOD);
-  for (const [f, status] of [['both', 0], ['id-only', 1]]) assert.deepEqual([run(f).status, run(f).stdout, run(f).stderr], [status, '', ''], f);
+  writeFileSync(join(dir, 'secret-only'), Buffer.concat([Buffer.from(SECRET), Buffer.from([0])]));
+  writeFileSync(join(dir, 'neither'), Buffer.from('a line\\n'));
+  const run = (f, extra = GOOD) => sourced(`shellx_binary_has_google_desktop_client "${join(dir, f)}"`, extra);
+  for (const [f, status] of [['both', 0], ['id-only', 1], ['secret-only', 1]]) assert.deepEqual([run(f).status, run(f).stdout, run(f).stderr], [status, '', ''], f);
+  // An unset or empty value is an empty grep pattern, which matches any line: it must never count as present.
+  for (const extra of [{}, { ...GOOD, SHELLX_GOOGLE_DESKTOP_CLIENT_ID: '' }, { ...GOOD, SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET: '' }, { SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET: SECRET }]) {
+    for (const f of ['neither', 'both']) assert.equal(run(f, extra).status, 1, `${f} with ${Object.keys(extra).join(',') || 'no values'}`);
+  }
 });
 
 test('sign-and-notarize.sh --build needs the client before building, and in the built app', () => {
