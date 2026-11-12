@@ -168,11 +168,18 @@ fn kept_message(message: &str) -> String {
     cut.chars().take(PANIC_MESSAGE_MAX_CHARS).collect()
 }
 
-/// The panic crash file: the header, `thread:`, `location:`, `message:` (further lines
-/// indented), `backtrace:` and its lines unchanged; every line redacted.
-pub fn panic_report(f: &PanicFacts) -> String {
+/// The panic crash file's first part: the header, `thread:`, `location:` and `message:`
+/// (further lines indented), every line redacted. The hook writes it before it captures the
+/// backtrace (review m2).
+pub fn panic_report_head(f: &PanicFacts) -> String {
     let mut lines = header(
-        "panic", &f.utc, &f.version, &f.commit, &f.build, &f.windows, f.exe_base,
+        "panic",
+        &f.utc,
+        &f.version,
+        &f.commit,
+        &f.build,
+        &f.windows,
+        f.exe_base,
     );
     let main = if f.main_thread { "yes" } else { "no" };
     lines.push(match f.thread_id {
@@ -184,9 +191,19 @@ pub fn panic_report(f: &PanicFacts) -> String {
     let mut message_lines = message.lines();
     lines.push(format!("message: {}", message_lines.next().unwrap_or("")));
     lines.extend(message_lines.map(|l| format!("  {l}")));
-    lines.push("backtrace:".to_string());
-    lines.extend(f.backtrace.lines().map(str::to_string));
     redacted_text(&lines)
+}
+
+/// `backtrace:` and the backtrace's lines unchanged, every line redacted.
+pub fn backtrace_section(backtrace: &str) -> String {
+    let mut lines = vec!["backtrace:".to_string()];
+    lines.extend(backtrace.lines().map(str::to_string));
+    redacted_text(&lines)
+}
+
+/// The whole panic crash file: `panic_report_head` then `backtrace_section`.
+pub fn panic_report(f: &PanicFacts) -> String {
+    panic_report_head(f) + &backtrace_section(&f.backtrace)
 }
 
 /// The start-failure file: the header, the `render mode:` line when given, `error: <outer>`

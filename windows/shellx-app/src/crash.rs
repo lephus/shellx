@@ -129,7 +129,6 @@ pub(crate) struct PanicParts {
     pub utc: String,
     pub location: String,
     pub message: String,
-    pub backtrace: String,
     pub thread_id: Option<u32>,
     pub main_thread: bool,
 }
@@ -162,7 +161,10 @@ fn run_hook(info: &std::panic::PanicHookInfo<'_>, mode: HookMode) {
     if let Some(ctx) = CONTEXT.get() {
         let parts = panic_parts(info, ctx);
         let spawn = |file: &Path| spawn_reporter(ctx, DialogKind::Crash, file);
-        let _ = handle_panic(ctx, &parts, mode, &HOOK_STATE, &spawn);
+        // `{:#}` keeps every frame's address (Ruling 11; plan review I-2). Captured only after
+        // the file and the dialog (review m2).
+        let backtrace = || format!("{:#}", std::backtrace::Backtrace::force_capture());
+        let _ = handle_panic(ctx, &parts, mode, &HOOK_STATE, &spawn, &backtrace);
     }
     let _ = IN_HOOK.try_with(|in_hook| in_hook.set(false));
 }
@@ -191,8 +193,6 @@ fn panic_parts(info: &std::panic::PanicHookInfo<'_>, ctx: &CrashContext) -> Pani
         utc: compact_utc(now_secs()),
         location,
         message,
-        // `{:#}` keeps every frame's address (Ruling 11; plan review I-2).
-        backtrace: format!("{:#}", std::backtrace::Backtrace::force_capture()),
         thread_id,
         main_thread,
     }
@@ -276,16 +276,22 @@ fn write_new_file(dir: &Path, name: &str, text: &str) -> Option<PathBuf> {
     create_new_in(dir, name, text).or_else(|| create_new_in(&std::env::temp_dir(), name, text))
 }
 
-fn append_line(path: &Path, line: &str) {
+fn append_text(path: &Path, text: &str) {
     if let Ok(mut file) = OpenOptions::new().append(true).open(path) {
-        let _ = file.write_all(format!("{line}\n").as_bytes());
+        let _ = file.write_all(text.as_bytes());
     }
+}
+
+fn append_line(path: &Path, line: &str) {
+    append_text(path, &format!("{line}\n"));
 }
 
 /// The hook's body (Rulings 8, 9). An abort follow-up (`panic in a function that cannot
 /// unwind` after a real panic on this thread) is appended to that panic's file; any other
 /// panic gets a new `crash.<utc>.<pid>.txt`, one line in the log, and, in `Dialog` mode and
-/// outside `expect_caught`, the reporter once per `state`. Returns the file written or
+/// outside `expect_caught`, the reporter once per `state`; only then is `backtrace` called
+/// and its section appended (symbolizing can hang or fault: the file and the dialog must not
+/// wait for it, review m2). A follow-up never calls `backtrace`. Returns the file written or
 /// appended to. A file that cannot be written anywhere still starts the reporter, which then
 /// names the intended path.
 pub(crate) fn handle_panic(
@@ -294,6 +300,7 @@ pub(crate) fn handle_panic(
     mode: HookMode,
     state: &HookState,
     spawn: &dyn Fn(&Path) -> bool,
+    backtrace: &dyn Fn() -> String,
 ) -> Option<PathBuf> {
     if let Some(line) = crash_report::follow_up_line(&parts.message)
         && let Some(last) = last_file()
@@ -303,7 +310,7 @@ pub(crate) fn handle_panic(
         return Some(last);
     }
     let name = crash_report::crash_file_name(CrashFileKind::Panic, &parts.utc, std::process::id());
-    let report = crash_report::panic_report(&PanicFacts {
+    let head = crash_report::panic_report_head(&PanicFacts {
         utc: parts.utc.clone(),
         version: ctx.version.clone(),
         commit: ctx.commit.clone(),
@@ -314,9 +321,9 @@ pub(crate) fn handle_panic(
         main_thread: parts.main_thread,
         location: parts.location.clone(),
         message: parts.message.clone(),
-        backtrace: parts.backtrace.clone(),
+        backtrace: String::new(),
     });
-    let written = write_new_file(&ctx.logs_dir, &name, &report);
+    let written = write_new_file(&ctx.logs_dir, &name, &head);
     match &written {
         Some(path) => {
             remember_last_file(path);
@@ -327,6 +334,9 @@ pub(crate) fn handle_panic(
     if mode == HookMode::Dialog && !caught() && state.claim_reporter() {
         let file = written.clone().unwrap_or_else(|| ctx.logs_dir.join(&name));
         let _ = spawn(&file);
+    }
+    if let Some(path) = &written {
+        append_text(path, &crash_report::backtrace_section(&backtrace()));
     }
     written
 }
