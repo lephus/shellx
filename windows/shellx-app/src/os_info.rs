@@ -262,13 +262,22 @@ mod tests {
     }
 
     #[test]
-    fn os_version_is_never_empty() {
+    fn os_version_is_never_unknown() {
+        // Ruling 28: RtlGetVersion, then the registry, then 10.0; never "unknown" (the relay
+        // refuses it).
         let v = os_version();
-        assert!(!v.is_empty());
+        assert!(!v.is_empty() && v != "unknown", "{v}");
         if cfg!(not(windows)) {
-            assert_eq!(v, "unknown");
+            assert_eq!(v, "10.0");
         } else {
             assert!(v.starts_with("10."), "{v}");
         }
+        assert_eq!(
+            os_version_from(Some((10, 0, 26100)), Some("10.0.19045".into())),
+            "10.0.26100"
+        );
+        assert_eq!(os_version_from(None, Some("10.0.19045".into())), "10.0.19045");
+        assert_eq!(os_version_from(None, Some("  ".into())), "10.0");
+        assert_eq!(os_version_from(None, None), "10.0");
     }
 }

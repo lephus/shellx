@@ -287,6 +287,7 @@ fn refresh_rate_interval_us(numerator: u32, denominator: u32) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shell::ShellKind;
 
     const T43: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdE"; // 43 chars, base64url
 
@@ -340,6 +341,8 @@ mod tests {
             relay: check(false),
             crash_files: vec![p()],
             log_tail: vec![p(), format!("panicked:\n{}", p())],
+            windows_error_events: Some(Ok(vec![p()])),
+            slow_checks_pending: false,
         }
     }
 
@@ -463,5 +466,229 @@ mod tests {
         assert_eq!(check(166_667, 500_000, 60, 1), (16_666, true));
         // A rate the patched fallback refuses (above 1 s per frame): the default.
         assert_eq!(check(60, 10_000_000, 1, 2), (16_666, true));
+    }
+
+    fn strings(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn typing_tools_are_found_by_exe_name() {
+        assert_eq!(
+            typing_tools(&strings(&["UniKeyNT.exe", "explorer.exe", "EVKey64.exe"])),
+            strings(&["UniKeyNT.exe", "EVKey64.exe"])
+        );
+        for tool in [
+            "unikeynt.exe",
+            "unikey.exe",
+            "evkey64.exe",
+            "evkey32.exe",
+            "evkey.exe",
+            "openkey64.exe",
+            "openkey32.exe",
+            "openkey.exe",
+            "gotiengviet.exe",
+        ] {
+            assert_eq!(typing_tools(&strings(&[tool])), strings(&[tool]));
+            let upper = tool.to_uppercase();
+            assert_eq!(typing_tools(std::slice::from_ref(&upper)), vec![upper]);
+        }
+        // Only the tools: no other process name, and one line per tool.
+        assert!(typing_tools(&strings(&["shellx-desktop.exe", "unikey.exe.bak", "myunikey.exe"])).is_empty());
+        assert_eq!(
+            typing_tools(&strings(&["UniKeyNT.exe", "unikeynt.exe"])),
+            strings(&["UniKeyNT.exe"])
+        );
+    }
+
+    #[test]
+    fn chosen_gpu_is_the_last_adapter_tried_before_the_device_was_created() {
+        const DEV: &str = "T INFO gpui::platform::windows::directx_devices:";
+        let lines = vec![
+            "T INFO shellx_desktop: ShellX 1.7.0 starting on Windows 10.0.26100".to_string(),
+            format!("{DEV} Using GPU: Microsoft Basic Render Driver"),
+            "T ERROR gpui: Required feature StructuredBuffer is not supported by GPU/driver".to_string(),
+            format!("{DEV} Using GPU: Intel(R) UHD Graphics 620"),
+            format!("{DEV} Created device with Direct3D 11.1 feature level."),
+        ];
+        assert_eq!(
+            chosen_gpu_from_log(&lines).as_deref(),
+            Some("Intel(R) UHD Graphics 620")
+        );
+        // A later start's choice wins; a start that tried an adapter but created no device
+        // after the last one that did does not.
+        let mut later = lines.clone();
+        later.push(format!("{DEV} Using GPU: NVIDIA GeForce RTX 3050"));
+        later.push(format!("{DEV} Created device with Direct3D 11.0 feature level."));
+        later.push(format!("{DEV} Using GPU: Broken Adapter"));
+        assert_eq!(
+            chosen_gpu_from_log(&later).as_deref(),
+            Some("NVIDIA GeForce RTX 3050")
+        );
+        assert_eq!(chosen_gpu_from_log(&lines[..3]), None);
+        assert_eq!(chosen_gpu_from_log(&[]), None);
+    }
+
+    #[test]
+    fn probe_scripts_exist_for_powershell_and_cmd_only() {
+        for kind in [ShellKind::Pwsh, ShellKind::WindowsPowerShell] {
+            let script = probe_script(Some(kind)).unwrap();
+            let names: Vec<&str> = script.steps.iter().map(|s| s.name).collect();
+            assert_eq!(names, ["echo", "unicode", "resize"]);
+            assert_eq!(script.steps[0].input, "Write-Output ('shellx-ok-' + (6*7))");
+            assert_eq!(script.steps[0].expect, "shellx-ok-42");
+            assert_eq!(script.steps[1].input, "Write-Output 'tiếng Việt'");
+            assert_eq!((script.steps[1].expect, script.steps[1].lines), ("tiếng Việt", 2));
+            assert_eq!(script.steps[2].columns, Some(120));
+            assert_eq!(script.steps[2].expect, "cols-120");
+        }
+        let cmd = probe_script(Some(ShellKind::Cmd)).unwrap();
+        let names: Vec<&str> = cmd.steps.iter().map(|s| s.name).collect();
+        assert_eq!(names, ["echo", "unicode"]);
+        assert_eq!((cmd.steps[0].input, cmd.steps[0].expect), ("set /a 6*7", "42"));
+        assert_eq!(
+            (cmd.steps[1].input, cmd.steps[1].expect, cmd.steps[1].lines),
+            ("echo tiếng Việt", "tiếng Việt", 2)
+        );
+        for other in [Some(ShellKind::GitBash), Some(ShellKind::Wsl), None] {
+            assert_eq!(probe_script(other), None, "{other:?}");
+        }
+    }
+
+    #[test]
+    fn windows_error_events_are_read_from_the_event_xml() {
+        let newest = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System>\
+            <Provider Name='Application Error'/><EventID Qualifiers='0'>1000</EventID>\
+            <TimeCreated SystemTime='2026-11-12T08:15:31.1234567Z'/><Computer>DESKTOP-OTHER</Computer>\
+            </System><EventData><Data Name='AppName'>shellx-desktop.exe</Data>\
+            <Data Name='ExceptionCode'>c0000409</Data>\
+            <Data Name='AppPath'>C:\\Users\\A &amp; B\\shellx-desktop.exe</Data></EventData></Event>";
+        let older = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System>\
+            <TimeCreated SystemTime=\"2026-11-11T07:00:00.0000000Z\"/></System><EventData>\
+            <Data>shellx-desktop.exe</Data><Data></Data><Data/><Data>  c0000005\r\n  </Data>\
+            <Data>&lt;x&gt; &quot;q&quot; &apos;a&apos; &#65;&#x42;</Data></EventData></Event>";
+        let lines = windows_error_summaries(&format!("{newest}\r\n{older}\r\n"));
+        assert_eq!(
+            lines,
+            strings(&[
+                "2026-11-12T08:15:31.1234567Z shellx-desktop.exe, c0000409, C:\\Users\\A & B\\shellx-desktop.exe",
+                "2026-11-11T07:00:00.0000000Z shellx-desktop.exe, c0000005, <x> \"q\" 'a' AB",
+            ])
+        );
+        assert!(!lines.iter().any(|l| l.contains("DESKTOP-OTHER")));
+        assert!(windows_error_summaries("").is_empty());
+        assert!(
+            windows_error_summaries(
+                "<Event><System><TimeCreated SystemTime='x'/></System><EventData><Data>a</Data>"
+            )
+            .is_empty()
+        );
+        let long = format!(
+            "<Event><System><TimeCreated SystemTime='t'/></System><EventData><Data>{}</Data></EventData></Event>",
+            "v".repeat(400)
+        );
+        let lines = windows_error_summaries(&long);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].chars().count(), 300);
+    }
+
+    fn section_after<'a>(text: &'a str, header: &str) -> Vec<&'a str> {
+        text.lines()
+            .skip_while(|l| *l != header)
+            .skip(1)
+            .take_while(|l| !l.starts_with('['))
+            .collect()
+    }
+
+    fn headers(text: &str) -> Vec<&str> {
+        text.lines()
+            .filter(|l| l.starts_with('[') && l.ends_with(']'))
+            .collect()
+    }
+
+    #[test]
+    fn windows_error_events_are_listed_under_crash_files() {
+        let base = DiagnosticsReport {
+            crash_files: strings(&["crash.20261112-081530.1.txt"]),
+            ..DiagnosticsReport::default()
+        };
+        let text = format_report(&base);
+        assert!(!text.contains("windows error event"), "{text}");
+        assert_eq!(section_after(&text, "[crash files]"), ["crash.20261112-081530.1.txt"]);
+        let with = |events| {
+            format_report(&DiagnosticsReport {
+                windows_error_events: Some(events),
+                ..base.clone()
+            })
+        };
+        let text = with(Ok(vec![]));
+        assert_eq!(
+            section_after(&text, "[crash files]"),
+            ["crash.20261112-081530.1.txt", "windows error events: none found"]
+        );
+        assert_eq!(headers(&text), HEADERS);
+        let text = with(Ok(strings(&["a", "b"])));
+        assert_eq!(
+            section_after(&text, "[crash files]"),
+            [
+                "crash.20261112-081530.1.txt",
+                "windows error event: a",
+                "windows error event: b"
+            ]
+        );
+        assert_eq!(headers(&text), HEADERS);
+        let text = with(Err("x".to_string()));
+        assert_eq!(
+            section_after(&text, "[crash files]"),
+            ["crash.20261112-081530.1.txt", "windows error events: unavailable (x)"]
+        );
+        assert_eq!(headers(&text), HEADERS);
+        // No crash files: `none`, then the events.
+        let text = format_report(&DiagnosticsReport {
+            windows_error_events: Some(Ok(vec![])),
+            ..DiagnosticsReport::default()
+        });
+        assert_eq!(
+            section_after(&text, "[crash files]"),
+            ["none", "windows error events: none found"]
+        );
+    }
+
+    #[test]
+    fn a_first_pass_report_marks_the_slow_checks_not_run_yet() {
+        let text = format_report(&DiagnosticsReport {
+            slow_checks_pending: true,
+            ..full_report()
+        });
+        let lines: Vec<&str> = text.lines().collect();
+        for pending in [
+            "chosen gpu: not run yet",
+            "dwm timing: not run yet",
+            "gpus: not run yet",
+            "found: not run yet",
+            "chosen: not run yet",
+            "checks: not run yet",
+            "version check: not run yet",
+            "windows error events: not run yet",
+        ] {
+            assert!(lines.contains(&pending), "{pending:?} missing:\n{text}");
+        }
+        assert!(!lines.iter().any(|l| l.starts_with("gpu 1:")), "{text}");
+        assert!(!lines.iter().any(|l| l.starts_with("windows error event:")), "{text}");
+        // The fast sections keep their values.
+        for kept in ["render mode: ", "display 1: ", "sign-in: ", "state dir: ok", "layouts: "] {
+            assert!(
+                lines.iter().any(|l| l.starts_with(kept) && !l.ends_with("not run yet")),
+                "{kept:?}:\n{text}"
+            );
+        }
+        assert_eq!(headers(&text), HEADERS);
+        // Without Windows events (the Mac), no events line at all.
+        let text = format_report(&DiagnosticsReport {
+            slow_checks_pending: true,
+            windows_error_events: None,
+            ..full_report()
+        });
+        assert!(!text.contains("windows error event"), "{text}");
     }
 }
