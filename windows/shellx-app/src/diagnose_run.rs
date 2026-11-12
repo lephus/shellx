@@ -1263,4 +1263,107 @@ mod tests {
             ["crash.20261112-081530.12.txt"]
         );
     }
+
+    fn cmd(program: &str, args: &[&str], label: &str) -> crate::local_pty::ShellCmd {
+        crate::local_pty::ShellCmd {
+            program: program.to_string(),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            env: Vec::new(),
+            label: label.to_string(),
+            kind: None,
+        }
+    }
+
+    /// B-2 review m1/m2: a person's own shell arguments (a password, an address) and
+    /// SHELLX_SHELL's value never reach `[shells]`; what a new tab starts is named, with
+    /// `instead of <program>` when the stored one is gone.
+    #[test]
+    fn the_shells_section_names_programs_never_arguments() {
+        use crate::local_pty::PanePlan;
+        use crate::local_pty::settings::{PaneStart, ShellSnapshot};
+        use shellx_model::shell::{CustomShellError, ShellChoice, ShellError, ShellKind, ShellLaunch};
+        const SECRETS: [&str; 4] = ["hunter2pass", "phu@example.com", "secret2", "-pw"];
+        let custom_line = r#""C:\Program Files\PuTTY\plink.exe" -ssh -pw hunter2pass phu@example.com"#;
+        let found = vec![ShellLaunch {
+            kind: Some(ShellKind::Pwsh),
+            program: r"C:\Program Files\PowerShell\7\pwsh.exe".into(),
+            args: vec!["-NoLogo".into(), "-Command".into(), "hook".into()],
+            osc7_hook: true,
+        }];
+        let snapshot = |choice: ShellChoice, env_override: Option<&str>| ShellSnapshot {
+            choice,
+            env_override: env_override.map(String::from),
+            found: found.clone(),
+            plan: None,
+        };
+        let plink = cmd(
+            r"C:\Program Files\PuTTY\plink.exe",
+            &["-ssh", "-pw", "hunter2pass", "phu@example.com"],
+            "plink.exe",
+        );
+        let pwsh = cmd(r"C:\Program Files\PowerShell\7\pwsh.exe", &["-NoLogo"], "PowerShell 7");
+        let custom = ShellChoice::Custom {
+            command_line: custom_line.into(),
+        };
+        let cases: Vec<(ShellSnapshot, Result<PaneStart, ShellError>, &str)> = vec![
+            (
+                snapshot(custom.clone(), None),
+                Ok(PaneStart {
+                    plan: PanePlan { first: plink.clone(), fallback: None },
+                    instead_of: None,
+                }),
+                r"custom command line; new tabs start plink.exe (C:\Program Files\PuTTY\plink.exe)",
+            ),
+            (
+                snapshot(ShellChoice::Auto, Some(r"C:\x\ssh.exe -pw secret2 phu@example.com")),
+                Ok(PaneStart {
+                    plan: PanePlan { first: pwsh.clone(), fallback: None },
+                    instead_of: Some("ssh.exe".into()),
+                }),
+                r"automatic, overridden by SHELLX_SHELL; new tabs start PowerShell 7 (C:\Program Files\PowerShell\7\pwsh.exe) instead of ssh.exe",
+            ),
+            (
+                snapshot(ShellChoice::Known { shell: ShellKind::Pwsh }, None),
+                Ok(PaneStart {
+                    plan: PanePlan { first: pwsh.clone(), fallback: None },
+                    instead_of: None,
+                }),
+                r"PowerShell 7; new tabs start PowerShell 7 (C:\Program Files\PowerShell\7\pwsh.exe)",
+            ),
+            (
+                snapshot(ShellChoice::Auto, None),
+                Err(ShellError::NoShellFound),
+                "automatic; new tabs start no shell (none found)",
+            ),
+            (
+                snapshot(custom.clone(), None),
+                Err(ShellError::Custom(CustomShellError::Empty)),
+                "custom command line; new tabs start no shell (the custom command line cannot start)",
+            ),
+            (
+                snapshot(custom.clone(), None),
+                Err(ShellError::Custom(CustomShellError::UnclosedQuote)),
+                "custom command line; new tabs start no shell (the custom command line cannot start)",
+            ),
+            (
+                snapshot(custom.clone(), None),
+                Err(ShellError::Custom(CustomShellError::NotFound("plink.exe -pw hunter2pass".into()))),
+                "custom command line; new tabs start no shell (the custom command line cannot start)",
+            ),
+            (
+                snapshot(ShellChoice::Auto, Some("ssh.exe -pw secret2")),
+                Err(ShellError::Override(CustomShellError::NotFound("ssh.exe -pw secret2".into()))),
+                "automatic, overridden by SHELLX_SHELL; new tabs start no shell (SHELLX_SHELL cannot start)",
+            ),
+        ];
+        for (snapshot, start, chosen) in cases {
+            let (listed, text) = shells_text(&snapshot, &start);
+            assert_eq!(text, chosen);
+            assert_eq!(listed, [r"PowerShell 7: C:\Program Files\PowerShell\7\pwsh.exe"]);
+            for secret in SECRETS {
+                assert!(!text.contains(secret), "{secret} in {text}");
+                assert!(!listed.iter().any(|l| l.contains(secret)), "{secret} in {listed:?}");
+            }
+        }
+    }
 }
