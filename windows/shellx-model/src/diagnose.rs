@@ -331,8 +331,8 @@ pub struct ProbeScript {
 
 /// The script for a kind of shell: PowerShell (7 and Windows) and Command Prompt have one;
 /// the others (Git Bash, WSL, a custom line, the Mac's bash) are checked for start and first
-/// output only. The computed value (`6*7`) proves the command ran: the typed text never holds
-/// it; the Vietnamese text must appear twice (typed, then echoed).
+/// output only. The computed marker (`shellx-ok-42`) proves the command ran: the typed text
+/// never holds it; the Vietnamese text must appear twice (typed, then echoed).
 pub fn probe_script(kind: Option<ShellKind>) -> Option<ProbeScript> {
     let step = |name, columns, input, expect, lines| ProbeStep {
         name,
@@ -344,10 +344,13 @@ pub fn probe_script(kind: Option<ShellKind>) -> Option<ProbeScript> {
     match kind? {
         ShellKind::Pwsh | ShellKind::WindowsPowerShell => Some(ProbeScript {
             steps: vec![
+                // The first line also turns PSReadLine's history saving off for this session,
+                // so the checks do not land in the person's history (B-2 review m4; that one
+                // line itself may still be saved). Harmless without PSReadLine.
                 step(
                     "echo",
                     None,
-                    "Write-Output ('shellx-ok-' + (6*7))",
+                    "if (Get-Module PSReadLine) { Set-PSReadLineOption -HistorySaveStyle SaveNothing }; Write-Output ('shellx-ok-' + (6*7))",
                     "shellx-ok-42",
                     1,
                 ),
@@ -369,7 +372,15 @@ pub fn probe_script(kind: Option<ShellKind>) -> Option<ProbeScript> {
         }),
         ShellKind::Cmd => Some(ProbeScript {
             steps: vec![
-                step("echo", None, "set /a 6*7", "42", 1),
+                // `call` expands %x% after the assignment; the typed text holds `%x%`, never
+                // `shellx-ok-42`, and the banner or a prompt cannot hold it either (m5).
+                step(
+                    "echo",
+                    None,
+                    "set /a x=6*7 >nul & call echo shellx-ok-%x%",
+                    "shellx-ok-42",
+                    1,
+                ),
                 step("unicode", None, "echo tiếng Việt", "tiếng Việt", 2),
             ],
         }),
