@@ -62,8 +62,8 @@ use std::sync::Arc;
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
 use shellx_model::mouse::{
-    PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, secondary_click,
-    wheel_action,
+    PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, cap_to_screen,
+    secondary_click, wheel_action,
 };
 use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
 use shellx_model::selection::{
@@ -824,15 +824,19 @@ impl TermView {
     /// primary screen scrolls its history, a full-screen program gets cursor
     /// keys unless it asked for mouse reporting (R2 F13).
     fn on_scroll(&mut self, event: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let Some(modes) = self.backend.core().map(|core| ScreenModes {
-            alternate: core.alternate_screen(),
-            mouse_reporting: core.mouse_tracking(),
+        let Some((modes, rows)) = self.backend.core().map(|core| {
+            let modes = ScreenModes {
+                alternate: core.alternate_screen(),
+                mouse_reporting: core.mouse_tracking(),
+            };
+            (modes, core.size().1)
         }) else {
             return;
         };
         let delta = event.delta.pixel_delta(self.line_height);
         let lines = f64::from(f32::from(delta.y) / f32::from(self.line_height));
-        match wheel_action(self.scroll.add(lines), modes) {
+        // at most one screen per event (review M8)
+        match cap_to_screen(wheel_action(self.scroll.add(lines), modes), rows) {
             WheelAction::None => {}
             WheelAction::Scrollback(n) => {
                 self.follow_viewport(false, |backend| {

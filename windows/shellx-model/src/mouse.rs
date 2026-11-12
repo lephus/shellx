@@ -71,6 +71,23 @@ pub fn wheel_action(lines: i32, modes: ScreenModes) -> WheelAction {
     }
 }
 
+/// At most one screen (`rows`, at least 1) per wheel event. Windows' "scroll one screen at a
+/// time" setting reaches GPUI as billions of lines a notch: that becomes one screen of history
+/// or `rows` arrow keys, never a thousand writes to the program.
+pub fn cap_to_screen(action: WheelAction, rows: u16) -> WheelAction {
+    let rows = rows.max(1);
+    match action {
+        WheelAction::None => WheelAction::None,
+        WheelAction::Scrollback(lines) => {
+            WheelAction::Scrollback(lines.clamp(-i32::from(rows), i32::from(rows)))
+        }
+        WheelAction::Arrows { key, count } => WheelAction::Arrows {
+            key,
+            count: count.min(u32::from(rows)),
+        },
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SecondaryButton {
     Right,
