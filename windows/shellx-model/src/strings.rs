@@ -1473,6 +1473,17 @@ mod tests {
     }
 
     #[test]
+    fn an_access_that_could_not_be_saved_reads_as_a_sentence_alone() {
+        // the pairing panel's line after an approval that could not be written to
+        // links.json: the sentence only, never the system's text after it (review m9)
+        assert_eq!(access_not_saved(Lang::Vi), "Không lưu được quyền truy cập");
+        assert_eq!(access_not_saved(Lang::En), "Could not save the access");
+        for lang in [Lang::Vi, Lang::En] {
+            assert_eq!(access_not_saved(lang), save_link_failed(lang, ""));
+        }
+    }
+
+    #[test]
     fn pairing_failures_have_their_own_sentences() {
         let cases: &[(&str, &str, &str)] = &[
             (
