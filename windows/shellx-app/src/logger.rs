@@ -310,4 +310,66 @@ mod tests {
             assert!(!text.contains(secret), "{secret} in {text}");
         }
     }
+
+    static HELD_RENAMES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+    /// A rename that fails for the current log, as on Windows when another program holds
+    /// `shellx.log` open without delete sharing (review m1); every other rename works.
+    fn rename_held(from: &Path, to: &Path) -> std::io::Result<()> {
+        if from.file_name().is_some_and(|n| n == "shellx.log") {
+            HELD_RENAMES.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            return Err(std::io::Error::other("held open"));
+        }
+        std::fs::rename(from, to)
+    }
+
+    fn write_until(state: &mut LogState, total: u64, from: u32) -> u32 {
+        let filler = "filler words ".repeat(75);
+        let mut written = 0u64;
+        let mut i = from;
+        while written < total {
+            let message = format!("record {i} {filler}");
+            written += message.len() as u64;
+            write_record(state, "2026-11-12T08:15:30.123Z", "INFO", "t", &message);
+            i += 1;
+        }
+        i
+    }
+
+    #[test]
+    fn a_rotation_that_cannot_move_the_log_keeps_the_older_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("shellx.log.1"), "one\n").unwrap();
+        std::fs::write(tmp.path().join("shellx.log.2"), "two\n").unwrap();
+        let mut state = LogState::open(tmp.path());
+        state.rename = rename_held;
+        let next = write_until(&mut state, 2 * 1_048_576 + 524_288, 0);
+        // Nothing older is lost, nothing is lost from the current file, and a failed rotation
+        // is tried again only after another MiB (at about 1 and 2 MiB), not on every write.
+        assert_eq!(read(tmp.path(), "shellx.log.1"), "one\n");
+        assert_eq!(read(tmp.path(), "shellx.log.2"), "two\n");
+        assert_eq!(HELD_RENAMES.load(std::sync::atomic::Ordering::SeqCst), 2);
+        let current = read(tmp.path(), "shellx.log");
+        assert_eq!(current.lines().count(), next as usize);
+        // Once the file can be moved, the next rotation works and shifts the older files.
+        state.rename = |from, to| std::fs::rename(from, to);
+        write_until(&mut state, 1_048_576, next);
+        drop(state);
+        assert!(read(tmp.path(), "shellx.log.1").starts_with("2026-11-12T08:15:30.123Z INFO t: record 0 "));
+        assert_eq!(read(tmp.path(), "shellx.log.2"), "one\n");
+        assert!(!tmp.path().join("shellx.log.3").exists());
+    }
+
+    #[test]
+    fn a_log_that_could_not_be_opened_is_opened_on_a_later_write() {
+        let tmp = tempfile::tempdir().unwrap();
+        let blocker = tmp.path().join("shellx.log");
+        std::fs::create_dir(&blocker).unwrap();
+        let mut state = LogState::open(tmp.path());
+        write_record(&mut state, "T", "INFO", "x", "lost");
+        std::fs::remove_dir(&blocker).unwrap();
+        write_record(&mut state, "T", "INFO", "x", "kept");
+        drop(state);
+        assert_eq!(read(tmp.path(), "shellx.log"), "T INFO x: kept\n");
+    }
 }
