@@ -312,12 +312,26 @@ def google_web_client_problems(oauth_xml: str, ledger_text):
 LICENCE_NAMES = (b"third_party_licenses", b"third_party_license_metadata")   # resource names in resources.pb
 LICENCE_ASSET_ENTRY = "base/assets/licenses/third_party_licenses.txt"        # the fallback's file
 LICENCE_PLACEHOLDER = b"Debug License Info"
+# Lines generate-licences.py writes on purpose; the asset must carry them (the licence texts, not only names and URLs).
+LICENCE_APACHE_MARKER = b"LICENCE TEXT: Apache License, Version 2.0"
+LICENCE_APACHE_TITLE = b"Version 2.0, January 2004"
+LICENCE_EMBEDDED_MARKER = b"== Notices embedded in Google libraries =="
+LICENCE_PLAY_SERVICES = b"com.google.android.gms:play-services-"
 
 
 def licence_notice_problems(resources: bytes, res_files: dict, asset) -> list:
     """The bundle must carry open-source licence notices: Google's plugin resources or the bundled asset."""
     if asset:
-        return []
+        problems = []
+        marker_at = asset.find(LICENCE_APACHE_MARKER)
+        if marker_at < 0 or LICENCE_APACHE_TITLE not in asset[marker_at:]:
+            problems.append("%s lacks the Apache-2.0 licence text (the line \"%s\" and its title): regenerate it with "
+                            "generate-licences.py" % ("assets/licenses/third_party_licenses.txt",
+                                                      LICENCE_APACHE_MARKER.decode()))
+        if LICENCE_PLAY_SERVICES in asset and LICENCE_EMBEDDED_MARKER not in asset:
+            problems.append("assets/licenses/third_party_licenses.txt lists a Google Play services library but has no "
+                            "section \"%s\": regenerate it with generate-licences.py" % LICENCE_EMBEDDED_MARKER.decode())
+        return problems
     if all(name in resources for name in LICENCE_NAMES):
         for entry in sorted(res_files):
             if LICENCE_PLACEHOLDER in res_files[entry]:
