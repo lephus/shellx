@@ -396,21 +396,20 @@ impl Shells {
     /// tab already starts the new choice; a custom line needs file checks and waits for the
     /// lookup. Nothing changes when the file cannot be written.
     pub fn set_choice(&self, choice: ShellChoice) -> io::Result<()> {
-        {
-            let mut state = self.inner.lock();
-            self.inner.file.save(&choice)?;
-            let replan =
-                self.inner.env_override.is_none() && !matches!(choice, ShellChoice::Custom { .. });
-            if replan && let Some(computed) = state.computed.as_mut() {
-                // no file is checked for Auto or a known shell
-                computed.plan =
-                    launch_plan(&choice, None, &computed.found, &self.inner.probe, &|_| {
-                        false
-                    });
-            }
-            state.choice = choice;
+        let mut state = self.inner.lock();
+        self.inner.file.save(&choice)?;
+        let replan =
+            self.inner.env_override.is_none() && !matches!(choice, ShellChoice::Custom { .. });
+        if replan && let Some(computed) = state.computed.as_mut() {
+            // no file is checked for Auto or a known shell
+            computed.plan = launch_plan(&choice, None, &computed.found, &self.inner.probe, &|_| {
+                false
+            });
         }
-        self.refresh();
+        state.choice = choice;
+        // Under the same lock: a lookup already running for the old choice gets an older
+        // number now, so it can no longer overwrite the plan made above (review M2).
+        self.spawn_lookup(&mut state);
         Ok(())
     }
 
