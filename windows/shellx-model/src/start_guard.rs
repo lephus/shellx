@@ -8,6 +8,23 @@ use serde::{Deserialize, Serialize};
 /// native AppId in the name, session namespace (no `Global\`).
 pub const APP_MUTEX_NAME: &str = "ShellXNative-D322DA97-3B0D-49C7-BDB2-8EBFADBA1004";
 
+/// `ERROR_ALREADY_EXISTS` and `ERROR_ACCESS_DENIED` (WinError.h).
+const ERROR_ALREADY_EXISTS: u32 = 183;
+const ERROR_ACCESS_DENIED: u32 = 5;
+
+/// Whether another ShellX holds the app mutex, from `CreateMutexW`'s result: with a handle,
+/// when the last error is `ERROR_ALREADY_EXISTS` ("the object existed before this function
+/// call"); without one, when it is `ERROR_ACCESS_DENIED`: the mutex exists but this start may
+/// not open it (an elevated ShellX created it, and the call asks for `MUTEX_ALL_ACCESS`;
+/// B-1b review m-3). Any other failure counts as no other instance.
+pub fn another_instance_runs(got_handle: bool, last_error: u32) -> bool {
+    if got_handle {
+        last_error == ERROR_ALREADY_EXISTS
+    } else {
+        last_error == ERROR_ACCESS_DENIED
+    }
+}
+
 /// How GPUI draws: `Standard` (DirectComposition) or `Compatible`
 /// (`GPUI_DISABLE_DIRECT_COMPOSITION=1`: a plain HWND swap chain).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

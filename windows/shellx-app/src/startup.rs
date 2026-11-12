@@ -375,7 +375,7 @@ pub fn acquire_app_mutex() -> bool {
     #[cfg(windows)]
     {
         use std::sync::atomic::AtomicUsize;
-        use windows_sys::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError, SetLastError};
+        use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
         use windows_sys::Win32::System::Threading::CreateMutexW;
         static APP_MUTEX: AtomicUsize = AtomicUsize::new(0);
         let name: Vec<u16> = start_guard::APP_MUTEX_NAME
@@ -390,12 +390,17 @@ pub fn acquire_app_mutex() -> bool {
         // SAFETY: no arguments; read right after the call it describes.
         let error = unsafe { GetLastError() };
         if handle.is_null() {
-            log::warn!("the app mutex could not be created (error {error})");
-            return false;
+            // ERROR_ACCESS_DENIED: it exists, held by a ShellX this start may not open
+            // (B-1b review m-3); anything else: logged, no other instance.
+            let other = start_guard::another_instance_runs(false, error);
+            if !other {
+                log::warn!("the app mutex could not be created (error {error})");
+            }
+            return other;
         }
         // Kept for the process lifetime and never closed: Windows closes it at exit.
         APP_MUTEX.store(handle as usize, Ordering::SeqCst);
-        error == ERROR_ALREADY_EXISTS
+        start_guard::another_instance_runs(true, error)
     }
     #[cfg(not(windows))]
     {
