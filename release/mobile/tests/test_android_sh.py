@@ -360,6 +360,29 @@ class AndroidShTest(unittest.TestCase):
         self.assertRefused(self.f.run(), "the licence notices are stale")
         self.assertFalse((self.f.tmp / "gradle.log").exists())
 
+    def test_never_traces_the_keystore_passwords(self):
+        """bash -x, SHELLOPTS=xtrace and set -x around source must not put a password in any output, even shell-quoted."""
+        import shlex
+        script = str(self.f.repo / "release/mobile/android.sh")
+        modes = {"build": [], "check-aab": ["--check-aab", str(self.f.aab), str(self.f.tmp / "mapping.txt")]}
+        routes = {
+            "bash -x": (lambda a: ["bash", "-x", script, *a], {}),
+            "SHELLOPTS=xtrace": (lambda a: ["bash", script, *a], {"SHELLOPTS": "xtrace"}),
+            "set -x; source": (lambda a: ["bash", "-c", 'set -x; source "$0" "$@"', script, *a], {}),
+        }
+        secrets = []
+        for pw in (STORE_PW, KEY_PW):
+            secrets += [pw, shlex.quote(pw), "'%s'" % pw, pw.replace("'", "'\\''")]
+        for route, (argv, extra) in routes.items():
+            for mode, args in modes.items():
+                with self.subTest(route=route, mode=mode):
+                    r = subprocess.run(argv(args), cwd=self.f.repo, env=self.f.env(**extra),
+                                       capture_output=True, text=True)
+                    for secret in secrets:
+                        self.assertNotIn(secret, r.stdout + r.stderr)
+                    self.assertNotEqual(0, r.returncode, "tracing must be refused, not tolerated")
+                    self.assertIn("xtrace", r.stderr)
+
     def test_usage_and_no_upload_path(self):
         r = self.f.run("--help")
         self.assertEqual(0, r.returncode)
