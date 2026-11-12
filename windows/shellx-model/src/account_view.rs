@@ -2,7 +2,7 @@
 //! only draws it.
 
 use crate::account::{AccountFlow, AccountState};
-use crate::strings::{Lang, Str, failure_sentence};
+use crate::strings::{Lang, Str, failure_sentence, google_error};
 
 /// What Settings › Account draws.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,7 +17,8 @@ pub struct AccountView {
     /// "Switch to Google sign-in": a password session, and the build has a Google client (Ruling 28).
     pub google_switch: bool,
     /// The line under the account, as a sentence: the notice (a failed sign-out, a sign-in methods
-    /// failure), else the error state's. Never a code, never the core's message.
+    /// failure, a failed switch to Google), else the error state's; Google's failures as the dialog
+    /// words them. Never a code, never the core's message.
     pub error: Option<String>,
 }
 
@@ -38,7 +39,10 @@ pub fn account_view(flow: &AccountFlow, google_available: bool, lang: Lang) -> A
         session_expired: expired,
         sign_out: flow.can_sign_out(),
         google_switch: flow.needs_google_switch() && google_available,
-        error: error.map(|code| failure_sentence(lang, code)),
+        // Google's own codes as the dialog words them (a timeout is not "ShellX is having a problem");
+        // every other code as `failure_sentence` (google_error falls back to it).
+        error: error
+            .map(|code| google_error(lang, code).unwrap_or_else(|| failure_sentence(lang, code))),
     }
 }
 
