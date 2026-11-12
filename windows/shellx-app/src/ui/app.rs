@@ -11,7 +11,7 @@ use gpui::{
     size,
 };
 use shellx_model::core_api::CoreCall;
-use shellx_model::crash_report::DialogKind;
+use shellx_model::start_guard::StartReason;
 use shellx_model::strings::Lang;
 
 use super::assets::Assets;
@@ -21,6 +21,7 @@ use crate::crash::{self, CrashTest};
 use crate::fonts;
 use crate::os_info;
 use crate::shell_info::BASE_TITLE;
+use crate::startup;
 
 /// App-wide services the views read with `cx.global::<Services>()`.
 /// Later tasks add the remote client here.
@@ -68,22 +69,11 @@ fn first_window_bounds(cx: &App) -> WindowBounds {
     WindowBounds::Windowed(Bounds::centered(None, size(px(1200.0), px(760.0)), cx))
 }
 
-/// The window could not be opened: log why, leave a start-failure file, show the reporter's
-/// dialog, exit 1 (spec §4.2: no silent exit). B6 puts the compatible-mode relaunch first.
-fn window_failed(error: &anyhow::Error) -> ! {
-    log::error!("the window could not be opened: {error:#}");
-    let ctx = crash::context()
-        .cloned()
-        .unwrap_or_else(crash::CrashContext::this_process);
-    let file = crash::write_window_failure(&ctx, error, None);
-    // A file that could not be written anywhere: the dialog names the logs folder.
-    let named = file.unwrap_or_else(|| ctx.logs_dir.clone());
-    crash::start_reporter(&ctx, DialogKind::WindowFailed, &named);
-    std::process::exit(1);
-}
-
 pub fn run() {
     Application::new().with_assets(Assets).run(|cx: &mut App| {
+        // GPUI has read GPUI_DISABLE_DIRECT_COMPOSITION (in `Application::new`): the shells in
+        // this window must not inherit a value this start set (plan review M-11).
+        startup::forget_render_variable();
         if let Err(error) = cx
             .text_system()
             .add_fonts(fonts::embedded().into_iter().map(Cow::Borrowed).collect())
@@ -100,8 +90,10 @@ pub fn run() {
 
         let background = dev_background();
         let window_bounds = first_window_bounds(cx);
-        let opened = if crash::crash_test() == Some(CrashTest::Window) {
-            // `--crash-test window`: the open fails without being tried (Ruling 31).
+        let retry = startup::render_status().reason == StartReason::RetryAfterOpenFailed;
+        let opened = if crash::crash_test() == Some(CrashTest::Window) && !retry {
+            // `--crash-test window`: the open fails without being tried, except in the
+            // compatible relaunch it causes (Ruling 31).
             Err(anyhow::anyhow!("crash test: the window was not opened"))
         } else {
             cx.open_window(
@@ -127,7 +119,7 @@ pub fn run() {
         };
         let window = match opened {
             Ok(window) => window,
-            Err(error) => window_failed(&error),
+            Err(error) => startup::window_failed(&error),
         };
         window
             .update(cx, |root, window, cx| {
@@ -135,6 +127,11 @@ pub fn run() {
                 if !background {
                     cx.activate(true);
                 }
+                // The first frame (Ruling 6): GPUI runs next-frame callbacks at the start of a
+                // frame request, so the second one runs once the first frame was presented.
+                window.on_next_frame(|window, _| {
+                    window.on_next_frame(|_, _| startup::first_frame_drawn())
+                });
             })
             .ok();
         // `--crash-test panic|native` (Ruling 31): a foreground task runs inside GPUI's window
@@ -144,12 +141,15 @@ pub fn run() {
                 // The procedure cannot unwind: the hook writes the file, then the process
                 // aborts.
                 cx.spawn(async move |_| -> () {
+                    // A crash test never changes the next start's display mode (I-4).
+                    startup::orderly_quit();
                     panic!("crash test: a panic on the UI thread (--crash-test panic)")
                 })
                 .detach();
             }
             Some(CrashTest::Native) => {
                 cx.spawn(async move |_| {
+                    startup::orderly_quit();
                     // SAFETY: none; this is the deliberate access violation of `--crash-test
                     // native`: a write into the first page, which is never mapped. Address 8,
                     // not null, so debug builds' null-pointer check cannot turn it into a panic.
@@ -161,6 +161,7 @@ pub fn run() {
         }
         cx.on_window_closed(|cx| {
             if cx.windows().is_empty() {
+                startup::orderly_quit();
                 cx.quit();
             }
         })

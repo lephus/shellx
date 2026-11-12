@@ -113,6 +113,17 @@ fn main() {
             build_info::about_version(),
             ctx.windows
         );
+        // The display mode (3b §5 steps 9b to 9f): decided before GPUI exists, because GPUI
+        // reads GPUI_DISABLE_DIRECT_COMPOSITION once, when the platform is created.
+        let other_instance = startup::acquire_app_mutex();
+        let (env_forced, is_retry) = startup::take_start_variables();
+        startup::plan_gui_start(
+            startup::StartPaths::this_pc().as_ref(),
+            env_forced,
+            is_retry,
+            other_instance,
+        );
+        startup::set_render_variable(env_forced);
         // Native crashes (access violations, illegal instructions) leave a file and the same
         // dialog (Ruling 10).
         #[cfg(windows)]

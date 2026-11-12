@@ -1,6 +1,407 @@
 //! Start-up of the window (spec §4.2, Rulings 4 to 7, 27; plan 3b §5): the display mode this
 //! start uses, the start marker and the remembered mode on disk, the installer's mutex, the
 //! `GPUI_DISABLE_DIRECT_COMPOSITION` variable, and what an open failure does.
+//!
+//! The rules are `shellx_model::start_guard`'s; this module reads and writes the two files
+//! (`starting.json`, `render.json`, each written to a temp file then renamed), keeps this
+//! start's decision in a `OnceLock`, and holds the only Win32 call (`CreateMutexW`). The
+//! `*_in` forms take the state explicitly so tests never touch the process-wide one.
+
+use std::io;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use shellx_model::crash_report::DialogKind;
+use shellx_model::start_guard::{
+    self, OpenFailed, RenderFile, RenderMode, StartInput, StartMarker, StartPlan, StartReason,
+};
+
+use crate::{crash, paths};
+
+/// The variable GPUI reads once, in `WindowsPlatform::new` (`platform.rs:138-139`).
+const RENDER_VARIABLE: &str = "GPUI_DISABLE_DIRECT_COMPOSITION";
+/// Set by a start for the compatible relaunch it starts.
+const RETRY_VARIABLE: &str = "SHELLX_RENDER_RETRY";
+
+/// What Settings › Display shows (A10).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)] // Settings › Display (A10) reads `remembered`
+pub struct RenderStatus {
+    pub mode: RenderMode,
+    pub reason: StartReason,
+    pub remembered: RenderMode,
+}
+
+/// The start marker and the remembered mode, in `%LOCALAPPDATA%\ShellX\native`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StartPaths {
+    pub marker: PathBuf,
+    pub render: PathBuf,
+}
+
+impl StartPaths {
+    pub fn in_dir(dir: &Path) -> StartPaths {
+        StartPaths {
+            marker: dir.join("starting.json"),
+            render: dir.join("render.json"),
+        }
+    }
+
+    /// The native state folder's files; `None` when `LOCALAPPDATA` is unusable (the start
+    /// then decides without files).
+    pub fn this_pc() -> Option<StartPaths> {
+        paths::native_dir().ok().map(|dir| StartPaths::in_dir(&dir))
+    }
+}
+
+/// This start's decision and what it did on disk.
+pub(crate) struct StartState {
+    paths: Option<StartPaths>,
+    pub plan: StartPlan,
+    pub remembered: RenderMode,
+    is_retry: bool,
+    /// This start's marker is on disk (written, not yet removed).
+    marker_on_disk: AtomicBool,
+    first_frame_seen: AtomicBool,
+    /// This start set `GPUI_DISABLE_DIRECT_COMPOSITION` itself.
+    variable_set: AtomicBool,
+}
+
+static START: OnceLock<StartState> = OnceLock::new();
+
+/// GPUI's own test of the variable: `"1"` or `"true"`.
+pub fn env_forces_compatible(value: Option<&str>) -> bool {
+    matches!(value, Some("1") | Some("true"))
+}
+
+/// A relaunched retry carries `SHELLX_RENDER_RETRY=1`.
+pub fn is_retry_value(value: Option<&str>) -> bool {
+    value == Some("1")
+}
+
+/// 3b §5 steps 9c and 9d: whether the person (or a parent) forced compatible mode and whether
+/// this start is a relaunched retry; on Windows the retry variable is then removed, so
+/// nothing this start launches inherits it.
+pub fn take_start_variables() -> (bool, bool) {
+    let env_forced = env_forces_compatible(std::env::var(RENDER_VARIABLE).ok().as_deref());
+    let is_retry = is_retry_value(std::env::var(RETRY_VARIABLE).ok().as_deref());
+    #[cfg(windows)]
+    {
+        // SAFETY: `remove_var` is always safe on Windows, in single- and multi-threaded
+        // programs (Rust documentation; plan review M-11).
+        unsafe { std::env::remove_var(RETRY_VARIABLE) };
+    }
+    (env_forced, is_retry)
+}
+
+/// A compatible start sets the variable itself unless the person already did.
+pub(crate) fn needs_render_variable(plan: &StartPlan, env_forced: bool) -> bool {
+    plan.mode == RenderMode::Compatible && !env_forced
+}
+
+/// After GPUI read it, the variable goes when this start set it or a parent did (a retry), so
+/// the shells in the window never inherit it; one the person set stays (plan review M-11).
+pub(crate) fn forgets_render_variable(set_by_this_start: bool, is_retry: bool) -> bool {
+    set_by_this_start || is_retry
+}
+
+/// `on_open_failed`, except off Windows, where GPUI ignores the variable and a relaunch would
+/// change nothing: always a report.
+pub(crate) fn open_failure_action(plan: &StartPlan, on_windows: bool) -> OpenFailed {
+    if on_windows {
+        start_guard::on_open_failed(plan)
+    } else {
+        OpenFailed::Report
+    }
+}
+
+/// Writes `bytes` to `<path>.tmp`, then renames it over `path` (folder created).
+fn write_replacing(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut temp = path.as_os_str().to_owned();
+    temp.push(".tmp");
+    let temp = PathBuf::from(temp);
+    std::fs::write(&temp, bytes)?;
+    std::fs::rename(&temp, path).inspect_err(|_| {
+        let _ = std::fs::remove_file(&temp);
+    })
+}
+
+fn read_text(path: &Path) -> Option<String> {
+    match std::fs::read(path) {
+        Ok(bytes) => Some(String::from_utf8_lossy(&bytes).into_owned()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        // Present but unreadable: as an unreadable marker (a standard start that died).
+        Err(_) => Some(String::new()),
+    }
+}
+
+/// Reads `render.json` and the marker, decides (Ruling 7), writes this start's marker when the
+/// plan says so, and logs the decision.
+pub(crate) fn start_in(
+    paths: Option<&StartPaths>,
+    env_forces_compatible: bool,
+    is_retry: bool,
+    other_instance: bool,
+) -> StartState {
+    let remembered =
+        start_guard::remembered_mode(paths.and_then(|p| read_text(&p.render)).as_deref());
+    // Another instance's marker is not judged (it may be starting right now).
+    let stale = if other_instance {
+        None
+    } else {
+        start_guard::stale_marker(paths.and_then(|p| read_text(&p.marker)).as_deref())
+    };
+    let plan = start_guard::plan_start(&StartInput {
+        remembered,
+        env_forces_compatible,
+        is_retry,
+        stale_marker: stale,
+        other_instance,
+    });
+    log::info!("{}", start_guard::start_line(&plan));
+    let mut marker_on_disk = false;
+    if plan.write_marker
+        && let Some(p) = paths
+    {
+        let marker = StartMarker {
+            pid: std::process::id(),
+            mode: plan.mode,
+        };
+        match write_replacing(&p.marker, &serde_json::to_vec(&marker).unwrap_or_default()) {
+            Ok(()) => marker_on_disk = true,
+            Err(error) => log::warn!("the start marker could not be written: {error}"),
+        }
+    }
+    StartState {
+        paths: paths.cloned(),
+        plan,
+        remembered,
+        is_retry,
+        marker_on_disk: AtomicBool::new(marker_on_disk),
+        first_frame_seen: AtomicBool::new(false),
+        variable_set: AtomicBool::new(false),
+    }
+}
+
+/// Removes this start's marker, once; never another start's.
+fn remove_own_marker(state: &StartState) {
+    if !state.marker_on_disk.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    if let Some(p) = &state.paths
+        && let Err(error) = std::fs::remove_file(&p.marker)
+        && error.kind() != io::ErrorKind::NotFound
+    {
+        log::warn!("the start marker could not be removed: {error}");
+    }
+}
+
+/// The first frame was drawn: remove the marker, remember a rescue's mode, log it. Once.
+pub(crate) fn first_frame_in(state: &StartState) {
+    if state.first_frame_seen.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    remove_own_marker(state);
+    if let Some(mode) = start_guard::remember_after_first_frame(&state.plan, state.remembered)
+        && let Some(p) = &state.paths
+        && let Err(error) = write_replacing(
+            &p.render,
+            &serde_json::to_vec(&RenderFile { mode }).unwrap_or_default(),
+        )
+    {
+        log::warn!("the display mode could not be remembered: {error}");
+    }
+    log::info!("{}", start_guard::first_frame_line(state.plan.mode));
+}
+
+/// An orderly end (or a crash test, or a failed open): this start's marker goes.
+pub(crate) fn orderly_quit_in(state: &StartState) {
+    remove_own_marker(state);
+}
+
+/// "Try standard display mode again": the next start is standard.
+pub(crate) fn request_standard_in(paths: &StartPaths) -> io::Result<()> {
+    let standard = RenderFile {
+        mode: RenderMode::Standard,
+    };
+    write_replacing(
+        &paths.render,
+        &serde_json::to_vec(&standard).unwrap_or_default(),
+    )
+}
+
+/// 3b §5 step 9e: decides this start's mode and keeps the decision for the rest of the
+/// process. Returns the plan and the remembered mode.
+pub fn plan_gui_start(
+    paths: Option<&StartPaths>,
+    env_forces_compatible: bool,
+    is_retry: bool,
+    other_instance: bool,
+) -> (StartPlan, RenderMode) {
+    let state = start_in(paths, env_forces_compatible, is_retry, other_instance);
+    let decided = (state.plan, state.remembered);
+    let _ = START.set(state);
+    decided
+}
+
+/// 3b §5 step 9f (Windows): a compatible start the person did not force sets
+/// `GPUI_DISABLE_DIRECT_COMPOSITION=1` before `Application::new()` reads it.
+pub fn set_render_variable(env_forced: bool) {
+    let Some(state) = START.get() else {
+        return;
+    };
+    if !needs_render_variable(&state.plan, env_forced) {
+        return;
+    }
+    #[cfg(windows)]
+    {
+        // SAFETY: `set_var` is always safe on Windows, in single- and multi-threaded programs
+        // (Rust documentation). macOS GPUI ignores the variable, so it is not set there.
+        unsafe { std::env::set_var(RENDER_VARIABLE, "1") };
+        state.variable_set.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Top of the `Application::run` closure, once GPUI has read the variable: remove it when this
+/// start set it or is a retry, so the shells in the window never inherit it (plan review M-11).
+pub fn forget_render_variable() {
+    let Some(state) = START.get() else {
+        return;
+    };
+    if !forgets_render_variable(state.variable_set.load(Ordering::SeqCst), state.is_retry) {
+        return;
+    }
+    #[cfg(windows)]
+    {
+        // SAFETY: `remove_var` is always safe on Windows (Rust documentation).
+        unsafe { std::env::remove_var(RENDER_VARIABLE) };
+    }
+}
+
+/// The second `on_next_frame` callback after the window opened (Ruling 6).
+pub fn first_frame_drawn() {
+    if let Some(state) = START.get() {
+        first_frame_in(state);
+    }
+}
+
+/// The last window closed, or a crash test is about to crash (Ruling 31).
+pub fn orderly_quit() {
+    if let Some(state) = START.get() {
+        orderly_quit_in(state);
+    }
+}
+
+/// This start's mode, why, and the remembered mode (standard and default before a GUI start).
+pub fn render_status() -> RenderStatus {
+    match START.get() {
+        Some(state) => RenderStatus {
+            mode: state.plan.mode,
+            reason: state.plan.reason,
+            remembered: state.remembered,
+        },
+        None => RenderStatus {
+            mode: RenderMode::Standard,
+            reason: StartReason::Default,
+            remembered: RenderMode::Standard,
+        },
+    }
+}
+
+/// Settings › Display, "Try standard display mode again" (A10).
+#[allow(dead_code)] // Settings › Display (A10) is its caller
+pub fn request_standard_next_start() -> io::Result<()> {
+    match StartPaths::this_pc() {
+        Some(paths) => request_standard_in(&paths),
+        None => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "LOCALAPPDATA is not set",
+        )),
+    }
+}
+
+/// `open_window` failed (3b §5): log it, remove this start's marker, then relaunch in
+/// compatible mode (a standard start that is not a retry, Windows only) or write the
+/// start-failure file, show the reporter's dialog and exit 1. Never returns.
+pub fn window_failed(error: &anyhow::Error) -> ! {
+    log::error!("the window could not be opened: {error:#}");
+    let plan = START.get().map(|state| {
+        orderly_quit_in(state);
+        state.plan
+    });
+    let plan = plan.unwrap_or(StartPlan {
+        mode: RenderMode::Standard,
+        reason: StartReason::Default,
+        write_marker: false,
+    });
+    if open_failure_action(&plan, cfg!(windows)) == OpenFailed::RelaunchCompatible {
+        match relaunch_compatible() {
+            Ok(()) => {
+                log::info!("relaunched in compatible display mode");
+                std::process::exit(0);
+            }
+            Err(error) => log::warn!("the compatible relaunch did not start: {error}"),
+        }
+    }
+    let ctx = crash::context()
+        .cloned()
+        .unwrap_or_else(crash::CrashContext::this_process);
+    let file = crash::write_window_failure(&ctx, error, Some(&start_guard::start_line(&plan)));
+    // A file that could not be written anywhere: the dialog names the logs folder.
+    let named = file.unwrap_or_else(|| ctx.logs_dir.clone());
+    crash::start_reporter(&ctx, DialogKind::WindowFailed, &named);
+    std::process::exit(1);
+}
+
+/// This exe again with the same arguments, `SHELLX_RENDER_RETRY=1` and the variable set.
+fn relaunch_compatible() -> io::Result<()> {
+    let exe = std::env::current_exe()?;
+    std::process::Command::new(exe)
+        .args(std::env::args_os().skip(1))
+        .env(RETRY_VARIABLE, "1")
+        .env(RENDER_VARIABLE, "1")
+        .spawn()
+        .map(|_| ())
+}
+
+/// The installer's mutex (Ruling 27), created by the window only and kept open until exit.
+/// True when it already existed: another ShellX is running. False off Windows or when it
+/// cannot be created (logged).
+pub fn acquire_app_mutex() -> bool {
+    #[cfg(windows)]
+    {
+        use std::sync::atomic::AtomicUsize;
+        use windows_sys::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError, SetLastError};
+        use windows_sys::Win32::System::Threading::CreateMutexW;
+        static APP_MUTEX: AtomicUsize = AtomicUsize::new(0);
+        let name: Vec<u16> = start_guard::APP_MUTEX_NAME
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        // SAFETY: plain value; clears a stale error so the read below is this call's.
+        unsafe { SetLastError(0) };
+        // SAFETY: null attributes (not inherited by the relaunch), not initially owned, a
+        // NUL-terminated name that outlives the call.
+        let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
+        // SAFETY: no arguments; read right after the call it describes.
+        let error = unsafe { GetLastError() };
+        if handle.is_null() {
+            log::warn!("the app mutex could not be created (error {error})");
+            return false;
+        }
+        // Kept for the process lifetime and never closed: Windows closes it at exit.
+        APP_MUTEX.store(handle as usize, Ordering::SeqCst);
+        error == ERROR_ALREADY_EXISTS
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -104,7 +505,11 @@ mod tests {
         let state = start_in(Some(&p), true, true, true);
         assert_eq!(
             (state.plan.mode, state.plan.reason, state.plan.write_marker),
-            (RenderMode::Compatible, StartReason::RetryAfterOpenFailed, true)
+            (
+                RenderMode::Compatible,
+                StartReason::RetryAfterOpenFailed,
+                true
+            )
         );
         assert_eq!(read(&p.marker), marker_of("compatible"));
         assert_eq!(on_open_failed(&state.plan), OpenFailed::Report);

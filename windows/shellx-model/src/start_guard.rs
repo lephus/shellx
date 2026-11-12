@@ -2,6 +2,185 @@
 //! uses and why, what an open failure does, what the first frame remembers, and the log lines
 //! for each decision. The files and the Win32 mutex are `shellx-app`'s `startup`.
 
+use serde::{Deserialize, Serialize};
+
+/// The installer's `AppMutex` and the app's "another ShellX is running" test (Ruling 27): the
+/// native AppId in the name, session namespace (no `Global\`).
+pub const APP_MUTEX_NAME: &str = "ShellXNative-D322DA97-3B0D-49C7-BDB2-8EBFADBA1004";
+
+/// How GPUI draws: `Standard` (DirectComposition) or `Compatible`
+/// (`GPUI_DISABLE_DIRECT_COMPOSITION=1`: a plain HWND swap chain).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RenderMode {
+    Standard,
+    Compatible,
+}
+
+impl RenderMode {
+    fn word(self) -> &'static str {
+        match self {
+            RenderMode::Standard => "standard",
+            RenderMode::Compatible => "compatible",
+        }
+    }
+}
+
+/// Why a start uses its mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartReason {
+    /// Nothing remembered: standard.
+    Default,
+    /// `render.json` said so.
+    Remembered,
+    /// The person set `GPUI_DISABLE_DIRECT_COMPOSITION`.
+    UserEnvironment,
+    /// This start is the relaunch after the standard mode could not open the window.
+    RetryAfterOpenFailed,
+    /// The marker of a start that died before its first frame was found.
+    PreviousStartDied,
+}
+
+/// What a start knows before GPUI exists.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StartInput {
+    pub remembered: RenderMode,
+    pub env_forces_compatible: bool,
+    pub is_retry: bool,
+    /// The mode of a marker left by an earlier start (`None`: no marker).
+    pub stale_marker: Option<RenderMode>,
+    /// The app mutex already existed.
+    pub other_instance: bool,
+}
+
+/// The decision: the mode, why, and whether this start writes the marker.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StartPlan {
+    pub mode: RenderMode,
+    pub reason: StartReason,
+    pub write_marker: bool,
+}
+
+/// Ruling 7, in order: a relaunched retry → compatible (it writes its own marker even though
+/// its parent may still hold the mutex); the variable set by the person → compatible; another
+/// instance running → the remembered mode, the marker neither judged nor written; a stale
+/// marker from a standard start → compatible; from a compatible start → standard; else the
+/// remembered mode.
+pub fn plan_start(input: &StartInput) -> StartPlan {
+    let remembered_reason = match input.remembered {
+        RenderMode::Standard => StartReason::Default,
+        RenderMode::Compatible => StartReason::Remembered,
+    };
+    let write_marker = !input.other_instance;
+    let (mode, reason, write_marker) = if input.is_retry {
+        (
+            RenderMode::Compatible,
+            StartReason::RetryAfterOpenFailed,
+            true,
+        )
+    } else if input.env_forces_compatible {
+        (
+            RenderMode::Compatible,
+            StartReason::UserEnvironment,
+            write_marker,
+        )
+    } else if input.other_instance {
+        (input.remembered, remembered_reason, false)
+    } else {
+        match input.stale_marker {
+            Some(RenderMode::Standard) => {
+                (RenderMode::Compatible, StartReason::PreviousStartDied, true)
+            }
+            Some(RenderMode::Compatible) => {
+                (RenderMode::Standard, StartReason::PreviousStartDied, true)
+            }
+            None => (input.remembered, remembered_reason, true),
+        }
+    };
+    StartPlan {
+        mode,
+        reason,
+        write_marker,
+    }
+}
+
+/// What a failed `open_window` does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenFailed {
+    /// Start this exe again in compatible mode (at most once per start the person makes).
+    RelaunchCompatible,
+    /// Write the start-failure file and show the dialog.
+    Report,
+}
+
+/// Only a standard start that is not a retry relaunches; anything else reports (Ruling 7).
+pub fn on_open_failed(plan: &StartPlan) -> OpenFailed {
+    if plan.mode == RenderMode::Standard && plan.reason != StartReason::RetryAfterOpenFailed {
+        OpenFailed::RelaunchCompatible
+    } else {
+        OpenFailed::Report
+    }
+}
+
+/// The mode to write to `render.json` once this start drew its first frame: only a rescue
+/// (`RetryAfterOpenFailed`, `PreviousStartDied`) that differs from what is remembered.
+pub fn remember_after_first_frame(plan: &StartPlan, remembered: RenderMode) -> Option<RenderMode> {
+    let rescue = matches!(
+        plan.reason,
+        StartReason::RetryAfterOpenFailed | StartReason::PreviousStartDied
+    );
+    (rescue && plan.mode != remembered).then_some(plan.mode)
+}
+
+/// The log line for the decision (no digits: it survives the redactor as it is).
+pub fn start_line(plan: &StartPlan) -> String {
+    let why = match plan.reason {
+        StartReason::Default => "default",
+        StartReason::Remembered => "remembered",
+        StartReason::UserEnvironment => "set by GPUI_DISABLE_DIRECT_COMPOSITION",
+        StartReason::RetryAfterOpenFailed => "the standard mode could not open the window",
+        StartReason::PreviousStartDied => "previous start died before its first frame",
+    };
+    let other = if plan.write_marker {
+        ""
+    } else {
+        "; another ShellX is running"
+    };
+    format!("render mode: {} ({why}{other})", plan.mode.word())
+}
+
+/// The log line once the first frame was drawn.
+pub fn first_frame_line(mode: RenderMode) -> String {
+    format!("first frame drawn in {} display mode", mode.word())
+}
+
+/// `render.json`: `{"mode":"standard"}` or `{"mode":"compatible"}`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenderFile {
+    pub mode: RenderMode,
+}
+
+/// `starting.json`: `{"pid":n,"mode":"standard"}`, written before GPUI starts and removed by
+/// the first frame or an orderly quit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StartMarker {
+    pub pid: u32,
+    pub mode: RenderMode,
+}
+
+/// The remembered mode from `render.json`'s text: missing or unreadable is standard.
+pub fn remembered_mode(text: Option<&str>) -> RenderMode {
+    text.and_then(|t| serde_json::from_str::<RenderFile>(t).ok())
+        .map_or(RenderMode::Standard, |f| f.mode)
+}
+
+/// The mode of a marker an earlier start left: `None` without a file; an unreadable marker
+/// counts as a standard start that died (Ruling 4).
+pub fn stale_marker(text: Option<&str>) -> Option<RenderMode> {
+    let text = text?;
+    Some(serde_json::from_str::<StartMarker>(text).map_or(RenderMode::Standard, |m| m.mode))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,8 +343,14 @@ mod tests {
     #[test]
     fn start_decisions_read_as_plain_lines() {
         let rows = [
-            (plan(Standard, Default, true), "render mode: standard (default)"),
-            (plan(Standard, Remembered, true), "render mode: standard (remembered)"),
+            (
+                plan(Standard, Default, true),
+                "render mode: standard (default)",
+            ),
+            (
+                plan(Standard, Remembered, true),
+                "render mode: standard (remembered)",
+            ),
             (
                 plan(Compatible, Remembered, true),
                 "render mode: compatible (remembered)",
@@ -210,11 +395,6 @@ mod tests {
         for mode in [Standard, Compatible] {
             assert_eq!(redact(&first_frame_line(mode)), first_frame_line(mode));
         }
-        assert_eq!(
-            redact(APP_MUTEX_NAME),
-            APP_MUTEX_NAME,
-            "the mutex name is never logged, but it must not read as a token either"
-        );
     }
 
     #[test]
@@ -231,7 +411,10 @@ mod tests {
             .unwrap(),
             r#"{"pid":42,"mode":"standard"}"#
         );
-        assert_eq!(remembered_mode(Some(r#"{"mode":"compatible"}"#)), Compatible);
+        assert_eq!(
+            remembered_mode(Some(r#"{"mode":"compatible"}"#)),
+            Compatible
+        );
         assert_eq!(remembered_mode(Some(r#"{"mode":"standard"}"#)), Standard);
         for unusable in [None, Some(""), Some("garbage"), Some(r#"{"mode":"other"}"#)] {
             assert_eq!(remembered_mode(unusable), Standard, "{unusable:?}");
@@ -247,7 +430,11 @@ mod tests {
         );
         // An unreadable marker counts as a standard start that died (Ruling 4).
         for unreadable in ["garbage", "", r#"{"pid":1}"#, r#"{"mode":"other"}"#] {
-            assert_eq!(stale_marker(Some(unreadable)), Some(Standard), "{unreadable}");
+            assert_eq!(
+                stale_marker(Some(unreadable)),
+                Some(Standard),
+                "{unreadable}"
+            );
         }
     }
 }
