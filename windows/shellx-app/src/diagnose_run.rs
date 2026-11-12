@@ -810,6 +810,9 @@ fn windows_error_events() -> Option<Result<Vec<String>, String>> {
                 "/c:5",
                 "/rd:true",
                 "/f:xml",
+                // Unicode output (UTF-16LE), so a Vietnamese user folder in AppPath stays
+                // readable; decode_tool_output reads it (B-2 review m3).
+                "/uni:true",
                 "/q:*[System[Provider[@Name='Application Error']] and EventData[Data='shellx-desktop.exe']]",
             ])
             .stdin(std::process::Stdio::null())
