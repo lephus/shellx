@@ -305,6 +305,26 @@ def google_web_client_problems(oauth_xml: str, ledger_text):
     return value, []
 
 
+LICENCE_NAMES = (b"third_party_licenses", b"third_party_license_metadata")   # resource names in resources.pb
+LICENCE_ASSET_ENTRY = "base/assets/licenses/third_party_licenses.txt"        # the fallback's file
+LICENCE_PLACEHOLDER = b"Debug License Info"
+
+
+def licence_notice_problems(resources: bytes, res_files: dict, asset) -> list:
+    """The bundle must carry open-source licence notices: Google's plugin resources or the bundled asset."""
+    if asset:
+        return []
+    if all(name in resources for name in LICENCE_NAMES):
+        for entry in sorted(res_files):
+            if LICENCE_PLACEHOLDER in res_files[entry]:
+                return ["%s holds the licences plugin's debug placeholder (\"Debug License Info\"): the plugin "
+                        "did not see the release dependencies" % entry]
+        return []
+    return ["the bundle has no open-source licence notices: neither the resources raw/third_party_licenses and "
+            "raw/third_party_license_metadata (Google's OSS licences plugin) nor "
+            "assets/licenses/third_party_licenses.txt"]
+
+
 def _read_text(path):
     with open(path, encoding="utf-8") as f:
         return f.read()
@@ -399,6 +419,8 @@ def _bundle_checks(args, violations, missing, app_id, web_id):
         if hits:
             violations.append("release contains debug-only code: %s" % ", ".join(hits))
         resources = b"".join(z.read(n) for n in names if re.match(r"^[^/]+/resources\.pb$", n))
+        res_files = {n: z.read(n) for n in names if re.match(r"^base/res/", n) and not n.endswith("/")}
+        licence_asset = z.read(LICENCE_ASSET_ENTRY) if LICENCE_ASSET_ENTRY in names else None
     if app_id and app_id.encode() not in resources:
         violations.append("the bundle's resources do not hold the Firebase app id %s (the google-services plugin "
                           "did not run for release)" % app_id)
@@ -408,6 +430,7 @@ def _bundle_checks(args, violations, missing, app_id, web_id):
         violations.append('the bundle\'s resources do not hold Google\'s "G" (drawable/ic_google_g): plan 3D Task 9 '
                           'Steps 7\u20139 (USER) are not done, or the resource shrinker dropped it '
                           '(res/raw/keep_google_branding.xml)')
+    violations.extend(licence_notice_problems(resources, res_files, licence_asset))
     native = "%d libraries 16 KB aligned" % len(libraries) if libraries else "none"
     return ("bundle checks passed: %s %s (%s), target SDK %s (Google Play needs %d since %s), %d permissions, "
             "native code: %s, R8 mapping %d bytes"
