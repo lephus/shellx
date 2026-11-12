@@ -10,7 +10,7 @@ SHELLX_APS_ENVIRONMENT = development
 // Google sign-in: the one iOS OAuth client of com.shellx.prod (Debug and Release use the same one) without
 // its ".apps.googleusercontent.com" suffix (Info.plist ShellXGoogleClientID). Not a secret. Until that client
 // exists, the placeholder makes Continue with Google report "not available in this build".
-SHELLX_GOOGLE_IOS_CLIENT = 0-shellx-placeholder
+SHELLX_GOOGLE_IOS_CLIENT = 852509094750-2u1non5qq4qgpg0i1ko9u2hkdicqkbfj
 // App Transport Security's local-network exception, for a relay on the Mac over plain HTTP
 // (SHELLX_API_BASE, honoured by Debug builds only). Release never has it: ios.sh --check-app refuses it.
 INFOPLIST_PREPROCESSOR_DEFINITIONS = SHELLX_ALLOWS_LOCAL_NETWORKING=1
