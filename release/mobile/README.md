@@ -172,9 +172,10 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
   (`assets/licenses/third_party_licenses.txt`), and a notice file that is out of date (next paragraphs).
 
 Each refusal prints `violation: <what>` lines and no bundle is copied to `build/release/android/`.
-`release/mobile/android.sh --check-aab <file.aab>` runs the same bundle checks on a built bundle; it also compares the bundle's signer with the upload key, so the upload key properties file must exist on that machine. On 2026-11-12
-the signed bundle prints exactly one violation: `google_web_client_id` is still the placeholder, until plan 1D's
-user steps (the Web OAuth client) are done and its id is written into `google_oauth.xml`.
+`release/mobile/android.sh --check-aab <file.aab>` runs the same bundle checks on a built bundle; it also compares the bundle's signer with the upload key, so the upload key properties file must exist on that machine.
+`google_oauth.xml` holds the Web client that Firebase created for project `shellxpro` ("Web client (auto created by
+Google Service)", the type-3 client of `google-services.json`) since 2026-11-12; the relay must list the same id
+in `GOOGLE_CLIENT_IDS`.
 
 **The 16 KB rule.** For each `.so` of every ABI, `check_android_bundle.py` refuses a LOAD segment aligned below
 16 KB (`a LOAD segment is aligned to 4096 bytes; Google Play needs 16 KB (16384)`). It also rounds the GNU_RELRO

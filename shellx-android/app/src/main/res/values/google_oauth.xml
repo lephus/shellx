@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Google sign-in (S1 §6.7, contracts §16): the OAuth client of type "Web application" in project shellxpro,
-     used as Credential Manager's serverClientId. PLACEHOLDER until plan 1D copies the real ID from
-     docs/superpowers/ledgers/shellx-signin-rollout.md; release/mobile/android.sh (3H) refuses a release
-     that still holds it. Client IDs are not secrets. -->
+     used as Credential Manager's serverClientId. This is "Web client (auto created by Google Service)", the
+     type-3 client of app/google-services.json. The relay must list it in GOOGLE_CLIENT_IDS. Client IDs are
+     not secrets. -->
 <resources>
-    <string name="google_web_client_id" translatable="false">0-shellx-placeholder.apps.googleusercontent.com</string>
+    <string name="google_web_client_id" translatable="false">852509094750-t48ejrvratb8picdha2s9geuafdimth4.apps.googleusercontent.com</string>
 </resources>
