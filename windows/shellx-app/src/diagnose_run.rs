@@ -24,7 +24,7 @@ use shellx_model::shell::{ShellChoice, ShellError, kind_label, launch_label};
 use shellx_model::start_guard::{self, RenderMode};
 
 use crate::core_service::{ConfiguredCore, MachineFacts};
-use crate::local_pty::{self, settings};
+use crate::local_pty::settings::{self, PaneStart, ShellSnapshot};
 use crate::startup::StartPaths;
 use crate::{build_info, crash, os_info, paths, smoke};
 
@@ -294,10 +294,15 @@ fn state_dir_check() -> Check {
     }
 }
 
-/// `<label>: <program>` per shell found, and the choice with what a new tab starts. A custom
-/// command line is never written (only that there is one and its program).
-fn shells_now() -> (Vec<String>, String) {
-    let snapshot = settings::shells().refresh_now();
+/// `<label>: <program>` per shell found, and the choice with what a new tab starts
+/// (`pane_start`, as the window does: a stored program that is gone starts Automatic, named
+/// with `instead of <program>`). Only programs and file names: a custom command line's or
+/// `SHELLX_SHELL`'s arguments (a password, an address) are never written, because the
+/// redactor cannot know them (B-2 review m1, m2).
+pub(crate) fn shells_text(
+    snapshot: &ShellSnapshot,
+    start: &Result<PaneStart, ShellError>,
+) -> (Vec<String>, String) {
     let found = snapshot
         .found
         .iter()
@@ -312,14 +317,38 @@ fn shells_now() -> (Vec<String>, String) {
         Some(_) => format!("{choice}, overridden by SHELLX_SHELL"),
         None => choice,
     };
-    let starts = match &snapshot.plan {
-        None => "not looked up".to_string(),
-        Some(Ok(plan)) => format!("{} ({})", launch_label(&plan.first), plan.first.program),
-        Some(Err(ShellError::NoShellFound)) => "no shell found".to_string(),
-        Some(Err(ShellError::Custom(_))) => "the custom command line cannot start".to_string(),
-        Some(Err(ShellError::Override(_))) => "SHELLX_SHELL cannot start".to_string(),
+    let starts = match start {
+        Ok(start) => {
+            let first = &start.plan.first;
+            match &start.instead_of {
+                Some(missing) => format!("{} ({}) instead of {missing}", first.label, first.program),
+                None => format!("{} ({})", first.label, first.program),
+            }
+        }
+        Err(ShellError::NoShellFound) => "no shell (none found)".to_string(),
+        Err(ShellError::Custom(_)) => "no shell (the custom command line cannot start)".to_string(),
+        Err(ShellError::Override(_)) => "no shell (SHELLX_SHELL cannot start)".to_string(),
     };
     (found, format!("{choice}; new tabs start {starts}"))
+}
+
+/// What a new tab starts, checked as the window starts it: the plan's first shell, then its
+/// fallback when the first cannot start (Ruling 15). No shell: one failed check.
+fn checks_for(start: &Result<PaneStart, ShellError>) -> Vec<Check> {
+    let Ok(start) = start else {
+        return vec![Check {
+            name: "new tab".into(),
+            ok: false,
+            millis: None,
+            detail: "no shell starts (see chosen)".into(),
+        }];
+    };
+    let mut checks = smoke::shell_checks(&start.plan.first, SHELL_STEP_BOUND);
+    let first_started = checks.first().is_some_and(|c| c.ok);
+    if !first_started && let Some(fallback) = &start.plan.fallback {
+        checks.extend(smoke::shell_checks(fallback, SHELL_STEP_BOUND));
+    }
+    checks
 }
 
 fn chosen_gpu_now(logs: &Path) -> String {
@@ -486,8 +515,17 @@ pub fn run(open_folder: bool) -> i32 {
     });
     let gpus = start(gpus_info);
     let dwm = start(dwm_timing);
-    let shells = start(shells_now);
-    let checks = start(|| smoke::shell_checks(&local_pty::default_shell(), SHELL_STEP_BOUND));
+    // One thread looks the shells up, decides what a new tab starts (after the lookup, so
+    // both agree), sends the `[shells]` text at once, then checks that shell (B-2 review m2).
+    let (shells_tx, shells_rx) = mpsc::channel();
+    let checks = start(move || {
+        let snapshot = settings::shells().refresh_now();
+        let pane = settings::shells().pane_start();
+        let _ = shells_tx.send(Ok(shells_text(&snapshot, &pane)));
+        checks_for(&pane)
+    });
+    // A probe that ends before sending drops `shells_tx`: `wait_until` reads that as failed.
+    let shells = Pending { rx: shells_rx };
     let relay = start(|| relay_check(&ConfiguredCore::this_pc(MachineFacts::this_pc())));
     let events = start(windows_error_events);
     report.chosen_gpu = text_or_reason(chosen_gpu.wait_until(deadline, PROBE_BOUND));

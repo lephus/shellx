@@ -1,7 +1,7 @@
 //! Working directory and git branch of a local terminal, without GPUI.
 //!
-//! The default shell reports its directory with OSC 7 at every prompt
-//! (`local_pty::default_shell`); `cwd_from_osc7` turns that URL into a path,
+//! The shell a new tab starts reports its directory with OSC 7 at every
+//! prompt (the PowerShell prompt hook); `cwd_from_osc7` turns that URL into a path,
 //! `display_path` shortens it with `~` like the Mac sidebar, and `git_branch`
 //! reads the branch from `.git/HEAD` (no `git` process, no libgit).
 

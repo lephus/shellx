@@ -261,17 +261,6 @@ pub(crate) fn dev_bash(override_shell: Option<&str>) -> ShellCmd {
     }
 }
 
-/// What a new tab starts first (`--diagnose` checks it; `--smoke` no longer runs it, Ruling
-/// 39): the first shell of `shells().plan_for_new_pane()`, or Windows PowerShell by its
-/// System32 path when the plan is an error. On the Mac: bash.
-pub fn default_shell() -> ShellCmd {
-    let shells = settings::shells();
-    match shells.plan_for_new_pane() {
-        Ok(plan) => plan.first,
-        Err(_) => settings::startup_plan(&shells.probe()).first,
-    }
-}
-
 /// Command Prompt, for a pane whose shell cannot start: the catalogue's, as
 /// cached by the last lookup. On the Mac: `/bin/sh -i`.
 pub fn command_prompt() -> ShellCmd {
