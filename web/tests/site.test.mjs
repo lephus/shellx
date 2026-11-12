@@ -45,6 +45,25 @@ function hrefs(html) {
   return [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
 }
 
+test('windowsSha256 is empty or 64 hex characters', () => {
+  const sha = config.windowsSha256;
+  assert.ok(sha === null || sha === undefined || /^[0-9a-fA-F]{64}$/.test(sha), 'windowsSha256 must be null or 64 hex characters');
+});
+
+test('the Windows download explains SmartScreen and Smart App Control, and shows the SHA-256 only when set', () => {
+  const html = readPage('/');
+  assert.ok(html.includes('id="windows-help"'), 'home: no Windows install help');
+  for (const needle of ['More info', 'Run anyway', 'Smart App Control']) {
+    assert.ok(html.includes(needle), `home: Windows help lacks "${needle}"`);
+  }
+  const sha = config.windowsSha256;
+  if (sha) {
+    assert.ok(html.includes(sha.toLowerCase()), 'home: the SHA-256 from site.config.json is not shown');
+  } else {
+    assert.ok(!html.includes('data-windows-sha256'), 'home: a SHA-256 block is shown without a value');
+  }
+});
+
 test('site config is valid', () => {
   assert.match(config.desktopVersion, /^\d+\.\d+\.\d+$/);
   assert.equal(config.downloadBaseUrl, 'https://download.shellx.pro/desktop');

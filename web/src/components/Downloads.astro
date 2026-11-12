@@ -1,6 +1,6 @@
 ---
 import { ui, type Lang } from '../i18n/ui';
-import { appStoreUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
+import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, windowsDownloadUrl, windowsSha256 } from '../lib/site';
 
 interface Props {
   lang: Lang;
@@ -22,6 +22,7 @@ const desktops = [
   { id: 'macos', label: t.macos, requirement: t.macosRequirement, url: macDownloadUrl(), logo: logos.apple },
   { id: 'windows', label: t.windows, requirement: t.windowsRequirement, url: windowsDownloadUrl(), logo: logos.windows },
 ];
+const shaCommand = t.winHelpShaCommand.replace('{version}', desktopVersion);
 const stores = [
   { id: 'app-store', label: t.appStore, requirement: t.appStoreRequirement, url: appStoreUrl, logo: logos.appStore },
   { id: 'google-play', label: t.googlePlay, requirement: t.googlePlayRequirement, url: googlePlayUrl, logo: logos.googlePlay },
@@ -38,6 +39,24 @@ const stores = [
         <span class="arrow" aria-hidden="true">↓</span>
       </a>
     ))}
+    <div class="win-help" id="windows-help">
+      <h4>{t.winHelpHeading}</h4>
+      <p>{t.winHelpIntro}</p>
+      <ol>
+        <li>{t.winHelpSmartScreen}</li>
+        <li>{t.winHelpSmartAppControl}</li>
+      </ol>
+      {
+        windowsSha256 && (
+          <div class="sha">
+            <p>{t.winHelpSha}</p>
+            <code class="sha-value" data-windows-sha256>{windowsSha256}</code>
+            <p class="hint">{t.winHelpShaHint}</p>
+            <code class="sha-cmd">{shaCommand}</code>
+          </div>
+        )
+      }
+    </div>
   </div>
   <div class="group">
     <h3>{t.mobileHeading}</h3>
@@ -94,6 +113,19 @@ const stores = [
     box-shadow: 0 10px 28px -12px rgba(167, 139, 250, 0.8);
   }
   a.button:hover .arrow { color: var(--purple-l); transform: translateY(2px); }
+  .win-help { margin-top: 1rem; color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+  .win-help h4 { margin: 0 0 0.35rem; color: var(--fg); font-size: 0.95rem; }
+  .win-help p { margin: 0 0 0.5rem; }
+  .win-help ol { margin: 0 0 0.5rem; padding-left: 1.2rem; }
+  .win-help li { margin-bottom: 0.4rem; }
+  .win-help code {
+    display: block; padding: 0.5rem 0.65rem; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+    overflow-wrap: anywhere; user-select: all;
+  }
+  .win-help .sha { margin-top: 0.75rem; }
+  .win-help .sha > p:first-child { color: var(--fg); margin-bottom: 0.3rem; }
+  .win-help .hint { margin-top: 0.6rem; }
   .disabled { opacity: 0.6; }
   .disabled .logo { background: var(--card-2); color: var(--muted); border: 1px solid var(--border); }
 </style>
