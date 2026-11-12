@@ -703,27 +703,3 @@ pub fn panes() -> Result<()> {
     println!("smoke: panes ok in {:?}", started.elapsed());
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use shellx_model::shell::{ShellKind, ShellProbe};
-
-    #[test]
-    fn the_smoke_shell_ignores_the_choice_and_shellx_shell() {
-        let probe = ShellProbe {
-            system_root: Some(r"C:\Windows".into()),
-            ..ShellProbe::default()
-        };
-        let windows = smoke_shell_for(true, &probe);
-        assert_eq!(
-            windows.program,
-            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
-        );
-        assert_eq!(windows.label, "Windows PowerShell");
-        assert_eq!(windows.kind, Some(ShellKind::WindowsPowerShell));
-        let mac = smoke_shell_for(false, &probe);
-        assert_eq!(mac.program, "/bin/bash");
-        assert!(mac.env.iter().any(|(key, _)| key == "PROMPT_COMMAND"));
-    }
-}

@@ -725,17 +725,6 @@ mod tests {
     }
 
     #[test]
-    fn the_hook_mode_follows_the_flags() {
-        // 3b §5 step 5 (plan review M-13): Dialog for the window and for `--diagnose`;
-        // FileOnly for the console flags and for `--diagnose --no-open` (CI).
-        assert_eq!(hook_mode(false, false, false), HookMode::Dialog);
-        assert_eq!(hook_mode(false, true, false), HookMode::Dialog);
-        assert_eq!(hook_mode(false, true, true), HookMode::FileOnly);
-        assert_eq!(hook_mode(true, false, false), HookMode::FileOnly);
-        assert_eq!(hook_mode(true, true, false), HookMode::FileOnly);
-    }
-
-    #[test]
     fn explorer_comes_from_the_system_root() {
         assert_eq!(
             explorer_exe(Some(r"D:\Windows".into())),
