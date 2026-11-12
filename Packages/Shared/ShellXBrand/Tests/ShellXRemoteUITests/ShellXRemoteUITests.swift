@@ -222,10 +222,13 @@ private func rm(
         // No raw code reaches the screen. A reopened sheet can meet the other flow still running.
         #expect(SignInErrorMessage.text(forCode: "email_sign_in_in_progress", labels: labels) == "s")
         #expect(SignInErrorMessage.text(forCode: "google_in_progress", labels: labels) == "s")
+        // A relay without the Google routes (production's 404 on /v1/auth/nonce) reads as the email path's "not available".
+        #expect(SignInErrorMessage.text(forCode: "not_found", labels: labels) == "un")
+        #expect(SignInErrorMessage.text(forCode: "http_404", labels: labels) == "un")
         // Every other code the Google flow can throw: the relay's own (passed through by the core), a body-less
         // proxy answer, the core's local ones and the Swift client's.
         let withoutTheirOwn = [
-            "invalid_device", "bad_request", "unauthorized", "not_found", "internal_error", "payload_too_large",
+            "invalid_device", "bad_request", "unauthorized", "internal_error", "payload_too_large",
             "http_502", "http_503", "server", "not_logged_in", "not_configured", "invalid_params", "io", "crypto",
             "state_dir_insecure", "state_file_insecure", "unknown_method", "invalid_json", "bad_response",
             "bad_relay_url", "weird_code"
