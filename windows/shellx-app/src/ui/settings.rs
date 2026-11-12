@@ -90,7 +90,7 @@ impl SettingsPanel {
                 }
             }),
         ];
-        let mut panel = SettingsPanel {
+        let panel = SettingsPanel {
             account,
             focus: cx.focus_handle(),
             open: false,
@@ -106,11 +106,15 @@ impl SettingsPanel {
         };
         // Development only (Ruling 24): Settings is open at start.
         #[cfg(target_os = "macos")]
-        if std::env::var("SHELLX_DEV_PREVIEW").as_deref() == Ok("settings") {
-            panel.open = true;
-            panel.fill_stored_line(cx);
-            panel.refresh_shells(cx);
-        }
+        let panel = {
+            let mut panel = panel;
+            if std::env::var("SHELLX_DEV_PREVIEW").as_deref() == Ok("settings") {
+                panel.open = true;
+                panel.fill_stored_line(cx);
+                panel.refresh_shells(cx);
+            }
+            panel
+        };
         panel
     }
 
