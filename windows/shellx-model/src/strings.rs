@@ -1035,7 +1035,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 145);
+        assert_eq!(Str::ALL.len(), 153);
     }
 
     #[test]
@@ -1952,5 +1952,51 @@ mod tests {
             t(Lang::En, Str::PasteTooLarge),
             "Paste too large (8 MB max)"
         );
+    }
+
+    #[test]
+    fn display_and_diagnostics_strings() {
+        let cases = [
+            (Str::Display, "Hiển thị", "Display"),
+            (
+                Str::DisplayStandard,
+                "Chế độ hiển thị thường",
+                "Standard display mode",
+            ),
+            (
+                Str::DisplayCompatible,
+                "Chế độ hiển thị tương thích",
+                "Compatible display mode",
+            ),
+            (
+                Str::DisplayCompatibleWhy,
+                "ShellX dùng chế độ này vì chế độ thường không mở được cửa sổ trên máy này.",
+                "ShellX uses this mode because the standard mode couldn't open its window on this PC.",
+            ),
+            (
+                Str::DisplayCompatibleByEnv,
+                "Biến môi trường GPUI_DISABLE_DIRECT_COMPOSITION đang bật chế độ này.",
+                "The GPUI_DISABLE_DIRECT_COMPOSITION environment variable turns this mode on.",
+            ),
+            (
+                Str::TryStandardDisplay,
+                "Thử lại chế độ hiển thị thường",
+                "Try standard display mode again",
+            ),
+            (
+                Str::TakesEffectNextStart,
+                "Áp dụng khi mở lại ShellX.",
+                "Takes effect the next time ShellX opens.",
+            ),
+            (
+                Str::CreateDiagnosticsReport,
+                "Tạo báo cáo chẩn đoán",
+                "Create Diagnostics Report",
+            ),
+        ];
+        for (key, vi, en) in cases {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
     }
 }
