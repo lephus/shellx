@@ -29,6 +29,7 @@ mod remote_session;
 mod remote_tabs;
 mod shell_info;
 mod smoke;
+mod startup;
 mod term_core;
 mod workspace;
 

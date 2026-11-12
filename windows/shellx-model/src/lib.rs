@@ -22,6 +22,7 @@ pub mod remote_state;
 pub mod selection;
 pub mod shell;
 pub mod sidebar;
+pub mod start_guard;
 pub mod strings;
 pub mod tabs;
 pub mod text_edit;
