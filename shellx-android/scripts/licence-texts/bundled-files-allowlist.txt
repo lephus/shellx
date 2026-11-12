@@ -1,0 +1,9 @@
+# Bundled files that the scan in generate-licences.py flags and that a maintainer has read and judged to need no notice
+# of their own. One row per file: group:artifact | entry glob | reason. Every row needs a reason.
+androidx.camera:camera-core | jni/*/*.so | CameraX's own JNI libraries; the libyuv code statically linked into libimage_processing_util_jni.so is covered by the vendored androidx.camera_camera-core.txt (BSD-3-Clause)
+androidx.compose.ui:ui-android | inspector.jar | Android Studio's layout inspector (androidx.compose.ui and androidx.inspection classes, Apache-2.0 per the POM); AGP does not package inspector.jar into the app
+androidx.emoji2:emoji2 | libs/repackaged.jar | Google FlatBuffers repackaged as androidx.emoji2.text.flatbuffer; FlatBuffers' POM in the Gradle cache names Apache License V2.0, which this file includes
+com.google.firebase:firebase-common | res/raw/firebase_common_keep.xml | the library's own 290-byte R8 keep-rules file
+org.bouncycastle:bcprov-jdk18on | org/bouncycastle/x509/CertPathReviewerMessages*.properties | Bouncy Castle's own message bundles inside its jar, under the Bouncy Castle licence reproduced in its entry
+androidx.datastore:datastore-core-android | jni/*/libdatastore_shared_counter.so | AndroidX's own JNI library (the POM names Apache-2.0 only); its strings carry no third-party copyright or licence text
+androidx.graphics:graphics-path | jni/*/libandroidx.graphics.path.so | AndroidX's own JNI library (the POM names Apache-2.0 only); its strings carry no third-party copyright or licence text

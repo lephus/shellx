@@ -15,6 +15,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -23,8 +24,9 @@ import com.shellx.app.ui.theme.ShellXTheme
 
 /**
  * Shows the open-source licence notices bundled in assets/licenses/third_party_licenses.txt, which
- * shellx-android/scripts/generate-licences.py writes from the lockfile and the libraries' POMs (plan 3H). System Back
- * closes it.
+ * shellx-android/scripts/generate-licences.py writes from the lockfile and the libraries' artifacts (plan 3H): the
+ * libraries, the licence texts, any NOTICE files and the notices Google's AARs embed. The list is lazy because the
+ * file is large. System Back closes it.
  */
 class LicencesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +34,7 @@ class LicencesActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ShellXTheme {
-                LicencesScreen(assets.open("licenses/third_party_licenses.txt").bufferedReader().use { it.readText() })
+                LicencesScreen(readLicenceNotices { assets.open(LICENCES_ASSET) })
             }
         }
     }
@@ -40,15 +42,24 @@ class LicencesActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LicencesScreen(text: String) {
+fun LicencesScreen(text: String?) {
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.settings_about_license)) }) }) { padding ->
+        if (text == null) {
+            Text(
+                stringResource(R.string.licences_unavailable),
+                modifier = Modifier.padding(padding).padding(16.dp),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            return@Scaffold
+        }
+        val blocks = remember(text) { licenceBlocks(text) }
         LazyColumn(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(text.split("\n\n").filter { it.isNotBlank() }) { block ->
-                Text(block.trim(), style = MaterialTheme.typography.bodyMedium)
+            items(blocks) { block ->
+                Text(block, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

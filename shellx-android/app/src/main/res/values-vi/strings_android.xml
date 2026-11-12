@@ -5,6 +5,7 @@
     <string name="action_type">gõ phím</string>
     <string name="first_mac_step2">Quét mã QR hiện ra bằng điện thoại này.</string>
     <string name="first_mac_subtitle">Xem và trả lời Claude Code trên Mac ngay từ điện thoại này.</string>
+    <string name="licences_unavailable">Không tải được giấy phép mã nguồn mở.</string>
     <string name="machine_state_revoked">Mac này đã gỡ điện thoại này</string>
     <string name="machines_unpair_message">Điện thoại này sẽ không còn nhận việc chờ từ Mac này. Muốn dùng lại thì ghép cặp lại.</string>
     <string name="nav_back">Quay lại</string>
