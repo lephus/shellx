@@ -274,7 +274,6 @@ pub fn default_shell() -> ShellCmd {
 
 /// Command Prompt, for a pane whose shell cannot start: the catalogue's, as
 /// cached by the last lookup. On the Mac: `/bin/sh -i`.
-#[allow(dead_code)] // the pane's "Mở Command Prompt" button (Task A2)
 pub fn command_prompt() -> ShellCmd {
     if cfg!(windows) {
         let shells = settings::shells();

@@ -15,8 +15,8 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
 
 use shellx_model::shell::{
-    LaunchPlan, ShellChoice, ShellError, ShellKind, ShellLaunch, ShellProbe, find_shells,
-    is_absolute, known_launch, launch_plan,
+    CustomShellError, LaunchPlan, ShellChoice, ShellError, ShellKind, ShellLaunch, ShellProbe,
+    find_shells, is_absolute, known_launch, launch_label, launch_plan,
 };
 
 use super::{PanePlan, ShellCmd, dev_bash};
@@ -187,6 +187,53 @@ pub fn startup_plan(probe: &ShellProbe) -> PanePlan {
             ShellKind::Cmd,
             format!(r"{root}\System32\cmd.exe"),
         ))),
+    }
+}
+
+/// What a new pane starts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PaneStart {
+    pub plan: PanePlan,
+    /// The stored custom line or `SHELLX_SHELL` names a program that is not there: its name
+    /// ("nope.exe"). `plan` is then Automatic, and the pane says it started that instead.
+    pub instead_of: Option<String>,
+}
+
+/// Design §4.4: a pane tries the next shell once before it reports. A custom line or
+/// `SHELLX_SHELL` whose program is gone starts the Automatic plan from the cached catalogue
+/// (no file is checked); the missing program is never handed to the process spawner. No
+/// shell at all, an empty line and an open quote stay errors: the pane says why and offers
+/// Retry and Command Prompt. So does a missing program when nothing Automatic is installed.
+pub fn pane_start(
+    plan: Result<PanePlan, ShellError>,
+    found: &[ShellLaunch],
+    probe: &ShellProbe,
+) -> Result<PaneStart, ShellError> {
+    let error = match plan {
+        Ok(plan) => {
+            return Ok(PaneStart {
+                plan,
+                instead_of: None,
+            });
+        }
+        Err(error) => error,
+    };
+    let (ShellError::Custom(CustomShellError::NotFound(program))
+    | ShellError::Override(CustomShellError::NotFound(program))) = &error
+    else {
+        return Err(error);
+    };
+    match launch_plan(&ShellChoice::Auto, None, found, probe, &|_| false) {
+        Ok(auto) => Ok(PaneStart {
+            plan: PanePlan::from_plan(&auto),
+            instead_of: Some(launch_label(&ShellLaunch {
+                kind: None,
+                program: program.clone(),
+                args: Vec::new(),
+                osc7_hook: false,
+            })),
+        }),
+        Err(_) => Err(error),
     }
 }
 
@@ -370,6 +417,15 @@ impl Shells {
                 .map_err(Clone::clone),
             None => Ok(startup_plan(&inner.probe)),
         }
+    }
+
+    /// What a new pane starts: `plan_for_new_pane`, with a missing custom or `SHELLX_SHELL`
+    /// program replaced by Automatic (`pane_start`). Reads only the cache after the first
+    /// pane.
+    pub fn pane_start(&self) -> Result<PaneStart, ShellError> {
+        let plan = self.plan_for_new_pane();
+        let found = self.snapshot().found;
+        pane_start(plan, &found, &self.inner.probe)
     }
 
     fn spawn_lookup(&self, state: &mut State) {

@@ -150,32 +150,56 @@ pub struct LocalPane {
 /// plan's first program could not start, its label and why.
 pub struct StartedPane {
     pub pane: LocalPane,
-    #[allow(dead_code)] // the pane's fallback notice (Task A2)
     pub used: String,
-    #[allow(dead_code)] // the pane's fallback notice (Task A2)
     pub fell_back: Option<(String, String)>,
 }
 
 /// No program of the plan could start: each attempt's label, program and
-/// error, in order.
+/// the system's reason (`spawn_reason`), in order.
 #[derive(Debug)]
 pub struct StartFailure {
     pub attempts: Vec<(String, String, String)>,
 }
 
-/// One line, in English: "label (program): error; ..." (the pane's text
-/// until it says it in the app's language, Task A2).
+impl StartFailure {
+    /// The pane's line per attempt: "label: reason".
+    pub fn lines(&self) -> Vec<String> {
+        self.attempts
+            .iter()
+            .map(|(label, _, reason)| format!("{label}: {reason}"))
+            .collect()
+    }
+}
+
+/// "label (program): reason; ..." on one line (`--smoke`'s error).
 impl std::fmt::Display for StartFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, (label, program, error)) in self.attempts.iter().enumerate() {
+        for (i, (label, program, reason)) in self.attempts.iter().enumerate() {
             if i > 0 {
                 f.write_str("; ")?;
             }
-            let error = error.split_whitespace().collect::<Vec<_>>().join(" ");
-            write!(f, "{label} ({program}): {error}")?;
+            write!(f, "{label} ({program}): {reason}")?;
         }
         Ok(())
     }
+}
+
+/// Longest reason a pane shows, in characters.
+const REASON_MAX_CHARS: usize = 160;
+
+/// Why a program did not start, as the operating system said it: the innermost error, from
+/// after its last "failed: " (portable-pty puts the whole command line, prompt hook
+/// included, before it on Windows), on one line and at most `REASON_MAX_CHARS` long
+/// (review M5).
+pub fn spawn_reason(error: &anyhow::Error) -> String {
+    let root = error.root_cause().to_string();
+    let reason = root.rsplit("failed: ").next().unwrap_or(&root);
+    let reason = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    if reason.chars().count() <= REASON_MAX_CHARS {
+        return reason;
+    }
+    let cut: String = reason.chars().take(REASON_MAX_CHARS - 1).collect();
+    format!("{cut}…")
 }
 
 fn start_local(cmd: &ShellCmd, cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
@@ -206,7 +230,7 @@ pub fn spawn_local_pane_with(
                 });
             }
             Err(error) => {
-                attempts.push((cmd.label.clone(), cmd.program.clone(), format!("{error:#}")))
+                attempts.push((cmd.label.clone(), cmd.program.clone(), spawn_reason(&error)))
             }
         }
     }

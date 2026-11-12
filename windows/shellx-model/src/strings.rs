@@ -1,6 +1,8 @@
 //! UI strings: they follow the Windows display language (Vietnamese on a
 //! Vietnamese Windows, English otherwise); `SHELLX_LANG=en|vi` overrides it.
 
+use crate::shell::{CustomShellError, ShellError, is_absolute};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lang {
     Vi,
@@ -129,6 +131,12 @@ pub enum Str {
     ShellExitsAtStart,
     /// Under `ShellExitsAtStart`.
     PressAnyKeyToRetry,
+    /// A pane whose shell (and its fallback) could not start.
+    ShellCannotStart,
+    /// The failed or held pane's second button.
+    OpenCommandPrompt,
+    /// Automatic found no shell at all.
+    NoShellFound,
     /// Title of the sign-in dialog.
     SignInTitle,
     /// Label over the dialog's email field.
@@ -279,6 +287,9 @@ impl Str {
         Str::RemoteAttachFailed,
         Str::ShellExitsAtStart,
         Str::PressAnyKeyToRetry,
+        Str::ShellCannotStart,
+        Str::OpenCommandPrompt,
+        Str::NoShellFound,
         Str::SignInTitle,
         Str::EmailAddress,
         Str::SignInEllipsis,
@@ -413,8 +424,15 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::FingerprintMismatch => "Khóa của máy không khớp, không kết nối",
             Str::NeedsPairing => "Cần xin quyền truy cập lại",
             Str::RemoteAttachFailed => "Không mở được phiên trên máy kia, đang thử lại…",
-            Str::ShellExitsAtStart => "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL.",
+            Str::ShellExitsAtStart => {
+                "Shell thoát ngay khi khởi động. Chọn shell khác trong Cài đặt › Terminal."
+            }
             Str::PressAnyKeyToRetry => "Nhấn phím bất kỳ hoặc Thử lại.",
+            Str::ShellCannotStart => {
+                "Không khởi động được shell. Chọn shell khác trong Cài đặt › Terminal, hoặc mở Command Prompt."
+            }
+            Str::OpenCommandPrompt => "Mở Command Prompt",
+            Str::NoShellFound => "Không tìm thấy shell nào trên máy này.",
             Str::SignInTitle => "Đăng nhập ShellX",
             Str::EmailAddress => "Địa chỉ email",
             Str::SignInEllipsis => "Đăng nhập…",
@@ -560,8 +578,15 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::FingerprintMismatch => "The machine's key does not match; not connecting",
             Str::NeedsPairing => "Request access again",
             Str::RemoteAttachFailed => "Could not open the session on the other machine, retrying…",
-            Str::ShellExitsAtStart => "The shell exits as soon as it starts. Check SHELLX_SHELL.",
+            Str::ShellExitsAtStart => {
+                "The shell exits as soon as it starts. Choose another shell in Settings › Terminal."
+            }
             Str::PressAnyKeyToRetry => "Press any key or Retry.",
+            Str::ShellCannotStart => {
+                "The shell couldn't start. Choose another shell in Settings › Terminal, or open Command Prompt."
+            }
+            Str::OpenCommandPrompt => "Open Command Prompt",
+            Str::NoShellFound => "No shell was found on this PC.",
             Str::SignInTitle => "Sign in to ShellX",
             Str::EmailAddress => "Email address",
             Str::SignInEllipsis => "Sign In…",
@@ -624,6 +649,55 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::SessionExpired => "Your session expired.",
             Str::SignInAgain => "Sign in again",
         },
+    }
+}
+
+/// What is wrong with a custom command line (Settings › Terminal, `SHELLX_SHELL`), as what to
+/// do about it. A program typed with `\`, `/` or `:` but not as a full path is answered with
+/// the full-path form of its file name.
+pub fn custom_shell_error(lang: Lang, error: &CustomShellError) -> String {
+    match error {
+        CustomShellError::Empty => match lang {
+            Lang::Vi => "Nhập một dòng lệnh, ví dụ wsl.exe -d Ubuntu.".to_string(),
+            Lang::En => "Type a command line, for example wsl.exe -d Ubuntu.".to_string(),
+        },
+        CustomShellError::UnclosedQuote => match lang {
+            Lang::Vi => "Thiếu dấu ngoặc kép đóng.".to_string(),
+            Lang::En => "A closing quotation mark is missing.".to_string(),
+        },
+        CustomShellError::NotFound(program)
+            if program.contains(['\\', '/', ':']) && !is_absolute(program) =>
+        {
+            let file = program.rsplit(['\\', '/', ':']).next().unwrap_or(program);
+            match lang {
+                Lang::Vi => {
+                    format!("Hãy ghi đường dẫn đầy đủ, ví dụ C:\\…\\{file}, thay cho {program}.")
+                }
+                Lang::En => format!("Use a full path such as C:\\…\\{file} instead of {program}."),
+            }
+        }
+        CustomShellError::NotFound(program) => match lang {
+            Lang::Vi => format!("Không tìm thấy chương trình {program}."),
+            Lang::En => format!("Can't find the program {program}."),
+        },
+    }
+}
+
+/// Why a launch plan names no shell: `NoShellFound`, the custom line's problem, or the same
+/// for `SHELLX_SHELL` with its name in front.
+pub fn shell_plan_error(lang: Lang, error: &ShellError) -> String {
+    match error {
+        ShellError::NoShellFound => t(lang, Str::NoShellFound).to_string(),
+        ShellError::Custom(e) => custom_shell_error(lang, e),
+        ShellError::Override(e) => format!("SHELLX_SHELL: {}", custom_shell_error(lang, e)),
+    }
+}
+
+/// The pane's note after it started another shell than the one asked for.
+pub fn shell_fell_back(lang: Lang, tried: &str, used: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Không khởi động được {tried}, đang dùng {used}."),
+        Lang::En => format!("{tried} couldn't start, so {used} is running instead."),
     }
 }
 

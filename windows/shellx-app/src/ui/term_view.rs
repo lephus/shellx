@@ -70,16 +70,16 @@ use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
-use shellx_model::shell::{CustomShellError, ShellError};
-use shellx_model::strings::{Lang, Str, save_link_failed, t};
+use shellx_model::shell::ShellError;
+use shellx_model::strings::{Lang, Str, save_link_failed, shell_fell_back, shell_plan_error, t};
 
 use super::app::Services;
 use super::button::{Kind, button};
 use super::theme;
 use crate::fonts;
 use crate::ime::{self, ImeTarget};
-use crate::local_pty::settings::shells;
-use crate::local_pty::{LocalPty, spawn_reader};
+use crate::local_pty::settings::{PaneStart, shells};
+use crate::local_pty::{LocalPty, PanePlan, command_prompt, spawn_reader};
 use crate::os_info;
 use crate::remote_link::{Applied, PaneEvent, Paste, RemoteMirror};
 use crate::remote_session::{RemotePane, RemoteSession, SessionStatus};
@@ -250,7 +250,7 @@ pub(super) struct TermView {
     font: Font,
     backend: Backend,
     /// The local shell could not start (drawn instead of the grid).
-    error: Option<String>,
+    failure: Option<StartProblem>,
     /// A held pane (`RespawnGuard`): the shell kept exiting as it started,
     /// so none runs; the pane shows why and waits for a retry.
     held: bool,
@@ -296,7 +296,7 @@ impl TermView {
             focus_handle: cx.focus_handle(),
             font: terminal_font(),
             backend: Backend::None,
-            error: None,
+            failure: None,
             held: false,
             failed: None,
             flash: None,
@@ -320,72 +320,121 @@ impl TermView {
     /// (Auto, the stored choice or `SHELLX_SHELL`), or its one fallback.
     pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
-        let started = shells()
-            .plan_for_new_pane()
-            .map_err(|error| plan_error_line(&error))
-            .and_then(|plan| {
-                spawn_local_pane_with(&plan, 80, 24, &[]).map_err(|failure| failure.to_string())
-            });
-        match started {
-            Ok(started) => {
-                let started = started.pane;
-                let (link, core, reader) = (started.link, started.core, started.reader);
-                view.backend = Backend::Local { core, link };
-                let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
-                spawn_reader(reader, move |bytes| tx.send_blocking(bytes).is_ok());
-                cx.spawn(async move |this, cx| {
-                    while let Ok(mut batch) = rx.recv().await {
-                        while let Ok(more) = rx.try_recv() {
-                            batch.extend_from_slice(&more);
-                        }
-                        let fed = this.update(cx, |view, cx| {
-                            let newline = batch.contains(&b'\n');
-                            view.follow_viewport(newline, |backend| {
-                                if let Some(core) = backend.core() {
-                                    core.feed(&batch);
-                                }
-                            });
-                            cx.notify();
-                        });
-                        if fed.is_err() {
-                            return;
-                        }
-                    }
-                })
-                .detach();
-                // ConPTY keeps its output pipe open after the shell exits, so
-                // poll the child (and the sticky write-failure flag) and tell
-                // RootView, which closes this pane through the tabs model.
-                cx.spawn(async move |this, cx| {
-                    loop {
-                        cx.background_executor()
-                            .timer(Duration::from_millis(500))
-                            .await;
-                        let exited = this.update(cx, |view, cx| {
-                            let exited = matches!(
-                                &view.backend,
-                                Backend::Local { link, .. } if link.is_closed()
-                            );
-                            if exited {
-                                cx.emit(TermEvent::Exited);
-                            }
-                            exited
-                        });
-                        // Err: the pane was dropped (closed by RootView).
-                        if exited.unwrap_or(true) {
-                            return;
-                        }
-                    }
-                })
-                .detach();
-            }
-            Err(error) => view.error = Some(error),
-        }
+        view.start_local(shells().pane_start(), cx);
         view
     }
 
-    /// A held pane: no shell; "Shell thoát ngay khi khởi động. Kiểm tra
-    /// SHELLX_SHELL." and "Thử lại". Any key or the button sends `Retry`.
+    /// Starts a local shell in this pane (`new`, Retry, "Mở Command Prompt"):
+    /// the plan's first program, else its fallback once; then the pane says
+    /// which shell runs instead of the one asked for. When none starts (or
+    /// the plan names none) the pane shows why, with Retry and Command
+    /// Prompt (design §4.4).
+    fn start_local(&mut self, start: Result<PaneStart, ShellError>, cx: &mut Context<Self>) {
+        self.held = false;
+        self.failure = None;
+        cx.notify();
+        let start = match start {
+            Ok(start) => start,
+            Err(error) => {
+                self.failure = Some(StartProblem::Plan(error));
+                return;
+            }
+        };
+        let started = match spawn_local_pane_with(&start.plan, 80, 24, &[]) {
+            Ok(started) => started,
+            Err(failure) => {
+                self.failure = Some(StartProblem::Spawn(failure.lines()));
+                return;
+            }
+        };
+        let tried = start
+            .instead_of
+            .or(started.fell_back.map(|(label, _)| label));
+        if let Some(tried) = tried {
+            let lang = cx.global::<Services>().lang;
+            self.flash(shell_fell_back(lang, &tried, &started.used), cx);
+        }
+        let started = started.pane;
+        let (link, core, reader) = (started.link, started.core, started.reader);
+        self.backend = Backend::Local { core, link };
+        let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
+        spawn_reader(reader, move |bytes| tx.send_blocking(bytes).is_ok());
+        cx.spawn(async move |this, cx| {
+            while let Ok(mut batch) = rx.recv().await {
+                while let Ok(more) = rx.try_recv() {
+                    batch.extend_from_slice(&more);
+                }
+                let fed = this.update(cx, |view, cx| {
+                    let newline = batch.contains(&b'\n');
+                    view.follow_viewport(newline, |backend| {
+                        if let Some(core) = backend.core() {
+                            core.feed(&batch);
+                        }
+                    });
+                    cx.notify();
+                });
+                if fed.is_err() {
+                    return;
+                }
+            }
+        })
+        .detach();
+        // ConPTY keeps its output pipe open after the shell exits, so
+        // poll the child (and the sticky write-failure flag) and tell
+        // RootView, which closes this pane through the tabs model.
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(500))
+                    .await;
+                let exited = this.update(cx, |view, cx| {
+                    let exited = matches!(
+                        &view.backend,
+                        Backend::Local { link, .. } if link.is_closed()
+                    );
+                    if exited {
+                        cx.emit(TermEvent::Exited);
+                    }
+                    exited
+                });
+                // Err: the pane was dropped (closed by RootView).
+                if exited.unwrap_or(true) {
+                    return;
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Retry from a pane without a shell: a held pane asks RootView (the
+    /// guard clears its history), a failed one starts again in place from
+    /// the cached plan.
+    fn retry(&mut self, cx: &mut Context<Self>) {
+        if self.held {
+            cx.emit(TermEvent::Retry);
+        } else {
+            self.start_local(shells().pane_start(), cx);
+        }
+    }
+
+    /// "Mở Command Prompt" in a held or failed pane: starts it in place.
+    fn open_command_prompt(&mut self, cx: &mut Context<Self>) {
+        let plan = PanePlan {
+            first: command_prompt(),
+            fallback: None,
+        };
+        self.start_local(
+            Ok(PaneStart {
+                plan,
+                instead_of: None,
+            }),
+            cx,
+        );
+    }
+
+    /// A held pane (`RespawnGuard`): no shell; "Shell thoát ngay khi khởi
+    /// động…", "Thử lại" (any key too: `Retry` to RootView) and "Mở Command
+    /// Prompt" (starts it in place).
     pub(super) fn new_held(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
         view.held = true;
@@ -770,11 +819,6 @@ impl TermView {
     }
 
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if self.held {
-            cx.emit(TermEvent::Retry);
-            cx.stop_propagation();
-            return;
-        }
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;
         let key = KeyIn {
@@ -789,6 +833,25 @@ impl TermView {
             // The IME owns keys while composing (map_key ignores them).
             composing: self.composing(),
         };
+        // No shell runs (held, or it could not start): any key retries.
+        // Window commands keep working (closing this pane among them), and
+        // Alt+F4 / Alt+Space go on to Windows (`Ignore`).
+        if self.held || self.failure.is_some() {
+            match map_key(&key, &ctx) {
+                KeyAction::App(command)
+                    if !matches!(command, AppCommand::Copy | AppCommand::Paste) =>
+                {
+                    cx.emit(TermEvent::Command(command));
+                    cx.stop_propagation();
+                }
+                KeyAction::Ignore => {}
+                _ => {
+                    self.retry(cx);
+                    cx.stop_propagation();
+                }
+            }
+            return;
+        }
         match map_key(&key, &ctx) {
             KeyAction::App(command @ (AppCommand::Copy | AppCommand::Paste)) => {
                 self.clipboard_command(command, cx);
@@ -924,9 +987,18 @@ fn status_pill(pill: &Overlay, lang: Lang) -> Div {
         .child(card)
 }
 
-/// What a held pane shows instead of a terminal: the reason, a hint and
-/// "Thử lại".
-fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
+/// Why a local pane has no shell, drawn instead of the grid.
+enum StartProblem {
+    /// The plan names no shell (`strings::shell_plan_error`).
+    Plan(ShellError),
+    /// No program of the plan started: "label: reason" per attempt.
+    Spawn(Vec<String>),
+}
+
+/// What a pane without a shell shows (held, or its shell could not start):
+/// why in the error colour, one muted line per program tried, the hint, then
+/// "Thử lại" and "Mở Command Prompt".
+fn start_message(lang: Lang, why: String, tried: Vec<String>, cx: &mut Context<TermView>) -> Div {
     div()
         .flex()
         .flex_col()
@@ -934,11 +1006,13 @@ fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
         .p(px(16.0))
         .font(theme::ui_font())
         .text_size(theme::UI_SIZE)
-        .child(
+        .child(div().text_color(theme::hsla(ERROR)).child(why))
+        .children(tried.into_iter().map(|line| {
             div()
-                .text_color(theme::hsla(ERROR))
-                .child(t(lang, Str::ShellExitsAtStart)),
-        )
+                .text_size(theme::SMALL_SIZE)
+                .text_color(theme::muted())
+                .child(line)
+        }))
         .child(
             div()
                 .text_size(theme::SMALL_SIZE)
@@ -946,26 +1020,25 @@ fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
                 .child(t(lang, Str::PressAnyKeyToRetry)),
         )
         .child(
-            div().flex().child(
-                button("held-retry", t(lang, Str::Retry), Kind::Primary, false)
-                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TermEvent::Retry))),
-            ),
+            div()
+                .flex()
+                .gap(px(8.0))
+                .child(
+                    button("held-retry", t(lang, Str::Retry), Kind::Primary, false)
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.retry(cx))),
+                )
+                .child(
+                    button(
+                        "held-cmd",
+                        t(lang, Str::OpenCommandPrompt),
+                        Kind::Secondary,
+                        false,
+                    )
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_command_prompt(cx);
+                    })),
+                ),
         )
-}
-
-/// A shell plan that names no program, in one English line (Task A2 says it
-/// in the app's language).
-fn plan_error_line(error: &ShellError) -> String {
-    let custom = |e: &CustomShellError| match e {
-        CustomShellError::Empty => "the command line is empty".to_string(),
-        CustomShellError::UnclosedQuote => "a closing quotation mark is missing".to_string(),
-        CustomShellError::NotFound(program) => format!("can't find the program {program}"),
-    };
-    match error {
-        ShellError::NoShellFound => "no shell was found on this PC".to_string(),
-        ShellError::Custom(e) => format!("Settings › Terminal: {}", custom(e)),
-        ShellError::Override(e) => format!("SHELLX_SHELL: {}", custom(e)),
-    }
 }
 
 /// The short status line at the bottom of a pane (`TermView::flash`).
@@ -1032,9 +1105,16 @@ impl Render for TermView {
                     this.secondary_click(SecondaryButton::Middle, window, cx);
                 }),
             );
-        let root = match &self.error {
-            _ if self.held => root.child(held_message(lang, cx)),
-            Some(error) => root.child(format!("Could not start the shell: {error}")),
+        let problem = match &self.failure {
+            _ if self.held => Some((t(lang, Str::ShellExitsAtStart).to_string(), Vec::new())),
+            Some(StartProblem::Plan(error)) => Some((shell_plan_error(lang, error), Vec::new())),
+            Some(StartProblem::Spawn(tried)) => {
+                Some((t(lang, Str::ShellCannotStart).to_string(), tried.clone()))
+            }
+            None => None,
+        };
+        let root = match problem {
+            Some((why, tried)) => root.child(start_message(lang, why, tried, cx)),
             None => root.child(TermElement { view: cx.entity() }),
         };
         root.children(pill.map(|pill| status_pill(&pill, lang)))
