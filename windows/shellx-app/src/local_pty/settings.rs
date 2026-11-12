@@ -250,13 +250,30 @@ impl Inner {
         Computed { found, plan }
     }
 
-    fn end(&self, generation: u64, computed: Computed) {
+    fn end(&self, generation: u64, computed: Option<Computed>) {
         let mut state = self.lock();
         state.running -= 1;
-        if state.generation == generation {
+        if let Some(computed) = computed
+            && state.generation == generation
+        {
             state.computed = Some(computed);
         }
         self.ended.notify_all();
+    }
+}
+
+/// A lookup in progress. However it ends, by returning or by a panic in a file check,
+/// dropping it counts it as ended, so the next pane can start another one; only a lookup
+/// that finished leaves its `result`.
+struct Lookup {
+    inner: Arc<Inner>,
+    generation: u64,
+    result: Option<Computed>,
+}
+
+impl Drop for Lookup {
+    fn drop(&mut self) {
+        self.inner.end(self.generation, self.result.take());
     }
 }
 
@@ -354,8 +371,12 @@ impl Shells {
         let spawned = std::thread::Builder::new()
             .name("shell-lookup".into())
             .spawn(move || {
-                let computed = inner.compute(&choice);
-                inner.end(generation, computed);
+                let mut lookup = Lookup {
+                    inner,
+                    generation,
+                    result: None,
+                };
+                lookup.result = Some(lookup.inner.compute(&choice));
             });
         if spawned.is_err() {
             // no thread: the panes keep the startup plan
@@ -406,6 +427,11 @@ impl Shells {
             let mut state = self.inner.lock();
             self.inner.begin(&mut state)
         };
+        let mut lookup = Lookup {
+            inner: self.inner.clone(),
+            generation,
+            result: None,
+        };
         let computed = self.inner.compute(&choice);
         let snapshot = ShellSnapshot {
             choice,
@@ -413,7 +439,8 @@ impl Shells {
             found: computed.found.clone(),
             plan: Some(computed.plan.clone()),
         };
-        self.inner.end(generation, computed);
+        lookup.result = Some(computed);
+        drop(lookup);
         snapshot
     }
 }
