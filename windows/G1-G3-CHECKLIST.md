@@ -1,5 +1,7 @@
 # ShellX Windows: danh sách kiểm G1 và G3
 
+> Danh sách kiểm hiện hành là [WINDOWS-TEST-CHECKLIST.md](WINDOWS-TEST-CHECKLIST.md) (10 bước trên máy thật); các mục dưới đây chưa bao gồm đã chuyển xuống mục "Kiểm sau" ở đó.
+
 Việc của bạn trên một máy Windows 10 1809+ hoặc Windows 11. Đánh dấu `[x]` khi xong, ghi kết quả (đạt / hỏng + ghi chú, ảnh chụp nếu hỏng) vào ledger `docs/superpowers/ledgers/native-desktop.md` hoặc nhắn lại cho Claude.
 
 ## Run id (điều phối viên cập nhật mục này)
