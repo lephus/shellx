@@ -24,8 +24,18 @@ public struct GoogleSignInResult: Equatable, Sendable {
     }
 }
 
-/// One way to sign in to the account (a Google or Apple identity).
+/// One way to sign in to the account (a Google, Apple or email-code identity).
 public struct AccountSignInMethod: Equatable, Sendable, Identifiable {
+    /// What a sign-in method is, for its title in Settings › Account.
+    public enum Kind: Equatable, Sendable {
+        /// A Google account (also the relay's `test` identities).
+        case google
+        /// An Apple ID.
+        case apple
+        /// An email address that signs in with a mailed code.
+        case email
+    }
+
     public let id: String
     public let provider: String
     public let email: String
@@ -34,6 +44,14 @@ public struct AccountSignInMethod: Equatable, Sendable, Identifiable {
     public let linkedViaDeviceName: String?
     public let createdAt: Date
     public var isApple: Bool { provider == "apple" }
+    /// "apple" is `.apple`, "email" is `.email`, every other provider is `.google`.
+    public var kind: Kind {
+        switch provider {
+        case "apple": return .apple
+        case "email": return .email
+        default: return .google
+        }
+    }
 
     public init(id: String, provider: String, email: String, isPrivateEmail: Bool, linkedViaDeviceName: String?, createdAt: Date) {
         self.id = id; self.provider = provider; self.email = email; self.isPrivateEmail = isPrivateEmail

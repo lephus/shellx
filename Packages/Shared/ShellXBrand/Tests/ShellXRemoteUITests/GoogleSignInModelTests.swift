@@ -97,6 +97,19 @@ import ShellXRemoteCore
     #expect(gate.runs == 2)
 }
 
+@MainActor @Test func clearErrorRemovesTheLastFailure() async {
+    let gate = Gate()
+    let m = model(gate)
+    let task = m.start()
+    while gate.continuation == nil { await Task.yield() }
+    gate.fail("google_timeout")
+    await task?.value
+    #expect(m.errorText == SignInErrorLabels.english.timeout)
+    m.clearError()
+    #expect(m.errorText == nil)
+    #expect(m.phase == .ready)
+}
+
 @MainActor @Test func aTimeoutShowsItsMessageAndAllowsRetry() async {
     let gate = Gate()
     let m = model(gate)
