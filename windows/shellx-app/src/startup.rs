@@ -16,6 +16,7 @@ use shellx_model::crash_report::DialogKind;
 use shellx_model::start_guard::{
     self, OpenFailed, RenderFile, RenderMode, StartInput, StartMarker, StartPlan, StartReason,
 };
+use shellx_model::strings::Str;
 
 use crate::{crash, paths};
 
@@ -26,11 +27,45 @@ const RETRY_VARIABLE: &str = "SHELLX_RENDER_RETRY";
 
 /// What Settings › Display shows (A10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)] // Settings › Display (A10) reads `remembered`
+#[allow(dead_code)] // Settings › Display reads `mode` and `reason`; `remembered` is kept for tests
 pub struct RenderStatus {
     pub mode: RenderMode,
     pub reason: StartReason,
     pub remembered: RenderMode,
+}
+
+/// What Settings › Display shows for a start (A10): the mode's name, the sentence under it,
+/// and whether the "try standard" button or the "takes effect" note follows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DisplayView {
+    pub mode: Str,
+    pub explanation: Option<Str>,
+    pub offer_standard: bool,
+    pub takes_effect_note: bool,
+}
+
+/// The pure rule of Settings › Display: `requested` is true once "try standard" was stored.
+pub fn display_view(status: &RenderStatus, requested: bool) -> DisplayView {
+    match status.mode {
+        RenderMode::Standard => DisplayView {
+            mode: Str::DisplayStandard,
+            explanation: None,
+            offer_standard: false,
+            takes_effect_note: false,
+        },
+        RenderMode::Compatible if status.reason == StartReason::UserEnvironment => DisplayView {
+            mode: Str::DisplayCompatible,
+            explanation: Some(Str::DisplayCompatibleByEnv),
+            offer_standard: false,
+            takes_effect_note: false,
+        },
+        RenderMode::Compatible => DisplayView {
+            mode: Str::DisplayCompatible,
+            explanation: Some(Str::DisplayCompatibleWhy),
+            offer_standard: !requested,
+            takes_effect_note: requested,
+        },
+    }
 }
 
 /// The start marker and the remembered mode, in `%LOCALAPPDATA%\ShellX\native`.
@@ -334,7 +369,6 @@ pub fn render_status() -> RenderStatus {
 }
 
 /// Settings › Display, "Try standard display mode again" (A10).
-#[allow(dead_code)] // Settings › Display (A10) is its caller
 pub fn request_standard_next_start() -> io::Result<()> {
     match StartPaths::this_pc() {
         Some(paths) => request_standard_in(&paths),
@@ -439,6 +473,53 @@ mod tests {
     use shellx_model::start_guard::{OpenFailed, RenderMode, StartReason, on_open_failed};
 
     use super::*;
+
+    fn status(mode: RenderMode, reason: StartReason) -> RenderStatus {
+        RenderStatus {
+            mode,
+            reason,
+            remembered: mode,
+        }
+    }
+
+    #[test]
+    fn display_shows_standard_without_a_button_or_a_reason() {
+        let view = display_view(&status(RenderMode::Standard, StartReason::Default), false);
+        assert_eq!(view.mode, Str::DisplayStandard);
+        assert_eq!(view.explanation, None);
+        assert!(!view.offer_standard && !view.takes_effect_note);
+    }
+
+    #[test]
+    fn display_names_the_environment_variable_and_offers_no_button() {
+        for requested in [false, true] {
+            let view = display_view(
+                &status(RenderMode::Compatible, StartReason::UserEnvironment),
+                requested,
+            );
+            assert_eq!(view.mode, Str::DisplayCompatible);
+            assert_eq!(view.explanation, Some(Str::DisplayCompatibleByEnv));
+            assert!(!view.offer_standard && !view.takes_effect_note);
+        }
+    }
+
+    #[test]
+    fn display_compatible_for_any_other_reason_offers_standard_until_requested() {
+        for reason in [
+            StartReason::Remembered,
+            StartReason::RetryAfterOpenFailed,
+            StartReason::PreviousStartDied,
+            StartReason::Default,
+        ] {
+            let before = display_view(&status(RenderMode::Compatible, reason), false);
+            assert_eq!(before.mode, Str::DisplayCompatible, "{reason:?}");
+            assert_eq!(before.explanation, Some(Str::DisplayCompatibleWhy));
+            assert!(before.offer_standard && !before.takes_effect_note);
+            let after = display_view(&status(RenderMode::Compatible, reason), true);
+            assert_eq!(after.explanation, Some(Str::DisplayCompatibleWhy));
+            assert!(!after.offer_standard && after.takes_effect_note);
+        }
+    }
 
     fn paths(dir: &Path) -> StartPaths {
         StartPaths::in_dir(dir)
