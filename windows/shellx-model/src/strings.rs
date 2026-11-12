@@ -840,7 +840,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 129);
+        assert_eq!(Str::ALL.len(), 132);
     }
 
     #[test]
@@ -1094,6 +1094,123 @@ mod tests {
     }
 
     #[test]
+    fn shell_start_sentences() {
+        let cases = [
+            (
+                Str::ShellCannotStart,
+                "Không khởi động được shell. Chọn shell khác trong Cài đặt › Terminal, hoặc mở Command Prompt.",
+                "The shell couldn't start. Choose another shell in Settings › Terminal, or open Command Prompt.",
+            ),
+            (
+                Str::ShellExitsAtStart,
+                "Shell thoát ngay khi khởi động. Chọn shell khác trong Cài đặt › Terminal.",
+                "The shell exits as soon as it starts. Choose another shell in Settings › Terminal.",
+            ),
+            (
+                Str::OpenCommandPrompt,
+                "Mở Command Prompt",
+                "Open Command Prompt",
+            ),
+            (
+                Str::NoShellFound,
+                "Không tìm thấy shell nào trên máy này.",
+                "No shell was found on this PC.",
+            ),
+        ];
+        for (key, vi, en) in cases {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            shell_fell_back(Lang::Vi, "nu.exe", "PowerShell 7"),
+            "Không khởi động được nu.exe, đang dùng PowerShell 7."
+        );
+        assert_eq!(
+            shell_fell_back(Lang::En, "nu.exe", "PowerShell 7"),
+            "nu.exe couldn't start, so PowerShell 7 is running instead."
+        );
+    }
+
+    #[test]
+    fn custom_shell_errors_say_what_to_do() {
+        use crate::shell::CustomShellError;
+        let e = |lang, error: CustomShellError| custom_shell_error(lang, &error);
+        assert_eq!(
+            e(Lang::Vi, CustomShellError::Empty),
+            "Nhập một dòng lệnh, ví dụ wsl.exe -d Ubuntu."
+        );
+        assert_eq!(
+            e(Lang::En, CustomShellError::Empty),
+            "Type a command line, for example wsl.exe -d Ubuntu."
+        );
+        assert_eq!(
+            e(Lang::Vi, CustomShellError::UnclosedQuote),
+            "Thiếu dấu ngoặc kép đóng."
+        );
+        assert_eq!(
+            e(Lang::En, CustomShellError::UnclosedQuote),
+            "A closing quotation mark is missing."
+        );
+        // a relative path: say to use a full one
+        let relative = || CustomShellError::NotFound(r".\pwsh.exe".into());
+        assert_eq!(
+            e(Lang::Vi, relative()),
+            r"Hãy ghi đường dẫn đầy đủ, ví dụ C:\…\pwsh.exe, thay cho .\pwsh.exe."
+        );
+        assert_eq!(
+            e(Lang::En, relative()),
+            r"Use a full path such as C:\…\pwsh.exe instead of .\pwsh.exe."
+        );
+        for lang in [Lang::Vi, Lang::En] {
+            let out = e(lang, relative());
+            assert!(
+                out.contains(r"C:\…\pwsh.exe") && out.contains(r".\pwsh.exe"),
+                "{out}"
+            );
+            // forward slashes and a drive-relative path are relative too
+            assert!(e(lang, CustomShellError::NotFound("tools/sh".into())).contains(r"C:\…\sh"));
+            let drive_relative = e(lang, CustomShellError::NotFound("C:x.exe".into()));
+            assert!(drive_relative.contains(r"C:\…\x.exe") && drive_relative.contains("C:x.exe"));
+        }
+        // a bare name or an absolute path that is not there
+        assert_eq!(
+            e(Lang::Vi, CustomShellError::NotFound("nope.exe".into())),
+            "Không tìm thấy chương trình nope.exe."
+        );
+        assert_eq!(
+            e(Lang::En, CustomShellError::NotFound("nope.exe".into())),
+            "Can't find the program nope.exe."
+        );
+        assert_eq!(
+            e(
+                Lang::En,
+                CustomShellError::NotFound(r"C:\tools\nu.exe".into())
+            ),
+            r"Can't find the program C:\tools\nu.exe."
+        );
+    }
+
+    #[test]
+    fn shell_plan_errors_name_shellx_shell() {
+        use crate::shell::{CustomShellError, ShellError};
+        for lang in [Lang::Vi, Lang::En] {
+            assert_eq!(
+                shell_plan_error(lang, &ShellError::NoShellFound),
+                t(lang, Str::NoShellFound)
+            );
+            let missing = CustomShellError::NotFound("nope.exe".into());
+            assert_eq!(
+                shell_plan_error(lang, &ShellError::Custom(missing.clone())),
+                custom_shell_error(lang, &missing)
+            );
+            assert_eq!(
+                shell_plan_error(lang, &ShellError::Override(missing.clone())),
+                format!("SHELLX_SHELL: {}", custom_shell_error(lang, &missing))
+            );
+        }
+    }
+
+    #[test]
     fn exact_vi_strings() {
         assert_eq!(t(Lang::Vi, Str::MachinesHeader), "Máy của bạn");
         assert_eq!(t(Lang::Vi, Str::Reconnecting), "đang kết nối lại…");
@@ -1121,7 +1238,7 @@ mod tests {
         assert_eq!(t(Lang::Vi, Str::IconCredits), t(Lang::En, Str::IconCredits));
         assert_eq!(
             t(Lang::Vi, Str::ShellExitsAtStart),
-            "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL."
+            "Shell thoát ngay khi khởi động. Chọn shell khác trong Cài đặt › Terminal."
         );
         assert_eq!(t(Lang::Vi, Str::Retry), "Thử lại");
     }
