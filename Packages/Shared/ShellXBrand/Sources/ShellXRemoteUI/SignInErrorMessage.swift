@@ -79,6 +79,8 @@ public enum SignInErrorMessage {
     /// - The other flow still running reads as "didn't finish": `google_in_progress`, and `email_sign_in_in_progress`,
     ///   which a sheet reopened while a closed sheet's code is still being verified meets.
     /// - `rate_limited` reads as the rate sentence.
+    /// - A relay without the Google routes (`not_found`, or a body-less `http_404`, on `/v1/auth/nonce`) reads as
+    ///   "not available", as the email path reads the same case.
     /// - Every other code without a sentence of its own reads as the server sentence. That covers the relay's own
     ///   codes the core passes through, a body-less proxy answer (`http_<status>`), and the core's and the client's
     ///   local codes.
@@ -98,6 +100,7 @@ public enum SignInErrorMessage {
         case "identity_in_use": return labels.identityInUse
         case "browser_unavailable": return labels.browser
         case "rate_limited": return labels.rateLimited
+        case "not_found", "http_404": return labels.unavailable
         default: return labels.server
         }
     }
