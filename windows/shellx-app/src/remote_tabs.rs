@@ -1091,6 +1091,7 @@ mod tests {
             last_seen_unix: 0,
             fingerprint: "f".into(),
             is_this_machine: false,
+            can_host: false,
         };
         remotes.machines_updated(&[mac(true)]);
         remotes.machines_updated(&[mac(false)]);

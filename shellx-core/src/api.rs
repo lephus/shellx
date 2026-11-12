@@ -213,8 +213,16 @@ pub struct MachineItem {
     pub last_seen_unix: Option<u64>,
     #[serde(default)]
     pub noise_public_key_b64: Option<String>,
-    #[serde(default)]
-    pub fingerprint: Option<String>,
+    /// The relay's word that this machine accepts connections from other desktops (absent today). Only
+    /// JSON `true` is true; absent, null or any other value is false and never fails the list. The relay's
+    /// own `fingerprint` is not read at all (D1: the core computes it from the key), so its type cannot
+    /// fail the list either.
+    #[serde(default, deserialize_with = "true_only")]
+    pub can_host: bool,
+}
+
+fn true_only<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
+    Ok(matches!(serde_json::Value::deserialize(d)?, serde_json::Value::Bool(true)))
 }
 
 /// `GET /v2/machines` 200 response.
