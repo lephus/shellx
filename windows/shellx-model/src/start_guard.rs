@@ -524,7 +524,10 @@ mod tests {
         // M-25).
         let iss = include_str!("../../installer/shellx-native.iss");
         let mutex_line = format!("AppMutex={APP_MUTEX_NAME}");
-        assert!(iss.lines().any(|l| l.trim() == mutex_line), "{mutex_line} missing");
+        assert!(
+            iss.lines().any(|l| l.trim() == mutex_line),
+            "{mutex_line} missing"
+        );
         assert!(iss.contains(r#"Parameters: "--diagnose""#));
         assert!(iss.contains("vietnamese.DiagnoseShortcut=ShellX – Chẩn đoán"));
         assert!(iss.contains("english.DiagnoseShortcut=ShellX – Diagnostics"));

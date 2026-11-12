@@ -1,8 +1,9 @@
 ﻿; ShellX (native) installer, Inno Setup 6.7.1. Unsigned, per-user, installs next to the Flutter ShellX.
 ; Compiled by windows/installer/build-installer.ps1:
 ;   ISCC.exe /DAppVersion=1.2.0 /DSourceDir=<folder with shellx-desktop.exe> /DOutputDir=<folder>
-;            [/DAppIcon=<app_icon.ico>] shellx-native.iss
-; Output: <OutputDir>\ShellX-Setup-<AppVersion>.exe
+;            [/DAppIcon=<app_icon.ico>] [/DFileLabel=<label>-<commit10>] shellx-native.iss
+; Output: <OutputDir>\ShellX-Setup-<AppVersion>.exe, or ShellX-Setup-<AppVersion>-<FileLabel>.exe for a
+; labelled test build (the version inside the app and the installer stays <AppVersion>).
 ; Coexistence with the Flutter app is checked by check_coexistence.py: nothing here may share its
 ; AppId, exe name, install dir or data dirs, and nothing may stop or delete them. The display name
 ; and the Start-menu shortcut are "ShellX" like the Flutter app's: the native app replaces it, so
@@ -32,6 +33,12 @@ AppPublisherURL=https://shellx.pro/
 AppSupportURL=https://shellx.pro/
 AppUpdatesURL=https://shellx.pro/
 VersionInfoVersion={#AppVersion}
+VersionInfoCompany=ShellX
+VersionInfoDescription=ShellX Setup
+VersionInfoProductName=ShellX
+; While a ShellX window runs (it holds this mutex, start_guard::APP_MUTEX_NAME), Setup asks to
+; close it (SetupAppRunningError). Session namespace, like the app's.
+AppMutex=ShellXNative-D322DA97-3B0D-49C7-BDB2-8EBFADBA1004
 DefaultDirName={autopf}\ShellX Native
 DefaultGroupName=ShellX Native
 DisableProgramGroupPage=yes
@@ -42,7 +49,11 @@ MinVersion=10.0.17763
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
+#ifdef FileLabel
+OutputBaseFilename=ShellX-Setup-{#AppVersion}-{#FileLabel}
+#else
 OutputBaseFilename=ShellX-Setup-{#AppVersion}
+#endif
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -59,6 +70,10 @@ SetupIconFile={#AppIcon}
 Name: "vietnamese"; MessagesFile: "Vietnamese.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+vietnamese.DiagnoseShortcut=ShellX – Chẩn đoán
+english.DiagnoseShortcut=ShellX – Diagnostics
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
@@ -69,6 +84,7 @@ Source: "{#SourceDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourc
 [Icons]
 Name: "{autoprograms}\{#ShortcutName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#ShortcutName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{cm:DiagnoseShortcut}"; Filename: "{app}\{#AppExeName}"; Parameters: "--diagnose"
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,ShellX}"; Flags: nowait postinstall skipifsilent
