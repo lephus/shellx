@@ -11,7 +11,7 @@ and signed the same way; `android.sh` never uploads: the maintainer uploads its 
 | `release/mobile/ios.sh --check-app [--unsigned] <path.app>` | Only the checks, on a built app | |
 | `shellx-ios/scripts/dev.sh test release` | Unsigned Release build and `--check-app --unsigned`, no Apple account (also part of `test all`) | |
 | `release/mobile/android.sh` | Signed release bundle (R8 on), every Android check | `build/release/android/ShellX-<version>-<code>.aab`, `.mapping.txt` and `.source` |
-| `release/mobile/android.sh --check-aab <file.aab> [<mapping.txt>]` | Only the checks, on a built bundle | |
+| `release/mobile/android.sh --check-aab <file.aab> [<mapping.txt>]` | Only the checks, on a built bundle (it also needs the upload key properties file) | |
 | `release/mobile/android.sh --mark-uploaded` | Records that the checked bundle of the current version was uploaded in Play Console | `ShellX-<version>-<code>.uploaded` |
 | `python3 release/mobile/play/store_assets.py listing\|graphics\|screenshots` | Store listing checks, icon, feature graphics, screenshots | `build/release/android/play/` |
 | `shellx-android/scripts/dev.sh build-release` | Unsigned release build and its checks (also part of `test all`) | |
@@ -172,7 +172,7 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
   (`assets/licenses/third_party_licenses.txt`), and a notice file that is out of date (next paragraphs).
 
 Each refusal prints `violation: <what>` lines and no bundle is copied to `build/release/android/`.
-`release/mobile/android.sh --check-aab <file.aab>` runs the same bundle checks on a built bundle. On 2026-11-12
+`release/mobile/android.sh --check-aab <file.aab>` runs the same bundle checks on a built bundle; it also compares the bundle's signer with the upload key, so the upload key properties file must exist on that machine. On 2026-11-12
 the signed bundle prints exactly one violation: `google_web_client_id` is still the placeholder, until plan 1D's
 user steps (the Web OAuth client) are done and its id is written into `google_oauth.xml`.
 
@@ -246,10 +246,16 @@ Policy and programs → App content:
 
   To see every screen without a Mac or an account: on the first screen, tap "Try without an account". It opens a sample Mac with workspaces, agent sessions and requests waiting for an answer. A "Demo · Exit" banner stays on top, and nothing is sent to any server.
 
-  You can also sign in with any Google account. That creates a new, empty ShellX account, and the next screen offers "Try with a sample Mac".
+  The app has two ways to sign in, and either one creates a new, empty ShellX account that then offers "Try with a sample Mac": "Continue with Google" with any Google account, or an email address: type it, tap "Send code", and enter the 6-digit code that ShellX emails to that address (it works for ten minutes). The demo above needs neither.
 
   To delete an account: Settings › Account › Delete Account…
   ```
+
+  How a Google Play reviewer gets in: through "Try without an account", which needs no mailbox. The code
+  has no review account and no fixed code, and the relay emails a different code to each address, so a reviewer
+  cannot use the email way without an inbox of their own. If Play asks for credentials or rejects the
+  instructions as incomplete, USER: make a test mailbox, state its address and how to read its codes in the
+  text above, and keep it working while the review lasts. Status: `pending (USER)`.
 
 - **Ads:** "No, my app does not contain ads".
 - **Content rating:** start the questionnaire; email: the support email; category "All other app types" (or
@@ -363,7 +369,8 @@ permission list; no analytics, advertising or crash SDK; no cleartext traffic. C
 - Does your app collect or share any of the required user data types? **Yes**.
 - Is all of the user data collected by your app encrypted in transit? **Yes**: HTTPS to `relay.shellx.pro` and to
   Google; the release build refuses cleartext traffic.
-- Account creation methods: **OAuth** (Sign in with Google).
+- Account creation methods: both of these. **Username and other authentication**: an email address with a
+  6-digit one-time code that ShellX emails to it (no password). **OAuth**: Sign in with Google.
 - Delete account URL: **https://shellx.pro/privacy#delete-account**.
 - Do you provide a way for users to request that some or all of their data is deleted, without requiring them to
   delete their account? **No**.
@@ -372,9 +379,9 @@ permission list; no analytics, advertising or crash SDK; no cleartext traffic. C
 
 | Data type | Collected | Processed ephemerally | Required or optional | Purposes | Fact |
 | --- | --- | --- | --- | --- | --- |
-| Personal info › Email address | Yes | No | Required | App functionality, Account management | Sign in with Google; the relay stores the account's email and the apps show it. |
-| Personal info › Name | Yes | Yes | Required | Account management | The Google ID token the app sends carries the Google profile name; the relay reads only the email and the account ID, and stores no name. |
-| Personal info › User IDs | Yes | No | Required | App functionality, Account management | The Google account ID (`sub`) and the ShellX account and device IDs. |
+| Personal info › Email address | Yes | No | Required | App functionality, Account management | Both sign-in ways collect it. With the emailed code the user types the address and the app sends it, with the app's language, to the relay, which emails the code; with Google it comes from the Google ID token. The relay stores the account's email and the apps show it. |
+| Personal info › Name | Yes | Yes | Required | Account management | Only the Google way: the ID token the app sends carries the Google profile name; the relay reads only the email and the account ID, and stores no name. The emailed-code way asks for no name. |
+| Personal info › User IDs | Yes | No | Required | App functionality, Account management | The ShellX account and device IDs, and, for Google sign-in, the Google account ID (`sub`). |
 | Device or other IDs | Yes | No | Required | App functionality | The Firebase Cloud Messaging token and the Firebase installation ID (registered after sign-in, whether or not notifications are allowed), and the phone's ShellX device ID, Link public key and device name (the phone's name from Android settings, or its model name when none is set), which the user's Mac shows. The IP address is used only in memory, to limit sign-in attempts. |
 | App info and performance › Diagnostics | Yes (maintainer's call, below) | No | Required | App functionality | The app's version number, sent with each request so the relay can ask outdated apps to update. |
 | Messages, Photos and videos, Files and docs, App activity | No | | | | Agent chat, answers, attachments and terminal input and output are end-to-end encrypted (Noise_XX_25519_ChaChaPoly_SHA256) between the phone and the user's own Mac; the relay forwards data it cannot read, which Play does not count as collected. |
@@ -425,9 +432,13 @@ Gboard (or Laban Key) with Vietnamese Telex.
 - **D3. Demo.** On the sign-in screen, "Try without an account" opens the demo with the "Demo · Exit" banner:
   workspaces, running agents and requests show; Allow on a permission card removes it; Exit returns to sign-in.
   Turn on airplane mode and repeat: the demo works the same.
-- **D4. Sign-in.** "Continue with Google" opens Google's account sheet; after choosing the account the app is
-  signed in, and Settings › Account shows its email. A developer error or an immediate failure means the
-  `ShellX Android (Play signing)` client is missing (Play 8). Once, for S1 §2.1 criterion 2 (plan 1D leaves it to
+- **D4. Sign-in, both ways.** (a) Email code: on the sign-in screen type an address you can read in "Email
+  address" and tap "Send code"; the code step opens ("We sent a 6-digit code to …"); the mail arrives (check
+  spam) with a 6-digit code; enter it: the app is signed in, and Settings › Account labels the address "Email
+  code". Also try a wrong code (an error, the step stays) and "Resend code" (it counts down first). Sign out.
+  (b) Google: "Continue with Google" opens Google's account sheet; after choosing the account the app is
+  signed in, and Settings › Account shows its email. A developer error or an immediate failure of this button
+  means the `ShellX Android (Play signing)` client is missing (Play 8); the email way does not need it. Once, for S1 §2.1 criterion 2 (plan 1D leaves it to
   this plan): sign in here first with a Google account new to ShellX, then on a Mac with the same account, then do
   D5 with that Mac; time the seconds from Google's sheet to signed in.
 - **D5. Pairing with the camera.** On the Mac, Pair Phone… shows a QR code. On the phone, scan it: the camera
@@ -453,10 +464,12 @@ Gboard (or Laban Key) with Vietnamese Telex.
   another: it must arrive.
 - **D10. Back.** The system Back gesture (predictive back on Android 14 and later) closes a sheet, then the
   screen, then leaves the app from the home screen; nothing traps Back.
-- **D11. Delete account** (last, with a throwaway Google account). Sign out (it asks first), sign in with the
-  throwaway account, Settings › Account › Delete Account…: the dialog says what is deleted, Google asks for the
-  account again, and the app returns to sign-in with no Mac. Signing in again with that account starts an empty
-  account. Sign back in with your own account, and pair again if the Mac is gone.
+- **D11. Delete account** (last, once with a throwaway Google account and once with a throwaway email address).
+  Sign out (it asks first), sign in with the throwaway account, Settings › Account › Delete Account…: the dialog
+  says what is deleted. For Google, Google asks for the account again; for an email-code account the app emails a
+  new 6-digit code to the address and asks for it, and only a tap on Delete Account then deletes. Afterwards the
+  app returns to sign-in with no Mac, and signing in again with that account or address starts an empty account.
+  Sign back in with your own account, and pair again if the Mac is gone.
 - **D12. Update prompt.** n/a for the first release. From the second release on: keep the older build
   installed, roll the newer one out to internal testing, and check that Google Play's own update dialog (plan 3E's
   flexible flow: "Update" / "No thanks") appears at launch and on a return to the app, and that a "Restart" bar
