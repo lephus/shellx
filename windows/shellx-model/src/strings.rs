@@ -28,6 +28,14 @@ impl Lang {
             _ => Lang::En,
         }
     }
+
+    /// The language the relay mails a sign-in code in (`auth.email.begin`'s `locale`).
+    pub fn locale(self) -> &'static str {
+        match self {
+            Lang::Vi => "vi",
+            Lang::En => "en",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -165,6 +173,28 @@ pub enum Str {
     RateLimited,
     /// A sign-in route this relay does not have, or has turned off.
     SignInUnavailable,
+    /// The sign-in dialog's line under its title: no separate sign-up (spec §4.1).
+    FirstSignInCreatesAccount,
+    /// Between "Send code" and "Continue with Google".
+    OrDivider,
+    SendCode,
+    /// Placeholder of the dialog's code field.
+    CodePlaceholder,
+    VerifyCode,
+    ResendCode,
+    UseDifferentEmail,
+    InvalidEmail,
+    DisposableEmail,
+    InvalidCode,
+    CodeExpired,
+    EmailSendFailed,
+    /// Settings -> Account: the title of an `email` sign-in method.
+    EmailCodeMethod,
+    /// The sidebar's and Settings' notice after the server ended the session (catalog
+    /// `signin.expired`, first sentence).
+    SessionExpired,
+    /// The notice's button (catalog `signin.expired`, second sentence).
+    SignInAgain,
 }
 
 impl Str {
@@ -283,6 +313,21 @@ impl Str {
         Str::ServerProblem,
         Str::RateLimited,
         Str::SignInUnavailable,
+        Str::FirstSignInCreatesAccount,
+        Str::OrDivider,
+        Str::SendCode,
+        Str::CodePlaceholder,
+        Str::VerifyCode,
+        Str::ResendCode,
+        Str::UseDifferentEmail,
+        Str::InvalidEmail,
+        Str::DisposableEmail,
+        Str::InvalidCode,
+        Str::CodeExpired,
+        Str::EmailSendFailed,
+        Str::EmailCodeMethod,
+        Str::SessionExpired,
+        Str::SignInAgain,
     ];
 }
 
@@ -416,6 +461,25 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ServerProblem => "ShellX đang gặp sự cố. Thử lại sau.",
             Str::RateLimited => "Thử lại sau ít phút.",
             Str::SignInUnavailable => "Bản này chưa dùng được cách đăng nhập này.",
+            Str::FirstSignInCreatesAccount => {
+                "Chưa có tài khoản? Lần đăng nhập đầu tiên sẽ tạo tài khoản cho bạn."
+            }
+            Str::OrDivider => "hoặc",
+            Str::SendCode => "Gửi mã",
+            Str::CodePlaceholder => "Mã 6 chữ số",
+            Str::VerifyCode => "Xác nhận",
+            Str::ResendCode => "Gửi lại mã",
+            Str::UseDifferentEmail => "Dùng email khác",
+            Str::InvalidEmail => "Địa chỉ email này chưa đúng.",
+            Str::DisposableEmail => {
+                "Không dùng được địa chỉ email tạm thời. Hãy dùng địa chỉ khác."
+            }
+            Str::InvalidCode => "Mã chưa đúng. Xem lại email rồi thử lại.",
+            Str::CodeExpired => "Mã này không còn dùng được. Hãy gửi mã mới.",
+            Str::EmailSendFailed => "Chưa gửi được email. Thử lại sau giây lát.",
+            Str::EmailCodeMethod => "Mã qua email",
+            Str::SessionExpired => "Phiên đăng nhập đã hết hạn.",
+            Str::SignInAgain => "Đăng nhập lại",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -499,7 +563,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ShellExitsAtStart => "The shell exits as soon as it starts. Check SHELLX_SHELL.",
             Str::PressAnyKeyToRetry => "Press any key or Retry.",
             Str::SignInTitle => "Sign in to ShellX",
-            Str::EmailAddress => "Email",
+            Str::EmailAddress => "Email address",
             Str::SignInEllipsis => "Sign In…",
             Str::SignInSubtitle => "Sign in with your ShellX account.",
             Str::Help => "Help",
@@ -544,6 +608,21 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ServerProblem => "ShellX is having a problem. Try again later.",
             Str::RateLimited => "Try again in a few minutes.",
             Str::SignInUnavailable => "This way of signing in isn't available in this build.",
+            Str::FirstSignInCreatesAccount => "No account yet? Your first sign-in creates one.",
+            Str::OrDivider => "or",
+            Str::SendCode => "Send code",
+            Str::CodePlaceholder => "6-digit code",
+            Str::VerifyCode => "Verify",
+            Str::ResendCode => "Resend code",
+            Str::UseDifferentEmail => "Use a different email",
+            Str::InvalidEmail => "That doesn't look like an email address.",
+            Str::DisposableEmail => "Temporary email addresses can't be used. Try another address.",
+            Str::InvalidCode => "That code isn't right. Check the email and try again.",
+            Str::CodeExpired => "That code no longer works. Send a new one.",
+            Str::EmailSendFailed => "Couldn't send the email. Try again in a moment.",
+            Str::EmailCodeMethod => "Email code",
+            Str::SessionExpired => "Your session expired.",
+            Str::SignInAgain => "Sign in again",
         },
     }
 }
@@ -580,6 +659,8 @@ pub fn failure_sentence(lang: Lang, code: &str) -> String {
         | "email_sign_in_disabled"
         | "password_sign_in_removed" => Str::SignInUnavailable,
         "switch_from_signed_in_device" => Str::SwitchFromSignedInDevice,
+        // The server refused the session (review M2).
+        "unauthorized" | "http_401" => Str::SessionExpired,
         _ => Str::ServerProblem,
     };
     t(lang, key).to_string()
@@ -601,6 +682,54 @@ pub fn google_error(lang: Lang, code: &str) -> Option<String> {
         other => return Some(failure_sentence(lang, other)),
     };
     Some(t(lang, key).to_string())
+}
+
+/// The sign-in dialog's line after a code was mailed (the phone catalog's `signin.email.sentTo`).
+pub fn sent_code_to(lang: Lang, email: &str) -> String {
+    match lang {
+        Lang::Vi => format!(
+            "Đã gửi mã 6 chữ số tới {email}. Nếu sau một phút chưa thấy, hãy xem cả thư rác."
+        ),
+        Lang::En => format!(
+            "We sent a 6-digit code to {email}. If it isn't there in a minute, check your spam folder."
+        ),
+    }
+}
+
+/// The locked "Resend code" button: "Resend code in 42 s" / "Gửi lại mã sau 42 giây" (whole seconds).
+pub fn resend_code_in(lang: Lang, secs: u64) -> String {
+    match lang {
+        Lang::Vi => format!("Gửi lại mã sau {secs} giây"),
+        Lang::En => format!("Resend code in {secs} s"),
+    }
+}
+
+/// The dialog's line for an email-path failure (D2): the eight email sentences, `network` as
+/// `RelayUnreachable`, anything else (`http_<status>`, `server`, `invalid_device`, `not_configured`, …)
+/// as `ServerProblem`. Never the code.
+pub fn email_error(lang: Lang, code: &str) -> String {
+    let key = match code {
+        "invalid_email" => Str::InvalidEmail,
+        "disposable_email" => Str::DisposableEmail,
+        "invalid_code" => Str::InvalidCode,
+        "code_expired" => Str::CodeExpired,
+        "email_send_failed" => Str::EmailSendFailed,
+        "email_sign_in_disabled" => Str::SignInUnavailable,
+        "rate_limited" => Str::RateLimited,
+        "switch_from_signed_in_device" => Str::SwitchFromSignedInDevice,
+        "network" => Str::RelayUnreachable,
+        _ => Str::ServerProblem,
+    };
+    t(lang, key).to_string()
+}
+
+/// Settings -> Account: the title of a sign-in method by its provider.
+pub fn sign_in_method_label(provider: &str) -> Str {
+    match provider {
+        "apple" => Str::AppleId,
+        "email" => Str::EmailCodeMethod,
+        _ => Str::GoogleAccount,
+    }
 }
 
 /// "ngoại tuyến · lần cuối 09:05" / "offline · last seen 09:05".
@@ -711,7 +840,168 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 114);
+        assert_eq!(Str::ALL.len(), 129);
+    }
+
+    #[test]
+    fn sign_in_again_strings() {
+        assert_eq!(t(Lang::En, Str::SessionExpired), "Your session expired.");
+        assert_eq!(
+            t(Lang::Vi, Str::SessionExpired),
+            "Phiên đăng nhập đã hết hạn."
+        );
+        assert_eq!(t(Lang::En, Str::SignInAgain), "Sign in again");
+        assert_eq!(t(Lang::Vi, Str::SignInAgain), "Đăng nhập lại");
+    }
+
+    #[test]
+    fn the_first_sign_in_line() {
+        assert_eq!(
+            t(Lang::En, Str::FirstSignInCreatesAccount),
+            "No account yet? Your first sign-in creates one."
+        );
+        assert_eq!(
+            t(Lang::Vi, Str::FirstSignInCreatesAccount),
+            "Chưa có tài khoản? Lần đăng nhập đầu tiên sẽ tạo tài khoản cho bạn."
+        );
+    }
+
+    /// D5: every email string is the phone catalog's (`shellx-ios/ShellX/Localizable.xcstrings`).
+    #[test]
+    fn email_strings_match_the_phone_catalog() {
+        let pairs = [
+            (Str::OrDivider, "hoặc", "or"),
+            (Str::SendCode, "Gửi mã", "Send code"),
+            (Str::CodePlaceholder, "Mã 6 chữ số", "6-digit code"),
+            (Str::VerifyCode, "Xác nhận", "Verify"),
+            (Str::ResendCode, "Gửi lại mã", "Resend code"),
+            (
+                Str::UseDifferentEmail,
+                "Dùng email khác",
+                "Use a different email",
+            ),
+            (
+                Str::InvalidEmail,
+                "Địa chỉ email này chưa đúng.",
+                "That doesn't look like an email address.",
+            ),
+            (
+                Str::DisposableEmail,
+                "Không dùng được địa chỉ email tạm thời. Hãy dùng địa chỉ khác.",
+                "Temporary email addresses can't be used. Try another address.",
+            ),
+            (
+                Str::InvalidCode,
+                "Mã chưa đúng. Xem lại email rồi thử lại.",
+                "That code isn't right. Check the email and try again.",
+            ),
+            (
+                Str::CodeExpired,
+                "Mã này không còn dùng được. Hãy gửi mã mới.",
+                "That code no longer works. Send a new one.",
+            ),
+            (
+                Str::EmailSendFailed,
+                "Chưa gửi được email. Thử lại sau giây lát.",
+                "Couldn't send the email. Try again in a moment.",
+            ),
+            (
+                Str::SignInUnavailable,
+                "Bản này chưa dùng được cách đăng nhập này.",
+                "This way of signing in isn't available in this build.",
+            ),
+            (
+                Str::RateLimited,
+                "Thử lại sau ít phút.",
+                "Try again in a few minutes.",
+            ),
+            (
+                Str::ServerProblem,
+                "ShellX đang gặp sự cố. Thử lại sau.",
+                "ShellX is having a problem. Try again later.",
+            ),
+            (Str::EmailCodeMethod, "Mã qua email", "Email code"),
+        ];
+        assert_eq!(pairs.len(), 15);
+        for (key, vi, en) in pairs {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            sent_code_to(Lang::En, "foo@bar.com"),
+            "We sent a 6-digit code to foo@bar.com. If it isn't there in a minute, check your spam folder."
+        );
+        assert_eq!(
+            sent_code_to(Lang::Vi, "foo@bar.com"),
+            "Đã gửi mã 6 chữ số tới foo@bar.com. Nếu sau một phút chưa thấy, hãy xem cả thư rác."
+        );
+        assert_eq!(resend_code_in(Lang::En, 42), "Resend code in 42 s");
+        assert_eq!(resend_code_in(Lang::Vi, 60), "Gửi lại mã sau 60 giây");
+        assert_eq!((Lang::Vi.locale(), Lang::En.locale()), ("vi", "en"));
+    }
+
+    #[test]
+    fn email_error_maps_codes() {
+        for lang in [Lang::Vi, Lang::En] {
+            let own = [
+                ("invalid_email", Str::InvalidEmail),
+                ("disposable_email", Str::DisposableEmail),
+                ("invalid_code", Str::InvalidCode),
+                ("code_expired", Str::CodeExpired),
+                ("email_send_failed", Str::EmailSendFailed),
+                ("email_sign_in_disabled", Str::SignInUnavailable),
+                ("rate_limited", Str::RateLimited),
+                ("network", Str::RelayUnreachable),
+                (
+                    "switch_from_signed_in_device",
+                    Str::SwitchFromSignedInDevice,
+                ),
+            ];
+            for (code, key) in own {
+                assert_eq!(email_error(lang, code), t(lang, key), "{lang:?} {code}");
+            }
+            for code in [
+                "http_502",
+                "http_503",
+                "http_504",
+                "server",
+                "invalid_device",
+                "invalid_params",
+                "bad_request",
+                "internal_error",
+                "payload_too_large",
+                "not_configured",
+                "io",
+                "crypto",
+                "unknown_method",
+                "",
+            ] {
+                assert_eq!(
+                    email_error(lang, code),
+                    t(lang, Str::ServerProblem),
+                    "{lang:?} {code:?}"
+                );
+            }
+            for code in own
+                .iter()
+                .map(|(c, _)| *c)
+                .chain(["http_502", "invalid_device", "io"])
+            {
+                let out = email_error(lang, code);
+                assert!(
+                    !out.contains("http_") && !out.contains('_'),
+                    "{code}: {out}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sign_in_method_labels_follow_the_provider() {
+        assert_eq!(sign_in_method_label("apple"), Str::AppleId);
+        assert_eq!(sign_in_method_label("email"), Str::EmailCodeMethod);
+        assert_eq!(sign_in_method_label("google"), Str::GoogleAccount);
+        assert_eq!(sign_in_method_label("test"), Str::GoogleAccount);
     }
 
     #[test]
@@ -759,6 +1049,8 @@ mod tests {
                     &["switch_from_signed_in_device"],
                     Str::SwitchFromSignedInDevice,
                 ),
+                // Review M2: the server refused the session.
+                (&["unauthorized", "http_401"], Str::SessionExpired),
                 (
                     &[
                         "bad_response",
@@ -880,7 +1172,7 @@ mod tests {
         assert_eq!(t(Lang::Vi, Str::SignInTitle), "Đăng nhập ShellX");
         assert_eq!(t(Lang::En, Str::SignInTitle), "Sign in to ShellX");
         assert_eq!(t(Lang::Vi, Str::EmailAddress), "Địa chỉ email");
-        assert_eq!(t(Lang::En, Str::EmailAddress), "Email");
+        assert_eq!(t(Lang::En, Str::EmailAddress), "Email address");
         assert_eq!(t(Lang::Vi, Str::SignInEllipsis), "Đăng nhập…");
         assert_eq!(t(Lang::En, Str::SignInEllipsis), "Sign In…");
         assert_eq!(

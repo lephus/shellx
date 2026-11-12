@@ -69,6 +69,12 @@ public final class GoogleSignInModel {
         return Task { [weak self] in await self?.cancelFlow() }
     }
 
+    /// Forgets the shown failure (only in `.ready`), so the other flow's start or typing hides it.
+    public func clearError() {
+        guard phase == .ready else { return }
+        errorText = nil
+    }
+
     /// The person confirmed the "Signed in as" screen.
     public func finish() {
         guard case .signedIn = phase, !reported else { return }

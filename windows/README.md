@@ -61,6 +61,13 @@ exits non-zero if no window appeared. The first release build takes about 5 minu
   Windows caption buttons.
 - State goes to `~/.local/share/shellx-native` (created with mode 0700, which shellx-core
   requires).
+- `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch|expired` (Mac development build only)
+  opens the sign-in dialog on that screen for screenshots, with a made-up address and no network
+  call: `start` as this build has it (no Google: a Mac build has no Google client), `google` the
+  same with the Google button, `code` the code step for you@example.com, `invalid` an address
+  with a Vietnamese letter, `switch` the first screen after a 409. `expired` opens no dialog: it
+  shows the sidebar's "Sign in again" notice after a server sign-out. With a stored session the
+  dialog closes at once, so move `~/.local/share/shellx-native/core/session.json` aside first.
 
 ## Command line
 
@@ -79,6 +86,7 @@ Environment variables:
 | `SHELLX_LANG` | Overrides the UI language: a value starting with `en` is English, one starting with `vi` is Vietnamese. Anything else or unset follows the Windows display language (Vietnamese on a Vietnamese Windows, English otherwise, and English on a Mac) |
 | `SHELLX_SHELL` | Program to start in new local panes instead of the default PowerShell, which runs as `powershell.exe -NoLogo -NoExit -Command <prompt hook>` (the hook wraps your `prompt` and reports the working directory with OSC 7). The override gets no arguments and no hook, so sidebar cards show no directory or branch for it |
 | `SHELLX_API_BASE` | API base URL for `config.set`; honored in debug builds only. Release builds always use `https://relay.shellx.pro` |
+| `SHELLX_OFFER_ALL_MACS` | `1` offers "Request access" for every Mac in the account, also one the relay does not mark as able to host (`can_host`). Only for trying Part 2 with a test Mac build (design §4.5); never for a Windows PC. Read once at start |
 
 ## State directories
 

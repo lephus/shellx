@@ -70,9 +70,7 @@ struct ShellXAccountDetailView: View {
     private func methodRow(_ method: AccountSignInMethod) -> some View {
         row {
             VStack(alignment: .leading, spacing: 2) {
-                Text(method.isApple
-                    ? String(localized: "settings.account.methods.apple", defaultValue: "Apple ID")
-                    : String(localized: "settings.account.methods.google", defaultValue: "Google account"))
+                Text(methodTitle(method.kind))
                     .cmuxFont(size: 12, weight: .medium)
                 Text(subtitle(method))
                     .cmuxFont(size: 11)
@@ -94,6 +92,17 @@ struct ShellXAccountDetailView: View {
                 .controlSize(.small)
                 .disabled(account.removingSignInMethodIDs.contains(method.id))
             }
+        }
+    }
+
+    private func methodTitle(_ kind: AccountSignInMethod.Kind) -> String {
+        switch kind {
+        case .apple:
+            return String(localized: "settings.account.methods.apple", defaultValue: "Apple ID")
+        case .email:
+            return String(localized: "settings.account.methods.email", defaultValue: "Email code")
+        case .google:
+            return String(localized: "settings.account.methods.google", defaultValue: "Google account")
         }
     }
 

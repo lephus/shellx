@@ -18,9 +18,9 @@ use std::sync::Mutex;
 
 use shellx_model::account::{AccountAction, AccountEvent};
 use shellx_model::core_api::{
-    CoreCall, CoreConfig, CoreErr, config_set, google_begin, google_cancel, google_finish,
-    heartbeat, list_machines, list_sign_in_methods, login, logout, register_machine,
-    remove_sign_in_method, session_info,
+    CoreCall, CoreConfig, CoreErr, config_set, email_begin, email_finish, google_begin,
+    google_cancel, google_finish, heartbeat, list_machines, list_sign_in_methods, login, logout,
+    register_machine, remove_sign_in_method, session_info,
 };
 
 /// The ShellX API (K2). The relay URL is never set here: it comes from
@@ -41,21 +41,6 @@ fn api_base_from(env: Option<String>) -> String {
     #[cfg(not(debug_assertions))]
     let _ = env;
     API_BASE.to_string()
-}
-
-/// Marker file (in the native data dir) recording that the one-time "switch to Google" offer was made.
-pub const GOOGLE_SWITCH_MARKER: &str = "google-switch-offered";
-
-/// True only for the call that creates `marker` (`create_new`).
-pub fn take_once(marker: &std::path::Path) -> bool {
-    if let Some(dir) = marker.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(marker)
-        .is_ok()
 }
 
 /// Facts about this PC sent with `config.set` and `machines.register`.
@@ -187,6 +172,19 @@ pub fn run_account_action(
                 result,
             })
         }
+        // The relay mails a code (local refusals come back without a request).
+        AccountAction::CallEmailBegin { email, locale } => {
+            Some(AccountEvent::EmailBegun(email_begin(core, &email, &locale)))
+        }
+        // The code is moved into the call and dropped with the action.
+        AccountAction::CallEmailFinish { challenge_id, code } => {
+            let result = email_finish(core, &challenge_id, &code);
+            drop(code);
+            Some(AccountEvent::EmailFinished {
+                challenge_id,
+                result,
+            })
+        }
         // The window opens the browser.
         AccountAction::OpenBrowser(_) => None,
         AccountAction::ScheduleTick { .. } => None,
@@ -199,6 +197,12 @@ pub fn run_version_check(core: &dyn CoreCall) -> shellx_model::update::UpdateSta
     shellx_model::update::from_result(shellx_model::core_api::version_check(core))
 }
 
+/// `auth.google.available` (after `config.set`): `Some(answer)`, or `None` when the core could not answer
+/// (asked again later; Google stays hidden meanwhile). Local: no request.
+pub fn run_google_check(core: &dyn CoreCall) -> Option<bool> {
+    shellx_model::core_api::google_available(core).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,6 +210,7 @@ mod tests {
     use shellx_fake_api::{FakeApi, FakeOptions};
     use shellx_model::account::{AccountFlow, AccountState};
     use shellx_model::core_api::FakeCore;
+    use shellx_model::email_sign_in::EmailStep;
     use shellx_model::sidebar::{Access, RowAction, build_groups};
     use shellx_model::strings::Lang;
     use std::collections::VecDeque;
@@ -454,11 +459,15 @@ mod tests {
         config_set(&mac, &cfg(&base, &tmp.path().join("mac"))).unwrap();
         mac.call("auth.login", json!({"email":"a@b.c","password":"pw"}))
             .unwrap();
-        mac.call(
-            "machines.register",
-            json!({"name":"MacBook","platform":"macos","os_version":"15.5","app_version":"2.0.0"}),
-        )
-        .unwrap();
+        let mac_id = mac
+            .call(
+                "machines.register",
+                json!({"name":"MacBook","platform":"macos","os_version":"15.5","app_version":"2.0.0"}),
+            )
+            .unwrap()["machine_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
         mac.call("machines.heartbeat", json!({})).unwrap();
 
         // This PC, the way the window drives it.
@@ -516,6 +525,23 @@ mod tests {
             .find(|g| g.machine_id == other.machine_id)
             .unwrap();
         assert_eq!(mac_row.action, RowAction::None);
+        assert_eq!(other.machine_id, mac_id);
+
+        // The relay now says the Mac can host (Part 2): the next list offers "Request access" through the
+        // whole chain (relay -> core -> model -> row), with no new Windows build (spec §4.5; review M4).
+        api.set_machine_can_host(&mac_id, json!(true));
+        let now = 1 + shellx_model::account::LIST_INTERVAL_MS;
+        let (ran, _) = drive(&mut flow, &core, AccountEvent::Tick(now), now);
+        assert_eq!(ran, ["CallList"]);
+        let listed = flow
+            .machines()
+            .iter()
+            .find(|m| m.machine_id == mac_id)
+            .unwrap();
+        assert!(listed.can_host && listed.online, "{listed:?}");
+        let groups = build_groups(flow.machines(), &|_| Access::None, 0, Lang::Vi);
+        let mac_row = groups.iter().find(|g| g.machine_id == mac_id).unwrap();
+        assert_eq!(mac_row.action, RowAction::RequestAccess);
         api.stop();
     }
 
@@ -538,14 +564,6 @@ mod tests {
         let down = FakeCore::new();
         down.on("version.check", Err(CoreErr::new("network", "down")));
         assert_eq!(run_version_check(&down), UpdateStatus::Unknown);
-    }
-
-    #[test]
-    fn take_once_is_true_only_the_first_time() {
-        let tmp = tempfile::tempdir().unwrap();
-        let marker = tmp.path().join(GOOGLE_SWITCH_MARKER);
-        assert!(take_once(&marker));
-        assert!(!take_once(&marker));
     }
 
     /// `config.set` with the fake API's Google overrides, like the plan's dev config.
@@ -612,6 +630,370 @@ mod tests {
         let methods = flow.sign_in_methods().unwrap();
         assert_eq!(methods.len(), 1);
         assert_eq!(methods[0].provider, "google");
+        api.stop();
+    }
+
+    // ----- email code sign-in and the Google check through the real shellx-core -----
+
+    /// The real shellx-core with its own state dir, against `api`.
+    fn real_core(api: &FakeApi, dir: std::path::PathBuf) -> ConfiguredCore {
+        let base = api.base_url.clone();
+        ConfiguredCore::new(Box::new(crate::core_bridge::CoreBridge::new()), move || {
+            Ok(cfg(&base, &dir))
+        })
+    }
+
+    fn send_code(email: &str, locale: &str) -> AccountEvent {
+        AccountEvent::EmailCodeRequested {
+            email: email.into(),
+            locale: locale.into(),
+        }
+    }
+
+    fn submit_code(text: &str) -> AccountEvent {
+        AccountEvent::EmailCodeSubmitted(text.into())
+    }
+
+    fn email_error_code(flow: &AccountFlow) -> Option<&str> {
+        flow.email_error().map(|e| e.code.as_str())
+    }
+
+    /// A signed-out flow on the code step for foo@bar.com (code requested at t=1).
+    fn on_the_code_step(core: &dyn CoreCall) -> AccountFlow {
+        let mut flow = AccountFlow::new();
+        drive(&mut flow, core, AccountEvent::Started, 0);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+        drive(&mut flow, core, send_code("foo@bar.com", "en"), 1);
+        assert_eq!(flow.email_step(), Some(EmailStep::Code), "{flow:?}");
+        flow
+    }
+
+    /// Email sign-in through the real shellx-core against the fake API (the fake's mailbox stands for the email).
+    #[test]
+    fn email_session_against_fake_api() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let mut flow = AccountFlow::new();
+        drive(&mut flow, &core, AccountEvent::Started, 0);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+
+        // Leading zeros go through the real core.
+        api.set_next_email_code("004217");
+        let (ran, _) = drive(&mut flow, &core, send_code(" Foo@Bar.com ", "vi"), 1);
+        assert_eq!(
+            ran,
+            ["CallEmailBegin { email: \"<redacted>\", locale: \"vi\" }"]
+        );
+        assert_eq!(flow.email_step(), Some(EmailStep::Code));
+        assert_eq!(flow.email_sent_to(), Some("foo@bar.com"));
+        assert_eq!(api.email_code("foo@bar.com").as_deref(), Some("004217"));
+        // D1: the relay gets exactly "vi".
+        assert_eq!(api.email_locale("foo@bar.com").as_deref(), Some("vi"));
+
+        let (ran, _) = drive(&mut flow, &core, submit_code("000000"), 2);
+        assert_eq!(ran.len(), 1, "{ran:?}");
+        assert!(ran[0].starts_with("CallEmailFinish {"), "{ran:?}");
+        assert!(
+            !ran[0].contains("000000") && !ran[0].contains("004217"),
+            "{ran:?}"
+        );
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+        assert_eq!(email_error_code(&flow), Some("invalid_code"));
+        assert_eq!(flow.email_step(), Some(EmailStep::Code));
+
+        let (ran, _) = drive(&mut flow, &core, submit_code("004 217\n"), 3);
+        assert_eq!(
+            ran[1..],
+            ["CallList", "CallRegister", "CallList"],
+            "{ran:?}"
+        );
+        assert!(
+            matches!(flow.state(), AccountState::LoggedIn { .. }),
+            "{:?}",
+            flow.state()
+        );
+        assert_eq!(flow.email(), Some("foo@bar.com"));
+        assert_eq!(flow.auth_method(), Some("email"));
+        assert!(!flow.needs_google_switch());
+        assert_eq!(flow.email_step(), None);
+
+        let (ran, _) = drive(&mut flow, &core, AccountEvent::SignInMethodsRequested, 4);
+        assert_eq!(ran, ["CallListSignInMethods"]);
+        let methods = flow.sign_in_methods().unwrap();
+        assert_eq!(methods.len(), 1, "{methods:?}");
+        assert_eq!(methods[0].provider, "email");
+        api.stop();
+    }
+
+    /// Production today: a relay whose mail gateway is off (503) or that predates the feature (404).
+    #[test]
+    fn a_relay_without_email_sign_in_answers_through_the_real_core() {
+        for opts in [
+            FakeOptions {
+                email_sign_in: false,
+                ..Default::default()
+            },
+            FakeOptions {
+                email_routes: false,
+                ..Default::default()
+            },
+        ] {
+            let what = format!("{opts:?}");
+            let api = FakeApi::start(opts);
+            let tmp = tempfile::tempdir().unwrap();
+            let core = real_core(&api, tmp.path().join("core"));
+            let mut flow = AccountFlow::new();
+            drive(&mut flow, &core, AccountEvent::Started, 0);
+            drive(&mut flow, &core, send_code("foo@bar.com", "en"), 1);
+            assert_eq!(
+                email_error_code(&flow),
+                Some("email_sign_in_disabled"),
+                "{what}"
+            );
+            assert_eq!(flow.email_step(), Some(EmailStep::Email), "{what}");
+            assert_eq!(flow.state(), &AccountState::LoggedOut, "{what}");
+            api.stop();
+        }
+    }
+
+    #[test]
+    fn a_failed_resend_through_the_real_core_drops_the_challenge() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let mut flow = on_the_code_step(&core);
+        api.fail_next_mail();
+        let (ran, _) = drive(&mut flow, &core, AccountEvent::EmailResendRequested, 61_000);
+        assert_eq!(
+            ran,
+            ["CallEmailBegin { email: \"<redacted>\", locale: \"en\" }"]
+        );
+        assert_eq!(flow.email_step(), Some(EmailStep::Code));
+        assert!(!flow.email_can_verify());
+        assert_eq!(email_error_code(&flow), Some("email_send_failed"));
+        assert_eq!(flow.email_resend_wait_secs(61_000), 0);
+        // The relay holds no live code either.
+        assert_eq!(api.email_code("foo@bar.com"), None);
+        api.stop();
+    }
+
+    #[test]
+    fn a_rate_limited_resend_through_the_real_core_keeps_the_code() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let mut flow = on_the_code_step(&core);
+        let first = api.email_code("foo@bar.com").unwrap();
+        api.fail_next("/v1/auth/email/code", 429, "rate_limited");
+        drive(&mut flow, &core, AccountEvent::EmailResendRequested, 61_000);
+        assert_eq!(flow.email_step(), Some(EmailStep::Code));
+        assert_eq!(email_error_code(&flow), Some("rate_limited"));
+        assert!(flow.email_can_verify());
+        assert_eq!(flow.email_resend_wait_secs(61_000), 0);
+        assert_eq!(api.email_code("foo@bar.com"), Some(first.clone()));
+        drive(&mut flow, &core, submit_code(&first), 61_100);
+        assert!(
+            matches!(flow.state(), AccountState::LoggedIn { .. }),
+            "{:?}",
+            flow.state()
+        );
+        assert_eq!(flow.auth_method(), Some("email"));
+        api.stop();
+    }
+
+    #[test]
+    fn an_expired_code_through_the_real_core_unlocks_resend() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let mut flow = on_the_code_step(&core);
+        let code = api.email_code("foo@bar.com").unwrap();
+        // A relay restart or deploy.
+        api.expire_email_codes();
+        drive(&mut flow, &core, submit_code(&code), 2_000);
+        assert_eq!(email_error_code(&flow), Some("code_expired"));
+        assert_eq!(flow.email_step(), Some(EmailStep::Code));
+        assert!(!flow.email_can_verify());
+        assert_eq!(flow.email_resend_wait_secs(2_000), 0);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+        drive(&mut flow, &core, AccountEvent::EmailResendRequested, 2_000);
+        assert_eq!(flow.email_step(), Some(EmailStep::Code));
+        assert!(flow.email_can_verify());
+        let fresh = api.email_code("foo@bar.com").unwrap();
+        drive(&mut flow, &core, submit_code(&fresh), 2_100);
+        assert!(
+            matches!(flow.state(), AccountState::LoggedIn { .. }),
+            "{:?}",
+            flow.state()
+        );
+        api.stop();
+    }
+
+    /// `config.set` that leaves the Google client empty: a build without one (every cross build today).
+    struct NoGoogleCore {
+        inner: crate::core_bridge::CoreBridge,
+    }
+
+    impl CoreCall for NoGoogleCore {
+        fn call(
+            &self,
+            method: &str,
+            mut params: serde_json::Value,
+        ) -> Result<serde_json::Value, CoreErr> {
+            if method == "config.set" {
+                params["google_client_id"] = json!("");
+                params["google_client_secret"] = json!("");
+            }
+            self.inner.call(method, params)
+        }
+    }
+
+    /// Ruling 28 through the real core: the build's client decides, never the network.
+    #[test]
+    fn google_availability_through_the_real_core() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let (base, dir) = (api.base_url.clone(), tmp.path().join("google"));
+        let with = ConfiguredCore::new(
+            Box::new(FakeGoogleCore {
+                inner: crate::core_bridge::CoreBridge::new(),
+                base: base.clone(),
+            }),
+            move || Ok(cfg(&base, &dir)),
+        );
+        assert_eq!(run_google_check(&with), Some(true));
+        let (base, dir) = (api.base_url.clone(), tmp.path().join("none"));
+        let without = ConfiguredCore::new(
+            Box::new(NoGoogleCore {
+                inner: crate::core_bridge::CoreBridge::new(),
+            }),
+            move || Ok(cfg(&base, &dir)),
+        );
+        assert_eq!(run_google_check(&without), Some(false));
+        let broken = ConfiguredCore::new(Box::new(crate::core_bridge::CoreBridge::new()), || {
+            Err(CoreErr::new(
+                "state_dir",
+                "ShellX state folder: LOCALAPPDATA is not set",
+            ))
+        });
+        assert_eq!(run_google_check(&broken), None);
+        assert!(api.requests().is_empty());
+        api.stop();
+    }
+
+    /// Ruling 39: the model's copies equal the core's.
+    #[test]
+    fn the_model_maps_digits_and_lengths_like_the_core() {
+        use shellx_model::email_sign_in::{DECIMAL_ZEROS, EMAIL_MAX_LEN, code_digits};
+        assert_eq!(DECIMAL_ZEROS, shellx_core::auth_email::DECIMAL_ZEROS);
+        assert_eq!(EMAIL_MAX_LEN, shellx_core::auth_email::MAX_EMAIL_BYTES);
+        for s in [
+            "１２３４５６",
+            "١٢٣٤٥٦",
+            "۱۲۳۴۵۶",
+            "१२३४५६",
+            " 123 456\n",
+            "004217",
+        ] {
+            assert_eq!(
+                code_digits(s),
+                shellx_core::auth_email::clean_code(s),
+                "{s:?}"
+            );
+            assert!(code_digits(s).is_some(), "{s:?}");
+        }
+    }
+
+    /// Review chunk 1 M3: the likeliest production failure. An account that still has a password (the
+    /// relay's PASSWORD_LOGIN is on) answers 409 on verify: the first screen with the switch sentence.
+    #[test]
+    fn a_password_account_gets_the_switch_answer_through_the_real_core() {
+        use shellx_model::strings::{Str, email_error, t};
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        // Another device signs in to that account with its password.
+        let other = crate::core_bridge::CoreBridge::new();
+        config_set(&other, &cfg(&api.base_url, &tmp.path().join("other"))).unwrap();
+        other
+            .call("auth.login", json!({"email":"foo@bar.com","password":"pw"}))
+            .unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let mut flow = on_the_code_step(&core);
+        let code = api.email_code("foo@bar.com").unwrap();
+        drive(&mut flow, &core, submit_code(&code), 2_000);
+        assert_eq!(flow.email_step(), Some(EmailStep::Email));
+        assert_eq!(
+            email_error_code(&flow),
+            Some("switch_from_signed_in_device")
+        );
+        assert_eq!(flow.email_sent_to(), None);
+        assert_eq!(flow.state(), &AccountState::LoggedOut);
+        for lang in [Lang::En, Lang::Vi] {
+            assert_eq!(
+                email_error(lang, "switch_from_signed_in_device"),
+                t(lang, Str::SwitchFromSignedInDevice)
+            );
+        }
+        api.stop();
+    }
+
+    /// Review chunk 1 M3: addresses the relay refuses, one of them one the model lets through.
+    #[test]
+    fn addresses_the_relay_refuses_answer_through_the_real_core() {
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        for (address, code) in [
+            ("x@mailinator.com", "disposable_email"),
+            // A one-letter top-level domain: plausible for the dialog, refused by the relay.
+            ("a@b.c", "invalid_email"),
+        ] {
+            let mut flow = AccountFlow::new();
+            drive(&mut flow, &core, AccountEvent::Started, 0);
+            drive(&mut flow, &core, send_code(address, "en"), 1);
+            assert_eq!(flow.email_step(), Some(EmailStep::Email), "{address}");
+            assert_eq!(email_error_code(&flow), Some(code), "{address}");
+            assert_eq!(flow.state(), &AccountState::LoggedOut, "{address}");
+        }
+        api.stop();
+    }
+
+    /// Review chunk 1 M3: offline. A verify keeps the code for another try; a send stays on the first
+    /// screen; both read the network sentence. "Offline" is a relay address where nothing listens (a
+    /// stopped fake still holds its port and lets a request wait for the core's 20 s timeout).
+    #[test]
+    fn offline_through_the_real_core() {
+        use shellx_model::strings::{Str, email_error, t};
+        let api = FakeApi::start(FakeOptions::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let core = real_core(&api, tmp.path().join("core"));
+        let nobody = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port())
+        };
+        let dir = tmp.path().join("offline");
+        let offline =
+            ConfiguredCore::new(Box::new(crate::core_bridge::CoreBridge::new()), move || {
+                Ok(cfg(&nobody, &dir))
+            });
+
+        let mut on_code = on_the_code_step(&core);
+        drive(&mut on_code, &offline, submit_code("123456"), 3_000);
+        assert_eq!(on_code.email_step(), Some(EmailStep::Code));
+        assert_eq!(email_error_code(&on_code), Some("network"));
+        assert!(on_code.email_can_verify(), "the challenge is kept");
+        assert_eq!(on_code.state(), &AccountState::LoggedOut);
+
+        let mut first = AccountFlow::new();
+        drive(&mut first, &offline, AccountEvent::Started, 0);
+        drive(&mut first, &offline, send_code("foo@bar.com", "vi"), 1);
+        assert_eq!(first.email_step(), Some(EmailStep::Email));
+        assert_eq!(email_error_code(&first), Some("network"));
+        assert_eq!(
+            email_error(Lang::Vi, "network"),
+            t(Lang::Vi, Str::RelayUnreachable)
+        );
         api.stop();
     }
 }

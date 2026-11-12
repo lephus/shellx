@@ -10,8 +10,9 @@
 //!
 //! The sidebar's machines come from the `AccountService` (signed in: the
 //! account's machines; signed out: this PC only). Sign-in is never asked at
-//! launch: Settings -> Account (or the machines "+" while signed out) opens
-//! the `SignInDialog`, drawn over the whole window. Access to the other
+//! launch and the dialog never opens by itself: Settings -> Account, the
+//! machines "+" while signed out, or the "Sign in again" notice after a
+//! server sign-out opens the `SignInDialog`, drawn over the whole window. Access to the other
 //! machines (links, the code being waited on) comes from the `PairingPanel`,
 //! which is drawn over the main area while it is open.
 //!
@@ -65,7 +66,9 @@ use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::modal::{Panel, Panels, RootKey};
 use shellx_model::palette::Status;
-use shellx_model::sidebar::{MachineInfo, build_groups};
+use shellx_model::sidebar::{
+    MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_picker,
+};
 use shellx_model::strings::Lang;
 use shellx_model::tabs::{CloseOutcome, PaneTarget, RespawnGuard, Tab, TabId, Tabs};
 use shellx_model::update::{UpdateStatus, download_url};
@@ -76,7 +79,7 @@ use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
 use super::settings::{SettingsEvent, SettingsPanel};
-use super::sidebar::{self, PickerEntry, SessionRow};
+use super::sidebar::{self, Picker, PickerEntry, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
@@ -126,6 +129,9 @@ pub struct RootView {
     help_open: bool,
     /// Each region's tab strip scroll, and the terminal it last showed.
     tab_strips: HashMap<SlotId, (ScrollHandle, PaneId)>,
+    /// Which Macs are offered "Request access" (design §4.5): only those the relay says can host,
+    /// or every Mac with `SHELLX_OFFER_ALL_MACS=1` (read once at start, for trying Part 2).
+    offer_rule: OfferRule,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -209,10 +215,51 @@ impl RootView {
             new_menu_open: false,
             help_open: false,
             tab_strips: HashMap::new(),
+            offer_rule: offer_rule_from_env(std::env::var("SHELLX_OFFER_ALL_MACS").ok().as_deref()),
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
+        #[cfg(target_os = "macos")]
+        root.dev_sign_in_preview(window, cx);
         root
+    }
+
+    /// Mac development build only: `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch` opens the
+    /// sign-in dialog on that screen for screenshots, with a made-up address and no core call;
+    /// `expired` opens no dialog and shows the "Sign in again" notice after a server sign-out
+    /// (Ruling 38). Any other value does nothing.
+    #[cfg(target_os = "macos")]
+    fn dev_sign_in_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Ok(value) = std::env::var("SHELLX_DEV_SIGN_IN") else {
+            return;
+        };
+        let value = value.trim();
+        if value == "expired" {
+            self.account
+                .update(cx, |account, cx| account.dev_preview_email(value, cx));
+            return;
+        }
+        if !matches!(value, "start" | "google" | "code" | "invalid" | "switch") {
+            return;
+        }
+        if value == "google" {
+            self.account
+                .update(cx, |account, cx| account.dev_set_google_available(true, cx));
+        }
+        self.open_sign_in(GooglePurpose::SignIn, window, cx);
+        if matches!(value, "code" | "switch") {
+            self.account
+                .update(cx, |account, cx| account.dev_preview_email(value, cx));
+        }
+        let fill = match value {
+            "invalid" => Some("phu@ẽample.com"),
+            "switch" => Some("you@example.com"),
+            _ => None,
+        };
+        if let Some(text) = fill {
+            self.sign_in
+                .update(cx, |dialog, cx| dialog.dev_fill_email(text, cx));
+        }
     }
 
     /// The forced update, if any: (minimum version, https download link).
@@ -384,16 +431,9 @@ impl RootView {
         if close {
             self.close_all_remote(window, cx);
         }
-        // The server ended the session: ask for sign-in again. A password account is offered the
-        // switch to Google once.
-        if self
-            .account
-            .update(cx, |a, _| a.take_signed_out_by_server())
-        {
-            self.open_sign_in(GooglePurpose::SignIn, window, cx);
-        } else if self.account.update(cx, |a, _| a.take_google_switch_offer()) {
-            self.open_sign_in(GooglePurpose::Link, window, cx);
-        }
+        // No dialog opens by itself (Ruling 29): after a server sign-out the sidebar shows the model's
+        // `account_view::sign_in_notice` (and Settings its view), and the keys being typed keep going to
+        // the shell.
     }
 
     /// Closes every remote session, then every remote pane through the
@@ -1005,22 +1045,31 @@ impl Render for RootView {
             let local_id = this_machine_id(&machines).to_string();
             let utc_offset = self.account.read(cx).utc_offset_secs();
             let pairing = self.pairing.read(cx);
-            let groups = build_groups(
+            let groups = build_groups_with(
                 &machines,
                 &|id: &str| pairing.access_for(id),
                 utc_offset,
                 lang,
+                self.offer_rule,
             );
-            let picker: Option<Vec<PickerEntry>> = pairing.picker_open().then(|| {
-                machines
-                    .iter()
-                    .filter(|m| !m.is_this_machine && !pairing.has_link(&m.machine_id))
-                    .map(|m| PickerEntry {
-                        machine_id: m.machine_id.clone(),
-                        name: m.name.clone(),
-                        online: m.online,
-                    })
-                    .collect()
+            // The "+" list and its sentences, as the model decides them (`request_picker`).
+            let picker = pairing.picker_open().then(|| {
+                let (targets, notes) = request_picker(
+                    &machines,
+                    &|id: &str| pairing.access_for(id),
+                    self.offer_rule,
+                );
+                Picker {
+                    entries: targets
+                        .into_iter()
+                        .map(|m| PickerEntry {
+                            machine_id: m.machine_id.clone(),
+                            name: m.name.clone(),
+                            online: m.online,
+                        })
+                        .collect(),
+                    notes,
+                }
             });
             let active = self.tabs.active().id;
             // A tab is listed under the machine its panes run on (a Mac tab
@@ -1052,7 +1101,7 @@ impl Render for RootView {
                 &groups,
                 &rows,
                 &local_id,
-                picker.as_deref(),
+                picker.as_ref(),
                 &self.account,
                 self.help_open,
                 lang,

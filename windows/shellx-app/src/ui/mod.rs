@@ -15,8 +15,6 @@ mod settings;
 mod sidebar;
 mod tab_bar;
 mod term_view;
-// The sign-in dialog no longer has text fields; the editable field stays for the next form that needs one.
-#[allow(dead_code)]
 mod text_field;
 mod theme;
 mod titlebar;

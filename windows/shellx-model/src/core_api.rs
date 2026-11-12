@@ -226,6 +226,56 @@ impl SignInMethod {
     pub fn is_apple(&self) -> bool {
         self.provider == "apple"
     }
+
+    pub fn is_email(&self) -> bool {
+        self.provider == "email"
+    }
+}
+
+/// `auth.email.begin`: the challenge a mailed code is checked against. `email` is the relay's normalized
+/// address. `Debug` shows `expires_in` and `resend_in` only.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+pub struct EmailChallenge {
+    pub challenge_id: String,
+    pub email: String,
+    pub expires_in: u64,
+    pub resend_in: u64,
+}
+
+impl fmt::Debug for EmailChallenge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EmailChallenge")
+            .field("expires_in", &self.expires_in)
+            .field("resend_in", &self.resend_in)
+            .finish_non_exhaustive()
+    }
+}
+
+/// `auth.email.begin`: the relay mails a 6-digit code to `email`, in `locale` (`"vi"` or `"en"`).
+pub fn email_begin(
+    core: &dyn CoreCall,
+    email: &str,
+    locale: &str,
+) -> Result<EmailChallenge, CoreErr> {
+    typed(
+        core,
+        "auth.email.begin",
+        json!({"email": email, "locale": locale}),
+    )
+}
+
+/// `auth.email.finish`: signs this device in with the mailed code. The value of `auth.google.finish`
+/// with `auth_method: "email"`.
+pub fn email_finish(
+    core: &dyn CoreCall,
+    challenge_id: &str,
+    code: &str,
+) -> Result<GoogleSignIn, CoreErr> {
+    typed(
+        core,
+        "auth.email.finish",
+        json!({"challenge_id": challenge_id, "code": code}),
+    )
 }
 
 pub fn google_begin(core: &dyn CoreCall, purpose: GooglePurpose) -> Result<GoogleBegin, CoreErr> {
@@ -244,6 +294,16 @@ pub fn google_finish(core: &dyn CoreCall, flow_id: &str) -> Result<GoogleSignIn,
 pub fn google_cancel(core: &dyn CoreCall, flow_id: &str) -> Result<(), CoreErr> {
     core.call("auth.google.cancel", json!({"flow_id": flow_id}))
         .map(|_| ())
+}
+
+/// `auth.google.available`: whether this build can sign in with Google (it has a Google client id and
+/// secret). Local, no request.
+pub fn google_available(core: &dyn CoreCall) -> Result<bool, CoreErr> {
+    #[derive(Deserialize)]
+    struct Resp {
+        available: bool,
+    }
+    typed::<Resp>(core, "auth.google.available", json!({})).map(|r| r.available)
 }
 
 pub fn session_info(core: &dyn CoreCall) -> Result<SessionInfo, CoreErr> {
@@ -741,5 +801,85 @@ mod tests {
             auth_method: "google".into(),
         };
         assert!(!format!("{s:?}").contains("g@x"));
+    }
+
+    #[test]
+    fn email_calls_send_their_params_and_parse() {
+        let f = FakeCore::new();
+        f.on(
+            "auth.email.begin",
+            Ok(json!({"challenge_id":"c1","expires_in":600,"resend_in":60,"email":"foo@bar.com"})),
+        );
+        f.on(
+            "auth.email.finish",
+            Ok(json!({"user_id":"u","device_id":"d","device_public_key_b64":"AAA","fingerprint":"ff",
+                      "email":"foo@bar.com","auth_method":"email"})),
+        );
+        f.on(
+            "account.identities.list",
+            Ok(json!({"identities":[{"identity_id":"e1","provider":"email","email":"foo@bar.com"}]})),
+        );
+        let c = email_begin(&f, "Foo@Bar.com", "vi").unwrap();
+        assert_eq!(
+            c,
+            EmailChallenge {
+                challenge_id: "c1".into(),
+                email: "foo@bar.com".into(),
+                expires_in: 600,
+                resend_in: 60,
+            }
+        );
+        let done = email_finish(&f, "c1", "004217").unwrap();
+        assert_eq!(
+            (done.email.as_str(), done.auth_method.as_str()),
+            ("foo@bar.com", "email")
+        );
+        let methods = list_sign_in_methods(&f).unwrap();
+        assert!(methods[0].is_email() && !methods[0].is_apple());
+        let calls = f.calls();
+        assert_eq!(
+            calls[0],
+            (
+                "auth.email.begin".into(),
+                json!({"email":"Foo@Bar.com","locale":"vi"})
+            )
+        );
+        assert_eq!(
+            calls[1],
+            (
+                "auth.email.finish".into(),
+                json!({"challenge_id":"c1","code":"004217"})
+            )
+        );
+    }
+
+    #[test]
+    fn google_available_reads_the_core_answer() {
+        let f = fake_with("auth.google.available", json!({"available": true}));
+        assert_eq!(google_available(&f), Ok(true));
+        assert_eq!(f.calls(), vec![("auth.google.available".into(), json!({}))]);
+        let f = fake_with("auth.google.available", json!({"available": false}));
+        assert_eq!(google_available(&f), Ok(false));
+        // An older core without the method.
+        assert_eq!(
+            google_available(&FakeCore::new()).unwrap_err().code,
+            "unknown_method"
+        );
+        let f = fake_with("auth.google.available", json!({}));
+        assert_eq!(google_available(&f).unwrap_err().code, "bad_response");
+    }
+
+    #[test]
+    fn email_values_hide_addresses_and_challenges_in_debug() {
+        let c = EmailChallenge {
+            challenge_id: "CH-SECRET".into(),
+            email: "foo@bar.com".into(),
+            expires_in: 600,
+            resend_in: 60,
+        };
+        let shown = format!("{c:?} {c:#?}");
+        assert!(!shown.contains("CH-SECRET"), "{shown}");
+        assert!(!shown.contains("foo@bar.com"), "{shown}");
+        assert!(shown.contains("600") && shown.contains("60"), "{shown}");
     }
 }

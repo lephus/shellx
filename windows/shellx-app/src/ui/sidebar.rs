@@ -9,7 +9,8 @@
 //! Signed in, the groups are the account's machines (this PC first, the
 //! others below, offline ones dimmed with "ngoại tuyến · lần cuối HH:MM");
 //! signed out, this PC is the only group and the sidebar never asks for a
-//! password: sign-in lives in Settings -> Account (`login.rs`).
+//! password: sign-in lives in Settings -> Account (`login.rs`). After the
+//! server ended the session, a "Sign in again" notice sits above the footer.
 //! Another online machine without access shows "Xin quyền truy cập", which
 //! opens the pairing panel (`pairing.rs`); while waiting, the row shows the
 //! code instead. The "+" in the machines header opens a small list of the
@@ -24,6 +25,7 @@ use gpui::{
     Resource, SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
 };
 use shellx_model::account::AccountState;
+use shellx_model::core_api::GooglePurpose;
 use shellx_model::palette::{
     PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
 };
@@ -59,11 +61,18 @@ pub struct SessionRow {
     pub branch: Option<String>,
 }
 
-/// A machine in the machines-header "+" list (another machine, no link).
+/// A machine in the machines-header "+" list (a Mac that may be asked, no link yet).
 pub struct PickerEntry {
     pub machine_id: String,
     pub name: String,
     pub online: bool,
+}
+
+/// The machines-header "+" list: its machines (`sidebar::request_targets`) and the sentences under them
+/// (`sidebar::request_panel_notes`: why none or none else can be asked).
+pub struct Picker {
+    pub entries: Vec<PickerEntry>,
+    pub notes: &'static [Str],
 }
 
 /// `local_id`: this PC's group (its server id when signed in).
@@ -75,7 +84,7 @@ pub fn render(
     groups: &[MachineGroup],
     sessions: &[SessionRow],
     local_id: &str,
-    picker: Option<&[PickerEntry]>,
+    picker: Option<&Picker>,
     account: &Entity<AccountService>,
     help_open: bool,
     lang: Lang,
@@ -118,7 +127,50 @@ pub fn render(
         .child(brand(lang))
         .child(machines_block(picker, signed_in, lang, cx))
         .child(list)
+        .children(session_notice(account, lang, cx))
         .child(footer(account, help_open, lang, cx))
+}
+
+/// After the server ended the session: "Your session expired." and "Sign in again" above the footer,
+/// until the next sign-in (Ruling 29). It holds no focus handle, so the keyboard stays where it was.
+fn session_notice(
+    account: &Entity<AccountService>,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Option<Div> {
+    let notice = account.read(cx).sign_in_notice()?;
+    Some(
+        div()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .gap(px(6.0))
+            .px(px(10.0))
+            .py(px(6.0))
+            .border_t_1()
+            .border_color(theme::line())
+            .child(
+                div()
+                    .text_size(theme::SMALL_SIZE)
+                    .text_color(theme::muted())
+                    .child(t(lang, notice.line)),
+            )
+            .child(
+                div().flex().child(
+                    button(
+                        "sidebar-sign-in-again",
+                        t(lang, notice.button),
+                        Kind::Secondary,
+                        false,
+                    )
+                    .on_click(cx.listener(
+                        |this, _: &ClickEvent, window, cx| {
+                            this.open_sign_in(GooglePurpose::SignIn, window, cx);
+                        },
+                    )),
+                ),
+            ),
+    )
 }
 
 fn brand(lang: Lang) -> Div {
@@ -153,7 +205,7 @@ fn brand(lang: Lang) -> Div {
 /// pressing the "+" again toggles it instead of closing and reopening it.
 /// The press still reaches what it hit (a terminal click focuses the pane).
 fn machines_block(
-    picker: Option<&[PickerEntry]>,
+    picker: Option<&Picker>,
     signed_in: bool,
     lang: Lang,
     cx: &mut Context<RootView>,
@@ -164,8 +216,8 @@ fn machines_block(
         .flex_none()
         .child(machines_header(signed_in, lang, cx));
     match picker {
-        Some(entries) => block
-            .child(machine_picker(entries, lang, cx))
+        Some(picker) => block
+            .child(machine_picker(picker, lang, cx))
             .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 this.close_machine_picker(window, cx);
             })),
@@ -223,10 +275,11 @@ fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> D
         )
 }
 
-/// The "+" list: the account's other machines without a link. Online ones
+/// The "+" list: the Macs that may be asked and have no link yet. Online ones
 /// request access on click; offline ones are dimmed (approval needs the
-/// other machine).
-fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView>) -> Div {
+/// other machine). Under them, the sentences saying why none (or none else)
+/// can be asked, so the list is never empty and silent.
+fn machine_picker(picker: &Picker, lang: Lang, cx: &mut Context<RootView>) -> Div {
     // Not a panel: no focus handle, so the keyboard stays where it was.
     let mut list = div()
         .flex()
@@ -239,16 +292,7 @@ fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView
         .border_color(theme::border())
         .bg(theme::raise())
         .text_size(theme::SMALL_SIZE);
-    if entries.is_empty() {
-        list = list.child(
-            div()
-                .px(px(10.0))
-                .py(px(6.0))
-                .text_color(theme::muted())
-                .child(t(lang, Str::NoOtherMachines)),
-        );
-    }
-    for (ix, entry) in entries.iter().enumerate() {
+    for (ix, entry) in picker.entries.iter().enumerate() {
         let dot = if entry.online {
             theme::done()
         } else {
@@ -281,6 +325,15 @@ fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView
             row.opacity(0.5)
         };
         list = list.child(row);
+    }
+    for note in picker.notes {
+        list = list.child(
+            div()
+                .px(px(10.0))
+                .py(px(6.0))
+                .text_color(theme::muted())
+                .child(t(lang, *note)),
+        );
     }
     list
 }

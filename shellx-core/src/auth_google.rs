@@ -284,6 +284,14 @@ pub fn cancel(flows: &Flows, params: &Value) -> Result<Value, CoreError> {
     Ok(json!({}))
 }
 
+/// `auth.google.available {}` → `{"available": bool}`: true when `cfg` has a non-empty Google desktop client id
+/// and secret (from `config.set`, the environment or the build). A build with only the id would fail at Google's
+/// token step, so it counts as none. Sends nothing and needs no session: the Windows app asks it to decide whether
+/// to draw "Continue with Google".
+pub fn available(cfg: &Config) -> Value {
+    json!({"available": !cfg.google_client_id.is_empty() && !cfg.google_client_secret.is_empty()})
+}
+
 /// `auth.google.finish {flow_id}`: wait for the browser, exchange the code, sign in or link.
 pub fn finish(
     agent: &ureq::Agent,
