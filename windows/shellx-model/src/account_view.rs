@@ -241,4 +241,58 @@ mod tests {
             }
         }
     }
+
+    /// Review chunk 2 M-A: Settings words a failed Google sign-in or switch as the dialog does.
+    #[test]
+    fn account_view_words_a_google_failure_like_the_dialog() {
+        let google = |purpose: GooglePurpose, flow: &mut AccountFlow, code: &str| {
+            flow.on(AccountEvent::GoogleRequested(purpose), 10);
+            flow.on(
+                AccountEvent::GoogleBegun {
+                    purpose,
+                    result: Ok(GoogleBegin {
+                        flow_id: "g1".into(),
+                        auth_url: "https://accounts.google.com/x".into(),
+                    }),
+                },
+                11,
+            );
+            flow.on(
+                AccountEvent::GoogleFinished {
+                    flow_id: "g1".into(),
+                    result: Err(CoreErr::new(code, "x")),
+                },
+                12,
+            );
+        };
+        for lang in [Lang::En, Lang::Vi] {
+            let mut f = AccountFlow::new();
+            f.on(AccountEvent::Started, 0);
+            f.on(
+                AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+                1,
+            );
+            google(GooglePurpose::SignIn, &mut f, "google_timeout");
+            assert_eq!(
+                account_view(&f, true, lang).error.as_deref(),
+                Some(t(lang, Str::GoogleTimedOut))
+            );
+            // A failed switch to Google from a password session.
+            let mut g = logged_in();
+            g.on(
+                AccountEvent::SessionResult(Ok(SessionInfo {
+                    user_id: "u".into(),
+                    device_id: "d".into(),
+                    email: Some("a@b.c".into()),
+                    auth_method: "password".into(),
+                })),
+                2,
+            );
+            google(GooglePurpose::Link, &mut g, "email_in_use");
+            assert_eq!(
+                account_view(&g, true, lang).error.as_deref(),
+                Some(t(lang, Str::EmailInUse))
+            );
+        }
+    }
 }
