@@ -29,11 +29,10 @@ val uploadSigning: Map<String, String>? = keyPropertiesPath?.let { path ->
     val storeFileValue = keyProperty("storeFile")
     val tildeRest = storeFileValue.drop(2)
     val homeDir = System.getProperty("user.home")
-    val propertiesDir = propertiesFile.absoluteFile.parentFile
     val storePath: File = when {
         storeFileValue.startsWith("~/") -> File(homeDir, tildeRest)
         File(storeFileValue).isAbsolute -> File(storeFileValue)
-        else -> File(propertiesDir, storeFileValue)
+        else -> propertiesFile.absoluteFile.toPath().resolveSibling(storeFileValue).toFile()
     }
     if (!storePath.isFile) error("${propertiesFile.name}: the keystore named by storeFile does not exist")
     mapOf(
