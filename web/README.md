@@ -9,7 +9,7 @@ videos and the switch to English: `docs/superpowers/specs/2026-10-29-web-videos-
 | Path | Page |
 |---|---|
 | `/` | Landing page: hero demo, the 1-minute intro video (`#video`), how it works, features, security, steps, FAQ, downloads |
-| `/videos/` | The 3-minute tutorial with chapters and transcript, then the intro (`?t=<seconds>` opens the tutorial there) |
+| `/videos/` | The 3-minute tutorial and the Automations demo, each with chapters and a transcript, then the intro (`?t=<seconds>` opens the tutorial there, `?v=automations&t=<seconds>` the demo) |
 | `/guides/` | Guides |
 | `/privacy/` | Privacy policy (`#delete-account` explains account deletion) |
 | `/terms/` | Terms of use |

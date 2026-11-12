@@ -1,0 +1,63 @@
+1
+00:00:00,600 --> 00:00:05,225
+Automate your Claude Code work in plain English, with ShellX Automations.
+
+2
+00:00:06,557 --> 00:00:12,207
+Automations keeps your Claude Code skills, workflows and scheduled jobs in one place.
+
+3
+00:00:12,207 --> 00:00:16,860
+Each card shows its schedule, the next run, and how the last run went.
+
+4
+00:00:18,207 --> 00:00:21,876
+To make a new one, press New and describe what you want.
+
+5
+00:00:21,876 --> 00:00:26,594
+Here: every weekday at nine, summarize the pull requests in my web repo.
+
+6
+00:00:33,795 --> 00:00:37,100
+Claude Code turns that into a draft cronjob: a name,
+
+7
+00:00:37,100 --> 00:00:42,565
+a schedule, the folder it runs in, and the only commands it may use while you're away.
+
+8
+00:00:43,904 --> 00:00:49,087
+It always asks how you want to hear back. I pick when it's done and when it fails, on my Mac.
+
+9
+00:00:56,363 --> 00:01:01,423
+The draft is drawn as a flowchart, so you can check the logic before anything runs.
+
+10
+00:01:01,423 --> 00:01:04,959
+The Text tab shows the skill file Claude Code will follow.
+
+11
+00:01:05,581 --> 00:01:09,057
+Press Save, and ShellX schedules it on this Mac.
+
+12
+00:01:10,796 --> 00:01:14,357
+The new card shows its next run. Run now tries it right away:
+
+13
+00:01:14,357 --> 00:01:17,859
+the card turns yellow while it works, then shows the result.
+
+14
+00:01:20,905 --> 00:01:24,240
+Skills you already have in Claude Code show up here too.
+
+15
+00:01:24,240 --> 00:01:29,420
+Open one, and Claude draws its flowchart, including the step where it stops to ask you.
+
+16
+00:01:30,951 --> 00:01:35,623
+ShellX is free for Mac. Get it at shellx.pro.
