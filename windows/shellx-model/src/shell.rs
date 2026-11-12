@@ -1245,6 +1245,41 @@ mod tests {
     }
 
     #[test]
+    fn shells_have_display_names() {
+        assert_eq!(kind_label(ShellKind::Pwsh), "PowerShell 7");
+        assert_eq!(kind_label(ShellKind::WindowsPowerShell), "Windows PowerShell");
+        assert_eq!(kind_label(ShellKind::Cmd), "Command Prompt");
+        assert_eq!(kind_label(ShellKind::GitBash), "Git Bash");
+        assert_eq!(kind_label(ShellKind::Wsl), "WSL");
+        // a found shell is named by its kind, whatever its file is called
+        let found = find_shells(&probe(), &exists_in(&ALL));
+        let labels: Vec<String> = found.iter().map(launch_label).collect();
+        assert_eq!(
+            labels,
+            [
+                "PowerShell 7",
+                "Windows PowerShell",
+                "Command Prompt",
+                "Git Bash",
+                "WSL"
+            ]
+        );
+        // a custom command line is named by its program's file
+        const GIT_BASH: &str = r"C:\Program Files\Git\bin\bash.exe";
+        let custom = custom_launch(GIT_BASH, &probe(), &exists_in(&[GIT_BASH])).unwrap();
+        assert_eq!(launch_label(&custom), "bash.exe");
+        let slashes = ShellLaunch {
+            kind: None,
+            program: "C:/tools/nu.exe".into(),
+            args: vec![],
+            osc7_hook: false,
+        };
+        assert_eq!(launch_label(&slashes), "nu.exe");
+        // the rule a caller needs for its own folder values
+        assert!(is_absolute(r"C:\Windows") && !is_absolute("Windows"));
+    }
+
+    #[test]
     fn same_program_folds_case_beyond_ascii() {
         let p = probe();
         let upper = r"C:\USERS\PHÚ\TOOLS\PWSH.EXE";

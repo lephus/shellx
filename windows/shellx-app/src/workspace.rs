@@ -283,6 +283,96 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    fn shell(program: &str, args: &[&str], label: &str) -> crate::local_pty::ShellCmd {
+        crate::local_pty::ShellCmd {
+            program: program.into(),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            env: Vec::new(),
+            label: label.into(),
+            kind: None,
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_fallback_starts_once_when_the_first_program_cannot_start() {
+        use crate::local_pty::{PanePlan, spawn_reader};
+        use crate::term_core::PtyLink;
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        let plan = PanePlan {
+            first: shell("/nonexistent/shell", &[], "nowhere"),
+            fallback: Some(shell("/bin/sh", &["-i"], "sh")),
+        };
+        let Ok(started) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
+            panic!("the fallback did not start");
+        };
+        assert_eq!(started.used, "sh");
+        let (tried, error) = started.fell_back.clone().expect("a fallback was used");
+        assert_eq!(tried, "nowhere");
+        assert!(!error.trim().is_empty());
+
+        let LocalPane {
+            mut core,
+            link,
+            reader,
+        } = started.pane;
+        let (tx, rx) = mpsc::channel();
+        spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
+        // the marker is computed by the shell: the typed text alone never contains it
+        link.write(b"echo ok-$((6*7))\n");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if let Ok(bytes) = rx.recv_timeout(Duration::from_millis(100)) {
+                core.feed(&bytes);
+            }
+            if core.text_lines().unwrap().iter().any(|l| l.contains("ok-42")) {
+                break;
+            }
+            assert!(Instant::now() < deadline, "no ok-42 from the fallback shell");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn both_programs_failing_report_both() {
+        use crate::local_pty::PanePlan;
+
+        let plan = PanePlan {
+            first: shell("/nonexistent/one", &[], "one"),
+            fallback: Some(shell("/nonexistent/two", &["-i"], "two")),
+        };
+        let Err(failure) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
+            panic!("a missing program started");
+        };
+        let tried: Vec<(&str, &str)> = failure
+            .attempts
+            .iter()
+            .map(|(label, program, _)| (label.as_str(), program.as_str()))
+            .collect();
+        assert_eq!(
+            tried,
+            [("one", "/nonexistent/one"), ("two", "/nonexistent/two")]
+        );
+        assert!(failure.attempts.iter().all(|(_, _, e)| !e.trim().is_empty()));
+        // one line that names both, for the pane until it says it in the app's language
+        let text = failure.to_string();
+        assert!(!text.contains('\n'), "{text}");
+        assert!(text.contains("/nonexistent/one") && text.contains("/nonexistent/two"));
+
+        // no fallback: one attempt
+        let alone = PanePlan {
+            first: shell("/nonexistent/one", &[], "one"),
+            fallback: None,
+        };
+        let Err(failure) = spawn_local_pane_with(&alone, 80, 24, &[]) else {
+            panic!("a missing program started");
+        };
+        assert_eq!(failure.attempts.len(), 1);
+    }
+
     #[test]
     fn focus_dir_with_pane_area_matches_rendered_rects() {
         let (mut tabs, p1) = Tabs::new();

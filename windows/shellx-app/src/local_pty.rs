@@ -10,6 +10,8 @@ use cmux_pty::{Child, MasterPty, PtyCommand, PtySize};
 
 use crate::term_core::PtyLink;
 
+pub mod settings;
+
 pub struct LocalPty {
     writer: Mutex<Box<dyn Write + Send>>,
     master: Mutex<Box<dyn MasterPty + Send>>,
