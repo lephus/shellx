@@ -322,7 +322,13 @@ mod tests {
         let message = r#"CreateProcessW `"\"C:\\Program Files\\PuTTY\\plink.exe\" -ssh -pw hunter2pass a@b.co"` in cwd `Some("C:\\Users\\Phú Lê")` failed: The requested operation requires elevation. (os error 740)"#;
         let tmp = tempfile::tempdir().unwrap();
         let mut state = LogState::open(tmp.path());
-        write_record(&mut state, "T", "ERROR", "portable_pty::win::psuedocon", message);
+        write_record(
+            &mut state,
+            "T",
+            "ERROR",
+            "portable_pty::win::psuedocon",
+            message,
+        );
         drop(state);
         let text = read(tmp.path(), "shellx.log");
         assert_eq!(
@@ -378,7 +384,10 @@ mod tests {
         state.rename = |from, to| std::fs::rename(from, to);
         write_until(&mut state, 1_048_576, next);
         drop(state);
-        assert!(read(tmp.path(), "shellx.log.1").starts_with("2026-11-12T08:15:30.123Z INFO t: record 0 "));
+        assert!(
+            read(tmp.path(), "shellx.log.1")
+                .starts_with("2026-11-12T08:15:30.123Z INFO t: record 0 ")
+        );
         assert_eq!(read(tmp.path(), "shellx.log.2"), "one\n");
         assert!(!tmp.path().join("shellx.log.3").exists());
     }

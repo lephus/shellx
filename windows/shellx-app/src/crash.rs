@@ -733,21 +733,31 @@ mod tests {
         .unwrap();
         assert_eq!(*events.borrow(), ["reporter", "backtrace"]);
         let text = std::fs::read_to_string(&file).unwrap();
-        let message = text.lines().position(|l| l == "message: the real panic").unwrap();
+        let message = text
+            .lines()
+            .position(|l| l == "message: the real panic")
+            .unwrap();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines[message + 1], "backtrace:");
         assert_eq!(lines[message + 2], "   0:     0x7ff6a1b2c3d4 - <unknown>");
         // The abort follow-up takes no backtrace.
         handle_panic(
             &ctx,
-            &parts("panic in a function that cannot unwind", "core/src/panicking.rs:225:5"),
+            &parts(
+                "panic in a function that cannot unwind",
+                "core/src/panicking.rs:225:5",
+            ),
             HookMode::Dialog,
             &state,
             &spawn,
             &backtrace,
         );
         assert_eq!(*events.borrow(), ["reporter", "backtrace"]);
-        assert!(std::fs::read_to_string(&file).unwrap().ends_with("(the process aborts)\n"));
+        assert!(
+            std::fs::read_to_string(&file)
+                .unwrap()
+                .ends_with("(the process aborts)\n")
+        );
     }
 
     #[test]
@@ -910,7 +920,8 @@ mod tests {
             assert!(!text.contains(secret), "{secret} leaked:\n{text}");
         }
         assert!(
-            text.lines().any(|l| l.contains(": ") && l.contains("0x") && l.contains(" - ")),
+            text.lines()
+                .any(|l| l.contains(": ") && l.contains("0x") && l.contains(" - ")),
             "no address line:\n{text}"
         );
         assert_eq!(

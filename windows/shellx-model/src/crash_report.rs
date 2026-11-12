@@ -173,13 +173,7 @@ fn kept_message(message: &str) -> String {
 /// backtrace (review m2).
 pub fn panic_report_head(f: &PanicFacts) -> String {
     let mut lines = header(
-        "panic",
-        &f.utc,
-        &f.version,
-        &f.commit,
-        &f.build,
-        &f.windows,
-        f.exe_base,
+        "panic", &f.utc, &f.version, &f.commit, &f.build, &f.windows, f.exe_base,
     );
     let main = if f.main_thread { "yes" } else { "no" };
     lines.push(match f.thread_id {

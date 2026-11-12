@@ -261,18 +261,21 @@ mod tests {
             assert!(!line.contains(secret), "{secret} in {line}");
         }
         // Every other target is kept as it is.
-        assert_eq!(record_message("shellx_desktop::workspace", PTY_FAILURE), PTY_FAILURE);
+        assert_eq!(
+            record_message("shellx_desktop::workspace", PTY_FAILURE),
+            PTY_FAILURE
+        );
         // A portable-pty line without a failure is still kept behind its own fixed text.
         assert_eq!(
-            record_message("portable_pty::cmdbuilder", "$SHELL -> \"/bin/zsh\" is not executable"),
+            record_message(
+                "portable_pty::cmdbuilder",
+                "$SHELL -> \"/bin/zsh\" is not executable"
+            ),
             "portable-pty: $SHELL -> \"/bin/zsh\" is not executable"
         );
         // The pane's rule (A2's spawn_reason): after the last "failed: ", one line, at most
         // 160 characters.
-        assert_eq!(
-            failure_reason("a failed: b failed:   c\r\n  d"),
-            "c d"
-        );
+        assert_eq!(failure_reason("a failed: b failed:   c\r\n  d"), "c d");
         let long = format!("x failed: {}", "y".repeat(400));
         assert_eq!(failure_reason(&long).chars().count(), 160);
         assert!(failure_reason(&long).ends_with('…'));
