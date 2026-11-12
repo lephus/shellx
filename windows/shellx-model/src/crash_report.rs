@@ -691,6 +691,12 @@ mod tests {
             reporter_command_line(exe, "--report-crash", file),
             r#""C:\Users\Phú Lê\AppData\Local\Programs\ShellX Native\shellx-desktop.exe" --report-crash "C:\Users\Phú Lê\AppData\Local\ShellX\native\logs\crash.20261112-081530.42.txt""#
         );
+        // A path ending in `\` keeps it: CommandLineToArgvW reads `\"` as a literal quote, so
+        // trailing backslashes are doubled before the closing quote (B-1a review §6).
+        assert_eq!(
+            reporter_command_line(r"C:\Tools\", "--report-crash", r"D:\logs\\"),
+            r#""C:\Tools\\" --report-crash "D:\logs\\\\""#
+        );
         assert_eq!(DialogKind::Crash.reporter_flag(), "--report-crash");
         assert_eq!(DialogKind::WindowFailed.reporter_flag(), "--report-window");
     }
