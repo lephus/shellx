@@ -815,7 +815,12 @@ mod tests {
             let script = probe_script(Some(kind)).unwrap();
             let names: Vec<&str> = script.steps.iter().map(|s| s.name).collect();
             assert_eq!(names, ["echo", "unicode", "resize"]);
-            assert_eq!(script.steps[0].input, "Write-Output ('shellx-ok-' + (6*7))");
+            // B-2 review m4: the first line turns PSReadLine's history saving off for this
+            // session (guarded, so it is harmless without PSReadLine).
+            assert_eq!(
+                script.steps[0].input,
+                "if (Get-Module PSReadLine) { Set-PSReadLineOption -HistorySaveStyle SaveNothing }; Write-Output ('shellx-ok-' + (6*7))"
+            );
             assert_eq!(script.steps[0].expect, "shellx-ok-42");
             assert_eq!(script.steps[1].input, "Write-Output 'tiếng Việt'");
             assert_eq!(
@@ -828,10 +833,20 @@ mod tests {
         let cmd = probe_script(Some(ShellKind::Cmd)).unwrap();
         let names: Vec<&str> = cmd.steps.iter().map(|s| s.name).collect();
         assert_eq!(names, ["echo", "unicode"]);
+        // B-2 review m5: the cmd banner and prompts often hold "42"; the marker cannot.
         assert_eq!(
             (cmd.steps[0].input, cmd.steps[0].expect),
-            ("set /a 6*7", "42")
+            ("set /a x=6*7 >nul & call echo shellx-ok-%x%", "shellx-ok-42")
         );
+        // No one-line step can pass on the typed text alone.
+        for script in [
+            probe_script(Some(ShellKind::Pwsh)).unwrap(),
+            probe_script(Some(ShellKind::Cmd)).unwrap(),
+        ] {
+            for step in script.steps.iter().filter(|s| s.lines == 1) {
+                assert!(!step.input.contains(step.expect), "{step:?}");
+            }
+        }
         assert_eq!(
             (cmd.steps[1].input, cmd.steps[1].expect, cmd.steps[1].lines),
             ("echo tiếng Việt", "tiếng Việt", 2)
