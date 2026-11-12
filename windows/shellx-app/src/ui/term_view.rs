@@ -532,7 +532,7 @@ impl TermView {
             // Only this pane closes (RootView's close path; the last pane of
             // the last tab respawns a local tab).
             Some(Ok(Applied::Ended)) => cx.emit(TermEvent::Exited),
-            Some(Err(error)) => eprintln!("shellx: remote pane update failed: {error:#}"),
+            Some(Err(error)) => log::warn!("shellx: remote pane update failed: {error:#}"),
         }
     }
 
