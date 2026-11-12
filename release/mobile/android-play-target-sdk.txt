@@ -1,0 +1,8 @@
+# Google Play's target API level rule for new apps and app updates (phones). Source:
+# https://developer.android.com/google/play/requirements/target-sdk
+# Each line: <day the rule applies from, YYYY-MM-DD> <minimum targetSdkVersion>
+# Google raises the level about once a year (late August). release/mobile/android.sh refuses to build when the
+# newest line is more than 365 days old: read the page above and add the new rule here.
+2024-08-31 34
+2025-08-31 35
+2026-08-31 36

@@ -1,0 +1,11 @@
+# Every permission the release build of the ShellX Android app requests, exactly (release/mobile/android.sh checks
+# the bundle against this list). A change here changes the Data safety answers or needs a Play declaration:
+# update release/mobile/README.md ("Google Play: Data safety") in the same commit. One name per line, sorted.
+android.permission.ACCESS_NETWORK_STATE                    # network changes (S3 §7.3); Firebase Cloud Messaging
+android.permission.CAMERA                                  # pairing QR code (CameraX); images never leave the phone
+android.permission.INTERNET                                # relay.shellx.pro and Google services
+android.permission.POST_NOTIFICATIONS                      # "Needs you" notifications on Android 13 and later
+android.permission.RECORD_AUDIO                            # hold-to-talk voice input (SpeechRecognizer)
+android.permission.WAKE_LOCK                               # Firebase Cloud Messaging
+com.google.android.c2dm.permission.RECEIVE                 # Firebase Cloud Messaging
+com.shellx.prod.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION   # AndroidX Core, signature level: this app only
