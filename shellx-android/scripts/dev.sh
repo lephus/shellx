@@ -5,7 +5,7 @@
 #   dev.sh test [link|core|app|screenshots|all]
 #       link: the JVM tests of shellx-link/kotlin; core: the :core tests; app: the :app unit tests of the debug
 #       and release variants (Robolectric); screenshots: the *RenderTest classes; all (the default): all of
-#       them, the script tests and build-release. Every test command first runs
+#       them, the script tests (shellx-android/scripts/tests and release/mobile/tests) and build-release. Every test command first runs
 #       scripts/shellx/check-android-license.sh, scripts/import-strings.py --check and the version catalog check.
 #   dev.sh screenshots record <dir>
 #       Runs every *RenderTest class and writes <name>-<light|dark>-<en|vi>.png into <dir>.
@@ -28,6 +28,7 @@
 # JAVA_HOME defaults to Android Studio's JDK and ANDROID_HOME to ~/Library/Android/sdk. The script never
 # downloads SDK packages (the user installs them with sdkmanager), never installs a release (non-debuggable) APK on a phone,
 # and keeps at most one ShellX emulator running.
+# dev.sh never signs with the upload key; release/mobile/android.sh does.
 set -euo pipefail
 
 ANDROID_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -41,6 +42,8 @@ SERIAL_FILE="$HOME/.config/shellx/android-serial"
 : "${JAVA_HOME:=/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
 : "${ANDROID_HOME:=$HOME/Library/Android/sdk}"
 export JAVA_HOME ANDROID_HOME
+# dev.sh never signs with the upload key; release/mobile/android.sh does.
+unset SHELLX_ANDROID_KEY_PROPERTIES
 ADB="$ANDROID_HOME/platform-tools/adb"
 AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 EMULATOR="$ANDROID_HOME/emulator/emulator"
@@ -107,6 +110,7 @@ cmd_test() {
     screenshots) gradle_android :app:testDebugUnitTest --tests 'com.shellx.app.screenshots.*' || status=$? ;;
     all)
       python3 -m unittest discover -s "$ANDROID_DIR/scripts/tests" -t "$ANDROID_DIR/scripts/tests" || status=$?
+      [ "$status" -ne 0 ] || python3 -m unittest discover -s "$REPO_ROOT/release/mobile/tests" -t "$REPO_ROOT/release/mobile/tests" || status=$?
       [ "$status" -ne 0 ] || gradle_link test || status=$?
       [ "$status" -ne 0 ] || gradle_android :core:test || status=$?
       [ "$status" -ne 0 ] || gradle_android --continue :app:testDebugUnitTest :app:testReleaseUnitTest || status=$?

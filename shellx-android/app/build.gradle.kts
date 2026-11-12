@@ -15,6 +15,35 @@ val versionProperties = Properties().apply { rootProject.file("version.propertie
 fun versionProperty(key: String): String =
     versionProperties.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() } ?: error("version.properties: missing $key")
 
+// Release signing (release/mobile/README.md, "Android: upload key and tools"). SHELLX_ANDROID_KEY_PROPERTIES names a
+// Java properties file with storeFile, storePassword, keyAlias and keyPassword. Unset: the release build stays
+// unsigned (dev.sh build-release). storeFile is resolved as in release/mobile/android.sh: "~/..." is under the home
+// folder, an absolute path is used as is, anything else is relative to the properties file's folder.
+val keyPropertiesPath: String? = providers.environmentVariable("SHELLX_ANDROID_KEY_PROPERTIES").orNull
+val uploadSigning: Map<String, String>? = keyPropertiesPath?.let { path ->
+    val propertiesFile = File(path)
+    if (!propertiesFile.isFile) error("SHELLX_ANDROID_KEY_PROPERTIES names a missing file")
+    val keyProperties = Properties().apply { propertiesFile.inputStream().use { load(it) } }
+    fun keyProperty(key: String): String =
+        keyProperties.getProperty(key)?.takeIf { it.isNotEmpty() } ?: error("${propertiesFile.name}: missing $key")
+    val storeFileValue = keyProperty("storeFile")
+    val tildeRest = storeFileValue.drop(2)
+    val homeDir = System.getProperty("user.home")
+    val propertiesDir = propertiesFile.absoluteFile.parentFile
+    val storePath: File = when {
+        storeFileValue.startsWith("~/") -> File(homeDir, tildeRest)
+        File(storeFileValue).isAbsolute -> File(storeFileValue)
+        else -> File(propertiesDir, storeFileValue)
+    }
+    if (!storePath.isFile) error("${propertiesFile.name}: the keystore named by storeFile does not exist")
+    mapOf(
+        "storeFile" to storePath.path,
+        "storePassword" to keyProperty("storePassword"),
+        "keyAlias" to keyProperty("keyAlias"),
+        "keyPassword" to keyProperty("keyPassword"),
+    )
+}
+
 android {
     namespace = "com.shellx.app"
     compileSdk = libs.versions.androidCompileSdk.get().toInt()
@@ -29,6 +58,17 @@ android {
         buildConfigField("String", "SHELLX_API_BASE", "\"\"")
     }
 
+    signingConfigs {
+        uploadSigning?.let { values ->
+            create("upload") {
+                storeFile = file(values.getValue("storeFile"))
+                storePassword = values.getValue("storePassword")
+                keyAlias = values.getValue("keyAlias")
+                keyPassword = values.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // `-PshellxApiBase=http://127.0.0.1:<port>` points a debug build at a relay on this Mac (adb reverse).
@@ -40,6 +80,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (uploadSigning != null) signingConfig = signingConfigs.getByName("upload")
         }
     }
 
