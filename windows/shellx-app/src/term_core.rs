@@ -316,6 +316,21 @@ mod tests {
     }
 
     #[test]
+    fn alternate_screen_and_mouse_tracking_follow_the_modes() {
+        let (mut t, _) = core();
+        assert!(!t.alternate_screen());
+        assert!(!t.mouse_tracking());
+        t.feed(b"\x1b[?1049h");
+        assert!(t.alternate_screen());
+        assert!(!t.mouse_tracking());
+        t.feed(b"\x1b[?1000h");
+        assert!(t.mouse_tracking());
+        t.feed(b"\x1b[?1049l\x1b[?1000l");
+        assert!(!t.alternate_screen());
+        assert!(!t.mouse_tracking());
+    }
+
+    #[test]
     fn resize_reaches_link_once() {
         let (mut t, link) = core();
         t.resize(100, 30, 8, 16).unwrap();
