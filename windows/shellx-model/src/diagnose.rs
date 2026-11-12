@@ -386,4 +386,24 @@ mod tests {
             "{text}"
         );
     }
+
+    #[test]
+    fn vsync_check_matches_gpui_0_2_2() {
+        let check = |period, frequency, numerator, denominator| {
+            let c = vsync_check(period, frequency, numerator, denominator);
+            (c.interval_us, c.unpatched_divides_by_zero)
+        };
+        // Normal PCs: QPC at 10 MHz, DWM periods of 60, 59.94 and 240 Hz.
+        assert_eq!(check(166_667, 10_000_000, 60, 1), (16_666, false));
+        assert_eq!(check(166_833, 10_000_000, 60_000, 1001), (16_683, false));
+        assert_eq!(check(41_667, 10_000_000, 240, 1), (4_166, false));
+        // The 29 µs case GPUI's comment cites: the rate fallback divided by zero.
+        assert_eq!(check(60, 10_000_000, 60, 1), (16_666, true));
+        // Nothing usable: the default interval.
+        assert_eq!(check(0, 10_000_000, 0, 0), (16_666, true));
+        // A QPC frequency under 1 MHz divided by zero at once.
+        assert_eq!(check(166_667, 500_000, 60, 1), (16_666, true));
+        // A rate the patched fallback refuses (above 1 s per frame): the default.
+        assert_eq!(check(60, 10_000_000, 1, 2), (16_666, true));
+    }
 }
