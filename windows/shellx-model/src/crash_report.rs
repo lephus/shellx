@@ -2,6 +2,285 @@
 //! texts, dialog sentences (Ruling 1: Part B's sentences live here, not in `strings`) and the
 //! reporter's command line. The panic hook and the reporter process are `shellx-app`'s
 //! `crash`.
+//!
+//! Every report line goes through `redact`. File names join their parts with `.` (Ruling 13):
+//! the redactor hides a 32+ character run of letters, digits and `-` that holds a digit, which
+//! a `-`-joined name with a large pid would reach.
+
+use crate::redact::redact;
+use crate::strings::Lang;
+
+/// What a file in the logs folder holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CrashFileKind {
+    Panic,
+    Native,
+    WindowFailed,
+    Diagnostics,
+}
+
+/// `crash.20261112-081530.1234.txt`, `crash-native.…`, `start-failed.…`, `diagnostics.…`:
+/// the kind, the UTC time (`log_file::compact_utc`) and the pid, joined with `.`.
+pub fn crash_file_name(kind: CrashFileKind, compact_utc: &str, pid: u32) -> String {
+    let prefix = match kind {
+        CrashFileKind::Panic => "crash",
+        CrashFileKind::Native => "crash-native",
+        CrashFileKind::WindowFailed => "start-failed",
+        CrashFileKind::Diagnostics => "diagnostics",
+    };
+    format!("{prefix}.{compact_utc}.{pid}.txt")
+}
+
+/// The `n`th file of the same name (n ≥ 2): `crash.X.P.txt` → `crash.X.P.<n>.txt`, for two
+/// panics in the same second.
+pub fn numbered_file_name(name: &str, n: u32) -> String {
+    let stem = name.strip_suffix(".txt").unwrap_or(name);
+    format!("{stem}.{n}.txt")
+}
+
+/// The messages std gives the second hook call when a panic unwinds into a function that
+/// cannot unwind (Ruling 9); the process aborts right after.
+const ABORT_MESSAGES: [&str; 2] = [
+    "panic in a function that cannot unwind",
+    "panic in a destructor during cleanup",
+];
+
+/// Most characters of a panic message a report keeps (plan review M-16).
+pub const PANIC_MESSAGE_MAX_CHARS: usize = 300;
+
+/// `Some("then: <message> (the process aborts)")` for a message that is, or starts with, one
+/// of std's abort messages: the line the hook appends to the report of the real panic.
+pub fn follow_up_line(message: &str) -> Option<String> {
+    if !ABORT_MESSAGES.iter().any(|m| message.starts_with(m)) {
+        return None;
+    }
+    let first = message.lines().next().unwrap_or("");
+    let first: String = first.chars().take(PANIC_MESSAGE_MAX_CHARS).collect();
+    Some(redact(&format!("then: {first} (the process aborts)")))
+}
+
+/// What a panic report says. `utc` is `log_file::compact_utc` (the file name's time);
+/// `backtrace` is `format!("{bt:#}")`, which keeps every frame's address (Ruling 11).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PanicFacts {
+    pub utc: String,
+    pub version: String,
+    pub commit: String,
+    pub build: String,
+    pub windows: String,
+    pub exe_base: Option<u64>,
+    pub thread_id: Option<u32>,
+    pub main_thread: bool,
+    pub location: String,
+    pub message: String,
+    pub backtrace: String,
+}
+
+/// What a start-failure file says (`start-failed.….txt`): the header facts, the optional
+/// `render mode: …` line (B6) and the error chain, outermost first.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WindowFailureFacts {
+    pub utc: String,
+    pub version: String,
+    pub commit: String,
+    pub build: String,
+    pub windows: String,
+    pub exe_base: Option<u64>,
+    pub render: Option<String>,
+    pub errors: Vec<String>,
+}
+
+/// One value on one line; blank reads `unknown`.
+fn value(text: &str) -> String {
+    let one_line = text.split(['\r', '\n']).collect::<Vec<_>>().join(" ");
+    let one_line = one_line.trim();
+    if one_line.is_empty() {
+        "unknown".to_string()
+    } else {
+        one_line.to_string()
+    }
+}
+
+/// `20261112-081530` → `2026-11-12 08:15:30 UTC`; anything else as it is.
+fn readable_utc(compact: &str) -> String {
+    let b = compact.as_bytes();
+    let digits = |r: std::ops::Range<usize>| b[r].iter().all(u8::is_ascii_digit);
+    if b.len() == 15 && b[8] == b'-' && digits(0..8) && digits(9..15) {
+        format!(
+            "{}-{}-{} {}:{}:{} UTC",
+            &compact[0..4],
+            &compact[4..6],
+            &compact[6..8],
+            &compact[9..11],
+            &compact[11..13],
+            &compact[13..15]
+        )
+    } else {
+        value(compact)
+    }
+}
+
+/// The lines every ShellX crash file starts with; the native report (B5) has the same order.
+fn header(
+    kind: &str,
+    utc: &str,
+    version: &str,
+    commit: &str,
+    build: &str,
+    windows: &str,
+    exe_base: Option<u64>,
+) -> Vec<String> {
+    vec![
+        "ShellX crash report".to_string(),
+        format!("kind: {kind}"),
+        format!("version: {}", value(version)),
+        format!("commit: {}", value(commit)),
+        format!("build: {}", value(build)),
+        format!("windows: {}", value(windows)),
+        match exe_base {
+            Some(base) => format!("exe base: 0x{base:016X}"),
+            None => "exe base: unknown".to_string(),
+        },
+        format!("time: {}", readable_utc(utc)),
+    ]
+}
+
+/// The lines joined with `\n`, each redacted, ending in `\n`.
+fn redacted_text(lines: &[String]) -> String {
+    let mut out = String::new();
+    for line in lines {
+        out.push_str(&redact(line));
+        out.push('\n');
+    }
+    out
+}
+
+/// A message as a report keeps it (plan review M-16): std's string-slicing message quotes the
+/// text it sliced after " of `", so a message starting with "byte index" is cut there; then
+/// every message is capped at `PANIC_MESSAGE_MAX_CHARS` characters. The redactor does not
+/// catch typed or terminal text, so this runs before it.
+fn kept_message(message: &str) -> String {
+    let cut = if message.starts_with("byte index") {
+        message.find(" of `").map_or(message, |i| &message[..i])
+    } else {
+        message
+    };
+    cut.chars().take(PANIC_MESSAGE_MAX_CHARS).collect()
+}
+
+/// The panic crash file: the header, `thread:`, `location:`, `message:` (further lines
+/// indented), `backtrace:` and its lines unchanged; every line redacted.
+pub fn panic_report(f: &PanicFacts) -> String {
+    let mut lines = header(
+        "panic", &f.utc, &f.version, &f.commit, &f.build, &f.windows, f.exe_base,
+    );
+    let main = if f.main_thread { "yes" } else { "no" };
+    lines.push(match f.thread_id {
+        Some(id) => format!("thread: {id} (main: {main})"),
+        None => format!("thread: unknown (main: {main})"),
+    });
+    lines.push(format!("location: {}", value(&f.location)));
+    let message = kept_message(&f.message);
+    let mut message_lines = message.lines();
+    lines.push(format!("message: {}", message_lines.next().unwrap_or("")));
+    lines.extend(message_lines.map(|l| format!("  {l}")));
+    lines.push("backtrace:".to_string());
+    lines.extend(f.backtrace.lines().map(str::to_string));
+    redacted_text(&lines)
+}
+
+/// The start-failure file: the header, the `render mode:` line when given, `error: <outer>`
+/// and `caused by: <inner>` for the rest of the chain (further lines indented); every line
+/// redacted.
+pub fn window_failure_report(f: &WindowFailureFacts) -> String {
+    let mut lines = header(
+        "window not opened",
+        &f.utc,
+        &f.version,
+        &f.commit,
+        &f.build,
+        &f.windows,
+        f.exe_base,
+    );
+    if let Some(render) = &f.render {
+        lines.push(value(render));
+    }
+    if f.errors.is_empty() {
+        lines.push("error: unknown".to_string());
+    }
+    for (i, error) in f.errors.iter().enumerate() {
+        let label = if i == 0 { "error" } else { "caused by" };
+        let mut error_lines = error.lines();
+        lines.push(format!("{label}: {}", error_lines.next().unwrap_or("")));
+        lines.extend(error_lines.map(|l| format!("  {l}")));
+    }
+    redacted_text(&lines)
+}
+
+/// Which dialog the reporter shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DialogKind {
+    Crash,
+    WindowFailed,
+}
+
+impl DialogKind {
+    /// The flag that starts the reporter for this dialog: `--report-crash` or
+    /// `--report-window`.
+    pub fn reporter_flag(self) -> &'static str {
+        match self {
+            DialogKind::Crash => "--report-crash",
+            DialogKind::WindowFailed => "--report-window",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DialogText {
+    pub title: String,
+    pub body: String,
+}
+
+/// The reporter's question, naming the file (Yes opens its folder).
+pub fn report_dialog(lang: Lang, kind: DialogKind, path: &str) -> DialogText {
+    let (title, body) = match (lang, kind) {
+        (Lang::Vi, DialogKind::Crash) => (
+            "ShellX gặp lỗi",
+            format!(
+                "ShellX gặp lỗi và đã lưu chi tiết vào:\n{path}\n\nMở thư mục chứa file này? Hãy gửi file cho đội ShellX để được giúp."
+            ),
+        ),
+        (Lang::En, DialogKind::Crash) => (
+            "ShellX ran into a problem",
+            format!(
+                "ShellX ran into a problem and saved the details to:\n{path}\n\nOpen the folder that contains it? Send the file to the ShellX team to get help."
+            ),
+        ),
+        (Lang::Vi, DialogKind::WindowFailed) => (
+            "ShellX không mở được cửa sổ",
+            format!(
+                "ShellX không mở được cửa sổ. Chi tiết nằm trong:\n{path}\n\nMở thư mục chứa file này? Hãy gửi file cho đội ShellX để được giúp."
+            ),
+        ),
+        (Lang::En, DialogKind::WindowFailed) => (
+            "ShellX couldn't open its window",
+            format!(
+                "ShellX couldn't open its window. The details are in:\n{path}\n\nOpen the folder that contains it? Send the file to the ShellX team to get help."
+            ),
+        ),
+    };
+    DialogText {
+        title: title.to_string(),
+        body,
+    }
+}
+
+/// `"<exe>" <flag> "<file>"`: the reporter's command line for `CreateProcessW` (B5's
+/// watchdog). Windows paths cannot hold `"`, and neither path ends in `\` (`.exe`, `.txt`),
+/// so plain quotes parse back to the same two paths.
+pub fn reporter_command_line(exe: &str, flag: &str, file: &str) -> String {
+    format!("\"{exe}\" {flag} \"{file}\"")
+}
 
 #[cfg(test)]
 mod tests {
@@ -10,7 +289,7 @@ mod tests {
     use crate::strings::Lang;
 
     const T43: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-AbCdE"; // 43 chars, base64url
-    const COMMIT: &str = "5dd1e2dc6a0123456789abcdef0123456789abcd";
+    const COMMIT: &str = "5dd1e2dc6a9f8e7d6c5b4a39281706f5e4d3c2b1";
 
     fn facts() -> PanicFacts {
         PanicFacts {
@@ -85,7 +364,7 @@ mod tests {
         for line in [
             "kind: panic",
             "version: 1.7.0",
-            "commit: 5dd1e2dc6a0123456789abcdef0123456789abcd",
+            "commit: 5dd1e2dc6a9f8e7d6c5b4a39281706f5e4d3c2b1",
             "build: release",
             "windows: 10.0.26100",
             "exe base: 0x00007FF6A0000000",
@@ -97,7 +376,11 @@ mod tests {
         ] {
             assert!(lines.contains(&line), "{line:?} missing in {text}");
         }
-        assert!(lines.iter().any(|l| l.starts_with("message: login failed for ")));
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.starts_with("message: login failed for "))
+        );
         assert!(text.ends_with('\n'));
         let unknown = panic_report(&PanicFacts {
             exe_base: None,
@@ -106,7 +389,11 @@ mod tests {
             commit: String::new(),
             ..facts()
         });
-        for line in ["exe base: unknown", "thread: unknown (main: no)", "commit: unknown"] {
+        for line in [
+            "exe base: unknown",
+            "thread: unknown (main: no)",
+            "commit: unknown",
+        ] {
             assert!(unknown.lines().any(|l| l == line), "{line:?} in {unknown}");
         }
     }
@@ -163,7 +450,10 @@ mod tests {
         );
         assert_eq!(follow_up_line("the real panic"), None);
         assert_eq!(follow_up_line(""), None);
-        assert_eq!(follow_up_line("not a panic in a function that cannot unwind"), None);
+        assert_eq!(
+            follow_up_line("not a panic in a function that cannot unwind"),
+            None
+        );
     }
 
     #[test]
@@ -238,8 +528,16 @@ mod tests {
         assert_eq!(lines[0], "ShellX crash report");
         assert_eq!(lines[1], "kind: window not opened");
         assert!(lines.contains(&"render mode: standard (default)"), "{text}");
-        assert!(lines.contains(&"error: could not open the window"), "{text}");
-        assert!(lines.iter().any(|l| l.starts_with("caused by: signed in as ")), "{text}");
+        assert!(
+            lines.contains(&"error: could not open the window"),
+            "{text}"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.starts_with("caused by: signed in as ")),
+            "{text}"
+        );
         assert!(!text.contains("a@b.co") && !text.contains(T43), "{text}");
         let none = window_failure_report(&WindowFailureFacts {
             render: None,

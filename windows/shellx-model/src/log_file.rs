@@ -136,7 +136,10 @@ mod tests {
         let lines: Vec<&str> = out.lines().collect();
         assert_eq!(lines.len(), 2, "{out}");
         assert!(out.ends_with('\n'));
-        assert!(lines[0].starts_with("T WARN shellx: login failed for "), "{out}");
+        assert!(
+            lines[0].starts_with("T WARN shellx: login failed for "),
+            "{out}"
+        );
         assert!(lines[1].starts_with("  "), "{out}");
         assert!(!out.contains("a@b.co"), "{out}");
         assert!(!out.contains(T43), "{out}");

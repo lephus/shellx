@@ -34,15 +34,44 @@ mod workspace;
 #[cfg(any(windows, target_os = "macos"))]
 mod ui;
 
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+use std::path::PathBuf;
 
-    if args.iter().any(|arg| arg == "--version") {
+use shellx_model::crash_report::DialogKind;
+
+fn main() {
+    // `args_os`: `args()` panics on an argument that is not Unicode, before any hook exists;
+    // the reporter's file stays an OsString (plan review M-22).
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let has = |flag: &str| args.iter().any(|arg| arg == flag);
+
+    // The crash reporter: a separate process that only shows the dialog. Nothing else runs:
+    // no hook, no log (3b §5 step 2).
+    for kind in [DialogKind::Crash, DialogKind::WindowFailed] {
+        if let Some(i) = args.iter().position(|arg| arg == kind.reporter_flag()) {
+            let file = args.get(i + 1).map(PathBuf::from).unwrap_or_default();
+            std::process::exit(crash::run_reporter(kind, &file));
+        }
+    }
+
+    // Every panic from here on leaves a crash file; the window's also starts the reporter.
+    let console = ["--version", "--smoke-ui-assets", "--smoke-panes", "--smoke"]
+        .iter()
+        .any(|flag| has(flag));
+    let ctx = crash::CrashContext::this_process();
+    let mode = if console {
+        crash::HookMode::FileOnly
+    } else {
+        crash::HookMode::Dialog
+    };
+    crash::install_panic_hook(ctx.clone(), mode);
+    crash::set_crash_test(crash::crash_test_from(&args));
+
+    if has("--version") {
         println!("shellx-desktop {}", shellx_model::VERSION);
         std::process::exit(0);
     }
 
-    if args.iter().any(|arg| arg == "--smoke-ui-assets") {
+    if has("--smoke-ui-assets") {
         match smoke::ui_assets() {
             Ok(()) => std::process::exit(0),
             Err(error) => {
@@ -52,7 +81,7 @@ fn main() {
         }
     }
 
-    if args.iter().any(|arg| arg == "--smoke-panes") {
+    if has("--smoke-panes") {
         match smoke::panes() {
             Ok(()) => std::process::exit(0),
             Err(error) => {
@@ -62,7 +91,7 @@ fn main() {
         }
     }
 
-    if args.iter().any(|arg| arg == "--smoke") {
+    if has("--smoke") {
         match smoke::run() {
             Ok(()) => std::process::exit(0),
             Err(error) => {
@@ -76,7 +105,11 @@ fn main() {
     {
         // Only the window writes the log (Ruling 12).
         logger::install(&paths::logs_dir());
-        log::info!("ShellX {} starting", env!("CARGO_PKG_VERSION"));
+        log::info!(
+            "{} starting on Windows {}",
+            build_info::about_version(),
+            ctx.windows
+        );
         ui::run();
     }
 

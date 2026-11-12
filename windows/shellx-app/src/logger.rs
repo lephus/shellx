@@ -174,7 +174,6 @@ pub fn install(dir: &Path) -> bool {
 
 /// One line from the panic hook: written only when the lock is free (the panic may have
 /// happened while this thread held it), so the hook never blocks or deadlocks here.
-#[allow(dead_code)] // the panic hook (B4) is its caller
 pub fn try_append(line: &str) {
     let timestamp = now_timestamp();
     let mut guard = match LOGGER.state.try_lock() {
@@ -208,7 +207,13 @@ mod tests {
             "shellx_desktop::account",
             &format!("sign-in failed for a@b.co with {T43}"),
         );
-        write_record(&mut state, "T", "INFO", "shellx", "the code 123456 was sent");
+        write_record(
+            &mut state,
+            "T",
+            "INFO",
+            "shellx",
+            "the code 123456 was sent",
+        );
         write_record(
             &mut state,
             "T",
@@ -235,7 +240,13 @@ mod tests {
         while written < 3 * 1_048_576 + 524_288 {
             let message = format!("record {i} {filler}");
             written += message.len() as u64;
-            write_record(&mut state, "2026-11-12T08:15:30.123Z", "INFO", "t", &message);
+            write_record(
+                &mut state,
+                "2026-11-12T08:15:30.123Z",
+                "INFO",
+                "t",
+                &message,
+            );
             i += 1;
         }
         drop(state);
