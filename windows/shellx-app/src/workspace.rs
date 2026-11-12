@@ -431,13 +431,39 @@ mod tests {
         assert_eq!(started.fell_back, None);
     }
 
+    #[test]
+    fn a_failed_start_keeps_only_the_systems_reason() {
+        // what portable-pty reports on Windows: the whole command line, then the reason
+        let windows = anyhow::anyhow!(
+            "CreateProcessW `\"C:\\x.exe\" -NoLogo -NoExit -Command \"if ($function:prompt) {{ }}\"` in cwd `Some(\"C:\\Users\\Phú\")` failed: The system cannot find the file specified. (os error 2)"
+        )
+        .context("failed to start C:\\x.exe");
+        assert_eq!(
+            spawn_reason(&windows),
+            "The system cannot find the file specified. (os error 2)"
+        );
+        // the Mac's: the reason alone
+        let mac = anyhow::Error::new(std::io::Error::from_raw_os_error(2))
+            .context("failed to start /nonexistent/shell");
+        assert_eq!(spawn_reason(&mac), "No such file or directory (os error 2)");
+        // a reason far too long is cut, on a character boundary
+        let long = anyhow::anyhow!("{}", "é".repeat(500));
+        assert!(spawn_reason(&long).chars().count() <= 160);
+    }
+
     #[cfg(unix)]
     #[test]
     fn both_programs_failing_report_both() {
         use crate::local_pty::PanePlan;
 
+        // the first one carries PowerShell's prompt hook, as a real plan does
+        let hook = shellx_model::shell::POWERSHELL_PROMPT_HOOK;
         let plan = PanePlan {
-            first: shell("/nonexistent/one", &[], "one"),
+            first: shell(
+                "/nonexistent/one",
+                &["-NoLogo", "-NoExit", "-Command", hook],
+                "one",
+            ),
             fallback: Some(shell("/nonexistent/two", &["-i"], "two")),
         };
         let Err(failure) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
@@ -458,10 +484,15 @@ mod tests {
                 .iter()
                 .all(|(_, _, e)| !e.trim().is_empty())
         );
-        // one line that names both, for the pane until it says it in the app's language
-        let text = failure.to_string();
-        assert!(!text.contains('\n'), "{text}");
-        assert!(text.contains("/nonexistent/one") && text.contains("/nonexistent/two"));
+        // one short line per attempt: its label and the system's reason, never the
+        // command line with the prompt hook (review M5)
+        let lines = failure.lines();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("one: ") && lines[1].starts_with("two: "));
+        for line in &lines {
+            assert!(line.chars().count() < 200, "{line}");
+            assert!(!line.contains("-Command") && !line.contains('\n'), "{line}");
+        }
 
         // no fallback: one attempt
         let alone = PanePlan {

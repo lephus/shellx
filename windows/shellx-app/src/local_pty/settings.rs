@@ -960,6 +960,87 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_custom_program_starts_automatic_instead() {
+        // design §4.4: the app tries the next shell once before it reports
+        let all = exists_in(&[PWSH, WINPS, CMD]);
+        let found = find_shells(&probe(), &|p: &str| all(p));
+        let missing = |p: &str| CustomShellError::NotFound(p.into());
+
+        let start = pane_start(
+            Err(ShellError::Custom(missing(r"C:\nope.exe"))),
+            &found,
+            &probe(),
+        )
+        .unwrap();
+        assert_eq!(start.plan.first.label, "PowerShell 7");
+        assert_eq!(start.plan.fallback.unwrap().label, "Windows PowerShell");
+        assert_eq!(start.instead_of.as_deref(), Some("nope.exe"));
+        // SHELLX_SHELL alike
+        let start = pane_start(
+            Err(ShellError::Override(missing("nope.exe"))),
+            &found,
+            &probe(),
+        )
+        .unwrap();
+        assert_eq!(start.plan.first.label, "PowerShell 7");
+        assert_eq!(start.instead_of.as_deref(), Some("nope.exe"));
+        // a plan that works is started as it is
+        let ok = startup_plan(&probe());
+        assert_eq!(
+            pane_start(Ok(ok.clone()), &found, &probe()),
+            Ok(PaneStart {
+                plan: ok,
+                instead_of: None
+            })
+        );
+        // the other errors stay: the pane says why and offers its buttons
+        for error in [
+            ShellError::NoShellFound,
+            ShellError::Custom(CustomShellError::Empty),
+            ShellError::Custom(CustomShellError::UnclosedQuote),
+            ShellError::Override(CustomShellError::UnclosedQuote),
+        ] {
+            assert_eq!(pane_start(Err(error.clone()), &found, &probe()), Err(error));
+        }
+        // nothing Automatic may start (only Git Bash here): the error stays
+        let git_only = vec![shellx_model::shell::known_launch(
+            ShellKind::GitBash,
+            r"C:\Program Files\Git\bin\bash.exe".into(),
+        )];
+        let gone = ShellError::Custom(missing(r"C:\nope.exe"));
+        assert_eq!(
+            pane_start(Err(gone.clone()), &git_only, &probe()),
+            Err(gone)
+        );
+    }
+
+    #[test]
+    fn a_stored_line_whose_program_is_gone_opens_powershell_7() {
+        let (_dir, path) = settings_path();
+        SettingsFile::new(path.clone())
+            .save(&ShellChoice::Custom {
+                command_line: r"C:\nope.exe".into(),
+            })
+            .unwrap();
+        let shells = windows(
+            &path,
+            exists_in(&[PWSH, WINPS, CMD]),
+            None,
+            Duration::from_millis(100),
+        );
+        shells.refresh_now();
+        // the plan stays an error (Settings shows it) ...
+        assert!(matches!(
+            shells.plan_for_new_pane(),
+            Err(ShellError::Custom(CustomShellError::NotFound(_)))
+        ));
+        // ... and a new pane starts Automatic, saying what it was asked for
+        let start = shells.pane_start().unwrap();
+        assert_eq!(start.plan.first.label, "PowerShell 7");
+        assert_eq!(start.instead_of.as_deref(), Some("nope.exe"));
+    }
+
+    #[test]
     fn command_prompt_prefers_the_catalogue_then_comspec_then_system32() {
         let found = vec![ShellLaunch {
             kind: Some(ShellKind::Cmd),
