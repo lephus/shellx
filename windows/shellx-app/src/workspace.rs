@@ -417,6 +417,22 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn a_first_program_that_starts_uses_no_fallback() {
+        use crate::local_pty::PanePlan;
+
+        let plan = PanePlan {
+            first: shell("/bin/sh", &["-i"], "sh"),
+            fallback: Some(shell("/bin/sh", &[], "fallback sh")),
+        };
+        let Ok(started) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
+            panic!("/bin/sh did not start");
+        };
+        assert_eq!(started.used, "sh");
+        assert_eq!(started.fell_back, None);
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn both_programs_failing_report_both() {
         use crate::local_pty::PanePlan;
 
