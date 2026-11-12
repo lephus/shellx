@@ -20,6 +20,8 @@ use shellx_model::strings::{
 };
 use shellx_model::update::{UpdateStatus, download_url};
 
+use crate::{build_info, startup};
+
 use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
@@ -63,6 +65,8 @@ pub struct SettingsPanel {
     refreshing: bool,
     /// The last choice could not be saved.
     shell_not_saved: bool,
+    /// "Try standard display mode again" was stored for the next start.
+    standard_requested: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -102,6 +106,7 @@ impl SettingsPanel {
             shell_checker: None,
             refreshing: false,
             shell_not_saved: false,
+            standard_requested: false,
             _subscriptions: subscriptions,
         };
         // Development only (Ruling 24): Settings is open at start.
@@ -576,6 +581,43 @@ impl SettingsPanel {
             })
     }
 
+    /// Settings › Display (spec §4.2): the mode this run uses and, when it is the compatible
+    /// one, why and a way to try the standard one at the next start.
+    fn display_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
+        let view = startup::display_view(&startup::render_status(), self.standard_requested);
+        Self::section(t(lang, Str::Display))
+            .child(div().text_color(theme::text()).child(t(lang, view.mode)))
+            .children(view.explanation.map(|why| Self::muted(t(lang, why))))
+            .when(view.offer_standard, |s| {
+                s.child(
+                    div().flex().child(
+                        button(
+                            "settings-try-standard",
+                            t(lang, Str::TryStandardDisplay),
+                            Kind::Secondary,
+                            false,
+                        )
+                        .on_click(cx.listener(
+                            |this, _: &ClickEvent, _, cx| {
+                                match startup::request_standard_next_start() {
+                                    Ok(()) => this.standard_requested = true,
+                                    Err(error) => {
+                                        log::warn!(
+                                            "the standard display mode was not stored: {error}"
+                                        )
+                                    }
+                                }
+                                cx.notify();
+                            },
+                        )),
+                    ),
+                )
+            })
+            .when(view.takes_effect_note, |s| {
+                s.child(Self::muted(t(lang, Str::TakesEffectNextStart)))
+            })
+    }
+
     fn update_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
         let account = self.account.read(cx);
         let status = account.update_status().clone();
@@ -647,11 +689,7 @@ impl SettingsPanel {
                 div()
                     .text_color(theme::text_hi())
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child(format!(
-                        "{} {}",
-                        t(lang, Str::AppName),
-                        shellx_model::VERSION
-                    )),
+                    .child(build_info::about_version()),
             )
             .child(Self::muted(t(lang, Str::CmuxCredits)))
             .child(Self::muted(t(lang, Str::IconCredits)))
@@ -721,6 +759,7 @@ impl Render for SettingsPanel {
                     .overflow_y_scroll()
                     .child(self.account_section(lang, cx))
                     .child(self.terminal_section(lang, cx))
+                    .child(self.display_section(lang, cx))
                     .child(self.update_section(lang, cx))
                     .child(Self::language_section(lang))
                     .child(Self::about_section(lang)),

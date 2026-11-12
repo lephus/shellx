@@ -548,7 +548,6 @@ pub fn run(open_folder: bool) -> i32 {
 
 /// Starts `<this exe> --diagnose`: the help menu's "Tạo báo cáo chẩn đoán" (A10), the same
 /// code as the Start entry, so the window stays responsive (Ruling 35).
-#[allow(dead_code)] // the help menu (A10) is its caller
 pub fn spawn_report_process() -> std::io::Result<()> {
     std::process::Command::new(std::env::current_exe()?)
         .arg("--diagnose")
