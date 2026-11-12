@@ -31,7 +31,8 @@ use shellx_model::palette;
 use shellx_model::remote_state::PairState;
 use shellx_model::sidebar::Access;
 use shellx_model::strings::{
-    Lang, Str, pairing_code_display, request_access_to, save_link_failed, t, your_device_code,
+    Lang, Str, pairing_code_display, pairing_failure_sentence, request_access_to, save_link_failed,
+    t, your_device_code,
 };
 
 use super::app::Services;
@@ -427,23 +428,18 @@ impl Render for PairingPanel {
                         .child(Self::close_button(lang, cx))
                         .child(Self::retry_button(lang, cx)),
                 ),
-            PairState::Failed(e) => {
-                let message = if e.message.trim().is_empty() {
-                    e.code.clone()
-                } else {
-                    e.message.clone()
-                };
-                card.child(Self::status_line(
+            // A sentence for the code, never the code or the server's text (M3).
+            PairState::Failed(e) => card
+                .child(Self::status_line(
                     error,
-                    format!("{} · {message}", t(lang, Str::Error)),
+                    pairing_failure_sentence(lang, &e.code),
                     error,
                 ))
                 .child(
                     buttons
                         .child(Self::close_button(lang, cx))
                         .child(Self::retry_button(lang, cx)),
-                )
-            }
+                ),
         };
 
         // Covers the main area (RootView makes it `relative`): the terminals

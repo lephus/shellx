@@ -151,6 +151,13 @@ pub enum Str {
     ShellEnvOverride,
     /// `settings.json` could not be written (no `LOCALAPPDATA`, a full disk).
     ShellChoiceNotSaved,
+    /// Pairing failures (`pairing_failure_sentence`).
+    MachineGone,
+    PairingSessionExpired,
+    PairingRefused,
+    HostOffline,
+    RequestAlreadyAnswered,
+    RequestGone,
     /// Title of the sign-in dialog.
     SignInTitle,
     /// Label over the dialog's email field.
@@ -311,6 +318,12 @@ impl Str {
         Str::AppliesToNewTerminals,
         Str::ShellEnvOverride,
         Str::ShellChoiceNotSaved,
+        Str::MachineGone,
+        Str::PairingSessionExpired,
+        Str::PairingRefused,
+        Str::HostOffline,
+        Str::RequestAlreadyAnswered,
+        Str::RequestGone,
         Str::SignInTitle,
         Str::EmailAddress,
         Str::SignInEllipsis,
@@ -463,6 +476,14 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
                 "SHELLX_SHELL đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này."
             }
             Str::ShellChoiceNotSaved => "Không lưu được lựa chọn shell trên máy này.",
+            Str::MachineGone => "Máy này không còn trong tài khoản của bạn.",
+            Str::PairingSessionExpired => "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+            Str::PairingRefused => {
+                "Máy chủ không nhận yêu cầu từ máy này. Đăng xuất rồi đăng nhập lại."
+            }
+            Str::HostOffline => "Máy kia đang ngoại tuyến. Mở ShellX trên máy đó rồi thử lại.",
+            Str::RequestAlreadyAnswered => "Máy kia đã trả lời yêu cầu này.",
+            Str::RequestGone => "Yêu cầu này không còn nữa. Hãy gửi lại.",
             Str::SignInTitle => "Đăng nhập ShellX",
             Str::EmailAddress => "Địa chỉ email",
             Str::SignInEllipsis => "Đăng nhập…",
@@ -626,6 +647,14 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
                 "SHELLX_SHELL is set, so ShellX uses it instead of this choice."
             }
             Str::ShellChoiceNotSaved => "The shell choice couldn't be saved on this PC.",
+            Str::MachineGone => "That machine is no longer in your account.",
+            Str::PairingSessionExpired => "Your session expired. Sign in again, then try again.",
+            Str::PairingRefused => {
+                "The server didn't accept a request from this PC. Sign out and sign in again."
+            }
+            Str::HostOffline => "The other machine is offline. Open ShellX on it, then try again.",
+            Str::RequestAlreadyAnswered => "The other machine already answered this request.",
+            Str::RequestGone => "This request no longer exists. Send it again.",
             Str::SignInTitle => "Sign in to ShellX",
             Str::EmailAddress => "Email address",
             Str::SignInEllipsis => "Sign In…",
@@ -800,6 +829,26 @@ pub fn failure_sentence(lang: Lang, code: &str) -> String {
         "switch_from_signed_in_device" => Str::SwitchFromSignedInDevice,
         // The server refused the session (review M2).
         "unauthorized" | "http_401" => Str::SessionExpired,
+        _ => Str::ServerProblem,
+    };
+    t(lang, key).to_string()
+}
+
+/// The pairing panel's line for a failed access request (Ruling 14, review M3): the pairing
+/// codes have sentences of their own; every other code, `not_found` and `http_404` included,
+/// reads as "ShellX is having a problem", never as a sign-in sentence, a code or server text.
+pub fn pairing_failure_sentence(lang: Lang, code: &str) -> String {
+    let key = match code {
+        "machine_not_found" => Str::MachineGone,
+        "unauthorized" | "http_401" | "not_logged_in" => Str::PairingSessionExpired,
+        "forbidden" | "desktop_only" => Str::PairingRefused,
+        "host_offline" => Str::HostOffline,
+        "pairing_not_pending" => Str::RequestAlreadyAnswered,
+        "pairing_removed" | "pairing_not_found" => Str::RequestGone,
+        "pairing_expired" => Str::Expired,
+        "not_granted" => Str::NeedsPairing,
+        "rate_limited" => Str::RateLimited,
+        "network" => Str::RelayUnreachable,
         _ => Str::ServerProblem,
     };
     t(lang, key).to_string()
