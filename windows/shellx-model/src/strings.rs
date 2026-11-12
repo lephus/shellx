@@ -979,7 +979,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 139);
+        assert_eq!(Str::ALL.len(), 145);
     }
 
     #[test]
@@ -1421,6 +1421,131 @@ mod tests {
             will_run(Lang::En, r"C:\Windows\System32\wsl.exe"),
             r"Runs C:\Windows\System32\wsl.exe."
         );
+    }
+
+    #[test]
+    fn pairing_failures_have_their_own_sentences() {
+        let cases: &[(&str, &str, &str)] = &[
+            (
+                "machine_not_found",
+                "Máy này không còn trong tài khoản của bạn.",
+                "That machine is no longer in your account.",
+            ),
+            (
+                "unauthorized",
+                "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+                "Your session expired. Sign in again, then try again.",
+            ),
+            (
+                "http_401",
+                "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+                "Your session expired. Sign in again, then try again.",
+            ),
+            (
+                "not_logged_in",
+                "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+                "Your session expired. Sign in again, then try again.",
+            ),
+            (
+                "forbidden",
+                "Máy chủ không nhận yêu cầu từ máy này. Đăng xuất rồi đăng nhập lại.",
+                "The server didn't accept a request from this PC. Sign out and sign in again.",
+            ),
+            (
+                "desktop_only",
+                "Máy chủ không nhận yêu cầu từ máy này. Đăng xuất rồi đăng nhập lại.",
+                "The server didn't accept a request from this PC. Sign out and sign in again.",
+            ),
+            (
+                "host_offline",
+                "Máy kia đang ngoại tuyến. Mở ShellX trên máy đó rồi thử lại.",
+                "The other machine is offline. Open ShellX on it, then try again.",
+            ),
+            (
+                "pairing_not_pending",
+                "Máy kia đã trả lời yêu cầu này.",
+                "The other machine already answered this request.",
+            ),
+            (
+                "pairing_removed",
+                "Yêu cầu này không còn nữa. Hãy gửi lại.",
+                "This request no longer exists. Send it again.",
+            ),
+            (
+                "pairing_not_found",
+                "Yêu cầu này không còn nữa. Hãy gửi lại.",
+                "This request no longer exists. Send it again.",
+            ),
+        ];
+        for (code, vi, en) in cases {
+            assert_eq!(pairing_failure_sentence(Lang::Vi, code), *vi, "{code}");
+            assert_eq!(pairing_failure_sentence(Lang::En, code), *en, "{code}");
+        }
+        // codes with sentences of the catalogue
+        for lang in [Lang::Vi, Lang::En] {
+            let reused = [
+                ("pairing_expired", Str::Expired),
+                ("not_granted", Str::NeedsPairing),
+                ("rate_limited", Str::RateLimited),
+                ("network", Str::RelayUnreachable),
+                // never "this way of signing in isn't available" (Ruling 14)
+                ("not_found", Str::ServerProblem),
+                ("http_404", Str::ServerProblem),
+                ("not_configured", Str::ServerProblem),
+                ("internal_error", Str::ServerProblem),
+            ];
+            for (code, key) in reused {
+                assert_eq!(pairing_failure_sentence(lang, code), t(lang, key), "{code}");
+            }
+        }
+    }
+
+    #[test]
+    fn pairing_failures_never_show_codes() {
+        let codes = [
+            "unauthorized",
+            "desktop_only",
+            "payload_too_large",
+            "rate_limited",
+            "bad_request",
+            "machine_not_found",
+            "forbidden",
+            "internal_error",
+            "http_400",
+            "http_401",
+            "http_404",
+            "http_500",
+            "http_502",
+            "not_logged_in",
+            "not_configured",
+            "not_registered",
+            "invalid_params",
+            "network",
+            "server",
+            "io",
+            "crypto",
+            "state_dir_insecure",
+            "state_file_insecure",
+            "unknown_method",
+            "bad_response",
+            "internal",
+            "pairing_expired",
+            "pairing_not_pending",
+            "pairing_removed",
+            "pairing_not_found",
+            "not_granted",
+            "host_offline",
+            "relay_v2_unavailable",
+            "not_found",
+            "",
+        ];
+        for lang in [Lang::Vi, Lang::En] {
+            for code in codes {
+                let out = pairing_failure_sentence(lang, code);
+                assert!(!out.trim().is_empty(), "{code}");
+                assert!(!out.contains('_') && !out.contains("http"), "{code}: {out}");
+            }
+        }
     }
 
     #[test]
