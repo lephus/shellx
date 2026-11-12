@@ -18,7 +18,7 @@ public final class ShellXAccount {
         public let email: String
         /// When this Mac last signed in. Nil for records saved before it was kept.
         public let signedInAt: Date?
-        /// `"google"` or `"password"`. Nil in records saved before Google sign-in (they were password sign-ins).
+        /// `"google"`, `"email"` or `"password"`. Nil in records saved before Google sign-in (they were password sign-ins).
         public let authMethod: String?
 
         public init(userID: String, email: String, signedInAt: Date? = nil, authMethod: String? = nil) {
@@ -54,6 +54,9 @@ public final class ShellXAccount {
     @ObservationIgnored private var waitingFlowID: String?
     @ObservationIgnored private var googleCancelRequested = false
     @ObservationIgnored private var googleToken: UUID?
+    /// Email codes being verified right now, at most one (a closed sheet's verify runs on, Ruling 12); neither Google
+    /// nor another email verify starts while it is above zero.
+    @ObservationIgnored private var emailVerifications = 0
 
     public init(service: ShellXRemoteService, openURL: @escaping @MainActor (URL) -> Bool = { _ in false }) {
         self.service = service
@@ -109,11 +112,15 @@ public final class ShellXAccount {
     /// Opens Google in the browser and waits for the person. `.signIn` creates the session (and starts the
     /// remote session with the gate on); `.link` switches the current session to Google in place.
     /// Throws the core's code (`google_cancelled`, `google_timeout`, `switch_from_signed_in_device`, ...),
-    /// `google_in_progress` while another flow waits, or `browser_unavailable`.
+    /// `google_in_progress` while another flow waits, `email_sign_in_in_progress` while an email code is being
+    /// verified (so two session writes never race), or `browser_unavailable`.
     @discardableResult
     public func signInWithGoogle(purpose: GoogleSignInPurpose) async throws -> Identity {
         guard googleStep == .idle else {
             throw ShellXCoreError(code: "google_in_progress", message: "a Google sign-in is already waiting")
+        }
+        guard emailVerifications == 0 else {
+            throw ShellXCoreError(code: "email_sign_in_in_progress", message: "an email sign-in code is being verified")
         }
         // Busy from the first await on, so a second click or a cancel during begin is seen.
         googleStep = .waiting(purpose)
@@ -164,6 +171,56 @@ public final class ShellXAccount {
         guard let flow = waitingFlowID else { return }
         let core = service.env.core
         _ = try? await ShellXRemoteService.offMain { try core.cancelGoogleSignIn(flowID: flow) }
+    }
+
+    // MARK: - Email code
+
+    /// Asks the relay to mail a sign-in code. Changes no session and writes nothing.
+    ///
+    /// - Parameters:
+    ///   - email: The address as typed (the core trims it).
+    ///   - locale: The UI language, for the mail's language.
+    /// - Returns: The challenge to verify the code against, with the relay's address.
+    /// - Throws: The core's code (`invalid_email`, `disposable_email`, `rate_limited`, `email_send_failed`, …).
+    public func requestEmailCode(email: String, locale: String) async throws -> EmailCodeChallenge {
+        try await service.ensureConfigured()
+        let core = service.env.core
+        return try await ShellXRemoteService.offMain { try core.beginEmailSignIn(email: email, locale: locale) }
+    }
+
+    /// Verifies the code and signs in like a Google `.signIn`: with the gate on it starts the remote session;
+    /// saves `Identity(authMethod: "email")`.
+    ///
+    /// - Parameters:
+    ///   - challengeID: The id from ``requestEmailCode(email:locale:)``.
+    ///   - code: The digits as typed.
+    /// - Returns: The saved identity.
+    /// - Throws: The core's code (nothing is saved then), `google_in_progress` while a Google flow waits, or
+    ///   `email_sign_in_in_progress` while another code is being verified (a closed sheet's verify runs on), so two
+    ///   session writes never race. While it runs, ``signInWithGoogle(purpose:)`` refuses with
+    ///   `email_sign_in_in_progress` too.
+    @discardableResult
+    public func signInWithEmailCode(challengeID: String, code: String) async throws -> Identity {
+        guard googleStep == .idle else {
+            throw ShellXCoreError(code: "google_in_progress", message: "a Google sign-in is waiting")
+        }
+        guard emailVerifications == 0 else {
+            throw ShellXCoreError(code: "email_sign_in_in_progress", message: "an email sign-in code is being verified")
+        }
+        emailVerifications += 1
+        defer { emailVerifications -= 1 }
+        let gate = service.env.gateEnabled()
+        if gate { await service.prepareLocal() }
+        try await service.ensureConfigured()
+        let core = service.env.core
+        let result = try await ShellXRemoteService.offMain {
+            try core.finishEmailSignIn(challengeID: challengeID, code: code)
+        }
+        if gate { await service.beginSignedInSession(userID: result.userID) }
+        let signedIn = Identity(userID: result.userID, email: result.email, signedInAt: Date(), authMethod: "email")
+        await save(signedIn)
+        RemoteLog.service.info("account signed in with an email code")
+        return signedIn
     }
 
     /// True once per `defaults` while this account still signs in with a password: the one-time offer to switch.

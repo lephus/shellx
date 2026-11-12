@@ -40,7 +40,11 @@ final class ShellXAccountFlow: AccountFlow {
 
     var isWorkingOnAuth: Bool { account.isWorking }
 
-    /// Opens the "Sign in to ShellX" sheet with the Google button; it closes once the person confirms.
+    /// The language the app's strings are shown in, for the mail's language.
+    static var emailLocale: String { Bundle.main.preferredLocalizations.first ?? "en" }
+
+    /// Opens the "Sign in to ShellX" sheet: the email field and Send code first, Google below; it closes once the
+    /// person confirms.
     func startSignIn() {
         presentGoogleSheet(.signIn)
     }
@@ -68,7 +72,16 @@ final class ShellXAccountFlow: AccountFlow {
             signIn: { try await account.signInWithGoogle(purpose: purpose).email },
             cancel: { await account.cancelGoogleSignIn() }
         )
-        SignInSheetPresenter.shared.present(model: model)
+        // Settings › Account, the sidebar's sign-in row and the automatic open after a server sign-out all arrive
+        // here; only the sign-in sheet has the email path.
+        let email: EmailSignInModel? = purpose == .signIn
+            ? EmailSignInModel(
+                labels: .localized,
+                requestCode: { try await account.requestEmailCode(email: $0, locale: Self.emailLocale) },
+                verify: { try await account.signInWithEmailCode(challengeID: $0, code: $1).email }
+            )
+            : nil
+        SignInSheetPresenter.shared.present(model: model, email: email)
     }
 
     func signOut() async {

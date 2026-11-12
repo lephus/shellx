@@ -4,8 +4,9 @@ import Foundation
 import ShellXRemoteCore
 
 /// DEBUG stand-in for `ShellXRemoteService` (L5 Task 13), served when the app
-/// is launched with `SHELLX_REMOTE_UI_FIXTURES=1`. It starts signed out; any
-/// non-empty email and password sign in except the password "wrong".
+/// is launched with `SHELLX_REMOTE_UI_FIXTURES=1`. It starts signed out; Google
+/// signs in as fixture@shellx.dev, and an email code request signs in with the
+/// code 123456 (`requestCode`) as the address it was sent to.
 /// Signed in it serves an online granted PC, an offline Mac mini, a MacBook
 /// Air with a pending request (code 123456) and an online Mac Studio with
 /// no access yet, so every header state shows.
@@ -49,6 +50,8 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
     private let now: () -> Date
     private var requestCounts: [RemoteMachine.ID: Int] = [:]
     private var openCounts: [RemoteMachine.ID: Int] = [:]
+    /// The address of the last email code request; an email sign-in signs in as it.
+    private var emailCodeAddress = ""
 
     init(now: @escaping () -> Date = { Date() }) {
         self.now = now
@@ -180,6 +183,33 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
 
     func signInWithGoogle() async throws -> String {
         try? await Task.sleep(nanoseconds: 400_000_000)
+        signIn()
+        return "fixture@shellx.dev"
+    }
+
+    func cancelGoogleSignIn() async {}
+
+    /// Like the relay, answers with the trimmed, lowercased address; no mail is sent.
+    func requestEmailCode(email: String, locale: String) async throws -> EmailCodeChallenge {
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        let address = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        emailCodeAddress = address
+        return EmailCodeChallenge(challengeID: "fixture-challenge", email: address, expiresIn: 600, resendIn: 60)
+    }
+
+    /// Signs in as the address of the last code request, but only with `requestCode`; any other code is
+    /// `invalid_code`, as a wrong guess on the relay.
+    func signInWithEmailCode(challengeID: String, code: String) async throws -> String {
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        guard code == Self.requestCode else {
+            throw ShellXCoreError(code: "invalid_code", message: "that code isn't right")
+        }
+        signIn()
+        return emailCodeAddress
+    }
+
+    /// The signed-in state both sign-ins share.
+    private func signIn() {
         machines = Self.fixtureMachines(now: now())
         // The MacBook Air's pending request, reopened from its header.
         outgoing = [OutgoingPairing(
@@ -188,10 +218,7 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
         )]
         pendingApprovals = Self.fixtureApprovals(now: now())
         isSignedIn = true
-        return "fixture@shellx.dev"
     }
-
-    func cancelGoogleSignIn() async {}
 
     func forgetRemoteWorkspace(_ id: UUID) {
         guard remoteWorkspaces[id] != nil else { return }

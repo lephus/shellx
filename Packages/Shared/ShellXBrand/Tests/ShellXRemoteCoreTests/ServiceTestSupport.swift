@@ -22,7 +22,11 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
     let googleEmail = Locked("g@shellx.test")
     /// `account.identities.list` items.
     let identities = Locked<[JSONValue]>([])
-    /// What `auth.session` reports (`auth.login` / `auth.google.finish` set them).
+    /// The code `auth.email.finish` accepts (leading zeros, so they are always exercised).
+    let emailCode = Locked("004217")
+    /// The address of the last `auth.email.begin`, trimmed and lowercased as the relay answers it.
+    let emailAddress = Locked<String?>(nil)
+    /// What `auth.session` reports (`auth.login` / `auth.google.finish` / `auth.email.finish` set them).
     let sessionEmail = Locked<String?>(nil)
     let sessionAuthMethod = Locked("password")
     /// The account `auth.login` signs into.
@@ -114,6 +118,22 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
                                     "email": .string(googleEmail.get()), "auth_method": .string("google")]))
         case "auth.google.cancel":
             return Self.ok(.object([:]))
+        case "auth.email.begin":
+            guard case .string(let email)? = params["email"] else { return Self.error("invalid_params") }
+            let address = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            emailAddress.with { $0 = address }
+            return Self.ok(.object(["challenge_id": .string("ch-1"), "expires_in": .number(600), "resend_in": .number(60),
+                                    "email": .string(address)]))
+        case "auth.email.finish":
+            guard params["challenge_id"] == .string("ch-1") else { return Self.error("code_expired") }
+            guard params["code"] == .string(emailCode.get()) else { return Self.error("invalid_code") }
+            let address = emailAddress.get() ?? ""
+            signedIn.with { $0 = true }
+            sessionEmail.with { $0 = address }
+            sessionAuthMethod.with { $0 = "email" }
+            return Self.ok(.object(["user_id": .string(userID.get()), "device_id": .string("d_1"),
+                                    "device_public_key_b64": .string("AAAA"), "fingerprint": .string(Self.ownFingerprint),
+                                    "email": .string(address), "auth_method": .string("email")]))
         case "auth.session":
             guard signedIn.get() else { return Self.error("not_logged_in") }
             return Self.ok(.object(["user_id": .string(userID.get()), "device_id": .string("d_1"),

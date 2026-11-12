@@ -2039,6 +2039,7 @@
 		D75280040000000000000001 /* DynamicTracingSignpostInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = D75280040000000000000002 /* DynamicTracingSignpostInterval.swift */; };
 		D3622100A1B2C3D4E5F60718 /* EditableTextViewArrowKeyForwardingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3622101A1B2C3D4E5F60718 /* EditableTextViewArrowKeyForwardingTests.swift */; };
 		A7206C010000000000000001 /* EffectiveAppearanceObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7206C020000000000000001 /* EffectiveAppearanceObservation.swift */; };
+		D688AC905B64AC31A79CFEBB /* EmailSignInSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C7EDFC4991B1F81EFEC79E /* EmailSignInSection.swift */; };
 		5732A0095732A0095732A009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0095732B0095732B009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift */; };
 		5732A0135732A0135732A013 /* EnvironmentValues+SidebarLazyContractProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0135732B0135732B013 /* EnvironmentValues+SidebarLazyContractProbe.swift */; };
 		DA3DCBDE094DF34AA5CF264F /* ExitingProcessCensusReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A43345B5B3C60929B9F661CB /* ExitingProcessCensusReader.swift */; };
@@ -3461,6 +3462,7 @@
 		3065388AAFB47F2F3B52D356 /* ShellXSidebarNameEffectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2451C5736A08D634760946D2 /* ShellXSidebarNameEffectTests.swift */; };
 		60C4D402ECE7067826019E69 /* ShellXSidebarSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81EF0707F741B6C620A647A /* ShellXSidebarSelectionTests.swift */; };
 		87BF3219AA36F5CA473F1A51 /* ShellXSidebarWaitingBorderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3F0B13A2B1144786869759 /* ShellXSidebarWaitingBorderTests.swift */; };
+		665D97024A5DF3B41BE81409 /* ShellXSignInSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A7D40029BD5BC8E230CF9F8 /* ShellXSignInSheetTests.swift */; };
 		9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */; };
 		D970853DB80E245B62638483 /* ShellXTabActivitySyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0086129B06987F4A5CC88A52 /* ShellXTabActivitySyncTests.swift */; };
 		B2C68350F29BD5759B40BE98 /* ShellXThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B157E03C649BE0CB191F7C8 /* ShellXThemeTests.swift */; };
@@ -6761,6 +6763,7 @@
 		D75280040000000000000002 /* DynamicTracingSignpostInterval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicTracingSignpostInterval.swift; sourceTree = "<group>"; };
 		D3622101A1B2C3D4E5F60718 /* EditableTextViewArrowKeyForwardingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableTextViewArrowKeyForwardingTests.swift; sourceTree = "<group>"; };
 		A7206C020000000000000001 /* EffectiveAppearanceObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectiveAppearanceObservation.swift; sourceTree = "<group>"; };
+		65C7EDFC4991B1F81EFEC79E /* EmailSignInSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/EmailSignInSection.swift; sourceTree = "<group>"; };
 		C11609000000000000000009 /* en */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = en; path = "en.lproj/cloud-agent-skill.md"; sourceTree = "<group>"; };
 		5732B0095732B0095732B009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/EnvironmentValues+MinimalModeInvalidationProbe.swift"; sourceTree = "<group>"; };
 		5732B0135732B0135732B013 /* EnvironmentValues+SidebarLazyContractProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/EnvironmentValues+SidebarLazyContractProbe.swift"; sourceTree = "<group>"; };
@@ -8153,6 +8156,7 @@
 		2451C5736A08D634760946D2 /* ShellXSidebarNameEffectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXSidebarNameEffectTests.swift"; sourceTree = "<group>"; };
 		E81EF0707F741B6C620A647A /* ShellXSidebarSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXSidebarSelectionTests.swift"; sourceTree = "<group>"; };
 		BB3F0B13A2B1144786869759 /* ShellXSidebarWaitingBorderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXSidebarWaitingBorderTests.swift"; sourceTree = "<group>"; };
+		7A7D40029BD5BC8E230CF9F8 /* ShellXSignInSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXSignInSheetTests.swift"; sourceTree = "<group>"; };
 		AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXSwitches.swift; sourceTree = "<group>"; };
 		0086129B06987F4A5CC88A52 /* ShellXTabActivitySyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXTabActivitySyncTests.swift"; sourceTree = "<group>"; };
 		0B157E03C649BE0CB191F7C8 /* ShellXThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXThemeTests.swift"; sourceTree = "<group>"; };
@@ -12757,6 +12761,7 @@
 				E2ECDB60B37189FB97D3AFD1 /* ShellXLinkTerminalViewSource.swift */,
 				A070661FDF313366163190FC /* ShellXLinkTerminalViewSource+Live.swift */,
 				F1DBE3000AAFB13402CECB23 /* ShellXLinkTerminalView+Live.swift */,
+				65C7EDFC4991B1F81EFEC79E /* EmailSignInSection.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14386,6 +14391,7 @@
 				723E1A8FA3865D682187CBA3 /* ShellXLinkTerminalViewSourceTests.swift */,
 				26E568B65909E3B282F5B0A2 /* ShellXLinkTerminalCreateTests.swift */,
 				F672858E7AF401175C10BB1B /* ShellXLinkTerminalSessionTests.swift */,
+				7A7D40029BD5BC8E230CF9F8 /* ShellXSignInSheetTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16218,6 +16224,7 @@
 				D10799040000000000000001 /* DragPasteboardCapabilityCleaner.swift in Sources */,
 				D75280040000000000000001 /* DynamicTracingSignpostInterval.swift in Sources */,
 				A7206C010000000000000001 /* EffectiveAppearanceObservation.swift in Sources */,
+				D688AC905B64AC31A79CFEBB /* EmailSignInSection.swift in Sources */,
 					5732A0095732A0095732A009 /* EnvironmentValues+MinimalModeInvalidationProbe.swift in Sources */,
 					5732A0135732A0135732A013 /* EnvironmentValues+SidebarLazyContractProbe.swift in Sources */,
 				E4C001000000000000000001 /* ExtensionSidebarWorkspaceRowView.swift in Sources */,
@@ -19491,6 +19498,7 @@
 				3065388AAFB47F2F3B52D356 /* ShellXSidebarNameEffectTests.swift in Sources */,
 				60C4D402ECE7067826019E69 /* ShellXSidebarSelectionTests.swift in Sources */,
 				87BF3219AA36F5CA473F1A51 /* ShellXSidebarWaitingBorderTests.swift in Sources */,
+				665D97024A5DF3B41BE81409 /* ShellXSignInSheetTests.swift in Sources */,
 				D970853DB80E245B62638483 /* ShellXTabActivitySyncTests.swift in Sources */,
 				B2C68350F29BD5759B40BE98 /* ShellXThemeTests.swift in Sources */,
 				1662FA327314C2564AB40E33 /* ShellXTitlebarModelTests.swift in Sources */,

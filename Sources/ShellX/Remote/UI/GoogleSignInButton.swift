@@ -9,6 +9,8 @@ struct GoogleSignInButton: View {
     typealias Spec = GoogleSignInButtonSpec
 
     let title: String
+    /// Return presses it. Off on the email-first sheet, where Return sends the code; on for the switch sheet.
+    var isDefaultAction = true
     let action: () -> Void
 
     /// The official mark (image set `GoogleG`) is in the app bundle; without it the button is text-only.
@@ -45,7 +47,7 @@ struct GoogleSignInButton: View {
             .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(.defaultAction)
+        .keyboardShortcut(isDefaultAction ? .defaultAction : nil)
         .accessibilityLabel(title)
     }
 }
