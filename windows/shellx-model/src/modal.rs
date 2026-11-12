@@ -370,6 +370,19 @@ mod tests {
     }
 
     #[test]
+    fn a_right_or_middle_press_only_closes_an_open_dropdown() {
+        // Right or middle while a dropdown shows: the press closes it and
+        // goes no further, so the terminal under it never pastes (review I2).
+        assert!(press_only_closes_dropdowns(false, true));
+        // The left button keeps its way: the dropdown closes itself on a
+        // press outside and the click still lands where it was aimed.
+        assert!(!press_only_closes_dropdowns(true, true));
+        // No dropdown: every press goes on as usual.
+        assert!(!press_only_closes_dropdowns(false, false));
+        assert!(!press_only_closes_dropdowns(true, false));
+    }
+
+    #[test]
     fn a_panel_opens_only_when_nothing_above_it_is_open() {
         // Drawing order, topmost first.
         let order = [
