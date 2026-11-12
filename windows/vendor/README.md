@@ -36,3 +36,4 @@ leave it alone).
 | Patch | Files | Reason | Commit |
 | --- | --- | --- | --- |
 | (d) | `build.rs` | The shader step was gated on the build host (`#[cfg(target_os = "windows")]`), so a cross build on Linux never compiled the HLSL and the release build failed at `include!(…/shaders_bytes.rs)`; the two host gates are removed, the match on `CARGO_CFG_TARGET_OS` already selects the target. Replaces the cross-build container's script that edited the registry copy. | `vendor(windows): gpui patch (d)` |
+| (a) | src/platform/windows/events.rs | A VK_PACKET key-up (SendInput KEYEVENTF_UNICODE: Unikey, EVKey, OpenKey, password managers) went through translate_message, which forges a WM_KEYDOWN, so the character came twice or with a stray one (R2 F1). Both key-up handlers return early for VK_PACKET with the value they returned before, without TranslateMessage. | vendor(windows): gpui patch (a) |
