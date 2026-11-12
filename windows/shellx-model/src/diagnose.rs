@@ -845,10 +845,11 @@ mod tests {
         let names: Vec<&str> = cmd.steps.iter().map(|s| s.name).collect();
         assert_eq!(names, ["echo", "unicode"]);
         // B-2 review m5: the cmd banner and prompts often hold "42"; the marker cannot.
+        // Final review m-b: the variable is a name no environment holds (not `x`).
         assert_eq!(
             (cmd.steps[0].input, cmd.steps[0].expect),
             (
-                "set /a x=6*7 >nul & call echo shellx-ok-%x%",
+                "set /a SHELLX_PROBE_7f3a=6*7 >nul & call echo shellx-ok-%SHELLX_PROBE_7f3a%",
                 "shellx-ok-42"
             )
         );
@@ -868,6 +869,22 @@ mod tests {
         for other in [Some(ShellKind::GitBash), Some(ShellKind::Wsl), None] {
             assert_eq!(probe_script(other), None, "{other:?}");
         }
+    }
+
+    #[test]
+    fn the_cmd_probe_variable_is_not_a_short_name() {
+        let cmd = probe_script(Some(ShellKind::Cmd)).unwrap();
+        let line = cmd.steps[0].input;
+        assert_eq!(cmd.steps[0].expect, "shellx-ok-42");
+        // `set /a NAME=` and `%NAME%`: the name must be long and unusual, never `x`/`X`.
+        let name = line
+            .split("set /a ")
+            .nth(1)
+            .and_then(|rest| rest.split('=').next())
+            .unwrap();
+        assert!(name.len() >= 12 && name.starts_with("SHELLX_PROBE_"), "{line}");
+        assert!(line.contains(&format!("%{name}%")), "{line}");
+        assert!(!line.contains("%x%") && !line.contains("%X%"), "{line}");
     }
 
     #[test]
