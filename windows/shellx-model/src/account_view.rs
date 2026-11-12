@@ -46,6 +46,24 @@ pub fn account_view(flow: &AccountFlow, google_available: bool, lang: Lang) -> A
     }
 }
 
+/// How the window asks for a sign-in outside Settings (Ruling 29): a line and a button above the
+/// sidebar's footer. The dialog never opens by itself: this notice is the only prompt, and the dialog
+/// opens when the person presses its button.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SignInNotice {
+    pub line: Str,
+    pub button: Str,
+}
+
+/// The notice after the server ended a session this flow had, until the next sign-in; else none.
+pub fn sign_in_notice(flow: &AccountFlow) -> Option<SignInNotice> {
+    let signed_in = matches!(flow.state(), AccountState::LoggedIn { .. });
+    (flow.session_ended_by_server() && !signed_in).then_some(SignInNotice {
+        line: Str::SessionExpired,
+        button: Str::SignInAgain,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

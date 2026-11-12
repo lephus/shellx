@@ -138,9 +138,7 @@ fn session_notice(
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Option<Div> {
-    if !account.read(cx).session_ended_by_server() {
-        return None;
-    }
+    let notice = account.read(cx).sign_in_notice()?;
     Some(
         div()
             .flex()
@@ -155,13 +153,13 @@ fn session_notice(
                 div()
                     .text_size(theme::SMALL_SIZE)
                     .text_color(theme::muted())
-                    .child(t(lang, Str::SessionExpired)),
+                    .child(t(lang, notice.line)),
             )
             .child(
                 div().flex().child(
                     button(
                         "sidebar-sign-in-again",
-                        t(lang, Str::SignInAgain),
+                        t(lang, notice.button),
                         Kind::Secondary,
                         false,
                     )

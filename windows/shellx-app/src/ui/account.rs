@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 
 use gpui::{Context, prelude::*};
 use shellx_model::account::{AccountAction, AccountEvent, AccountFlow, AccountState};
-use shellx_model::account_view::{AccountView, account_view};
+use shellx_model::account_view::{AccountView, SignInNotice, account_view, sign_in_notice};
 use shellx_model::core_api::{CoreCall, CoreErr, GooglePurpose, SignInMethod};
 use shellx_model::email_sign_in::EmailStep;
 use shellx_model::sidebar::MachineInfo;
@@ -366,10 +366,10 @@ impl AccountService {
         self.flow.removing_sign_in_method()
     }
 
-    /// The server ended the session: the sidebar and Settings show "Your session expired." with
-    /// "Sign in again" until the next sign-in. No dialog opens by itself (Ruling 29).
-    pub fn session_ended_by_server(&self) -> bool {
-        self.flow.session_ended_by_server()
+    /// The sidebar's "Sign in again" notice after a server sign-out, until the next sign-in. It is the
+    /// only prompt outside Settings: no dialog opens by itself (Ruling 29).
+    pub fn sign_in_notice(&self) -> Option<SignInNotice> {
+        sign_in_notice(&self.flow)
     }
 
     /// What Settings › Account draws, in `lang`.

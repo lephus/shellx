@@ -431,8 +431,9 @@ impl RootView {
         if close {
             self.close_all_remote(window, cx);
         }
-        // No dialog opens by itself (Ruling 29): after a server sign-out the sidebar and Settings show
-        // "Sign in again", and the keys being typed keep going to the shell.
+        // No dialog opens by itself (Ruling 29): after a server sign-out the sidebar shows the model's
+        // `account_view::sign_in_notice` (and Settings its view), and the keys being typed keep going to
+        // the shell.
     }
 
     /// Closes every remote session, then every remote pane through the
