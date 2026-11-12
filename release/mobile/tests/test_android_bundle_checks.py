@@ -91,11 +91,34 @@ class NativeLibraryTest(unittest.TestCase):
         example1 = elf64([(LOAD, 0, 0xCFAF0, 0x4000), (LOAD, 0xDFAF0, 0x4510, 0x4000), (RELRO, 0xDFAF0, 0x1510, 1)])
         example2 = elf64([(LOAD, 0, 0xCFAF0, 0x4000), (LOAD, 0xDFAF0, 0x3510, 0x4000), (RELRO, 0xDFAF0, 0x510, 1)])
         example4 = elf64([(LOAD, 0, 0x680, 0x4000), (LOAD, 0x4680, 0x980, 0x4000), (RELRO, 0x4680, 0x980, 1)])
-        self.assertEqual(["%s: GNU_RELRO ends at 0xe1000, inside a 16 KB page that also holds writable data" % entry],
+        self.assertEqual(["%s: GNU_RELRO 0xdfaf0-0xe1000 shares its 16 KB pages with other loaded data at 0xe1000-0xe4000" % entry],
                          cab.elf_problems(entry, example1))
         self.assertEqual([], cab.elf_problems(entry, example2))
         self.assertEqual([], cab.elf_problems(entry, ALIGNED))  # example 3: no GNU_RELRO
         self.assertEqual([], cab.elf_problems(entry, example4))
+
+    def test_relro_padded_past_its_load_is_safe_when_nothing_else_shares_the_pages(self):
+        entry = "base/lib/arm64-v8a/libpad.so"
+        arm64 = elf64([(LOAD, 0, 0x1C40, 0x4000), (LOAD, 0x5C40, 0x390, 0x4000), (LOAD, 0x9FD0, 0x10, 0x4000),
+                       (RELRO, 0x5C40, 0x3C0, 1)])
+        x86_64 = elf64([(LOAD, 0, 0x1EC0, 0x4000), (LOAD, 0x5EC0, 0x3A8, 0x4000), (LOAD, 0xA268, 0x10, 0x4000),
+                        (RELRO, 0x5EC0, 0x1140, 1)])
+        self.assertEqual([], cab.elf_problems(entry, arm64))
+        self.assertEqual([], cab.elf_problems(entry, x86_64))
+
+    def test_relro_sharing_a_page_with_other_loaded_data_is_refused(self):
+        entry = "base/lib/arm64-v8a/libshare.so"
+        bss_in_page = elf64([(LOAD, 0, 0x1C40, 0x4000), (LOAD, 0x5C40, 0x390, 0x4000), (LOAD, 0x6100, 0x10, 0x4000),
+                             (RELRO, 0x5C40, 0x3C0, 1)])
+        self.assertEqual(["%s: GNU_RELRO 0x5c40-0x6000 shares its 16 KB pages with other loaded data at "
+                          "0x6100-0x6110" % entry], cab.elf_problems(entry, bss_in_page))
+        rw_after = elf64([(LOAD, 0, 0x1C40, 0x4000), (LOAD, 0x5C40, 0x390, 0x4000), (LOAD, 0x7000, 0x100, 0x4000),
+                          (RELRO, 0x5C40, 0x390, 1)])
+        self.assertEqual(["%s: GNU_RELRO 0x5c40-0x5fd0 shares its 16 KB pages with other loaded data at "
+                          "0x7000-0x7100" % entry], cab.elf_problems(entry, rw_after))
+        starts_mid_load = elf64([(LOAD, 0, 0x1C40, 0x4000), (LOAD, 0x4100, 0x700, 0x4000), (RELRO, 0x4400, 0x400, 1)])
+        self.assertEqual(["%s: GNU_RELRO 0x4400-0x4800 shares its 16 KB pages with other loaded data at "
+                          "0x4100-0x4400" % entry], cab.elf_problems(entry, starts_mid_load))
 
     def test_a_library_that_is_not_elf_is_refused(self):
         self.assertEqual(["base/lib/arm64-v8a/libz.so: not an ELF shared library"],
