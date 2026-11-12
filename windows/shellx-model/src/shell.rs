@@ -17,6 +17,27 @@ pub enum ShellKind {
     Wsl,
 }
 
+/// The name a person knows a shell by (Settings, a pane that says what it started). Product
+/// names, the same in every language.
+pub fn kind_label(kind: ShellKind) -> &'static str {
+    match kind {
+        ShellKind::Pwsh => "PowerShell 7",
+        ShellKind::WindowsPowerShell => "Windows PowerShell",
+        ShellKind::Cmd => "Command Prompt",
+        ShellKind::GitBash => "Git Bash",
+        ShellKind::Wsl => "WSL",
+    }
+}
+
+/// A launch's name: its kind's, or for a custom command line the program's file name
+/// (`bash.exe`).
+pub fn launch_label(l: &ShellLaunch) -> String {
+    match l.kind {
+        Some(kind) => kind_label(kind).to_string(),
+        None => file_name(&l.program).to_string(),
+    }
+}
+
 /// A program to start in a pane. `kind` is `None` for a custom command line.
 /// `osc7_hook` says the arguments already carry the prompt hook that reports the
 /// working directory.
@@ -170,7 +191,7 @@ fn is_separator(c: char) -> bool {
 /// `X:\...`, `X:/...` or `\\server\...` (two separators, then a server name). An empty, `.`,
 /// relative, drive-relative (`C:x`) or bare `\\` path is not: the process would resolve it
 /// against whatever folder ShellX was started from.
-fn is_absolute(path: &str) -> bool {
+pub fn is_absolute(path: &str) -> bool {
     let c: Vec<char> = path.chars().take(3).collect();
     let drive = c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && is_separator(c[2]);
     let unc = c.len() == 3 && is_separator(c[0]) && is_separator(c[1]) && !is_separator(c[2]);
@@ -310,23 +331,23 @@ fn base(value: &Option<String>) -> Option<&str> {
         .map(|v| v.trim_end_matches('\\'))
 }
 
-fn powershell(kind: ShellKind, program: String) -> ShellLaunch {
-    ShellLaunch {
-        kind: Some(kind),
-        program,
-        args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK]
-            .map(String::from)
-            .to_vec(),
-        osc7_hook: true,
-    }
-}
-
-fn plain(kind: ShellKind, program: String, args: &[&str]) -> ShellLaunch {
+/// A known shell at `program`, with the arguments ShellX starts it with: PowerShell 7 and
+/// Windows PowerShell `-NoLogo -NoExit -Command <POWERSHELL_PROMPT_HOOK>`, Git Bash
+/// `--login -i`, Command Prompt and WSL none. The one place these lists are written.
+pub fn known_launch(kind: ShellKind, program: String) -> ShellLaunch {
+    let (args, osc7_hook): (&[&str], bool) = match kind {
+        ShellKind::Pwsh | ShellKind::WindowsPowerShell => (
+            &["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK],
+            true,
+        ),
+        ShellKind::GitBash => (&["--login", "-i"], false),
+        ShellKind::Cmd | ShellKind::Wsl => (&[], false),
+    };
     ShellLaunch {
         kind: Some(kind),
         program,
         args: args.iter().map(|a| a.to_string()).collect(),
-        osc7_hook: false,
+        osc7_hook,
     }
 }
 
@@ -342,12 +363,12 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         exists(&p).then_some(p)
     });
     if let Some(p) = pwsh {
-        found.push(powershell(ShellKind::Pwsh, p));
+        found.push(known_launch(ShellKind::Pwsh, p));
     }
 
     let winps = format!(r"{system_root}\System32\WindowsPowerShell\v1.0\powershell.exe");
     if exists(&winps) {
-        found.push(powershell(ShellKind::WindowsPowerShell, winps));
+        found.push(known_launch(ShellKind::WindowsPowerShell, winps));
     }
 
     let comspec = probe
@@ -361,7 +382,7 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         exists(&p).then_some(p)
     });
     if let Some(p) = cmd {
-        found.push(plain(ShellKind::Cmd, p, &[]));
+        found.push(known_launch(ShellKind::Cmd, p));
     }
 
     let git_candidates = [
@@ -369,12 +390,12 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         program_files.map(|f| format!(r"{f}\Git\bin\bash.exe")),
     ];
     if let Some(p) = git_candidates.into_iter().flatten().find(|p| exists(p)) {
-        found.push(plain(ShellKind::GitBash, p, &["--login", "-i"]));
+        found.push(known_launch(ShellKind::GitBash, p));
     }
 
     let wsl = format!(r"{system_root}\System32\wsl.exe");
     if exists(&wsl) {
-        found.push(plain(ShellKind::Wsl, wsl, &[]));
+        found.push(known_launch(ShellKind::Wsl, wsl));
     }
     found
 }
@@ -1242,6 +1263,44 @@ mod tests {
         let found = find_shells(&p, &ex);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].program, r"C:\Windows\System32\cmd.exe");
+    }
+
+    #[test]
+    fn shells_have_display_names() {
+        assert_eq!(kind_label(ShellKind::Pwsh), "PowerShell 7");
+        assert_eq!(
+            kind_label(ShellKind::WindowsPowerShell),
+            "Windows PowerShell"
+        );
+        assert_eq!(kind_label(ShellKind::Cmd), "Command Prompt");
+        assert_eq!(kind_label(ShellKind::GitBash), "Git Bash");
+        assert_eq!(kind_label(ShellKind::Wsl), "WSL");
+        // a found shell is named by its kind, whatever its file is called
+        let found = find_shells(&probe(), &exists_in(&ALL));
+        let labels: Vec<String> = found.iter().map(launch_label).collect();
+        assert_eq!(
+            labels,
+            [
+                "PowerShell 7",
+                "Windows PowerShell",
+                "Command Prompt",
+                "Git Bash",
+                "WSL"
+            ]
+        );
+        // a custom command line is named by its program's file
+        const GIT_BASH: &str = r"C:\Program Files\Git\bin\bash.exe";
+        let custom = custom_launch(GIT_BASH, &probe(), &exists_in(&[GIT_BASH])).unwrap();
+        assert_eq!(launch_label(&custom), "bash.exe");
+        let slashes = ShellLaunch {
+            kind: None,
+            program: "C:/tools/nu.exe".into(),
+            args: vec![],
+            osc7_hook: false,
+        };
+        assert_eq!(launch_label(&slashes), "nu.exe");
+        // the rule a caller needs for its own folder values
+        assert!(is_absolute(r"C:\Windows") && !is_absolute("Windows"));
     }
 
     #[test]

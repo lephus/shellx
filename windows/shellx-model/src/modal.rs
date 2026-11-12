@@ -7,13 +7,14 @@
 //! from Settings -> Account) draws over Settings. The dropdowns (the title
 //! bar "+ ▾" menu, the "?" help menu, the machines "+" list) are not panels:
 //! they never hold the keyboard, but a plain Esc while one is open closes
-//! them and goes nowhere else (`Panels::esc_closes_dropdowns`).
+//! them and goes nowhere else (`Panels::esc_closes_dropdowns`); so does a
+//! right or middle press (`press_only_closes_dropdowns`).
 //!
 //! Typed text is never swallowed (`Panels::root_key`): on Windows a key-down
 //! that was handled is not translated, so no WM_CHAR follows and the field
 //! (or the terminal) would never see the letter.
 
-use crate::keys::{AppCommand, KeyAction};
+use crate::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 
 /// A panel, topmost first in drawing order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -143,6 +144,50 @@ impl Panels {
                 _ => RootKey::Pass,
             },
         }
+    }
+}
+
+/// Whether a mouse press only closes the open dropdowns and goes nowhere
+/// else: a button other than the left one while a dropdown shows. A
+/// dropdown leaves the keyboard on the terminal, so a right click that
+/// dismisses it would otherwise also paste there. The root asks in the
+/// CAPTURE phase, before the terminal sees the press. A left press keeps
+/// its way: the dropdown closes itself and the click lands.
+pub fn press_only_closes_dropdowns(left_button: bool, dropdown_open: bool) -> bool {
+    dropdown_open && !left_button
+}
+
+/// What a key-down does in a pane without a shell (held by the respawn guard, or its shell
+/// could not start).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StoppedPaneKey {
+    /// A window command (close this pane, open a tab): it runs as in any pane.
+    Command(AppCommand),
+    /// Not the pane's: Alt+F4 and Alt+Space (Windows'), the Windows key, a modifier alone, a
+    /// key while the IME composes.
+    Pass,
+    /// Start the shell again.
+    Retry,
+    /// The auto-repeat of a held key: stopped, without a retry, so holding a key does not
+    /// start a shell thirty times a second (review m1).
+    Swallow,
+}
+
+/// The key-down rule of a pane without a shell: any fresh key retries, except window
+/// commands, the keys that are not the pane's and auto-repeats (`repeat`, GPUI's `is_held`).
+pub fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
+    let modifier_alone = matches!(
+        k.key.to_lowercase().as_str(),
+        "shift" | "control" | "ctrl" | "alt" | "platform" | "cmd" | "win" | "function" | "capslock"
+    );
+    match map_key(k, ctx) {
+        KeyAction::App(command) if !matches!(command, AppCommand::Copy | AppCommand::Paste) => {
+            StoppedPaneKey::Command(command)
+        }
+        KeyAction::Ignore => StoppedPaneKey::Pass,
+        _ if modifier_alone => StoppedPaneKey::Pass,
+        _ if repeat => StoppedPaneKey::Swallow,
+        _ => StoppedPaneKey::Retry,
     }
 }
 
@@ -367,6 +412,96 @@ mod tests {
         }
         assert_eq!(closed, [Panel::SignIn, Panel::Settings, Panel::Pairing]);
         assert!(p.allows_app_commands());
+    }
+
+    #[test]
+    fn a_pane_without_a_shell_retries_on_a_fresh_key_only() {
+        use crate::keys::{AppCommand, KeyCtx, KeyIn};
+        let key = |key, ctrl, alt, shift| KeyIn {
+            key,
+            ctrl,
+            alt,
+            shift,
+            win: false,
+        };
+        let idle = KeyCtx {
+            has_selection: false,
+            composing: false,
+        };
+        let a = key("a", false, false, false);
+        // a fresh key retries; its auto-repeat never does (review m1)
+        assert_eq!(stopped_pane_key(&a, &idle, false), StoppedPaneKey::Retry);
+        assert_eq!(stopped_pane_key(&a, &idle, true), StoppedPaneKey::Swallow);
+        let enter = key("enter", false, false, false);
+        assert_eq!(
+            stopped_pane_key(&enter, &idle, false),
+            StoppedPaneKey::Retry
+        );
+        assert_eq!(
+            stopped_pane_key(&enter, &idle, true),
+            StoppedPaneKey::Swallow
+        );
+        // Copy and Paste have nothing to act on: they retry like any key
+        let paste = key("v", true, false, true);
+        assert_eq!(
+            stopped_pane_key(&paste, &idle, false),
+            StoppedPaneKey::Retry
+        );
+        // window commands keep working (closing this pane among them)
+        let close = key("w", true, false, true);
+        assert_eq!(
+            stopped_pane_key(&close, &idle, false),
+            StoppedPaneKey::Command(AppCommand::ClosePane)
+        );
+        // Windows' own keys, the Windows key and an IME composition are not the pane's
+        for (k, ctx) in [
+            (key("f4", false, true, false), idle),
+            (key("space", false, true, false), idle),
+            (
+                KeyIn {
+                    win: true,
+                    ..key("e", false, false, false)
+                },
+                idle,
+            ),
+            (
+                a,
+                KeyCtx {
+                    composing: true,
+                    ..idle
+                },
+            ),
+        ] {
+            for repeat in [false, true] {
+                assert_eq!(
+                    stopped_pane_key(&k, &ctx, repeat),
+                    StoppedPaneKey::Pass,
+                    "{k:?} repeat {repeat}"
+                );
+            }
+        }
+        // a modifier alone
+        for name in ["shift", "control", "alt", "platform", "capslock"] {
+            let k = key(name, name == "control", name == "alt", name == "shift");
+            assert_eq!(
+                stopped_pane_key(&k, &idle, false),
+                StoppedPaneKey::Pass,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_right_or_middle_press_only_closes_an_open_dropdown() {
+        // Right or middle while a dropdown shows: the press closes it and
+        // goes no further, so the terminal under it never pastes (review I2).
+        assert!(press_only_closes_dropdowns(false, true));
+        // The left button keeps its way: the dropdown closes itself on a
+        // press outside and the click still lands where it was aimed.
+        assert!(!press_only_closes_dropdowns(true, true));
+        // No dropdown: every press goes on as usual.
+        assert!(!press_only_closes_dropdowns(false, false));
+        assert!(!press_only_closes_dropdowns(true, false));
     }
 
     #[test]

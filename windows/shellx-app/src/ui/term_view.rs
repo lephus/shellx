@@ -61,26 +61,36 @@ use std::sync::Arc;
 
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
+use shellx_model::modal::{StoppedPaneKey, stopped_pane_key};
+use shellx_model::mouse::{
+    PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, cap_to_screen,
+    secondary_click, wheel_action,
+};
 use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
+use shellx_model::paste::{ConfirmKey, PendingPaste, confirm_key, needs_paste_confirmation};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
-use shellx_model::strings::{Lang, Str, save_link_failed, t};
+use shellx_model::shell::ShellError;
+use shellx_model::strings::{
+    Lang, Str, paste_lines_prompt, save_link_failed, shell_fell_back, shell_plan_error, t,
+};
 
 use super::app::Services;
 use super::button::{Kind, button};
 use super::theme;
 use crate::fonts;
 use crate::ime::{self, ImeTarget};
-use crate::local_pty::{LocalPty, spawn_reader};
+use crate::local_pty::settings::{PaneStart, shells};
+use crate::local_pty::{LocalPty, PanePlan, command_prompt, spawn_reader};
 use crate::os_info;
 use crate::remote_link::{Applied, PaneEvent, Paste, RemoteMirror};
 use crate::remote_session::{RemotePane, RemoteSession, SessionStatus};
 use crate::remote_tabs::{OpenError, Overlay, Tone, coalesce, failed_overlay, overlay};
 use crate::shell_info::{BASE_TITLE, ScreenReaderProbe, a11y_title_env, window_title};
 use crate::term_core::{PtyLink, TermCore, rgb};
-use crate::workspace::spawn_local_pane;
+use crate::workspace::spawn_local_pane_with;
 
 /// What a pane tells RootView.
 pub(super) enum TermEvent {
@@ -244,7 +254,7 @@ pub(super) struct TermView {
     font: Font,
     backend: Backend,
     /// The local shell could not start (drawn instead of the grid).
-    error: Option<String>,
+    failure: Option<StartProblem>,
     /// A held pane (`RespawnGuard`): the shell kept exiting as it started,
     /// so none runs; the pane shows why and waits for a retry.
     held: bool,
@@ -254,6 +264,9 @@ pub(super) struct TermView {
     /// ngừng nhập"), cleared after `FLASH`.
     flash: Option<String>,
     flash_seq: u64,
+    /// Clipboard text of several lines waiting for "Dán" (Enter) or "Hủy"
+    /// (Esc): the bar at the bottom of the pane asks.
+    pending_paste: Option<PendingPaste>,
     /// IME composition text (preedit), shown inline at the cursor and never
     /// sent to the PTY until committed.
     marked: Option<String>,
@@ -267,6 +280,8 @@ pub(super) struct TermView {
     cell_lines: Vec<String>,
     /// Scale factor the metrics were last computed at.
     scale: f32,
+    /// Wheel and touchpad lines not scrolled yet (fractions of a line).
+    scroll: ScrollAccumulator,
     _window_bounds: Subscription,
     cell_width: Pixels,
     line_height: Pixels,
@@ -288,11 +303,12 @@ impl TermView {
             focus_handle: cx.focus_handle(),
             font: terminal_font(),
             backend: Backend::None,
-            error: None,
+            failure: None,
             held: false,
             failed: None,
             flash: None,
             flash_seq: 0,
+            pending_paste: None,
             marked: None,
             marked_selection: None,
             selection: None,
@@ -300,6 +316,7 @@ impl TermView {
             grid: None,
             cell_lines: Vec::new(),
             scale: window.scale_factor(),
+            scroll: ScrollAccumulator::default(),
             _window_bounds: window_bounds,
             cell_width: px(8.0),
             line_height: px(18.0),
@@ -307,68 +324,130 @@ impl TermView {
         }
     }
 
-    /// A local pane: PowerShell (or `SHELLX_SHELL`) on ConPTY.
+    /// A local pane on ConPTY: the shell `shells()` plans for a new pane
+    /// (Auto, the stored choice or `SHELLX_SHELL`), or its one fallback.
     pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
-        match spawn_local_pane(80, 24, &[]) {
-            Ok(started) => {
-                let (link, core, reader) = (started.link, started.core, started.reader);
-                view.backend = Backend::Local { core, link };
-                let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
-                spawn_reader(reader, move |bytes| tx.send_blocking(bytes).is_ok());
-                cx.spawn(async move |this, cx| {
-                    while let Ok(mut batch) = rx.recv().await {
-                        while let Ok(more) = rx.try_recv() {
-                            batch.extend_from_slice(&more);
-                        }
-                        let fed = this.update(cx, |view, cx| {
-                            let newline = batch.contains(&b'\n');
-                            view.follow_viewport(newline, |backend| {
-                                if let Some(core) = backend.core() {
-                                    core.feed(&batch);
-                                }
-                            });
-                            cx.notify();
-                        });
-                        if fed.is_err() {
-                            return;
-                        }
-                    }
-                })
-                .detach();
-                // ConPTY keeps its output pipe open after the shell exits, so
-                // poll the child (and the sticky write-failure flag) and tell
-                // RootView, which closes this pane through the tabs model.
-                cx.spawn(async move |this, cx| {
-                    loop {
-                        cx.background_executor()
-                            .timer(Duration::from_millis(500))
-                            .await;
-                        let exited = this.update(cx, |view, cx| {
-                            let exited = matches!(
-                                &view.backend,
-                                Backend::Local { link, .. } if link.is_closed()
-                            );
-                            if exited {
-                                cx.emit(TermEvent::Exited);
-                            }
-                            exited
-                        });
-                        // Err: the pane was dropped (closed by RootView).
-                        if exited.unwrap_or(true) {
-                            return;
-                        }
-                    }
-                })
-                .detach();
-            }
-            Err(error) => view.error = Some(format!("{error:#}")),
+        view.start_local(shells().pane_start(), cx);
+        // Development only (Ruling 24): every new pane asks about a 3-line paste.
+        #[cfg(target_os = "macos")]
+        if std::env::var("SHELLX_DEV_PREVIEW").as_deref() == Ok("paste") {
+            view.pending_paste = Some(PendingPaste::new("echo 1\necho 2\necho 3\n".into()));
         }
         view
     }
 
-    /// A held pane: no shell; "Shell thoát ngay khi khởi động. Kiểm tra
-    /// SHELLX_SHELL." and "Thử lại". Any key or the button sends `Retry`.
+    /// Starts a local shell in this pane (`new`, Retry, "Mở Command Prompt"):
+    /// the plan's first program, else its fallback once; then the pane says
+    /// which shell runs instead of the one asked for. When none starts (or
+    /// the plan names none) the pane shows why, with Retry and Command
+    /// Prompt (design §4.4).
+    fn start_local(&mut self, start: Result<PaneStart, ShellError>, cx: &mut Context<Self>) {
+        self.held = false;
+        self.failure = None;
+        cx.notify();
+        let start = match start {
+            Ok(start) => start,
+            Err(error) => {
+                self.failure = Some(StartProblem::Plan(error));
+                return;
+            }
+        };
+        let started = match spawn_local_pane_with(&start.plan, 80, 24, &[]) {
+            Ok(started) => started,
+            Err(failure) => {
+                self.failure = Some(StartProblem::Spawn(failure.lines()));
+                return;
+            }
+        };
+        let tried = start
+            .instead_of
+            .or(started.fell_back.map(|(label, _)| label));
+        if let Some(tried) = tried {
+            let lang = cx.global::<Services>().lang;
+            self.flash(shell_fell_back(lang, &tried, &started.used), cx);
+        }
+        let started = started.pane;
+        let (link, core, reader) = (started.link, started.core, started.reader);
+        self.backend = Backend::Local { core, link };
+        let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
+        spawn_reader(reader, move |bytes| tx.send_blocking(bytes).is_ok());
+        cx.spawn(async move |this, cx| {
+            while let Ok(mut batch) = rx.recv().await {
+                while let Ok(more) = rx.try_recv() {
+                    batch.extend_from_slice(&more);
+                }
+                let fed = this.update(cx, |view, cx| {
+                    let newline = batch.contains(&b'\n');
+                    view.follow_viewport(newline, |backend| {
+                        if let Some(core) = backend.core() {
+                            core.feed(&batch);
+                        }
+                    });
+                    cx.notify();
+                });
+                if fed.is_err() {
+                    return;
+                }
+            }
+        })
+        .detach();
+        // ConPTY keeps its output pipe open after the shell exits, so
+        // poll the child (and the sticky write-failure flag) and tell
+        // RootView, which closes this pane through the tabs model.
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(500))
+                    .await;
+                let exited = this.update(cx, |view, cx| {
+                    let exited = matches!(
+                        &view.backend,
+                        Backend::Local { link, .. } if link.is_closed()
+                    );
+                    if exited {
+                        cx.emit(TermEvent::Exited);
+                    }
+                    exited
+                });
+                // Err: the pane was dropped (closed by RootView).
+                if exited.unwrap_or(true) {
+                    return;
+                }
+            }
+        })
+        .detach();
+    }
+
+    /// Retry from a pane without a shell: a held pane asks RootView (the
+    /// guard clears its history), a failed one starts again in place from
+    /// the cached plan.
+    fn retry(&mut self, cx: &mut Context<Self>) {
+        if self.held {
+            cx.emit(TermEvent::Retry);
+        } else {
+            self.start_local(shells().pane_start(), cx);
+        }
+    }
+
+    /// "Mở Command Prompt" in a held or failed pane: starts it in place.
+    fn open_command_prompt(&mut self, cx: &mut Context<Self>) {
+        let plan = PanePlan {
+            first: command_prompt(),
+            fallback: None,
+        };
+        self.start_local(
+            Ok(PaneStart {
+                plan,
+                instead_of: None,
+            }),
+            cx,
+        );
+    }
+
+    /// A held pane (`RespawnGuard`): no shell; "Shell thoát ngay khi khởi
+    /// động…", "Thử lại" (any key too: `Retry` to RootView) and "Mở Command
+    /// Prompt" (starts it in place).
     pub(super) fn new_held(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
         view.held = true;
@@ -560,18 +639,40 @@ impl TermView {
         self.clear_selection(cx);
     }
 
-    /// Clipboard text as data: `TermCore::paste` normalizes newlines, strips
-    /// embedded `ESC[200~` / `ESC[201~` and brackets only under mode 2004.
-    /// A remote pane that is not attached refuses it (never queued).
+    /// The one way a paste starts (Ctrl+Shift+V, Shift+Insert, right click,
+    /// RootView's fallback; Ruling 20). Text of more than one line for a
+    /// shell without bracketed paste waits for the person to confirm it
+    /// (R2 F18); anything else is pasted at once. A remote pane that is not
+    /// attached refuses it (never queued).
     fn paste_clipboard(&mut self, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             return;
         };
+        if self.backend.input_refused() {
+            self.flash_input_paused(cx);
+            return;
+        }
+        let Some(bracketed) = self.backend.core().map(|core| core.bracketed_paste()) else {
+            return;
+        };
+        if needs_paste_confirmation(&text, bracketed) {
+            self.pending_paste = Some(PendingPaste::new(text));
+            cx.notify();
+        } else {
+            self.paste_now(&text, cx);
+        }
+    }
+
+    /// Clipboard text as data: `TermCore::paste` normalizes newlines, strips
+    /// embedded `ESC[200~` / `ESC[201~` and brackets only under mode 2004.
+    fn paste_now(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.pending_paste = None;
+        cx.notify();
         match &mut self.backend {
             Backend::None => {}
-            Backend::Local { core, .. } => core.paste(&text),
+            Backend::Local { core, .. } => core.paste(text),
             // Refused whole when not attached or over 8 MiB encoded.
-            Backend::Remote(remote) => match remote.mirror.paste(&text) {
+            Backend::Remote(remote) => match remote.mirror.paste(text) {
                 Paste::Sent => {}
                 Paste::Refused => {
                     self.flash_input_paused(cx);
@@ -585,6 +686,18 @@ impl TermView {
             },
         }
         self.clear_selection(cx);
+        cx.notify();
+    }
+
+    /// "Dán" or Enter on the paste question: the waiting text goes in.
+    fn confirm_paste(&mut self, cx: &mut Context<Self>) {
+        if let Some(pending) = self.pending_paste.take() {
+            self.paste_now(&pending.into_text(), cx);
+        }
+    }
+
+    fn cancel_paste(&mut self, cx: &mut Context<Self>) {
+        self.pending_paste = None;
         cx.notify();
     }
 
@@ -733,12 +846,26 @@ impl TermView {
         self.drag = None;
     }
 
-    fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if self.held {
-            cx.emit(TermEvent::Retry);
-            cx.stop_propagation();
-            return;
+    /// Right and middle clicks as in the Windows console (`mouse::secondary_click`,
+    /// R2 F4, F10). "Focused" is read before anything moves the keyboard: GPUI
+    /// runs this listener before its own focus-on-click (Ruling 21), so a first
+    /// click on another pane only focuses it.
+    fn secondary_click(
+        &mut self,
+        button: SecondaryButton,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focused = self.focus_handle.is_focused(window);
+        match secondary_click(button, focused, self.has_selection()) {
+            PaneClick::FocusOnly => window.focus(&self.focus_handle),
+            PaneClick::Paste => self.paste_clipboard(cx),
+            PaneClick::CopySelection => self.copy_selection(cx),
+            PaneClick::Nothing => {}
         }
+    }
+
+    fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;
         let key = KeyIn {
@@ -753,6 +880,40 @@ impl TermView {
             // The IME owns keys while composing (map_key ignores them).
             composing: self.composing(),
         };
+        // No shell runs (held, or it could not start): a fresh key retries
+        // (`modal::stopped_pane_key`; never its auto-repeat).
+        if self.held || self.failure.is_some() {
+            match stopped_pane_key(&key, &ctx, event.is_held) {
+                StoppedPaneKey::Command(command) => {
+                    cx.emit(TermEvent::Command(command));
+                    cx.stop_propagation();
+                }
+                StoppedPaneKey::Pass => {}
+                StoppedPaneKey::Retry => {
+                    self.retry(cx);
+                    cx.stop_propagation();
+                }
+                StoppedPaneKey::Swallow => cx.stop_propagation(),
+            }
+            return;
+        }
+        // A paste waits for Enter or Esc; any other key drops it and goes on.
+        // While the IME composes, the question stays.
+        if self.pending_paste.is_some() && !ctx.composing {
+            match confirm_key(&key) {
+                ConfirmKey::Confirm => {
+                    self.confirm_paste(cx);
+                    cx.stop_propagation();
+                    return;
+                }
+                ConfirmKey::Cancel => {
+                    self.cancel_paste(cx);
+                    cx.stop_propagation();
+                    return;
+                }
+                ConfirmKey::CancelAndPass => self.cancel_paste(cx),
+            }
+        }
         match map_key(&key, &ctx) {
             KeyAction::App(command @ (AppCommand::Copy | AppCommand::Paste)) => {
                 self.clipboard_command(command, cx);
@@ -783,16 +944,42 @@ impl TermView {
         }
     }
 
+    /// The wheel and the touchpad (`mouse::wheel_action`): the fractions of a
+    /// line a touchpad sends add up in this pane's accumulator (R2 F2); the
+    /// primary screen scrolls its history, a full-screen program gets cursor
+    /// keys unless it asked for mouse reporting (R2 F13).
     fn on_scroll(&mut self, event: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let Some((modes, rows)) = self.backend.core().map(|core| {
+            let modes = ScreenModes {
+                alternate: core.alternate_screen(),
+                mouse_reporting: core.mouse_tracking(),
+            };
+            (modes, core.size().1)
+        }) else {
+            return;
+        };
         let delta = event.delta.pixel_delta(self.line_height);
-        let lines = (f32::from(delta.y) / f32::from(self.line_height)).round() as isize;
-        if lines != 0 && !matches!(self.backend, Backend::None) {
-            self.follow_viewport(false, |backend| {
-                if let Some(core) = backend.core() {
-                    core.scroll_lines(-lines);
+        let lines = f64::from(f32::from(delta.y) / f32::from(self.line_height));
+        // at most one screen per event (review M8)
+        match cap_to_screen(wheel_action(self.scroll.add(lines), modes), rows) {
+            WheelAction::None => {}
+            WheelAction::Scrollback(n) => {
+                self.follow_viewport(false, |backend| {
+                    if let Some(core) = backend.core() {
+                        core.scroll_lines(-(n as isize));
+                    }
+                });
+                cx.notify();
+            }
+            // The encoder honours the program's cursor-key mode (DECCKM); a
+            // remote link that is not attached drops the keys.
+            WheelAction::Arrows { key, count } => {
+                if let Some(core) = self.backend.core() {
+                    for _ in 0..count {
+                        core.send_chord(key);
+                    }
                 }
-            });
-            cx.notify();
+            }
         }
     }
 }
@@ -862,9 +1049,18 @@ fn status_pill(pill: &Overlay, lang: Lang) -> Div {
         .child(card)
 }
 
-/// What a held pane shows instead of a terminal: the reason, a hint and
-/// "Thử lại".
-fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
+/// Why a local pane has no shell, drawn instead of the grid.
+enum StartProblem {
+    /// The plan names no shell (`strings::shell_plan_error`).
+    Plan(ShellError),
+    /// No program of the plan started: "label: reason" per attempt.
+    Spawn(Vec<String>),
+}
+
+/// What a pane without a shell shows (held, or its shell could not start):
+/// why in the error colour, one muted line per program tried, the hint, then
+/// "Thử lại" and "Mở Command Prompt".
+fn start_message(lang: Lang, why: String, tried: Vec<String>, cx: &mut Context<TermView>) -> Div {
     div()
         .flex()
         .flex_col()
@@ -872,11 +1068,13 @@ fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
         .p(px(16.0))
         .font(theme::ui_font())
         .text_size(theme::UI_SIZE)
-        .child(
+        .child(div().text_color(theme::hsla(ERROR)).child(why))
+        .children(tried.into_iter().map(|line| {
             div()
-                .text_color(theme::hsla(ERROR))
-                .child(t(lang, Str::ShellExitsAtStart)),
-        )
+                .text_size(theme::SMALL_SIZE)
+                .text_color(theme::muted())
+                .child(line)
+        }))
         .child(
             div()
                 .text_size(theme::SMALL_SIZE)
@@ -884,10 +1082,85 @@ fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
                 .child(t(lang, Str::PressAnyKeyToRetry)),
         )
         .child(
-            div().flex().child(
-                button("held-retry", t(lang, Str::Retry), Kind::Primary, false)
-                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TermEvent::Retry))),
-            ),
+            div()
+                .flex()
+                .gap(px(8.0))
+                .child(
+                    button("held-retry", t(lang, Str::Retry), Kind::Primary, false)
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.retry(cx))),
+                )
+                .child(
+                    button(
+                        "held-cmd",
+                        t(lang, Str::OpenCommandPrompt),
+                        Kind::Secondary,
+                        false,
+                    )
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_command_prompt(cx);
+                    })),
+                ),
+        )
+}
+
+/// The multi-line paste question at the bottom of a pane (R2 F18): how many
+/// lines would run, "Dán" and "Hủy", and the keys that answer. It occludes
+/// the grid, so a click on it never starts a selection.
+fn paste_bar(lang: Lang, lines: usize, cx: &mut Context<TermView>) -> Div {
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .bottom(px(12.0))
+        .flex()
+        .justify_center()
+        .child(
+            div()
+                .id("paste-bar")
+                .occlude()
+                .flex()
+                .flex_col()
+                .gap(px(8.0))
+                .mx(px(16.0))
+                .px(px(14.0))
+                .py(px(10.0))
+                .rounded(px(10.0))
+                .border_1()
+                .border_color(theme::border())
+                .bg(theme::raise())
+                .font(theme::ui_font())
+                .text_size(theme::UI_SIZE)
+                .child(
+                    div()
+                        .text_color(theme::text_hi())
+                        .child(paste_lines_prompt(lang, lines)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(8.0))
+                        .child(
+                            button("paste-confirm", t(lang, Str::Paste), Kind::Primary, false)
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.confirm_paste(cx);
+                                })),
+                        )
+                        .child(
+                            button("paste-cancel", t(lang, Str::Cancel), Kind::Secondary, false)
+                                .on_click(
+                                    cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        this.cancel_paste(cx)
+                                    }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_size(theme::SMALL_SIZE)
+                                .text_color(theme::muted())
+                                .child(t(lang, Str::PasteConfirmKeys)),
+                        ),
+                ),
         )
 }
 
@@ -926,6 +1199,7 @@ impl Render for TermView {
             _ => self.failed.clone(),
         };
         let flash = self.flash.clone();
+        let pending = self.pending_paste.as_ref().map(PendingPaste::lines);
         let root = div()
             .relative()
             .size_full()
@@ -942,14 +1216,36 @@ impl Render for TermView {
                 cx.listener(|this, _: &MouseDownEvent, window, _| {
                     window.focus(&this.focus_handle);
                 }),
+            )
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    this.secondary_click(SecondaryButton::Right, window, cx);
+                }),
+            )
+            .on_mouse_down(
+                MouseButton::Middle,
+                cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    this.secondary_click(SecondaryButton::Middle, window, cx);
+                }),
             );
-        let root = match &self.error {
-            _ if self.held => root.child(held_message(lang, cx)),
-            Some(error) => root.child(format!("Could not start the shell: {error}")),
+        let problem = match &self.failure {
+            _ if self.held => Some((t(lang, Str::ShellExitsAtStart).to_string(), Vec::new())),
+            Some(StartProblem::Plan(error)) => Some((shell_plan_error(lang, error), Vec::new())),
+            Some(StartProblem::Spawn(tried)) => {
+                Some((t(lang, Str::ShellCannotStart).to_string(), tried.clone()))
+            }
+            None => None,
+        };
+        let root = match problem {
+            Some((why, tried)) => root.child(start_message(lang, why, tried, cx)),
             None => root.child(TermElement { view: cx.entity() }),
         };
         root.children(pill.map(|pill| status_pill(&pill, lang)))
-            .children(flash.map(flash_line))
+            .children(match pending {
+                Some(lines) => Some(paste_bar(lang, lines, cx)),
+                None => flash.map(flash_line),
+            })
     }
 }
 

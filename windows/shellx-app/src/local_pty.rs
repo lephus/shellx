@@ -1,5 +1,6 @@
 //! The local byte link: a ConPTY (via cmux-pty / portable-pty) running a
-//! shell. `TermCore` talks to it only through `PtyLink`.
+//! shell. `TermCore` talks to it only through `PtyLink`. Which shell, and the
+//! one to try instead: `settings` and `PanePlan`.
 
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -7,8 +8,13 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context as _, Result};
 use cmux_pty::{Child, MasterPty, PtyCommand, PtySize};
+use shellx_model::shell::{
+    LaunchPlan, ShellKind, ShellLaunch, ShellProbe, is_absolute, known_launch, launch_label,
+};
 
 use crate::term_core::PtyLink;
+
+pub mod settings;
 
 pub struct LocalPty {
     writer: Mutex<Box<dyn Write + Send>>,
@@ -161,9 +167,25 @@ pub struct ShellCmd {
     pub program: String,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
+    /// The name a person knows it by: "PowerShell 7", or a custom line's file ("bash.exe").
+    pub label: String,
+    /// `None`: a custom command line, `SHELLX_SHELL`, or the Mac's bash.
+    pub kind: Option<ShellKind>,
 }
 
 impl ShellCmd {
+    /// A catalogue entry or a custom line as given (PowerShell's arguments carry the OSC 7
+    /// prompt hook); no extra environment.
+    pub fn from_launch(l: &ShellLaunch) -> ShellCmd {
+        ShellCmd {
+            program: l.program.clone(),
+            args: l.args.clone(),
+            env: Vec::new(),
+            label: launch_label(l),
+            kind: l.kind,
+        }
+    }
+
     /// `args` with `extra` added. PowerShell's `-Command` takes everything
     /// after it as the script, so `extra` goes before that flag.
     fn args_with(&self, extra: &[&str]) -> Vec<String> {
@@ -195,84 +217,106 @@ impl ShellCmd {
     }
 }
 
-/// PowerShell: wrap the profile's `prompt` so the working directory (OSC 7)
-/// is written at every prompt. The wrapper calls the original FIRST, so a
-/// theme (oh-my-posh, starship) still reads the real `$?` of the user's last
-/// command, and writes OSC 7 after it. Without a `prompt` function the
-/// fallback writes OSC 7 and returns the stock `PS <path>> `. The profile
-/// still loads (`-Command` runs after it).
-const POWERSHELL_HOOK: &str = r#"if ($function:prompt) { $__shellxPrompt = $function:prompt; function global:prompt { $p = & $__shellxPrompt; $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; $p } } else { function global:prompt { $l = $ExecutionContext.SessionState.Path.CurrentLocation; if ($l.Provider.Name -eq 'FileSystem') { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($l.ProviderPath -replace '\\','/') + [char]27 + '\') }; "PS $($l.Path)> " } }"#;
+/// What a new pane starts, and the one shell it starts instead when that program cannot be
+/// started (Ruling 15: a shell that starts and exits is `RespawnGuard`'s).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanePlan {
+    pub first: ShellCmd,
+    pub fallback: Option<ShellCmd>,
+}
 
-/// bash (the macOS dev harness): the same OSC 7 before every prompt.
-const BASH_PROMPT_COMMAND: &str = r#"printf '\033]7;file://%s%s\033\\' "$HOSTNAME" "$PWD""#;
-
-/// `override_shell` is `SHELLX_SHELL`: that program, no args, no env.
-fn shell_cmd(override_shell: Option<&str>) -> ShellCmd {
-    if let Some(shell) = override_shell
-        && !shell.trim().is_empty()
-    {
-        return ShellCmd {
-            program: shell.to_string(),
-            args: Vec::new(),
-            env: Vec::new(),
-        };
-    }
-    if cfg!(windows) {
-        ShellCmd {
-            program: "powershell.exe".to_string(),
-            args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_HOOK]
-                .map(String::from)
-                .to_vec(),
-            env: Vec::new(),
-        }
-    } else {
-        ShellCmd {
-            program: "/bin/bash".to_string(),
-            args: ["--noprofile", "--norc", "-i"].map(String::from).to_vec(),
-            env: vec![(
-                "PROMPT_COMMAND".to_string(),
-                BASH_PROMPT_COMMAND.to_string(),
-            )],
+impl PanePlan {
+    pub fn from_plan(plan: &LaunchPlan) -> PanePlan {
+        PanePlan {
+            first: ShellCmd::from_launch(&plan.first),
+            fallback: plan.fallback.as_ref().map(ShellCmd::from_launch),
         }
     }
 }
 
-/// PowerShell on Windows (override with SHELLX_SHELL), bash elsewhere; both
-/// report the working directory with OSC 7 (`TermCore::pwd`).
+/// bash (the macOS dev harness): the same OSC 7 before every prompt.
+const BASH_PROMPT_COMMAND: &str = r#"printf '\033]7;file://%s%s\033\\' "$HOSTNAME" "$PWD""#;
+
+/// The macOS development harness's shell (Ruling 19): bash with the OSC 7
+/// `PROMPT_COMMAND`, or `override_shell` (`SHELLX_SHELL`): that program, no
+/// arguments, no environment.
+pub(crate) fn dev_bash(override_shell: Option<&str>) -> ShellCmd {
+    if let Some(shell) = override_shell.filter(|s| !s.trim().is_empty()) {
+        return ShellCmd::from_launch(&ShellLaunch {
+            kind: None,
+            program: shell.to_string(),
+            args: Vec::new(),
+            osc7_hook: false,
+        });
+    }
+    ShellCmd {
+        program: "/bin/bash".to_string(),
+        args: ["--noprofile", "--norc", "-i"].map(String::from).to_vec(),
+        env: vec![(
+            "PROMPT_COMMAND".to_string(),
+            BASH_PROMPT_COMMAND.to_string(),
+        )],
+        label: "bash".to_string(),
+        kind: None,
+    }
+}
+
+/// What a new tab starts first (`--smoke` runs it): the first shell of
+/// `shells().plan_for_new_pane()`, or Windows PowerShell by its System32
+/// path when the plan is an error. On the Mac: bash.
 pub fn default_shell() -> ShellCmd {
-    shell_cmd(std::env::var("SHELLX_SHELL").ok().as_deref())
+    let shells = settings::shells();
+    match shells.plan_for_new_pane() {
+        Ok(plan) => plan.first,
+        Err(_) => settings::startup_plan(&shells.probe()).first,
+    }
+}
+
+/// Command Prompt, for a pane whose shell cannot start: the catalogue's, as
+/// cached by the last lookup. On the Mac: `/bin/sh -i`.
+pub fn command_prompt() -> ShellCmd {
+    if cfg!(windows) {
+        let shells = settings::shells();
+        command_prompt_for(&shells.snapshot().found, &shells.probe())
+    } else {
+        ShellCmd {
+            program: "/bin/sh".to_string(),
+            args: vec!["-i".to_string()],
+            env: Vec::new(),
+            label: "sh".to_string(),
+            kind: None,
+        }
+    }
+}
+
+/// The catalogue's Command Prompt, else `%ComSpec%` when it is an absolute
+/// path, else `%SystemRoot%\System32\cmd.exe` (`C:\Windows` when SystemRoot
+/// is not absolute). No file is checked: CreateProcess says when it is missing.
+pub fn command_prompt_for(found: &[ShellLaunch], probe: &ShellProbe) -> ShellCmd {
+    if let Some(cmd) = found.iter().find(|l| l.kind == Some(ShellKind::Cmd)) {
+        return ShellCmd::from_launch(cmd);
+    }
+    let program = probe
+        .comspec
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| is_absolute(c))
+        .map(String::from)
+        .unwrap_or_else(|| format!(r"{}\System32\cmd.exe", settings::system_root(probe)));
+    ShellCmd::from_launch(&known_launch(ShellKind::Cmd, program))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn default_shell_has_the_osc7_hook() {
-        let shell = shell_cmd(None);
-        if cfg!(windows) {
-            assert_eq!(shell.program, "powershell.exe");
-            assert!(shell.args.iter().any(|a| a == "-NoExit"));
-            assert!(shell.args.iter().any(|a| a == POWERSHELL_HOOK));
-            assert!(POWERSHELL_HOOK.contains("]7;file://"));
-            assert!(shell.env.is_empty());
-        } else {
-            assert_eq!(shell.program, "/bin/bash");
-            let prompt_command = shell
-                .env
-                .iter()
-                .find(|(key, _)| key == "PROMPT_COMMAND")
-                .map(|(_, value)| value.as_str())
-                .expect("PROMPT_COMMAND is set");
-            assert!(prompt_command.contains("]7;file://"));
-        }
-    }
+    use shellx_model::shell::POWERSHELL_PROMPT_HOOK;
 
     /// Themes (oh-my-posh, starship) read `$?` first in their prompt, so the
     /// wrapper must call the original before it runs any statement of its own.
+    /// (The hook now comes with the model's PowerShell launch arguments.)
     #[test]
     fn powershell_hook_runs_the_users_prompt_first() {
-        let (_, wrapped) = POWERSHELL_HOOK
+        let (_, wrapped) = POWERSHELL_PROMPT_HOOK
             .split_once("function global:prompt { ")
             .unwrap();
         assert!(
@@ -285,7 +329,7 @@ mod tests {
         assert!(called < osc7);
         assert!(wrapped.contains("}; $p }"));
         // Without a prompt function the fallback still reports the directory.
-        let (_, fallback) = POWERSHELL_HOOK.split_once("} else { ").unwrap();
+        let (_, fallback) = POWERSHELL_PROMPT_HOOK.split_once("} else { ").unwrap();
         assert!(fallback.contains("]7;file://") && fallback.contains("\"PS $($l.Path)> \""));
     }
 
@@ -302,7 +346,7 @@ mod tests {
 
         let tmp = tempfile::tempdir().unwrap();
         let dir = std::fs::canonicalize(tmp.path()).unwrap();
-        let (link, reader) = shell_cmd(None).spawn(&[], 80, 24).unwrap();
+        let (link, reader) = dev_bash(None).spawn(&[], 80, 24).unwrap();
         let (tx, rx) = mpsc::channel();
         spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
         let mut core = TermCore::new(link.clone(), 80, 24).unwrap();
@@ -323,12 +367,13 @@ mod tests {
     }
 
     #[test]
-    fn shellx_shell_overrides_without_args_or_env() {
-        let shell = shell_cmd(Some("C:\\tools\\nu.exe"));
-        assert_eq!(shell.program, "C:\\tools\\nu.exe");
+    fn the_mac_shellx_shell_overrides_without_args_or_env() {
+        let shell = dev_bash(Some("/opt/homebrew/bin/nu"));
+        assert_eq!(shell.program, "/opt/homebrew/bin/nu");
         assert!(shell.args.is_empty() && shell.env.is_empty());
+        assert_eq!(shell.label, "nu");
         // A blank override is no override.
-        assert_ne!(shell_cmd(Some("  ")).program, "  ");
+        assert_eq!(dev_bash(Some("  ")).program, "/bin/bash");
     }
 
     #[test]
@@ -339,12 +384,14 @@ mod tests {
                 .map(String::from)
                 .to_vec(),
             env: Vec::new(),
+            label: "Windows PowerShell".into(),
+            kind: Some(ShellKind::WindowsPowerShell),
         };
         assert_eq!(
             shell.args_with(&["-NoProfile"]),
             ["-NoLogo", "-NoExit", "-NoProfile", "-Command", "script"]
         );
-        let bash = shell_cmd(Some("/bin/zsh"));
+        let bash = dev_bash(Some("/bin/zsh"));
         assert_eq!(bash.args_with(&["-x"]), ["-x"]);
     }
 }
