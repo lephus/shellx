@@ -18,6 +18,15 @@ import test_android_bundle_checks as bt  # noqa: E402  (its bundle and command-l
 NAMES = b"\x22\x14third_party_licenses\x2a\x1cthird_party_license_metadata"
 LICENCES = b"Apache License, Version 2.0 https://www.apache.org/licenses/LICENSE-2.0\n"
 METADATA = b"0:71 OkHttp\n"
+APACHE_TEXT = (b"LICENCE TEXT: Apache License, Version 2.0\n\n                                 Apache License\n"
+               b"                           Version 2.0, January 2004\n")
+EMBEDDED = b"== Notices embedded in Google libraries ==\n\nEmbedded in com.google.android.gms:play-services-basement:18.9.0\n"
+LIBRARY = b"OkHttp (com.squareup.okhttp3:okhttp:5.1.0)\n"
+PLAY_SERVICES = b"Basement (com.google.android.gms:play-services-basement:18.9.0)\n"
+NO_APACHE = ("assets/licenses/third_party_licenses.txt lacks the Apache-2.0 licence text (the line \"LICENCE TEXT: "
+             "Apache License, Version 2.0\" and its title): regenerate it with generate-licences.py")
+NO_EMBEDDED = ("assets/licenses/third_party_licenses.txt lists a Google Play services library but has no section "
+               "\"== Notices embedded in Google libraries ==\": regenerate it with generate-licences.py")
 MISSING = ("the bundle has no open-source licence notices: neither the resources raw/third_party_licenses and "
            "raw/third_party_license_metadata (Google's OSS licences plugin) nor assets/licenses/third_party_licenses.txt")
 
@@ -37,8 +46,19 @@ class LicenceNoticeTest(unittest.TestCase):
                           "(\"Debug License Info\"): the plugin did not see the release dependencies"],
                          cab.licence_notice_problems(NAMES, files, None))
 
-    def test_the_fallback_asset_passes(self):
-        self.assertEqual([], cab.licence_notice_problems(b"", {}, b"OkHttp (com.squareup.okhttp3:okhttp:5.1.0)\n"))
+    def test_the_fallback_asset_with_the_apache_text_passes(self):
+        self.assertEqual([], cab.licence_notice_problems(b"", {}, LIBRARY + APACHE_TEXT))
+
+    def test_an_asset_with_only_names_and_urls_is_refused(self):
+        self.assertEqual([NO_APACHE], cab.licence_notice_problems(b"", {}, LIBRARY))
+
+    def test_an_asset_whose_marker_has_no_licence_title_is_refused(self):
+        self.assertEqual([NO_APACHE], cab.licence_notice_problems(b"", {}, LIBRARY + b"LICENCE TEXT: Apache License, Version 2.0\n"))
+
+    def test_play_services_need_the_section_of_embedded_google_notices(self):
+        self.assertEqual([NO_EMBEDDED], cab.licence_notice_problems(b"", {}, PLAY_SERVICES + APACHE_TEXT))
+        self.assertEqual([], cab.licence_notice_problems(b"", {}, PLAY_SERVICES + APACHE_TEXT + EMBEDDED))
+        self.assertEqual([NO_APACHE, NO_EMBEDDED], cab.licence_notice_problems(b"", {}, PLAY_SERVICES))
 
     def test_a_bundle_without_notices_is_refused(self):
         self.assertEqual([MISSING], cab.licence_notice_problems(b"\x22\x14third_party_licenses", {}, None))
