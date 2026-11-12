@@ -437,4 +437,16 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn a_mutex_that_exists_means_another_shellx_runs() {
+        // CreateMutexW: a handle plus ERROR_ALREADY_EXISTS (183) means it existed; no handle
+        // with ERROR_ACCESS_DENIED (5) means it exists but this start may not open it (an
+        // elevated ShellX holds it, B-1b review m-3).
+        assert!(another_instance_runs(true, 183));
+        assert!(!another_instance_runs(true, 0));
+        assert!(another_instance_runs(false, 5));
+        assert!(!another_instance_runs(false, 87));
+        assert!(!another_instance_runs(false, 0));
+    }
 }
