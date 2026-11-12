@@ -1404,3 +1404,252 @@ lower-case letters is hidden; `OTPCode` is not recognised; a Windows SID is hidd
 
 **Not verified**: the cross build with the vendored GPUI has not run (it needs the VPS), nothing ran on Windows, and the
 shell lookup, the prompt hook and the first-window frame follow GPUI's source and the Windows documentation, not a run.
+
+## 35. Windows: start-up, crash files, diagnostics (as built)
+
+Plan `2026-11-12-shellx-windows-usable-3-wiring-and-windows-only.md` with `…-3b-windows-only-details.md`: Part A landed in
+`8cc7b11888`, Part B, A10 and the docs in `ed3748ac6e` (tree identical to the reviewed `c0dad13a62`). Owner: the Windows
+app (`windows/shellx-app`: `main`, `startup`, `crash`, `crash_native`, `logger`, `diagnose_run`, `smoke`), its model
+(`windows/shellx-model`: `crash_report`, `log_file`, `start_guard`, `diagnose`, `redact`), `windows/vendor`,
+`windows/installer` and the cross build. Consumers: every later change to the Windows window, and whoever reads a report
+a person sends. §34's redactor, shell and first-window rules stand. Names checked against `develop`.
+
+**Where things are** (`%LOCALAPPDATA%\ShellX\native\`, `paths::native_dir`)
+- `logs\` holds `shellx.log` (`.1`, `.2`; at most 3 files, rotated before a write would pass 1 MiB), `crash.<utc>.<pid>.txt`,
+  `crash-native.<utc>.<pid>.txt`, `start-failed.<utc>.<pid>.txt` and `diagnostics.<utc>.<pid>.txt`. `<utc>` is
+  `log_file::compact_utc` (`20261112-081530`). Parts are joined with `.`, never `-`, because the redactor hides a 32+
+  character run of letters, digits and `-` that holds a digit (test `crash_file_names_survive_the_redactor`). When
+  `LOCALAPPDATA` is unusable the logs folder is `%TEMP%\ShellX\logs` (`paths::logs_dir_from`, test
+  `logs_live_under_native_else_under_temp`).
+- A panic file and a `start-failed` file that cannot be created in `logs\` go to `%TEMP%` under the same name; a second
+  file of the same name becomes `<name>.2.txt` … `.99.txt` (`crash::create_new_in`); when nothing can be written the
+  dialog still names the intended path in `logs\` (test `a_file_that_cannot_be_written_anywhere_names_its_intended_path`).
+  The native file has no temp fallback and no number: it is created once at start-up under the process start time,
+  `CREATE_ALWAYS`. `--diagnose` lists crash files in both folders and tags the temp ones `(in the temp folder)`.
+- `render.json` (`{"mode":"standard"|"compatible"}`) and `starting.json` (`{"pid":n,"mode":…}`) sit in `native\` itself.
+  Both are written to `<name>.tmp` and renamed over the target, so no reader sees half a file (test
+  `a_start_writes_the_marker_and_the_first_frame_clears_it`; the model's `render_files_are_small_json`).
+- Only the window installs the log (`logger::install`, level Info and above); the reporter process, `--version`,
+  `--smoke*` and `--diagnose` write no log. The panic hook adds one line `panic: see <file name>` (the name only, through
+  `logger::try_append`, which gives up rather than wait for a lock the panicking thread may hold).
+
+**What a line, a file or the report may hold**
+- Every log line, panic file, `start-failed` file and report line goes through `redact` once more at the point it is
+  written (`log_file::format_record`, `crash_report::{panic_report_head, backtrace_section, window_failure_report}`,
+  `diagnose::format_report`); the report also redacts the log lines it copies. Tests: `records_are_one_line_per_text_line_and_redacted`,
+  `every_record_is_redacted_before_it_is_written`, `panic_report_is_redacted_line_by_line`,
+  `the_start_failure_file_is_redacted`, `report_redacts_planted_secrets_everywhere`.
+- **Never in a log line, crash file, start-failed file or report**: an email address, a token or key, a sign-in or
+  challenge code, text the person typed, terminal content, a custom shell line or any argument of it (also
+  `SHELLX_SHELL`'s value), the name of another machine in the account, the installer mutex's name
+  (`start_guard::APP_MUTEX_NAME`; it would read as `<token>`, so no code path writes it), and serde's error text. The rules
+  that keep each out:
+  - A failed process start logs only the OS reason: `log_file::record_message` replaces every `portable_pty*` record
+    with fixed text plus `failure_reason` (the text after the last `failed: `, one line, at most 160 characters), because
+    portable-pty's own error carries the whole command line and the folder. Tests `a_failed_process_start_keeps_only_the_system_reason`,
+    `a_failed_process_start_never_logs_the_command_line`. The pane's sentence uses the same rule (`workspace::spawn_reason`).
+  - Repeat lines are fixed text (`the line above repeated N more times`), never the record's (test
+    `repeat_lines_carry_no_message_text`; folding: `repeats_collapse_into_one_count_line`).
+  - A panic file keeps at most 300 characters of the message, and a message that starts with `byte index` is cut at
+    ` of \``, because std quotes the sliced text there; the redactor cannot know typed text, so the cut runs before it (test
+    `panic_report_cuts_quoted_text_and_long_messages`). `location` is the source position, not data.
+  - A JSON load error is logged as its category and position only (`links_store::load_error_text`: `{:?}` of
+    `classify()`, `line`, `column`), because serde_json's text can quote the value (test
+    `a_bad_links_file_is_logged_without_any_value_from_it`).
+  - `[account]` is `signed in with <method>`, `signed out` or `unknown (<code>)`; the session's email is never read (test
+    `the_report_names_only_the_sign_in_method`). `[relay]` is the status and the time, or the error code.
+  - `[shells]` names programs and file names only, never arguments; a custom line reads `custom command line`, and
+    an override reads `, overridden by SHELLX_SHELL` without its value (`diagnose_run::shells_text`; test
+    `the_shells_section_names_programs_never_arguments`).
+  - `[keyboard]` keeps a process name only when it is one of nine typing tools (`diagnose::typing_tools`, test
+    `typing_tools_are_found_by_exe_name`). The Windows error events read only the time and the `Data` values, never
+    `<Computer>` (`diagnose::windows_error_summaries`, one line of at most 300 characters; test
+    `windows_error_events_are_read_from_the_event_xml`).
+- **What stays readable on purpose**: version, commit, build kind, Windows build, GPU and driver names, layout names, file
+  and folder paths (a path can hold the Windows account name; §34's redactor keeps paths readable), the exe base and
+  module path of a native crash, and the program paths of the shells found. The native file is not run through `redact`
+  when it is written (the filter cannot allocate); only its header, built at start-up, is.
+- A person who puts a password into a custom shell line is not protected: the redactor cannot know it. `--diagnose` starts
+  the shell that new tabs start, so a custom `ssh` or `plink` line connects for the length of a step (10 s) and nothing is
+  typed into it; the README says so (Support lines 3).
+
+**Crash files and the one dialog**
+- `main` handles `--report-crash <file>` and `--report-window <file>` first and exits: no hook, no log, no console attach,
+  no GPUI. The reporter shows one Yes/No box (`MessageBoxW`, topmost) naming the file; Yes starts
+  `<SystemRoot>\explorer.exe /select,"<file>"` (an absolute `SystemRoot`, else `C:\Windows`; test
+  `explorer_comes_from_the_system_root`), always exits 0 and takes its language from `SHELLX_LANG` or the system. Texts and
+  the quoting of its command line (a trailing backslash is doubled) are the model's (`report_dialog`,
+  `reporter_command_line`; tests `dialog_text_names_the_file_in_both_languages`,
+  `reporter_command_line_quotes_paths_with_spaces_and_vietnamese`). The title reads `ShellX gặp lỗi` /
+  `ShellX ran into a problem`, or `ShellX không mở được cửa sổ` / `ShellX couldn't open its window` for a start failure.
+- **One reporter dialog per process.** The panic hook, `startup::window_failed` (through `crash::start_reporter`) and the
+  native filter claim the same atomic (`crash::claim_reporter`); the first one starts the reporter, later crashes still
+  write their file and show nothing more. A panic inside `crash::expect_caught` (the `--diagnose` probes) writes its file
+  and starts no reporter. Tests `the_hook_writes_a_file_and_asks_for_one_reporter`,
+  `a_caught_panic_writes_a_file_but_starts_no_reporter`, `the_installed_hook_writes_one_file_and_starts_one_reporter`
+  (Unix only). The native filter and the panic hook sharing the claim has no test.
+- **Hook mode** (`crash::hook_mode`): `FileOnly` (file, no reporter) for `--version`, `--smoke*` and `--diagnose
+  --no-open`; `Dialog` for the window and for `--diagnose` (test `the_hook_mode_follows_the_flags`). The hook is installed
+  right after the reporter and console steps of `main`, for every thread, and chains to the previous hook.
+- **Order inside the hook**: write the file with the header, `thread:`, `location:` and `message:`; log the line; start the
+  reporter; only then capture the backtrace (symbolising can hang) and append it with every frame's address (`{:#}`), so
+  the file and the dialog never wait for it (test `the_backtrace_is_taken_after_the_file_and_never_for_a_follow_up`). std's
+  second hook call for a panic that cannot unwind (`panic in a function that cannot unwind`, `panic in a destructor during
+  cleanup`) appends `then: … (the process aborts)` to the first file of that thread and captures nothing (test
+  `an_abort_follow_up_is_appended_to_the_first_report`; `abort_follow_ups_are_recognised`). A panic in a window procedure
+  ends in a fast fail, exit code `0xC0000409`.
+- **The native filter** (`crash_native`, Windows only): installed once, in the window and in `--diagnose`, after everything
+  it needs is built (the file's UTF-16 path, the header bytes, two events and a watchdog thread that owns the reporter's
+  command line). The filter allocates nothing, takes no lock, formats into a 1,536-byte stack buffer
+  (`crash_report::write_native_report`, tests `native_report_formats_codes_addresses_module_and_time`,
+  `native_report_never_overruns_its_buffer`), wakes the watchdog and waits at most 5 s for it to start the reporter, then
+  returns `EXCEPTION_CONTINUE_SEARCH` so Windows Error Reporting still records the crash; it does not chain a previous
+  filter. A second exception while it runs is left to Windows. The watchdog starts the reporter only on the event's signal,
+  never on a failed wait. In `FileOnly` there is no watchdog. No minidump is written. A fault inside a Win32 call the filter
+  makes (`CreateFileW`, the loader lock) can still stop it before the file exists: accepted.
+- A crash file's header is fixed: `ShellX crash report`, `kind:` (`panic`, `native exception`, `window not opened`),
+  `version:` (plain `x.y.z`), `commit:`, `build:` (`release`, `debug`, plus the test label), `windows:`, `exe base:` and
+  `time:`; the native file has no `time:` line in the header but one after it with the crash's own time. A start failure adds
+  `render mode: …` (the start decision's line) and `error:` / `caused by:` for the chain (test
+  `the_start_failure_report_has_the_header_the_render_line_and_the_chain`).
+- `--crash-test panic|native|window` (`crash::crash_test_from`, test `crash_test_flags_are_read_from_the_arguments`) exists
+  in every build and does nothing unless passed. Before it crashes, `panic` and `native` call `startup::orderly_quit` so the
+  test never changes the next start's mode; `window` fails the open without trying, except in the relaunch it causes.
+
+**The start decision** (`start_guard::plan_start`, then `startup`)
+- Decided in `main` before GPUI exists, because GPUI reads `GPUI_DISABLE_DIRECT_COMPOSITION` once in
+  `Application::new`. Order of the steps: the log, the mutex, `take_start_variables`, `plan_gui_start`, `set_render_variable`,
+  the native filter, `ui::run`. The window's first log line is `ShellX <about version> starting on Windows <build>`.
+- Inputs: `render.json` (missing, unreadable or an unknown value means standard); the marker `starting.json` (missing: none;
+  unreadable counts as a standard start that died); `GPUI_DISABLE_DIRECT_COMPOSITION` (only the exact values `1` and `true`,
+  like GPUI); `SHELLX_RENDER_RETRY` (only the exact value `1`; removed from the environment on Windows once read, so nothing
+  the window starts inherits it); and whether the app mutex already existed.
+- Rules, first match wins: a relaunched retry → compatible, writes its own marker; the person's variable → compatible; another
+  instance running → the remembered mode, the marker neither judged nor written; a stale marker from a standard start →
+  compatible; from a compatible start → standard; else the remembered mode. The log line is `render mode: <standard|compatible>
+  (<default|remembered|set by GPUI_DISABLE_DIRECT_COMPOSITION|the standard mode could not open the window|previous start died
+  before its first frame>[; another ShellX is running])`, then `first frame drawn in <standard|compatible> display mode`;
+  both are fixed text without digits, so the redactor leaves them (tests `start_plan_follows_the_rules_in_order`,
+  `start_decisions_read_as_plain_lines`).
+- **One relaunch.** A standard start that is not a retry, on Windows, whose window cannot open starts this exe again with the
+  same arguments, `SHELLX_RENDER_RETRY=1` and the variable set, and exits 0; if that process cannot start, or the start is
+  compatible, or this is a retry, or the OS is not Windows, it writes `start-failed.*.txt`, starts the `--report-window`
+  dialog and exits 1 (tests `open_failure_relaunches_once_then_reports`, `a_retry_writes_its_own_marker_and_never_relaunches`).
+- **The marker** is written before GPUI starts when the plan says so, and removed by the first frame (the second
+  `on_next_frame` callback after the window opened) or by an orderly end (the last window closed, a crash test about to
+  crash, a failed open). A start removes only a marker that still holds its own pid (tests
+  `the_marker_of_another_start_is_never_removed`, `only_a_marker_with_this_pid_is_this_starts`,
+  `another_instance_leaves_the_marker_alone`, `an_unreadable_marker_counts_as_a_failed_standard_start`). A panic or a native
+  crash leaves the marker: that is how the next start learns the first one died.
+- **Reset rules for `render.json`**: written (once) at the first frame of a rescue start only (`RetryAfterOpenFailed` or
+  `PreviousStartDied`) and only when its mode differs from what is remembered (`remember_after_first_frame`; test
+  `only_a_rescue_is_remembered`, `a_stale_marker_starts_compatible_and_the_first_frame_remembers_it`); never for
+  a default, remembered or person-forced start. A start that reports a failed open after a compatible mode that came from
+  `render.json` rewrites it to standard, so the next start tries standard (`forget_remembered_after_report`; test
+  `a_remembered_compatible_mode_that_cannot_open_is_forgotten`, `a_remembered_compatible_start_that_cannot_open_resets_render_json`);
+  a standard start's report leaves it alone. Settings › Display › "try standard display mode again" writes
+  `{"mode":"standard"}` (`startup::request_standard_next_start`; the rule for what the panel shows is `startup::display_view`,
+  tests `display_shows_standard_without_a_button_or_a_reason`, `display_names_the_environment_variable_and_offers_no_button`,
+  `display_compatible_for_any_other_reason_offers_standard_until_requested`). Deleting the file is the manual fallback. With
+  no state folder the start still decides, without files (test `without_a_state_folder_the_start_still_decides`).
+- **The variable**: a compatible start the person did not force sets `GPUI_DISABLE_DIRECT_COMPOSITION=1` itself; after GPUI
+  has read it, `forget_render_variable` removes it when this start set it or is a retry, so the shells in the window never
+  inherit it; a value the person set stays (test `the_variables_are_read_like_gpui_and_set_only_where_needed`). A value set
+  by the person is never remembered.
+- **The mutex** is the installer's `AppMutex` (`start_guard::APP_MUTEX_NAME`, the native AppId in the name, session
+  namespace), created by the window only, kept open until exit and not inheritable. Another instance runs when `CreateMutexW`
+  gives a handle with `ERROR_ALREADY_EXISTS`, or no handle with `ERROR_ACCESS_DENIED` (an elevated ShellX holds it); any other
+  failure counts as none (test `a_mutex_that_exists_means_another_shellx_runs`). A second launch still opens its own window. The installer
+  and the app cannot drift: `the_installer_names_the_app_mutex_and_the_diagnostics_entry` reads `shellx-native.iss`.
+- **First window**: `ui::app::first_window_bounds` uses §34's `first_window` through `os_info::first_window_placement(
+  os_info::primary_work_area())` with `display_id: None`: 1200 x 760 shrunk to the primary monitor's work area and centred in
+  workspace coordinates, maximized below 720 x 420 or when the work area is unknown (test
+  `the_first_window_is_placed_for_the_screens_of_r1`).
+
+**The three GPUI patches** (`windows/vendor/gpui-0.2.2`, behind `[patch.crates-io]`; patch (d), the shader build, is §34's)
+- (a) `events.rs`: both key-up handlers return early for `VK_PACKET` with the value they returned before and never call
+  `TranslateMessage`; otherwise a character from Unikey, EVKey, OpenKey or a password manager (`SendInput` with
+  `KEYEVENTF_UNICODE`) came twice. The key-down path is untouched.
+- (b) `vsync.rs`: a DWM refresh period under 1 ms no longer divides by zero (the fallback computes denominator / numerator
+  seconds, 16.666 ms when unusable; a QPC frequency under 1 MHz no longer divides). The model mirrors it as
+  `diagnose::vsync_check`, so a report says whether an unpatched GPUI would have stopped repainting here (test
+  `vsync_check_matches_gpui_0_2_2`).
+- (c) `directx_renderer.rs` and `events.rs` (`draw_window`): the render target is an `Option`; a failed resize is retried at the
+  next draw; recovery after `DXGI_ERROR_DEVICE_REMOVED` releases the old objects once, releases what a failed attempt
+  made and remembers the composition mode; nothing is drawn after a recovery until `draw_window` forces a fresh frame. When
+  five recovery attempts fail on a healthy device the window **panics with a fixed message**, so the hook leaves a crash file
+  and the dialog instead of a window that stays blank; when the device it was handed is itself removed it stays released
+  and the next round recovers.
+- **The rule (`check-gpui`)**: `windows/vendor/check-gpui.sh` must pass (today: 4 patched files, `build.rs`,
+  `directx_renderer.rs`, `events.rs`, `vsync.rs`): the files that differ from the published crate are exactly the files whose
+  first line is `// Modified by ShellX: <reason>. See windows/vendor/README.md.` (Apache-2.0 §4(b)). Each patch is its own commit
+  with a row in the README table (a file two patches touch keeps the first patch's notice line). A patch to GPUI's Windows
+  code also needs `scripts/shellx/check-windows-build.sh` and `… --release` to pass. No test covers the patches themselves
+  (the copy is outside the workspace); they are proved by reading and by the compile checks, and are **not run on Windows**.
+
+**`--diagnose`** (`diagnose_run`, `shellx_model::diagnose`)
+- `diagnostics.<utc>.<pid>.txt` in `logs\`; stdout gets `Diagnostics report: <path>`; exit 0 when the complete report was
+  written, else 1; unless `--no-open`, Explorer shows the report (when either write left it on disk) or else the logs folder
+  (`shown_after_writes`; tests `a_failed_final_write_still_shows_the_first_pass_or_the_folder`).
+- **Twelve sections in a fixed order**: `[app]`, `[windows]`, `[cpu]`, `[displays]`, `[gpu]`, `[keyboard]`, `[shells]`,
+  `[state]`, `[account]`, `[relay]`, `[crash files]`, `[log: last 200 lines]` (`LOG_TAIL_LINES`, read across the rotated
+  files). Empty values read `unknown`, empty lists `none` (tests `report_lists_every_section_in_order`,
+  `empty_values_read_unknown_or_none`, `report_keeps_only_the_last_200_log_lines`).
+- **Bounds.** Every probe runs on its own thread (`diagnose-probe`) inside `crash::expect_caught` and `catch_unwind`; a panic
+  becomes `failed: <message>` in its field. `run` waits at most 10 s per phase (`PROBE_BOUND`), 60 s for the shell checks
+  (`SHELL_BOUND`, each step of them at most `SHELL_STEP_BOUND` = 10 s), so a run ends within about 70 s; a probe that does not
+  answer reads `timed out after N s` and its thread is abandoned (the process then exits). Tests
+  `bounded_probes_time_out_and_catch_panics`.
+- **Written twice under one name.** Phase 1 (versions, CPU, displays, first window, render mode, keyboard, state folder,
+  account, crash files, log tail) is written first with `slow_checks_pending`: the lines of the probes that can hang on a
+  driver, the network or a shell read `not run yet`. Phase 2 (GPU, DWM timing, shells and their checks, relay, Windows error
+  events) then completes it. Each write goes to `<name>.tmp` and is renamed over the report. A hang or a crash in phase 2
+  therefore still leaves a report (test `a_first_pass_report_marks_the_slow_checks_not_run_yet`). `[shells]` and the
+  checks come from one lookup and one `pane_start()` (the same decision a new tab makes), including the fallback shell when
+  the first cannot start.
+- **Windows error events**: `System32\wevtutil.exe` under an absolute `SystemRoot`, with `qe Application /c:5 /rd:true
+  /f:xml /uni:true` and a query for provider `Application Error` and data `shellx-desktop.exe`, no window, stdin closed. `/uni:true`
+  makes the output UTF-16 so a Vietnamese user folder stays readable; `decode_tool_output` reads UTF-16 (BOM or a NUL second
+  byte) or UTF-8 (tests `tool_output_is_read_as_utf16_or_utf8`, `windows_error_events_are_listed_under_crash_files`). The
+  Windows part itself has no test and is unverified on a PC.
+- **The shell checks** (`smoke::shell_checks`, `diagnose::probe_script`): start, first output, then for PowerShell (7 and
+  Windows) `echo` (the computed `shellx-ok-42`), `unicode` (`tiếng Việt` twice: typed and echoed) and `resize` (120 columns),
+  for Command Prompt `echo` and `unicode`; Git Bash, WSL and custom lines get start and first output only. The echo marker is
+  computed so the typed text never holds it; the PowerShell script's first line turns PSReadLine history saving off for the
+  session; the cmd check uses the variable `SHELLX_PROBE_7f3a` (an unusual name no environment holds; tests
+  `probe_scripts_exist_for_powershell_and_cmd_only`, `the_cmd_probe_variable_is_not_a_short_name`). The shell is killed
+  afterwards. A failure's detail is a fixed sentence or the OS reason.
+- `--smoke` is different: it always starts Windows PowerShell, whatever Settings and `SHELLX_SHELL` say, and says so (test
+  `the_smoke_shell_ignores_the_choice_and_shellx_shell`).
+- **Console output.** `--version`, `--smoke*` and `--diagnose` attach to the parent's console only when stdout has no handle of
+  its own (a pipe or file is never replaced) and write with `writeln!` and the error ignored, so a closed console cannot
+  panic. The exe is a GUI-subsystem program, so cmd and PowerShell do not wait for it (the README gives `start /wait` and
+  `| more`).
+- Three entry points start the same code in its own process, so the window stays usable: the Start entry
+  `ShellX – Chẩn đoán` (`ShellX – Diagnostics` in an English setup; `Parameters: "--diagnose"` in `shellx-native.iss`), the
+  help-menu item `Str::CreateDiagnosticsReport` (`diagnose_run::spawn_report_process`), and the command line.
+
+**Version and build rules**
+- **Version numbers inside the app stay plain `x.y.z`**: `shellx_model::VERSION` is what the exe's version resource
+  (`exe_resource::version_resource`, which refuses anything but three whole numbers; test
+  `the_version_resource_names_shellx_and_the_version`), the installer's `AppVersion`, the core's `app_version` (config and machine
+  registration), `--version` and a crash file's `version:` line carry. A test build's label is **never** inside a version number.
+- The label (`SHELLX_BUILD_LABEL`: a lower-case letter then up to nine lower-case letters or digits; anything else is ignored
+  by the app and refused by the build script) appears in three places only: the installer's file name
+  `ShellX-Setup-<version>-<label>-<commit10>.exe` (`/DFileLabel`), Settings › About and the start log line and report `[app]`
+  (`build_info::about_version`: `ShellX 1.7.0 (<label> <commit10>)`; without a label just `ShellX 1.7.0`), and the `build:` field
+  (`release test`). The commit is the full 40-hex `SHELLX_BUILD_COMMIT` or `CMUX_TUI_BUILD_COMMIT`, else ignored (test
+  `build_info_validates_label_and_commit`).
+- Cross build (`windows/cross/build-in-container.sh`, `scripts/shellx/release/build-windows-cross.sh`): libghostty-vt is built for the
+  **baseline x86-64 CPU** on every build (`CMUX_GHOSTTY_VT_ZIG_CPU=baseline`); `CARGO_PROFILE_RELEASE_DEBUG=line-tables-only`
+  makes a PDB that goes to the output folder's `…-symbols` folder next to the exe and **never into the installer** (a crash
+  file's addresses map to code only with it); a failed PDB or symbols download is a warning, not a failed build.
+- Installer (`windows/installer/shellx-native.iss`): `AppMutex` (Setup asks to close a running ShellX), the diagnostics Start
+  entry in both languages, the version information, the per-user install, and coexistence with the Flutter app
+  (`check_coexistence.py` and its tests: no shared AppId, exe name, install or data folders, nothing stopped or deleted).
+  Uninstalling removes only `{app}`; `native\` stays.
+
+**Not verified**: everything above ran on this Mac and in the Docker compile check only. Nothing ran on a Windows PC: the
+native filter, the dialog, the mutex, the relaunch, the three patches, `wevtutil`, the shell checks, the version resource, the
+PDB and the label in the installer name. The VPS cross build with the vendored GPUI and the PDB setting has not run, and
+neither has Inno Setup on the new script lines.
