@@ -578,4 +578,19 @@ mod tests {
             OpenFailed::RelaunchCompatible
         );
     }
+
+    #[test]
+    fn the_marker_of_another_start_is_never_removed() {
+        // B-1b review m-4: a retry (which always writes its own marker) replaced this start's.
+        let tmp = tempfile::tempdir().unwrap();
+        let p = paths(tmp.path());
+        let state = start_in(Some(&p), false, false, false);
+        assert_eq!(read(&p.marker), marker_of("standard"));
+        let theirs = r#"{"pid":4294967294,"mode":"compatible"}"#;
+        std::fs::write(&p.marker, theirs).unwrap();
+        first_frame_in(&state);
+        assert_eq!(read(&p.marker), theirs);
+        orderly_quit_in(&state);
+        assert_eq!(read(&p.marker), theirs);
+    }
 }

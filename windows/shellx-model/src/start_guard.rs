@@ -466,4 +466,12 @@ mod tests {
         assert!(!another_instance_runs(false, 87));
         assert!(!another_instance_runs(false, 0));
     }
+
+    #[test]
+    fn only_a_marker_with_this_pid_is_this_starts() {
+        assert!(marker_written_by(Some(r#"{"pid":42,"mode":"standard"}"#), 42));
+        assert!(!marker_written_by(Some(r#"{"pid":43,"mode":"compatible"}"#), 42));
+        assert!(!marker_written_by(Some("garbage"), 42));
+        assert!(!marker_written_by(None, 42));
+    }
 }
