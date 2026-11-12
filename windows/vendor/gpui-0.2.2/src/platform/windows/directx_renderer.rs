@@ -229,10 +229,15 @@ impl DirectXRenderer {
                 log::error!(
                     "DirectXRenderer failed to recover from device lost after multiple attempts"
                 );
-                // ShellX (patch (c)): the device loss is unrecoverable. Upstream panics here too:
-                // the app's crash hook then leaves a file and a dialog instead of a window that
-                // stays blank until it is closed (B-1b review m-2). Fixed text only.
-                panic!("the GPU device was lost and the window could not recover it");
+                // ShellX (patch (c)): when the device handed in is healthy, the loss cannot be
+                // recovered: panic like upstream, so the app's crash hook leaves a file and a
+                // dialog instead of a window that stays blank (B-1b review m-2). When that device
+                // is itself removed (the vsync thread could not recreate its own and forwarded
+                // the old one), stay released: the next round recreates it and the window
+                // recovers, as before (re-review n-1). Fixed text only.
+                if unsafe { directx_devices.device.GetDeviceRemovedReason() }.is_ok() {
+                    panic!("the GPU device was lost and the window could not recover it");
+                }
             },
         );
     }
