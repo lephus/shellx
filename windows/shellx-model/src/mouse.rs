@@ -212,6 +212,49 @@ mod tests {
     }
 
     #[test]
+    fn one_wheel_event_moves_at_most_one_screen() {
+        // Windows' "scroll one screen at a time" makes a notch billions of lines
+        // (review M8): never more than the pane's rows of history or arrow keys.
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(1000), 24),
+            WheelAction::Scrollback(24)
+        );
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(-1000), 24),
+            WheelAction::Scrollback(-24)
+        );
+        assert_eq!(
+            cap_to_screen(
+                WheelAction::Arrows {
+                    key: "up",
+                    count: 1000
+                },
+                24
+            ),
+            WheelAction::Arrows {
+                key: "up",
+                count: 24
+            }
+        );
+        // ordinary steps are untouched
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(3), 24),
+            WheelAction::Scrollback(3)
+        );
+        let three = WheelAction::Arrows {
+            key: "down",
+            count: 3,
+        };
+        assert_eq!(cap_to_screen(three, 24), three);
+        assert_eq!(cap_to_screen(WheelAction::None, 24), WheelAction::None);
+        // a pane not measured yet still moves one line
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(-5), 0),
+            WheelAction::Scrollback(-1)
+        );
+    }
+
+    #[test]
     fn secondary_clicks_follow_the_windows_console() {
         for button in [SecondaryButton::Right, SecondaryButton::Middle] {
             for has_selection in [false, true] {
