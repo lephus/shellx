@@ -274,14 +274,16 @@ Changes (each is the minimum for one of those faults):
    In `events.rs`, `draw_window` (`:1196-1205`), right after `request_frame` is taken:
    ```rust
         let mut request_frame = self.state.borrow_mut().callbacks.request_frame.take()?;
-        // ShellX (patch (c)): the first frame after a device-lost recovery rebuilds the scene.
-        let force_render = force_render || self.state.borrow_mut().renderer.take_needs_fresh_frame();
+        // ShellX (patch (c)): the first frame after a device-lost recovery rebuilds the scene. The
+        // flag is taken first, so a frame that is forced anyway also clears it and is drawn.
+        let fresh = self.state.borrow_mut().renderer.take_needs_fresh_frame();
+        let force_render = force_render || fresh;
         request_frame(RequestFrameOptions {
             require_presentation: false,
             force_render,
         });
    ```
-   (`renderer` is a `pub` field of the window state, `window.rs:51`; the borrow ends with the statement, before `request_frame` runs.) `draw_window` is the only caller of `request_frame` (`events.rs:1197`), so no stale scene reaches the renderer: the forced frame runs `window.draw(cx)` then `present()`, and ShellX has no `.cached(` views, so the whole scene is rebuilt. A minimised window has no `request_frame` (`events.rs:175-177`): `draw_window` returns before taking the flag, which waits for the restore.
+   (`renderer` is a `pub` field of the window state, `window.rs:51`; the borrow ends with the statement, before `request_frame` runs. The flag is taken before the `||`: with `force_render || take_needs_fresh_frame()` a forced update (`WM_GPUI_FORCE_UPDATE_WINDOW`, 200 ms after a recovery) would short-circuit, leave the flag set, rebuild the scene and then skip drawing it until the next paint; B-1b review m-1.) `draw_window` is the only caller of `request_frame` (`events.rs:1197`), so no stale scene reaches the renderer: the forced frame runs `window.draw(cx)` then `present()`, and ShellX has no `.cached(` views, so the whole scene is rebuilt. A minimised window has no `request_frame` (`events.rs:175-177`): `draw_window` returns before taking the flag, which waits for the restore.
 
 Why it cannot make anything worse for a PC whose device is never lost: `released` stays `None`, `needs_fresh_frame` stays `false` and `render_target_view[0]` stays `Some`, so every new branch is a false test (`draw_window` gains one `RefCell` borrow per frame and passes `force_render` unchanged); the render target is released once at each resize and once at drop, in the same order as before; `disable_direct_composition` holds the value the old code derived at the first call. Behaviour changes only after a failed resize (frames are skipped and the resize is retried instead of a panic inside the window procedure) or during device-lost recovery (old objects released once; a failed attempt releases what it made; retries and the final drop skip released objects; the first frame afterwards is rendered afresh). Recovery that never succeeds now leaves a window that skips frames (and logs, collapsed by the log's count line) instead of a use-after-free. One case stays (plan review M-5, documented, not handled): if the vsync thread recovers its devices but the window's five attempts all fail, no further device-lost event comes (`check_device_lost` sees a healthy device) and `released` stays `Some`, so the window draws nothing until it is closed, with no dialog (before the patch: a crash, which B4 would now report).
 
