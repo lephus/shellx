@@ -1404,4 +1404,15 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn a_failed_final_write_still_shows_the_first_pass_or_the_folder() {
+        // B-2 review m6: a Start-menu run must not end silently.
+        let report = Path::new("/logs/diagnostics.20261112-081530.1.txt");
+        let logs = Path::new("/logs");
+        assert_eq!(shown_after_writes(true, true, report, logs), report);
+        assert_eq!(shown_after_writes(false, true, report, logs), report);
+        assert_eq!(shown_after_writes(true, false, report, logs), report);
+        assert_eq!(shown_after_writes(false, false, report, logs), logs);
+    }
 }
