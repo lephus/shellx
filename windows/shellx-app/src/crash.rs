@@ -518,10 +518,14 @@ mod tests {
             utc: "20261112-081530".into(),
             location: location.into(),
             message: message.into(),
-            backtrace: "   0:     0x7ff6a1b2c3d4 - <unknown>".into(),
             thread_id: Some(7),
             main_thread: true,
         }
+    }
+
+    /// The backtrace a test's panic has (`{:#}` form).
+    fn backtrace() -> String {
+        "   0:     0x7ff6a1b2c3d4 - <unknown>".to_string()
     }
 
     fn files_in(dir: &Path) -> Vec<String> {
@@ -550,6 +554,7 @@ mod tests {
             HookMode::Dialog,
             &state,
             &spawn,
+            &backtrace,
         )
         .unwrap();
         let second = handle_panic(
@@ -558,6 +563,7 @@ mod tests {
             HookMode::Dialog,
             &state,
             &spawn,
+            &backtrace,
         )
         .unwrap();
         assert_eq!(
@@ -597,6 +603,7 @@ mod tests {
             HookMode::Dialog,
             &state,
             &spawn,
+            &backtrace,
         )
         .unwrap();
         let second = handle_panic(
@@ -608,6 +615,7 @@ mod tests {
             HookMode::Dialog,
             &state,
             &spawn,
+            &backtrace,
         )
         .unwrap();
         assert_eq!(second, first);
@@ -644,6 +652,7 @@ mod tests {
                 HookMode::Dialog,
                 &state,
                 &spawn,
+                &backtrace,
             )
         })
         .unwrap();
@@ -656,6 +665,7 @@ mod tests {
             HookMode::FileOnly,
             &state,
             &spawn,
+            &backtrace,
         )
         .unwrap();
         assert!(file_only.is_file());
@@ -667,9 +677,53 @@ mod tests {
             HookMode::Dialog,
             &state,
             &spawn,
+            &backtrace,
         );
         assert_eq!(*spawned.borrow(), 1);
         assert_eq!(files_in(&ctx.logs_dir).len(), 3);
+    }
+
+    #[test]
+    fn the_backtrace_is_taken_after_the_file_and_never_for_a_follow_up() {
+        // Review m2: symbolizing can hang or fault, so the file and the dialog come first.
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = ctx(tmp.path());
+        let state = HookState::new();
+        let events: RefCell<Vec<&str>> = RefCell::new(Vec::new());
+        let spawn = |_: &Path| {
+            events.borrow_mut().push("reporter");
+            true
+        };
+        let backtrace = || {
+            events.borrow_mut().push("backtrace");
+            "   0:     0x7ff6a1b2c3d4 - <unknown>".to_string()
+        };
+        let file = handle_panic(
+            &ctx,
+            &parts("the real panic", "src/ui/app.rs:9:9"),
+            HookMode::Dialog,
+            &state,
+            &spawn,
+            &backtrace,
+        )
+        .unwrap();
+        assert_eq!(*events.borrow(), ["reporter", "backtrace"]);
+        let text = std::fs::read_to_string(&file).unwrap();
+        let message = text.lines().position(|l| l == "message: the real panic").unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines[message + 1], "backtrace:");
+        assert_eq!(lines[message + 2], "   0:     0x7ff6a1b2c3d4 - <unknown>");
+        // The abort follow-up takes no backtrace.
+        handle_panic(
+            &ctx,
+            &parts("panic in a function that cannot unwind", "core/src/panicking.rs:225:5"),
+            HookMode::Dialog,
+            &state,
+            &spawn,
+            &backtrace,
+        );
+        assert_eq!(*events.borrow(), ["reporter", "backtrace"]);
+        assert!(std::fs::read_to_string(&file).unwrap().ends_with("(the process aborts)\n"));
     }
 
     #[test]
