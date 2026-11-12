@@ -189,11 +189,16 @@ explorer.
 `shellx-android/scripts/generate-licences.py` writes from `shellx-android/app/gradle.lockfile` and the POMs in
 the Gradle cache. Google's oss-licenses plugin is not used: its library needs compileSdk 37 and the project is at
 36. The file carries each library's licence, the Apache-2.0 text once, each non-Apache library's own licence
-text with its copyright line, any `META-INF/NOTICE*` file and the notices Google's AARs embed. The Android SDK
+text with its copyright line, any `META-INF/NOTICE*` file, extra notices for bundled data (OkHttp's Public Suffix List, MPL-2.0) and the
+notices Google's AARs embed. The Android SDK
 and Play Core entries keep their name and URL, because they are terms of use. After any lockfile change run
 `python3 shellx-android/scripts/generate-licences.py` and commit the file. A new library whose artifact ships no
-licence text with a copyright line stops the generator by name: add the project's own text as
-`shellx-android/scripts/licence-texts/<group>_<artifact>.txt`, copied from its published licence.
+licence text with a copyright line that names a holder stops the generator by name: add the project's own text as
+`shellx-android/scripts/licence-texts/<group>_<artifact>.txt`, copied from its published licence. A new dependency
+that bundles third-party data or code (files under `assets/` or `res/raw/`, native libraries, big resources) makes
+the generator fail naming the files until you either vendor `<group>_<artifact>.extra.txt` there (a notice, with
+`@licence-text: MPL-2.0` lines for a shared full text) or add a reviewed row with a reason to `bundled-files-allowlist.txt`
+in the same folder. A library missing from the Gradle cache also stops it.
 `generate-licences.py --check`, which `shellx-android/scripts/dev.sh` and `android.sh` run, refuses a stale
 file. The generator reads POMs and artifacts from `~/.gradle/caches`: on a machine with an empty cache, run
 `shellx-android/scripts/dev.sh lock` and one build first.
@@ -345,9 +350,10 @@ Google's test robot reaches only the sign-in screen and the demo. Note the warni
 
 ### Play 10. USER — testing tracks and the path to production
 
-Gate: internal testing (Play 7) may take the build as it is. The in-app licence notices carry each library's
-licence, the Apache-2.0 text, each MIT, BSD-3-Clause and Bouncy Castle text with its copyright line, every NOTICE
-file and the notices Google's AARs embed; `generate-licences.py --check` and the bundle check enforce it.
+Every track may take the build as far as licence notices go: the in-app notices carry each library's licence, the
+Apache-2.0 text, each MIT, BSD-3-Clause and Bouncy Castle text with its copyright line, every NOTICE file, Google's
+embedded notices and extra notices for bundled data such as OkHttp's Public Suffix List (MPL-2.0).
+`generate-licences.py --check` and the bundle check enforce it.
 
 Choose the path from Play 1:
 
@@ -500,4 +506,4 @@ Not secret. SHA-1s and OAuth client IDs live in `docs/superpowers/ledgers/shellx
 | App signing key certificate SHA-256 | pending (USER, Play 8) | Play 8 |
 | Internal testing opt-in link | pending (USER, Play 7) | Play 7 |
 | Closed test: day the 12th tester opted in (path B) | pending (USER, Play 10) | Play 10 |
-| Licence texts in the in-app notices | done: `generate-licences.py --check` and the bundle check enforce them | Play 10 |
+| Licence texts and extra notices in the in-app notices | done: `generate-licences.py --check` and the bundle check enforce them | Play 10 |
