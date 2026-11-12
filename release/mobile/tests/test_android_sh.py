@@ -63,7 +63,7 @@ case " $* " in
   *) echo "fake keytool: unexpected $*" >&2; exit 2 ;;
 esac
 """
-FAKE_JARSIGNER = "#!/usr/bin/env bash\necho 'jar verified.'\n"
+FAKE_JARSIGNER = "#!/usr/bin/env bash\necho\necho 'jar verified.'\n"  # the JDK 17 tool prints a blank line first
 FAKE_JAVA = "#!/usr/bin/env bash\necho 'openjdk version \"17.0.9\" 2023-10-17' >&2\n"
 FAKE_NETWORK = "#!/usr/bin/env bash\necho \"$(basename \"$0\") $*\" >>\"$FIXTURE_NETWORK_LOG\"\nexit 1\n"
 FAKE_LICENCE = ("#!/usr/bin/env bash\nif [ -n \"${FAKE_LICENCE_FAIL:-}\" ]; then echo 'violation: x: y'; exit 1; fi\n"
