@@ -1,5 +1,6 @@
 package com.shellx.app.ui.settings
 
+import androidx.activity.compose.setContent
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -21,7 +22,7 @@ class LicencesScreenTest {
     @Test
     fun theScreenShowsTheFirstLibraryOfTheBundledNotices() {
         val asset = compose.activity.assets.open(LICENCES_ASSET).bufferedReader().use { it.readText() }
-        val first = Regex("""^(.+) \([^()\s]+:[^()\s]+:[^()\s]+\)$""", RegexOption.MULTILINE).find(asset)!!.groupValues[1]
+        val first = Regex("""^.+ \([^()\s]+:[^()\s]+:[^()\s]+\)$""", RegexOption.MULTILINE).find(asset)!!.value
         compose.onNodeWithText(first, substring = true).assertExists()
     }
 
