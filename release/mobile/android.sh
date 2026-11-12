@@ -152,10 +152,7 @@ check_signature() {
   sha1="$(printf '%s\n' "$listing" | awk '$1 == "SHA1:" { print $2; exit }')"
   [ -n "$sha256" ] || die "keytool printed no SHA-256 for the upload key"
   verify="$("$JARSIGNER" -verify "$aab" 2>&1 || true)"
-  case "$verify" in
-    "jar verified."*) ;;
-    *) die "jarsigner could not verify $aab" ;;
-  esac
+  printf '%s\n' "$verify" | grep -q '^jar verified\.' || die "jarsigner could not verify $aab"
   cert="$("$KEYTOOL" -printcert -jarfile "$aab" 2>/dev/null || true)"
   owner="$(printf '%s\n' "$cert" | sed -n 's/^Owner: //p' | head -n 1)"
   case "$owner" in
