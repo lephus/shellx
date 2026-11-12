@@ -33,6 +33,7 @@ const FAKE_SSH = `i=$(( $(ls "$CALLS" | grep -c '\\.argv$') + 1 ))
 printf '%s' "$*" > "$CALLS/$i.argv"; cat > "$CALLS/$i.stdin"
 case "$*" in
   *"df -Pk"*) echo 100 ;;
+  *"if [ -e "*) echo free ;;
   *"echo taken"*) echo taken ;;
   *"echo released"*) echo released ;;
   *"cat ~/phu/shellx/.winbuild/out/ShellX-Setup-9.9.9.exe"*|*"cat ~/phu/shellx/.winbuild/out/shellx-desktop.exe"*) printf 'EXE' ;;
