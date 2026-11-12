@@ -1030,6 +1030,57 @@ mod tests {
     }
 
     #[test]
+    fn a_lookup_made_out_of_date_by_a_choice_keeps_its_catalogue() {
+        use std::sync::Mutex as StdMutex;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::thread::ThreadId;
+
+        let (_dir, path) = settings_path();
+        let files = exists_in(&[PWSH, WINPS, CMD]);
+        // the first lookup's thread waits at its own gate, every later one at the second
+        let first: Arc<StdMutex<Option<ThreadId>>> = Arc::new(StdMutex::new(None));
+        let first_gate = Arc::new(AtomicBool::new(false));
+        let later_gate = Arc::new(AtomicBool::new(false));
+        let exists: Exists = {
+            let (first, first_gate, later_gate) =
+                (first.clone(), first_gate.clone(), later_gate.clone());
+            Arc::new(move |p: &str| {
+                let me = std::thread::current().id();
+                let is_first = *first.lock().unwrap().get_or_insert(me) == me;
+                let gate = if is_first { &first_gate } else { &later_gate };
+                while !gate.load(Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                files(p)
+            })
+        };
+        let shells = windows(&path, exists, None, Duration::ZERO);
+        // the first pane starts the first lookup, which waits
+        assert_eq!(
+            shells.plan_for_new_pane().unwrap().first.label,
+            "Windows PowerShell"
+        );
+        // a choice made meanwhile makes that lookup's plan out of date, not its catalogue
+        shells
+            .set_choice(ShellChoice::Known {
+                shell: ShellKind::Cmd,
+            })
+            .unwrap();
+        first_gate.store(true, Ordering::SeqCst);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while shells.plan_for_new_pane().unwrap().first.label != "Command Prompt" {
+            assert!(
+                Instant::now() < deadline,
+                "the first lookup's catalogue was thrown away"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // the later lookup is still at its gate; Settings lists the shells found
+        assert_eq!(shells.snapshot().found.len(), 3);
+        later_gate.store(true, Ordering::SeqCst);
+    }
+
+    #[test]
     fn a_lookup_that_panics_does_not_stop_the_next_one() {
         use std::sync::atomic::{AtomicBool, Ordering};
 
