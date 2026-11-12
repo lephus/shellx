@@ -657,7 +657,15 @@ impl SignInDialog {
         let element = if enabled {
             element
                 .track_focus(&handle)
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| on_click(this, cx)))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    // The press already gave this button the keyboard, but `on_focus` runs only
+                    // at the end of the next draw, and a touchpad tap delivers press and release
+                    // with no draw between them. Record the holder now, so the sync this click
+                    // triggers hands the keyboard back to the field when the button turns off
+                    // (re-review of I-A).
+                    this.focused = control;
+                    on_click(this, cx)
+                }))
         } else {
             element
         };
