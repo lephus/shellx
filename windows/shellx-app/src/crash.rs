@@ -737,6 +737,30 @@ mod tests {
     }
 
     #[test]
+    fn a_file_that_cannot_be_written_anywhere_names_its_intended_path() {
+        // Review m8: the dialog must name the intended file, not the logs folder.
+        let tmp = tempfile::tempdir().unwrap();
+        let blocked = tmp.path().join("a-file-not-a-folder");
+        let also_blocked = tmp.path().join("another-file");
+        std::fs::write(&blocked, "x").unwrap();
+        std::fs::write(&also_blocked, "x").unwrap();
+        let open = tmp.path().join("logs");
+        let name = "start-failed.20261112-081530.1.txt";
+        assert_eq!(
+            write_new_file(&blocked, &also_blocked, name, "t"),
+            Err(blocked.join(name))
+        );
+        assert_eq!(
+            write_new_file(&blocked, &open, name, "t"),
+            Ok(open.join(name))
+        );
+        assert_eq!(
+            write_new_file(&open, &also_blocked, name, "t"),
+            Ok(open.join("start-failed.20261112-081530.1.2.txt"))
+        );
+    }
+
+    #[test]
     fn the_start_failure_file_is_redacted() {
         let tmp = tempfile::tempdir().unwrap();
         let ctx = ctx(tmp.path());
