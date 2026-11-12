@@ -16,15 +16,17 @@ const en = {
   homeTitle: 'ShellX — Your Command Center for AI-Powered Development',
   homeDescription:
     'Terminal for AI coding agents on Mac and PC: workspaces, split panes, SSH, tmux. Open it from your phone, end-to-end encrypted, no open ports or VPN. Free.',
-  e2e: 'End-to-end encrypted: the relay server in the middle cannot read your terminal content.',
   heroEyebrow: 'End-to-end encrypted · Free',
   heroTitle: 'Your command center for',
   heroTitleAccent: 'AI-powered development.',
   heroLead:
-    'ShellX is a terminal app for Mac and PC. Open the very session running on your computer from your phone, type commands and watch the output live, anywhere with an Internet connection.',
+    'ShellX is a terminal app for Mac and PC. Open the same live session from your phone, from anywhere.',
   ctaFree: 'Download free',
   ctaHow: 'See how it works',
   ctaWatch: 'Watch the 1-minute video',
+  heroIos: 'iOS',
+  heroAndroid: 'Android',
+  heroSoon: 'Soon',
   heroDemoText:
     'Illustration: a command runs in the terminal on a computer and its output appears on a phone at the same time.',
   heroPhoneStatus: 'paired · encrypted',

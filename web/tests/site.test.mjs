@@ -524,6 +524,15 @@ for (const page of homePages) {
     assert.ok(hrefs(section).includes(videosPage), `the video section lacks a link to ${videosPage}`);
     const hero = html.match(/<section class="hero"[\s\S]*?<\/section>/)[0];
     assert.ok(hrefs(hero).includes('#video'), 'the hero lacks a link to #video');
+    for (const [store, url] of [['ios', config.appStoreUrl], ['android', config.googlePlayUrl ?? config.androidPreviewUrl]]) {
+      if (url) {
+        assert.match(hero, new RegExp(`<a [^>]*data-hero-store="${store}"[^>]*href="${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`), `the hero lacks the ${store} link`);
+      } else {
+        assert.match(hero, new RegExp(`<span [^>]*data-hero-store="${store}"[^>]*aria-disabled="true"`), `the hero lacks the ${store} placeholder`);
+      }
+    }
+    const lead = hero.match(/<p class="lead"[^>]*>([\s\S]*?)<\/p>/)[1];
+    assert.ok(lead.length <= 120, `the hero lead has ${lead.length} characters; past 120 it pushes the buttons off a laptop screen`);
     const start = html.match(/<section[^>]*id="start"[\s\S]*?<\/section>/)[0];
     assert.ok(hrefs(start).includes(videosPage), `the steps section lacks a link to ${videosPage}`);
     const nav = html.match(/<nav class="top-nav"[\s\S]*?<\/nav>/)[0];

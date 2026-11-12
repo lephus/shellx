@@ -6,7 +6,8 @@ import SecurityFlow from './SecurityFlow.astro';
 import Downloads from './Downloads.astro';
 import VideoPlayer from './VideoPlayer.astro';
 import { ui, type Lang, pathFor } from '../i18n/ui';
-import { appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
+import { androidPreviewUrl, appStoreUrl, desktopVersion, discordUrl, googlePlayUrl, macDownloadUrl, windowsDownloadUrl } from '../lib/site';
+import { logos } from '../lib/logos';
 import { appId, author, capabilities, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
 import { video } from '../lib/videos';
 
@@ -25,6 +26,11 @@ const useCases = [
   { title: t.useCase2Title, body: t.useCase2Body, href: guidePath(lang, 'ssh-from-phone') },
   { title: t.useCase3Title, body: t.useCase3Body, href: guidePath(lang, 'remote-terminal-without-vpn') },
   { title: t.useCase4Title, body: t.useCase4Body, href: pathFor(lang, 'guides') },
+];
+// The hero's phone buttons: a link once there is one (the Android test build counts), else marked "Soon".
+const heroStores = [
+  { id: 'ios', label: t.heroIos, url: appStoreUrl, logo: logos.apple },
+  { id: 'android', label: t.heroAndroid, url: googlePlayUrl ?? androidPreviewUrl, logo: logos.phone },
 ];
 // Store listings only once they exist (site.config.json), so no structured data points at nothing.
 const mobileApps = [
@@ -109,12 +115,28 @@ const intro = video(lang, 'intro');
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
             <span data-os-label>{t.ctaFree}</span>
           </a>
-          <a class="btn btn-ghost" href="#video">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>
+          {
+            heroStores.map((s) =>
+              s.url ? (
+                <a class="btn btn-ghost btn-store" data-hero-store={s.id} href={s.url} rel="noopener">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={s.logo} /></svg>
+                  {s.label}
+                </a>
+              ) : (
+                <span class="btn btn-ghost btn-store is-soon" data-hero-store={s.id} aria-disabled="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={s.logo} /></svg>
+                  {s.label}<span class="soon">{t.heroSoon}</span>
+                </span>
+              ),
+            )
+          }
+        </div>
+        <p class="hero-video">
+          <a href="#video">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>
             {t.ctaWatch}
           </a>
-        </div>
-        <p class="e2e">{t.e2e}</p>
+        </p>
       </div>
       <HeroDemo text={t.heroDemoText} phoneStatus={t.heroPhoneStatus} />
     </div>
@@ -327,13 +349,21 @@ const intro = video(lang, 'intro');
 </Base>
 
 <style>
-  .hero { position: relative; overflow-x: clip; padding: 4.5rem 0 3rem; }
+  .hero { position: relative; overflow-x: clip; padding: 3.5rem 0 3rem; }
   .hero-grid { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 3rem; align-items: center; }
-  .hero h1 { font-size: clamp(2.6rem, 6.5vw, 4.6rem); font-weight: 700; margin-bottom: 1.1rem; }
-  .lead { font-size: 1.15rem; color: var(--muted); max-width: 34rem; margin: 0 0 2rem; }
+  .hero h1 { font-size: clamp(2.4rem, 5vw, 3.2rem); font-weight: 700; margin-bottom: 1.1rem; }
+  .lead { font-size: 1.15rem; color: var(--muted); max-width: 34rem; margin: 0 0 1.6rem; }
   .ctas { display: flex; flex-wrap: wrap; gap: 0.8rem; }
-  .e2e { margin: 1.75rem 0 0; color: var(--muted); font-size: 0.9rem; max-width: 34rem;
-         padding-left: 0.9rem; border-left: 2px solid var(--purple); }
+  .btn-store { padding-inline: 1.1rem; }
+  .btn-store.is-soon { color: var(--muted); cursor: default; }
+  .btn-store.is-soon:hover { border-color: var(--border); background: rgba(255, 255, 255, 0.03); }
+  .btn-store .soon {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid var(--border);
+  }
+  .hero-video { margin: 1.1rem 0 0; font-size: 0.95rem; }
+  .hero-video a { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--muted); text-decoration: none; }
+  .hero-video a:hover { color: var(--fg); }
   .eyebrow {
     display: inline-flex; align-items: center; gap: 0.55rem; margin: 0 0 1.1rem;
     padding: 0.3rem 0.85rem; border-radius: 999px; border: 1px solid var(--border);
