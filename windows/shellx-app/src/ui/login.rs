@@ -26,7 +26,7 @@ use std::time::Duration;
 use gpui::{
     AnyElement, App, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable,
     FontWeight, IntoElement, KeyDownEvent, Render, SharedString, Stateful, Subscription, Window,
-    div, prelude::*, px,
+    div, prelude::*, px, transparent_black,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::GooglePurpose;
@@ -48,6 +48,10 @@ use super::theme;
 
 /// Card width (the Mac's sheet).
 const CARD_W: f32 = 340.0;
+/// The corner of `ui/button.rs`'s buttons.
+const BUTTON_RADIUS: f32 = 7.0;
+/// The keyboard ring around a focused button, outside its own border.
+const RING_WIDTH: f32 = 2.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SignInEvent {
@@ -626,32 +630,44 @@ impl SignInDialog {
         }
     }
 
-    /// A button that can hold the keyboard: its focus handle, a 2 px ring while it holds it, and the
-    /// click handler only when it is enabled (GPUI clicks a focused element on Enter or Space).
+    /// A button that can hold the keyboard: its focus handle and its click handler, only while it is
+    /// enabled (GPUI clicks a focused element on Enter or Space; a disabled button takes no focus, so a
+    /// click on it never takes the keyboard: the card's handle gets it and gives it back). The ring that
+    /// shows the keyboard sits outside the button and never changes its box (review chunk 2 M-C): a
+    /// 2 px border that is always there, transparent until the button holds the keyboard. Google's
+    /// branded stroke stays as it is. `radius`: the button's corner; `wide`: the button fills the row.
+    #[allow(clippy::too_many_arguments)]
     fn focusable(
         &self,
         element: Stateful<Div>,
         control: DialogFocus,
         enabled: bool,
+        radius: f32,
+        wide: bool,
         window: &Window,
         cx: &Context<Self>,
         on_click: impl Fn(&mut Self, &mut Context<Self>) + 'static,
-    ) -> Stateful<Div> {
+    ) -> Div {
         let handle = self.handle_of(control, cx);
-        let focused = handle.is_focused(window);
-        let element = element.when(focused, |el| {
-            el.border_2()
-                .border_color(theme::hsla(palette::PRIMARY_LINE))
-        });
-        // A disabled button takes no focus handle: a click on it never takes the keyboard (the card's
-        // handle gets it and gives it back), and it has no click handler.
-        if enabled {
+        let ring = if handle.is_focused(window) {
+            theme::hsla(palette::PRIMARY_LINE)
+        } else {
+            transparent_black()
+        };
+        let element = if enabled {
             element
                 .track_focus(&handle)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| on_click(this, cx)))
         } else {
             element
-        }
+        };
+        div()
+            .flex()
+            .when(wide, |ring| ring.w_full())
+            .rounded(px(radius + RING_WIDTH))
+            .border(px(RING_WIDTH))
+            .border_color(ring)
+            .child(element)
     }
 
     fn title(text: &'static str) -> Div {
@@ -690,7 +706,7 @@ impl SignInDialog {
     }
 
     /// One button on its own line.
-    fn row(element: Stateful<Div>) -> AnyElement {
+    fn row(element: Div) -> AnyElement {
         div().flex().child(element).into_any_element()
     }
 
@@ -783,6 +799,8 @@ impl SignInDialog {
                         send,
                         DialogFocus::SendCode,
                         c.send,
+                        BUTTON_RADIUS,
+                        true,
                         window,
                         cx,
                         |this, cx| this.send_code(cx),
@@ -809,6 +827,8 @@ impl SignInDialog {
                             google,
                             DialogFocus::Google,
                             c.google_button,
+                            shellx_model::google_button::CORNER_RADIUS,
+                            false,
                             window,
                             cx,
                             |this, cx| this.start(cx),
@@ -852,6 +872,8 @@ impl SignInDialog {
                         verify,
                         DialogFocus::Verify,
                         c.verify,
+                        BUTTON_RADIUS,
+                        true,
                         window,
                         cx,
                         |this, cx| this.verify(cx),
@@ -869,6 +891,8 @@ impl SignInDialog {
                     resend,
                     DialogFocus::Resend,
                     c.resend,
+                    BUTTON_RADIUS,
+                    false,
                     window,
                     cx,
                     |this, cx| this.resend(cx),
@@ -883,6 +907,8 @@ impl SignInDialog {
                     change,
                     DialogFocus::ChangeEmail,
                     c.change,
+                    BUTTON_RADIUS,
+                    false,
                     window,
                     cx,
                     |this, cx| this.change_email(cx),
@@ -908,11 +934,16 @@ impl SignInDialog {
                 .flex()
                 .flex_row()
                 .justify_end()
-                .child(
-                    self.focusable(cancel, DialogFocus::Cancel, true, window, cx, |this, cx| {
-                        this.close(cx)
-                    }),
-                )
+                .child(self.focusable(
+                    cancel,
+                    DialogFocus::Cancel,
+                    true,
+                    BUTTON_RADIUS,
+                    false,
+                    window,
+                    cx,
+                    |this, cx| this.close(cx),
+                ))
                 .into_any_element(),
         );
         items
