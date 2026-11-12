@@ -39,6 +39,12 @@ def sdk_payloads(m):
     return pkg["id"], pkg.get("payloads", [])
 
 
+def matches(rx, file_name):
+    """The callers' regexes name a payload behind a backslash ("\\\\<cab>$"); the manifest has
+    used both "\\" and "/" as its separator, so match against the backslash form."""
+    return rx.search(file_name.replace("/", "\\"))
+
+
 def main():
     m = manifest()
     pid, payloads = sdk_payloads(m)
@@ -47,14 +53,14 @@ def main():
         rx = re.compile(sys.argv[2], re.I)
         print(pid)
         for p in payloads:
-            if rx.search(p["fileName"]):
+            if matches(rx, p["fileName"]):
                 print(p["fileName"], p.get("size"))
     elif mode == "get":
         out, rx = sys.argv[2], re.compile(sys.argv[3], re.I)
         os.makedirs(out, exist_ok=True)
         for p in payloads:
             name = p["fileName"].replace("\\", "/").rsplit("/", 1)[-1]
-            if not rx.search(p["fileName"]):
+            if not matches(rx, p["fileName"]):
                 continue
             dst = os.path.join(out, name)
             if not os.path.exists(dst):
