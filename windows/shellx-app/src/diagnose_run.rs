@@ -321,7 +321,9 @@ pub(crate) fn shells_text(
         Ok(start) => {
             let first = &start.plan.first;
             match &start.instead_of {
-                Some(missing) => format!("{} ({}) instead of {missing}", first.label, first.program),
+                Some(missing) => {
+                    format!("{} ({}) instead of {missing}", first.label, first.program)
+                }
                 None => format!("{} ({})", first.label, first.program),
             }
         }
@@ -589,7 +591,12 @@ pub fn run(open_folder: bool) -> i32 {
     }
     // A run from the Start menu has no console: it always shows something (B-2 review m6).
     if open_folder {
-        show_in_folder(&shown_after_writes(written.is_ok(), first_written, &path, &logs));
+        show_in_folder(&shown_after_writes(
+            written.is_ok(),
+            first_written,
+            &path,
+            &logs,
+        ));
     }
     if written.is_ok() { 0 } else { 1 }
 }
@@ -1347,9 +1354,12 @@ mod tests {
     fn the_shells_section_names_programs_never_arguments() {
         use crate::local_pty::PanePlan;
         use crate::local_pty::settings::{PaneStart, ShellSnapshot};
-        use shellx_model::shell::{CustomShellError, ShellChoice, ShellError, ShellKind, ShellLaunch};
+        use shellx_model::shell::{
+            CustomShellError, ShellChoice, ShellError, ShellKind, ShellLaunch,
+        };
         const SECRETS: [&str; 4] = ["hunter2pass", "phu@example.com", "secret2", "-pw"];
-        let custom_line = r#""C:\Program Files\PuTTY\plink.exe" -ssh -pw hunter2pass phu@example.com"#;
+        let custom_line =
+            r#""C:\Program Files\PuTTY\plink.exe" -ssh -pw hunter2pass phu@example.com"#;
         let found = vec![ShellLaunch {
             kind: Some(ShellKind::Pwsh),
             program: r"C:\Program Files\PowerShell\7\pwsh.exe".into(),
@@ -1367,7 +1377,11 @@ mod tests {
             &["-ssh", "-pw", "hunter2pass", "phu@example.com"],
             "plink.exe",
         );
-        let pwsh = cmd(r"C:\Program Files\PowerShell\7\pwsh.exe", &["-NoLogo"], "PowerShell 7");
+        let pwsh = cmd(
+            r"C:\Program Files\PowerShell\7\pwsh.exe",
+            &["-NoLogo"],
+            "PowerShell 7",
+        );
         let custom = ShellChoice::Custom {
             command_line: custom_line.into(),
         };
@@ -1375,23 +1389,40 @@ mod tests {
             (
                 snapshot(custom.clone(), None),
                 Ok(PaneStart {
-                    plan: PanePlan { first: plink.clone(), fallback: None },
+                    plan: PanePlan {
+                        first: plink.clone(),
+                        fallback: None,
+                    },
                     instead_of: None,
                 }),
                 r"custom command line; new tabs start plink.exe (C:\Program Files\PuTTY\plink.exe)",
             ),
             (
-                snapshot(ShellChoice::Auto, Some(r"C:\x\ssh.exe -pw secret2 phu@example.com")),
+                snapshot(
+                    ShellChoice::Auto,
+                    Some(r"C:\x\ssh.exe -pw secret2 phu@example.com"),
+                ),
                 Ok(PaneStart {
-                    plan: PanePlan { first: pwsh.clone(), fallback: None },
+                    plan: PanePlan {
+                        first: pwsh.clone(),
+                        fallback: None,
+                    },
                     instead_of: Some("ssh.exe".into()),
                 }),
                 r"automatic, overridden by SHELLX_SHELL; new tabs start PowerShell 7 (C:\Program Files\PowerShell\7\pwsh.exe) instead of ssh.exe",
             ),
             (
-                snapshot(ShellChoice::Known { shell: ShellKind::Pwsh }, None),
+                snapshot(
+                    ShellChoice::Known {
+                        shell: ShellKind::Pwsh,
+                    },
+                    None,
+                ),
                 Ok(PaneStart {
-                    plan: PanePlan { first: pwsh.clone(), fallback: None },
+                    plan: PanePlan {
+                        first: pwsh.clone(),
+                        fallback: None,
+                    },
                     instead_of: None,
                 }),
                 r"PowerShell 7; new tabs start PowerShell 7 (C:\Program Files\PowerShell\7\pwsh.exe)",
@@ -1413,22 +1444,32 @@ mod tests {
             ),
             (
                 snapshot(custom.clone(), None),
-                Err(ShellError::Custom(CustomShellError::NotFound("plink.exe -pw hunter2pass".into()))),
+                Err(ShellError::Custom(CustomShellError::NotFound(
+                    "plink.exe -pw hunter2pass".into(),
+                ))),
                 "custom command line; new tabs start no shell (the custom command line cannot start)",
             ),
             (
                 snapshot(ShellChoice::Auto, Some("ssh.exe -pw secret2")),
-                Err(ShellError::Override(CustomShellError::NotFound("ssh.exe -pw secret2".into()))),
+                Err(ShellError::Override(CustomShellError::NotFound(
+                    "ssh.exe -pw secret2".into(),
+                ))),
                 "automatic, overridden by SHELLX_SHELL; new tabs start no shell (SHELLX_SHELL cannot start)",
             ),
         ];
         for (snapshot, start, chosen) in cases {
             let (listed, text) = shells_text(&snapshot, &start);
             assert_eq!(text, chosen);
-            assert_eq!(listed, [r"PowerShell 7: C:\Program Files\PowerShell\7\pwsh.exe"]);
+            assert_eq!(
+                listed,
+                [r"PowerShell 7: C:\Program Files\PowerShell\7\pwsh.exe"]
+            );
             for secret in SECRETS {
                 assert!(!text.contains(secret), "{secret} in {text}");
-                assert!(!listed.iter().any(|l| l.contains(secret)), "{secret} in {listed:?}");
+                assert!(
+                    !listed.iter().any(|l| l.contains(secret)),
+                    "{secret} in {listed:?}"
+                );
             }
         }
     }

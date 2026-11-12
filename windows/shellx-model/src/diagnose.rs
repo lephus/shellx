@@ -847,7 +847,10 @@ mod tests {
         // B-2 review m5: the cmd banner and prompts often hold "42"; the marker cannot.
         assert_eq!(
             (cmd.steps[0].input, cmd.steps[0].expect),
-            ("set /a x=6*7 >nul & call echo shellx-ok-%x%", "shellx-ok-42")
+            (
+                "set /a x=6*7 >nul & call echo shellx-ok-%x%",
+                "shellx-ok-42"
+            )
         );
         // No one-line step can pass on the typed text alone.
         for script in [
