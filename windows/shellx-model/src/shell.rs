@@ -17,6 +17,27 @@ pub enum ShellKind {
     Wsl,
 }
 
+/// The name a person knows a shell by (Settings, a pane that says what it started). Product
+/// names, the same in every language.
+pub fn kind_label(kind: ShellKind) -> &'static str {
+    match kind {
+        ShellKind::Pwsh => "PowerShell 7",
+        ShellKind::WindowsPowerShell => "Windows PowerShell",
+        ShellKind::Cmd => "Command Prompt",
+        ShellKind::GitBash => "Git Bash",
+        ShellKind::Wsl => "WSL",
+    }
+}
+
+/// A launch's name: its kind's, or for a custom command line the program's file name
+/// (`bash.exe`).
+pub fn launch_label(l: &ShellLaunch) -> String {
+    match l.kind {
+        Some(kind) => kind_label(kind).to_string(),
+        None => file_name(&l.program).to_string(),
+    }
+}
+
 /// A program to start in a pane. `kind` is `None` for a custom command line.
 /// `osc7_hook` says the arguments already carry the prompt hook that reports the
 /// working directory.
@@ -170,7 +191,7 @@ fn is_separator(c: char) -> bool {
 /// `X:\...`, `X:/...` or `\\server\...` (two separators, then a server name). An empty, `.`,
 /// relative, drive-relative (`C:x`) or bare `\\` path is not: the process would resolve it
 /// against whatever folder ShellX was started from.
-fn is_absolute(path: &str) -> bool {
+pub fn is_absolute(path: &str) -> bool {
     let c: Vec<char> = path.chars().take(3).collect();
     let drive = c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && is_separator(c[2]);
     let unc = c.len() == 3 && is_separator(c[0]) && is_separator(c[1]) && !is_separator(c[2]);
@@ -1247,7 +1268,10 @@ mod tests {
     #[test]
     fn shells_have_display_names() {
         assert_eq!(kind_label(ShellKind::Pwsh), "PowerShell 7");
-        assert_eq!(kind_label(ShellKind::WindowsPowerShell), "Windows PowerShell");
+        assert_eq!(
+            kind_label(ShellKind::WindowsPowerShell),
+            "Windows PowerShell"
+        );
         assert_eq!(kind_label(ShellKind::Cmd), "Command Prompt");
         assert_eq!(kind_label(ShellKind::GitBash), "Git Bash");
         assert_eq!(kind_label(ShellKind::Wsl), "WSL");

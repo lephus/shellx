@@ -7,7 +7,7 @@
 //! hands back the values of removed panes, whose drop kills their shell.
 //!
 //! Also here: the pane-area geometry the window lays out and `Tabs::focus_dir`
-//! uses, and the one way a local pane (PowerShell on ConPTY) is started.
+//! uses, and the one way a local pane (a shell on ConPTY) is started.
 
 // The window (cfg(windows)) is the main user; the Mac build only tests it.
 #![cfg_attr(not(windows), allow(dead_code))]
@@ -20,7 +20,7 @@ use anyhow::Result;
 use shellx_model::layout::{PaneId, Rect};
 use shellx_model::tabs::{PaneTarget, Tabs};
 
-use crate::local_pty::{LocalPty, default_shell};
+use crate::local_pty::{LocalPty, PanePlan, ShellCmd, default_shell};
 use crate::term_core::TermCore;
 
 /// Width of the line between split panes (`Layout::rects` divider), in px.
@@ -146,12 +146,84 @@ pub struct LocalPane {
     pub reader: Box<dyn Read + Send>,
 }
 
-/// Starts the default shell (PowerShell, or `SHELLX_SHELL`) with
-/// `extra_args` added, on a `cols` x `rows` pseudoconsole.
-pub fn spawn_local_pane(cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
-    let (link, reader) = default_shell().spawn(extra_args, cols, rows)?;
+/// A pane whose shell started: which one (`used`, a label) and, when the
+/// plan's first program could not start, its label and why.
+pub struct StartedPane {
+    pub pane: LocalPane,
+    #[allow(dead_code)] // the pane's fallback notice (Task A2)
+    pub used: String,
+    #[allow(dead_code)] // the pane's fallback notice (Task A2)
+    pub fell_back: Option<(String, String)>,
+}
+
+/// No program of the plan could start: each attempt's label, program and
+/// error, in order.
+#[derive(Debug)]
+pub struct StartFailure {
+    pub attempts: Vec<(String, String, String)>,
+}
+
+/// One line, in English: "label (program): error; ..." (the pane's text
+/// until it says it in the app's language, Task A2).
+impl std::fmt::Display for StartFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, (label, program, error)) in self.attempts.iter().enumerate() {
+            if i > 0 {
+                f.write_str("; ")?;
+            }
+            let error = error.split_whitespace().collect::<Vec<_>>().join(" ");
+            write!(f, "{label} ({program}): {error}")?;
+        }
+        Ok(())
+    }
+}
+
+fn start_local(cmd: &ShellCmd, cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
+    let (link, reader) = cmd.spawn(extra_args, cols, rows)?;
     let core = TermCore::new(link.clone(), cols, rows)?;
     Ok(LocalPane { core, link, reader })
+}
+
+/// Starts the plan's first shell with `extra_args` added, on a `cols` x
+/// `rows` pseudoconsole; when it cannot start, the fallback once (Ruling 15).
+pub fn spawn_local_pane_with(
+    plan: &PanePlan,
+    cols: u16,
+    rows: u16,
+    extra_args: &[&str],
+) -> Result<StartedPane, StartFailure> {
+    let mut attempts: Vec<(String, String, String)> = Vec::new();
+    for cmd in std::iter::once(&plan.first).chain(plan.fallback.as_ref()) {
+        match start_local(cmd, cols, rows, extra_args) {
+            Ok(pane) => {
+                let fell_back = attempts
+                    .first()
+                    .map(|(label, _, error)| (label.clone(), error.clone()));
+                return Ok(StartedPane {
+                    pane,
+                    used: cmd.label.clone(),
+                    fell_back,
+                });
+            }
+            Err(error) => {
+                attempts.push((cmd.label.clone(), cmd.program.clone(), format!("{error:#}")))
+            }
+        }
+    }
+    Err(StartFailure { attempts })
+}
+
+/// Starts the default shell (`local_pty::default_shell`) with `extra_args`
+/// added, on a `cols` x `rows` pseudoconsole, without a fallback (`--smoke`
+/// checks that shell itself).
+pub fn spawn_local_pane(cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
+    let plan = PanePlan {
+        first: default_shell(),
+        fallback: None,
+    };
+    spawn_local_pane_with(&plan, cols, rows, extra_args)
+        .map(|started| started.pane)
+        .map_err(|failure| anyhow::anyhow!("{failure}"))
 }
 
 #[cfg(test)]
@@ -328,10 +400,18 @@ mod tests {
             if let Ok(bytes) = rx.recv_timeout(Duration::from_millis(100)) {
                 core.feed(&bytes);
             }
-            if core.text_lines().unwrap().iter().any(|l| l.contains("ok-42")) {
+            if core
+                .text_lines()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("ok-42"))
+            {
                 break;
             }
-            assert!(Instant::now() < deadline, "no ok-42 from the fallback shell");
+            assert!(
+                Instant::now() < deadline,
+                "no ok-42 from the fallback shell"
+            );
         }
     }
 
@@ -356,7 +436,12 @@ mod tests {
             tried,
             [("one", "/nonexistent/one"), ("two", "/nonexistent/two")]
         );
-        assert!(failure.attempts.iter().all(|(_, _, e)| !e.trim().is_empty()));
+        assert!(
+            failure
+                .attempts
+                .iter()
+                .all(|(_, _, e)| !e.trim().is_empty())
+        );
         // one line that names both, for the pane until it says it in the app's language
         let text = failure.to_string();
         assert!(!text.contains('\n'), "{text}");

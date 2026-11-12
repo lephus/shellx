@@ -66,6 +66,7 @@ use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
+use shellx_model::shell::{CustomShellError, ShellError};
 use shellx_model::strings::{Lang, Str, save_link_failed, t};
 
 use super::app::Services;
@@ -73,6 +74,7 @@ use super::button::{Kind, button};
 use super::theme;
 use crate::fonts;
 use crate::ime::{self, ImeTarget};
+use crate::local_pty::settings::shells;
 use crate::local_pty::{LocalPty, spawn_reader};
 use crate::os_info;
 use crate::remote_link::{Applied, PaneEvent, Paste, RemoteMirror};
@@ -80,7 +82,7 @@ use crate::remote_session::{RemotePane, RemoteSession, SessionStatus};
 use crate::remote_tabs::{OpenError, Overlay, Tone, coalesce, failed_overlay, overlay};
 use crate::shell_info::{BASE_TITLE, ScreenReaderProbe, a11y_title_env, window_title};
 use crate::term_core::{PtyLink, TermCore, rgb};
-use crate::workspace::spawn_local_pane;
+use crate::workspace::spawn_local_pane_with;
 
 /// What a pane tells RootView.
 pub(super) enum TermEvent {
@@ -307,11 +309,19 @@ impl TermView {
         }
     }
 
-    /// A local pane: PowerShell (or `SHELLX_SHELL`) on ConPTY.
+    /// A local pane on ConPTY: the shell `shells()` plans for a new pane
+    /// (Auto, the stored choice or `SHELLX_SHELL`), or its one fallback.
     pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
-        match spawn_local_pane(80, 24, &[]) {
+        let started = shells()
+            .plan_for_new_pane()
+            .map_err(|error| plan_error_line(&error))
+            .and_then(|plan| {
+                spawn_local_pane_with(&plan, 80, 24, &[]).map_err(|failure| failure.to_string())
+            });
+        match started {
             Ok(started) => {
+                let started = started.pane;
                 let (link, core, reader) = (started.link, started.core, started.reader);
                 view.backend = Backend::Local { core, link };
                 let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
@@ -362,7 +372,7 @@ impl TermView {
                 })
                 .detach();
             }
-            Err(error) => view.error = Some(format!("{error:#}")),
+            Err(error) => view.error = Some(error),
         }
         view
     }
@@ -889,6 +899,21 @@ fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
                     .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TermEvent::Retry))),
             ),
         )
+}
+
+/// A shell plan that names no program, in one English line (Task A2 says it
+/// in the app's language).
+fn plan_error_line(error: &ShellError) -> String {
+    let custom = |e: &CustomShellError| match e {
+        CustomShellError::Empty => "the command line is empty".to_string(),
+        CustomShellError::UnclosedQuote => "a closing quotation mark is missing".to_string(),
+        CustomShellError::NotFound(program) => format!("can't find the program {program}"),
+    };
+    match error {
+        ShellError::NoShellFound => "no shell was found on this PC".to_string(),
+        ShellError::Custom(e) => format!("Settings › Terminal: {}", custom(e)),
+        ShellError::Override(e) => format!("SHELLX_SHELL: {}", custom(e)),
+    }
 }
 
 /// The short status line at the bottom of a pane (`TermView::flash`).
