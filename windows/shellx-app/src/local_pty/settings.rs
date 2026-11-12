@@ -1206,6 +1206,31 @@ mod tests {
     }
 
     #[test]
+    fn an_uninstalled_stored_shell_shows_automatic_as_chosen() {
+        let found = find_shells(&probe(), &|p: &str| [PWSH, WINPS, CMD].contains(&p));
+        let git = ShellChoice::Known {
+            shell: ShellKind::GitBash,
+        };
+        // the lookup ended without Git Bash: new tabs start Automatic, and that row shows it
+        assert_eq!(shown_choice(&git, &found, true), ShellChoice::Auto);
+        // before the first lookup ends nothing is known yet: the stored row
+        assert_eq!(shown_choice(&git, &[], false), git);
+        // an installed one, Automatic and a custom line are shown as stored
+        let cmd = ShellChoice::Known {
+            shell: ShellKind::Cmd,
+        };
+        assert_eq!(shown_choice(&cmd, &found, true), cmd);
+        assert_eq!(
+            shown_choice(&ShellChoice::Auto, &found, true),
+            ShellChoice::Auto
+        );
+        let custom = ShellChoice::Custom {
+            command_line: "wsl.exe".into(),
+        };
+        assert_eq!(shown_choice(&custom, &found, true), custom);
+    }
+
+    #[test]
     fn shell_options_list_auto_found_and_custom() {
         use ShellKind::*;
         let all = find_shells(&probe(), &|p: &str| {
