@@ -450,7 +450,7 @@ fn spawn_job(tx: &Sender<Msg>, name: &str, on_fail: Msg, job: impl FnOnce() + Se
         .name(format!("shellx-remote-{name}"))
         .spawn(job)
     {
-        eprintln!("shellx: could not start the {name} job: {error}");
+        log::warn!("shellx: could not start the {name} job: {error}");
         let _ = tx.send(on_fail);
     }
 }

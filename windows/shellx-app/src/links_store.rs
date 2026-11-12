@@ -85,7 +85,7 @@ impl LinksStore {
                 Ok(links) => Ok(links),
                 Err(e) => {
                     let bad = quarantine(path)?;
-                    eprintln!(
+                    log::warn!(
                         "shellx: {} is not valid ({e}); moved it to {} and starting with no links",
                         path.display(),
                         bad.display()

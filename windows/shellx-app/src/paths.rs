@@ -40,6 +40,19 @@ fn native_dir_from(
     }
 }
 
+/// The logs folder: `native_dir()\logs` (`%LOCALAPPDATA%\ShellX\native\logs`), else
+/// `%TEMP%\ShellX\logs` when `LOCALAPPDATA` is unusable (Ruling 12). Not created.
+pub fn logs_dir() -> PathBuf {
+    logs_dir_from(native_dir(), std::env::temp_dir())
+}
+
+fn logs_dir_from(native: io::Result<PathBuf>, temp: PathBuf) -> PathBuf {
+    match native {
+        Ok(native) => native.join("logs"),
+        Err(_) => temp.join("ShellX").join("logs"),
+    }
+}
+
 /// Creates the directory (and parents). On unix it is 0700, which shellx-core
 /// requires of its state dir; Windows keeps the inherited ACL.
 fn ensure(path: PathBuf) -> io::Result<PathBuf> {

@@ -71,7 +71,12 @@ fn main() {
     }
 
     #[cfg(any(windows, target_os = "macos"))]
-    ui::run();
+    {
+        // Only the window writes the log (Ruling 12).
+        logger::install(&paths::logs_dir());
+        log::info!("ShellX {} starting", env!("CARGO_PKG_VERSION"));
+        ui::run();
+    }
 
     #[cfg(not(any(windows, target_os = "macos")))]
     {

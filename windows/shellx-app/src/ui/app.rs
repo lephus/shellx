@@ -72,7 +72,7 @@ pub fn run() {
             .text_system()
             .add_fonts(fonts::embedded().into_iter().map(Cow::Borrowed).collect())
         {
-            eprintln!("failed to register the embedded fonts: {error:#}");
+            log::warn!("failed to register the embedded fonts: {error:#}");
         }
         cx.set_global(Services {
             lang: Lang::from_system(

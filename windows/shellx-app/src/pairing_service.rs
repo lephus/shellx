@@ -233,7 +233,7 @@ impl PairingService {
     pub fn load_links(&mut self) {
         match self.store.load() {
             Ok(links) => self.links = links,
-            Err(e) => eprintln!("shellx: could not read the remote links: {e}"),
+            Err(e) => log::warn!("shellx: could not read the remote links: {e}"),
         }
     }
 

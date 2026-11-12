@@ -15,6 +15,8 @@ anyhow = "1"
 async-channel = "2"
 cmux-pty = { path = "../../cmux-tui/crates/cmux-pty" }
 ghostty-vt = { path = "../../cmux-tui/crates/ghostty-vt" }
+# The log file (logger.rs); already in the tree through gpui.
+log = "0.4"
 shellx-core = { path = "../../shellx-core" }
 shellx-model = { path = "../shellx-model" }
 shellx-remote = { path = "../shellx-remote" }

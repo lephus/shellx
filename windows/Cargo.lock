@@ -4931,6 +4931,7 @@ dependencies = [
  "embed-resource",
  "ghostty-vt",
  "gpui",
+ "log",
  "serde_json",
  "shellx-core",
  "shellx-fake-api",
