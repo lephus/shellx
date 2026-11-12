@@ -19,6 +19,8 @@ mod crash;
 mod crash_native;
 mod cwd;
 mod diagnose_run;
+#[cfg(test)]
+mod exe_resource;
 mod fonts;
 mod icons;
 mod ime;

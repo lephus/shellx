@@ -517,4 +517,16 @@ mod tests {
             assert!(!forget_remembered_after_report(&p), "{p:?}");
         }
     }
+
+    #[test]
+    fn the_installer_names_the_app_mutex_and_the_diagnostics_entry() {
+        // Built from the constant, so the installer and the app cannot drift (plan review
+        // M-25).
+        let iss = include_str!("../../installer/shellx-native.iss");
+        let mutex_line = format!("AppMutex={APP_MUTEX_NAME}");
+        assert!(iss.lines().any(|l| l.trim() == mutex_line), "{mutex_line} missing");
+        assert!(iss.contains(r#"Parameters: "--diagnose""#));
+        assert!(iss.contains("vietnamese.DiagnoseShortcut=ShellX – Chẩn đoán"));
+        assert!(iss.contains("english.DiagnoseShortcut=ShellX – Diagnostics"));
+    }
 }
