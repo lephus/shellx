@@ -2,6 +2,19 @@
 //!
 //! Hand-written scanning (no regex crate). The four passes run in this order and repeat
 //! until the text no longer changes.
+//!
+//! Known limits (kept on purpose; each would cost more readable text than it protects):
+//! - A prefix glued to a UUID (`machine-0e7a...`) is one run: it is kept when it is hex and
+//!   dashes only, hidden when the prefix has other letters and the run is 32+ characters.
+//! - Constant names such as `D3D11_CREATE_DEVICE_BGRA_SUPPORT` (32+ characters, with a
+//!   digit) read as tokens.
+//! - A code more than 24 characters away from its keyword, or split (`123 456`), is not hidden;
+//!   neither is an email written `%40` or `\u0040`.
+//! - Hex-only secrets are kept; the relay's secrets are base64url.
+//! - A joined CamelCase name with 8+ capitals, 8+ lower-case letters and 32+ characters reads
+//!   as a token (`JetBrainsMonoNerdFontMono-ExtraBoldItalic`).
+//! - A code keyword in capitals glued to a capitalised word (`OTPCode`) is not recognised.
+//! - A Windows SID (`S-1-5-21-...-1001`) is hidden: it is long, with digits and dashes.
 
 /// Shortest run of token characters (without a trailing `=`) that counts as a secret.
 const TOKEN_MIN_CHARS: usize = 32;
@@ -114,8 +127,10 @@ fn redact_emails(text: &str) -> String {
     out
 }
 
+/// A Resend key is `re_` and then letters, digits, `_` or `-` (a relay token can hold `-`
+/// too, so a longer run with `re_` inside is judged as a token, not cut as a key).
 fn is_key_char(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_'
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
 }
 
 /// The end (exclusive) of a Resend key that starts at `i`: `re_` and at least 8 key chars.
@@ -138,7 +153,8 @@ fn redact_keys(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
     while i < chars.len() {
-        let after_word = i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_');
+        let after_word =
+            i > 0 && (chars[i - 1].is_alphanumeric() || matches!(chars[i - 1], '_' | '-'));
         if !after_word && let Some(end) = key_end(&chars, i) {
             out.push_str("<key>");
             i = end;
@@ -160,19 +176,29 @@ fn is_base64_char(c: char) -> bool {
     is_url_safe_char(c) || c == '+' || c == '/'
 }
 
-/// A URL-safe token: at least 32 characters with a letter and a digit, and not only hex
+/// Looks random rather than like a name: a digit, or both cases well represented (at least
+/// 8 upper-case and 8 lower-case ASCII letters). Random base64url values have a digit in all
+/// but about 1 in 1 600; `SOME_LONG_CONSTANT_NAME` has no lower case and
+/// `CreateSwapChainForCompositionSurfaceHandle` has only 7 capitals.
+fn looks_random(run: &[char]) -> bool {
+    let upper = run.iter().filter(|c| c.is_ascii_uppercase()).count();
+    let lower = run.iter().filter(|c| c.is_ascii_lowercase()).count();
+    run.iter().any(char::is_ascii_digit) || (upper >= 8 && lower >= 8)
+}
+
+/// A URL-safe token: at least 32 characters with a letter, `looks_random`, and not only hex
 /// digits and dashes (machine ids, commit ids and checksums stay readable).
 fn is_url_safe_token(run: &[char]) -> bool {
     run.len() >= TOKEN_MIN_CHARS
         && run.iter().any(char::is_ascii_alphabetic)
-        && run.iter().any(char::is_ascii_digit)
+        && looks_random(run)
         && !run.iter().all(|c| c.is_ascii_hexdigit() || *c == '-')
 }
 
 /// `/` never joins a token, so a path or URL is judged piece by piece. Two kinds of secret
 /// are hidden: (a) a URL-safe run (`[A-Za-z0-9_-]`, 43 characters for the relay's tokens)
 /// that `is_url_safe_token`; (b) a standard base64 run (`[A-Za-z0-9+/_-]`, then any `=`
-/// padding) of at least 32 characters with a digit that contains `+` or ends with `=`.
+/// padding) of at least 32 characters that `looks_random` and contains `+` or ends with `=`.
 fn redact_tokens(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());
@@ -192,9 +218,8 @@ fn redact_tokens(text: &str) -> String {
             k += 1;
         }
         let run = &chars[i..j];
-        let standard_base64 = run.len() >= TOKEN_MIN_CHARS
-            && run.iter().any(char::is_ascii_digit)
-            && (run.contains(&'+') || k > j);
+        let standard_base64 =
+            run.len() >= TOKEN_MIN_CHARS && looks_random(run) && (run.contains(&'+') || k > j);
         if standard_base64 {
             out.push_str("<token>");
         } else {
@@ -237,20 +262,30 @@ fn lower(c: char) -> char {
     c.to_lowercase().next().unwrap_or(c)
 }
 
-/// Whether `text[from..to]` holds one of the code words as a whole word: the characters
-/// right before and after it (even outside the window) are not letters, so `encoder`,
-/// `decode`, `Unicode` and `barcode` do not count, while `error_code` and `code=` do.
+/// Whether `text[from..to]` holds one of the code words as a whole word. A word starts after
+/// a non-letter or at a lower-to-upper case change (`signInCode`, `otpCode`), and ends before
+/// a non-letter, or before one `s`/`S` and then a non-letter (`codes`, `OTPs`). The characters
+/// just outside the window count too, so `encoder`, `decode`, `Unicode`, `barcode` and
+/// `codesign` do not match, while `error_code` and `code=` do.
 fn mentions_code(text: &[char], from: usize, to: usize) -> bool {
     (from..to).any(|a| {
         CODE_WORDS.iter().any(|word| {
             let b = a + word.len();
-            b <= to
-                && text[a..b]
+            if b > to
+                || !text[a..b]
                     .iter()
                     .zip(word.iter())
                     .all(|(c, w)| lower(*c) == *w)
-                && (a == 0 || !text[a - 1].is_alphabetic())
-                && text.get(b).is_none_or(|c| !c.is_alphabetic())
+            {
+                return false;
+            }
+            let starts = a == 0
+                || !text[a - 1].is_alphabetic()
+                || (text[a - 1].is_lowercase() && text[a].is_uppercase());
+            let ends = text.get(b).is_none_or(|c| !c.is_alphabetic())
+                || (matches!(text[b], 's' | 'S')
+                    && text.get(b + 1).is_none_or(|c| !c.is_alphabetic()));
+            starts && ends
         })
     })
 }
@@ -441,6 +476,107 @@ mod tests {
             &format!("123456{}coded", " ".repeat(20)),
         ] {
             assert_eq!(redact(text), text, "{text}");
+        }
+    }
+
+    #[test]
+    fn a_token_without_a_digit_is_still_hidden() {
+        // 43 base64url characters, mixed case with `-` and `_`, no digit
+        const NO_DIGIT: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz-_aBcDeFgHiJkLmNo";
+        assert_eq!(NO_DIGIT.len(), 43);
+        assert!(!NO_DIGIT.chars().any(|c| c.is_ascii_digit()));
+        assert_eq!(redact(NO_DIGIT), "<token>");
+        assert_eq!(
+            redact(&format!("Authorization: Bearer {NO_DIGIT}")),
+            "Authorization: Bearer <token>"
+        );
+        assert_eq!(
+            redact(&format!(r#"{{"token":"{NO_DIGIT}"}}"#)),
+            r#"{"token":"<token>"}"#
+        );
+        assert_eq!(
+            redact(&format!("/cb?state={NO_DIGIT}&x=1")),
+            "/cb?state=<token>&x=1"
+        );
+        // a standard base64 value without a digit: it has `+` and mixed case
+        let b64 = "AbCdEfGhIjKlMnOpQrSt+UvWxYzaBcDeFgHiJkLm/No=";
+        assert_eq!(redact(b64), "<token>");
+        // names stay readable: no digit and not mixed case enough
+        for text in [
+            "ERROR_GRAPHICS_OPM_PROTECTED_OUTPUT_DOES_NOT_HAVE_COPP_SEMANTICS",
+            "some_very_long_snake_case_identifier_name_here",
+            "CreateSwapChainForCompositionSurfaceHandle",
+            "failed in CreateSwapChainForCompositionSurfaceHandle: 0x887A0005",
+        ] {
+            assert_eq!(redact(text), text);
+        }
+    }
+
+    #[test]
+    fn camel_case_and_plural_code_words_count() {
+        for text in [
+            "signInCode: 123456",
+            "emailCode=123456",
+            r#"{"otpCode":"123456"}"#,
+            "codes: 123456",
+            "OTPs 123456",
+            "otps 123456",
+            "Mãs 123456",
+        ] {
+            assert!(!redact(text).contains("123456"), "{text}");
+        }
+        for text in [
+            "encoder 654321 frames",
+            "decode 123456",
+            "Unicode 123456",
+            "barcode 123456",
+            "codesign 123456",
+            "decodes 123456",
+            "Unicodes 123456",
+            "barcodes 123456",
+            "codec 123456",
+            "hotplugs 123456",
+        ] {
+            assert_eq!(redact(text), text, "{text}");
+        }
+    }
+
+    #[test]
+    fn a_relay_token_with_re_inside_is_not_cut_as_a_resend_key() {
+        // `-re_` inside a longer run: the whole run is a token, nothing stays readable
+        assert_eq!(
+            redact("Bearer AbCdEfGhIjKlMnOpQrSt-re_Wx9z0123456789AbCdE"),
+            "Bearer <token>"
+        );
+        // a 43-character token that starts with `re_`
+        let starts = "re_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-Ab";
+        assert_eq!(starts.len(), 43);
+        for text in [
+            starts.to_string(),
+            format!("Bearer {starts}"),
+            format!("x={starts}"),
+        ] {
+            let out = redact(&text);
+            assert!(!out.contains("AbCd") && !out.contains("0123"), "{out}");
+            assert!(out.ends_with("<token>") || out.ends_with("<key>"), "{out}");
+        }
+        // real Resend keys stay `<key>` alone
+        assert_eq!(redact("Bearer re_AbCdEf123_xyz"), "Bearer <key>");
+        assert_eq!(
+            redact(r#"{"key":"re_AbCdEf123_xyz"}"#),
+            r#"{"key":"<key>"}"#
+        );
+        assert_eq!(
+            redact("RESEND_API_KEY=re_AbCdEf123_xyz"),
+            "RESEND_API_KEY=<key>"
+        );
+        for s in [
+            "Bearer AbCdEfGhIjKlMnOpQrSt-re_Wx9z0123456789AbCdE",
+            "-re_abcdefgh",
+            "a-re_abcdefghij",
+        ] {
+            let once = redact(s);
+            assert_eq!(redact(&once), once, "{s}");
         }
     }
 

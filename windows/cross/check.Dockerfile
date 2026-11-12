@@ -2,7 +2,7 @@
 # arm64 Linux host (Docker on this Mac). Used by scripts/shellx/check-windows-build.sh; runs
 # check-in-container.sh. The installer image is Dockerfile; this one has no wine, msitools,
 # xvfb, Inno Setup or fxc.exe, because the check uses cargo's dev profile, in which gpui
-# compiles no shaders.
+# compiles no shaders (the --release check uses fxc-standin.sh, which compiles none either).
 #
 #   rustc + cargo-xwin: MSVC CRT and Windows SDK libs via xwin
 #   clang/lld/llvm 18: clang-cl, lld-link, llvm-lib, llvm-rc for cc-rs, rustc and embed-resource
@@ -48,7 +48,7 @@ RUN arch="$(uname -m)" \
  && rm /tmp/zig.tar.xz \
  && zig version
 
-COPY llvm-rc.sh zig-libc-msvc.sh check-in-container.sh /opt/winbuild/
+COPY llvm-rc.sh zig-libc-msvc.sh check-in-container.sh fxc-standin.sh /opt/winbuild/
 RUN chmod +x /opt/winbuild/*.sh
 
 # Caches live on the shellx-wincheck-cache volume at /cache. XWIN_INCLUDE_DEBUG_SYMBOLS keeps

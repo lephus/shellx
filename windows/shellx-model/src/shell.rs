@@ -163,18 +163,23 @@ fn file_name(path: &str) -> &str {
     path.rsplit(['\\', '/']).next().unwrap_or(path)
 }
 
-/// `X:\...`, `X:/...` or `\\server\...`. An empty, `.`, relative or drive-relative (`C:x`) path
-/// is not: the process would resolve it against whatever folder ShellX was started from.
+fn is_separator(c: char) -> bool {
+    c == '\\' || c == '/'
+}
+
+/// `X:\...`, `X:/...` or `\\server\...` (two separators, then a server name). An empty, `.`,
+/// relative, drive-relative (`C:x`) or bare `\\` path is not: the process would resolve it
+/// against whatever folder ShellX was started from.
 fn is_absolute(path: &str) -> bool {
     let c: Vec<char> = path.chars().take(3).collect();
-    let drive =
-        c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && matches!(c[2], '\\' | '/');
-    let unc = c.len() >= 2 && c[0] == '\\' && c[1] == '\\';
+    let drive = c.len() == 3 && c[0].is_ascii_alphabetic() && c[1] == ':' && is_separator(c[2]);
+    let unc = c.len() == 3 && is_separator(c[0]) && is_separator(c[1]) && !is_separator(c[2]);
     drive || unc
 }
 
-/// Finds the file `program` names. A name with `\`, `/` or `:` is checked as given, then
-/// with `.exe` added when it has no extension; any other name is looked up in each
+/// Finds the file `program` names. A name with `\`, `/` or `:` must be an absolute path (a
+/// relative one gives `None`); it is checked as given, then with `.exe` added when it has no
+/// extension; any other name is looked up in each
 /// `;`-separated `PATH` entry (quotes stripped), plain then `.exe`. Entries that are not
 /// absolute (empty, `.`, relative) are skipped, so a program in ShellX's working folder is
 /// never chosen. The first existing file wins.
@@ -187,6 +192,10 @@ pub fn resolve_program(
         return None;
     }
     if program.contains(['\\', '/', ':']) {
+        // a path must be absolute: a relative one would be looked for in ShellX's folder
+        if !is_absolute(program) {
+            return None;
+        }
         if exists(program) {
             return Some(program.to_string());
         }
@@ -215,17 +224,19 @@ pub fn resolve_program(
 
 /// A custom shell typed as a command line: its program must exist (the Settings field
 /// calls this on every edit). The result has no kind and no prompt hook. A whole line that
-/// is a path to a file (spaces allowed, `.exe` optional) is that program with no arguments.
+/// is an absolute path to a file (spaces allowed, `.exe` optional) is that program with no
+/// arguments. The program of a parsed line is a bare name or an absolute path, never a
+/// relative path.
 pub fn custom_launch(
     line: &str,
     probe: &ShellProbe,
     exists: &dyn Fn(&str) -> bool,
 ) -> Result<ShellLaunch, CustomShellError> {
     // An unquoted path with spaces that names a file (with or without `.exe`) is that program
-    // with no arguments. Only a value that looks like a path can be one: a bare name is
-    // looked up on PATH, never in the current folder.
+    // with no arguments. Only an absolute path can be one: a bare name is looked up on PATH
+    // and a relative path is refused, so the current folder is never searched.
     let whole = line.trim();
-    if whole.contains(['\\', '/', ':'])
+    if is_absolute(whole)
         && let Some(program) = resolve_program(whole, probe, exists)
     {
         return Ok(ShellLaunch {
@@ -289,11 +300,13 @@ pub enum ShellError {
     Override(CustomShellError),
 }
 
+/// An environment value used as a folder: trimmed, absolute (a relative one would be the
+/// current folder in disguise), without a trailing backslash.
 fn base(value: &Option<String>) -> Option<&str> {
     value
         .as_deref()
         .map(str::trim)
-        .filter(|v| !v.is_empty())
+        .filter(|v| is_absolute(v))
         .map(|v| v.trim_end_matches('\\'))
 }
 
@@ -341,7 +354,7 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         .comspec
         .as_deref()
         .map(str::trim)
-        .filter(|c| !c.is_empty() && exists(c))
+        .filter(|c| is_absolute(c) && exists(c))
         .map(String::from);
     let cmd = comspec.or_else(|| {
         let p = format!(r"{system_root}\System32\cmd.exe");
@@ -377,8 +390,9 @@ fn auto_shells(found: &[ShellLaunch]) -> impl Iterator<Item = &ShellLaunch> {
     })
 }
 
+/// Windows ignores case (Unicode, `Phú` and `PHÚ` are one folder) and accepts `/` for `\\`.
 fn same_program(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
+    a.replace('/', "\\").to_lowercase() == b.replace('/', "\\").to_lowercase()
 }
 
 /// The first Auto shell that is not the program in `first`: the one fallback.
@@ -1091,6 +1105,171 @@ mod tests {
         );
         assert_eq!(
             plan.unwrap().fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+    }
+
+    #[test]
+    fn a_bare_unc_prefix_is_not_an_absolute_path_entry() {
+        let probe = ShellProbe {
+            path: r"\;//;\\;C:\Program Files\PowerShell\7".into(),
+            ..ShellProbe::default()
+        };
+        let ex = exists_in(&[
+            r"\\\pwsh.exe",
+            r"\pwsh.exe",
+            r"C:\Program Files\PowerShell\7\pwsh.exe",
+        ]);
+        let found = find_shells(&probe, &ex);
+        assert_eq!(found[0].program, r"C:\Program Files\PowerShell\7\pwsh.exe");
+        assert_eq!(
+            resolve_program("pwsh", &probe, &ex),
+            Some(r"C:\Program Files\PowerShell\7\pwsh.exe".to_string())
+        );
+    }
+
+    #[test]
+    fn the_whole_value_rule_needs_an_absolute_path() {
+        let p = probe();
+        let asked = std::cell::RefCell::new(Vec::<String>::new());
+        let ex = |path: &str| {
+            asked.borrow_mut().push(path.to_string());
+            [r"C:\Windows\System32\cmd.exe"].contains(&path)
+        };
+        // `cmd /k`: a bare name with an argument; PATH finds cmd, `/k` is the argument
+        let on_path = ShellProbe {
+            path: r"C:\Windows\System32".into(),
+            ..p.clone()
+        };
+        let plan = launch_plan(&ShellChoice::Auto, Some("cmd /k"), &[], &on_path, &ex).unwrap();
+        assert_eq!(plan.first.program, r"C:\Windows\System32\cmd.exe");
+        assert_eq!(plan.first.args, ["/k"]);
+        assert!(
+            asked.borrow().iter().all(|q| !q.contains("cmd /k")),
+            "{:?}",
+            asked.borrow()
+        );
+    }
+
+    #[test]
+    fn a_relative_path_is_never_a_shell() {
+        let p = probe();
+        // every file "exists": only the rule may refuse
+        let ex = |_: &str| true;
+        for value in [
+            r".\pwsh.exe",
+            r"bin\bash",
+            "tools/sh",
+            r"..\x.exe",
+            r"C:x.exe",
+            r#""tools\sh.exe" -l"#,
+        ] {
+            let name = parse_command_line(value).unwrap().remove(0);
+            assert_eq!(
+                launch_plan(&ShellChoice::Auto, Some(value), &[], &p, &ex),
+                Err(ShellError::Override(CustomShellError::NotFound(
+                    name.clone()
+                ))),
+                "{value}"
+            );
+            assert_eq!(
+                custom_launch(value, &p, &ex),
+                Err(CustomShellError::NotFound(name)),
+                "{value}"
+            );
+        }
+        // an absolute path still works, quoted or not
+        assert!(custom_launch(r"C:\tools\sh.exe", &p, &ex).is_ok());
+        assert!(custom_launch(r#""C:\tools\sh.exe" -l"#, &p, &ex).is_ok());
+    }
+
+    #[test]
+    fn forward_slashes_name_the_same_program() {
+        let p = probe();
+        let ex = exists_in(&[PWSH, WINPS, CMD, "C:/Program Files/PowerShell/7/pwsh.exe"]);
+        let found = find_shells(&p, &ex);
+        let plan = launch_plan(
+            &ShellChoice::Auto,
+            Some("C:/Program Files/PowerShell/7/pwsh.exe"),
+            &found,
+            &p,
+            &ex,
+        )
+        .unwrap();
+        assert_eq!(plan.first.program, "C:/Program Files/PowerShell/7/pwsh.exe");
+        assert_eq!(
+            plan.fallback.unwrap().kind,
+            Some(ShellKind::WindowsPowerShell)
+        );
+    }
+
+    #[test]
+    fn environment_values_that_are_not_absolute_are_not_folders() {
+        // a relative %ComSpec% falls back to System32\cmd.exe
+        for comspec in ["cmd.exe", r".\cmd.exe", r"system32\cmd.exe"] {
+            let p = ShellProbe {
+                comspec: Some(comspec.into()),
+                ..probe()
+            };
+            let files = [comspec, r"C:\Windows\System32\cmd.exe"];
+            let ex = exists_in(&files);
+            let found = find_shells(&p, &ex);
+            let cmd = found
+                .iter()
+                .find(|l| l.kind == Some(ShellKind::Cmd))
+                .unwrap();
+            assert_eq!(cmd.program, r"C:\Windows\System32\cmd.exe", "{comspec}");
+        }
+        // a relative %ProgramFiles% gives no PowerShell 7 and no Git Bash candidate
+        let p = ShellProbe {
+            program_files: Some("PF".into()),
+            git_install_path: Some("Git".into()),
+            ..probe()
+        };
+        let ex = exists_in(&[
+            r"PF\PowerShell\7\pwsh.exe",
+            r"PF\Git\bin\bash.exe",
+            r"Git\bin\bash.exe",
+        ]);
+        assert!(find_shells(&p, &ex).is_empty());
+        // a relative %SystemRoot% counts as absent: C:\Windows
+        let p = ShellProbe {
+            system_root: Some("Windows".into()),
+            comspec: None,
+            ..probe()
+        };
+        let ex = exists_in(&[r"Windows\System32\cmd.exe", r"C:\Windows\System32\cmd.exe"]);
+        let found = find_shells(&p, &ex);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].program, r"C:\Windows\System32\cmd.exe");
+    }
+
+    #[test]
+    fn same_program_folds_case_beyond_ascii() {
+        let p = probe();
+        let upper = r"C:\USERS\PHÚ\TOOLS\PWSH.EXE";
+        let pwsh = r"C:\Users\Phú\tools\pwsh.exe";
+        let winps = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+        let files = [upper, pwsh, winps];
+        let ex = exists_in(&files);
+        let found = vec![
+            ShellLaunch {
+                kind: Some(ShellKind::Pwsh),
+                program: pwsh.into(),
+                args: vec![],
+                osc7_hook: true,
+            },
+            ShellLaunch {
+                kind: Some(ShellKind::WindowsPowerShell),
+                program: winps.into(),
+                args: vec![],
+                osc7_hook: true,
+            },
+        ];
+        let plan = launch_plan(&ShellChoice::Auto, Some(upper), &found, &p, &ex).unwrap();
+        assert_eq!(plan.first.program, upper);
+        assert_eq!(
+            plan.fallback.unwrap().kind,
             Some(ShellKind::WindowsPowerShell)
         );
     }

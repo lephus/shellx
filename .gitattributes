@@ -32,5 +32,7 @@ Resources/markdown-viewer/webviews-app/** linguist-generated
 cmux.xcodeproj/project.pbxproj merge=pbxproj-v1
 
 # windows/vendor holds third-party crates copied verbatim (plus ShellX patches,
-# windows/vendor/README.md); keep them out of GitHub Linguist's language stats.
-windows/vendor/** linguist-vendored
+# windows/vendor/README.md); keep them out of GitHub Linguist's language stats. -text: no
+# line-ending conversion on any checkout (core.autocrlf=true, the Git for Windows default,
+# would otherwise rewrite the published bytes, and check-gpui.sh would reject the copy).
+windows/vendor/** -text linguist-vendored
