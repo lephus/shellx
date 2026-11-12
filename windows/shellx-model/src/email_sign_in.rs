@@ -410,6 +410,107 @@ mod tests {
         );
     }
 
+    /// Review chunk 2 I-A: a button that is pressed and turns disabled (Resend, Verify) gives the keyboard
+    /// back to the screen's field, so a code typed or pasted next reaches the field.
+    #[test]
+    fn a_disabled_holder_gives_the_keyboard_to_the_field() {
+        let code = SignInScreen::Code { busy: false };
+        let busy = SignInScreen::Code { busy: true };
+        let start = SignInScreen::Start {
+            sending: false,
+            google_waiting: false,
+        };
+        let only_cancel = |f: DialogFocus| f == Cancel;
+        // Resend pressed: busy while the code is on its way, then locked for the relay's resend_in.
+        assert_eq!(keep_keyboard(busy, false, Resend, only_cancel), CodeField);
+        let locked = |f: DialogFocus| f != Resend && f != Verify;
+        assert_eq!(keep_keyboard(code, false, Resend, locked), CodeField);
+        // Verify pressed, then a wrong code: busy, then the emptied field, Verify off.
+        assert_eq!(keep_keyboard(busy, false, Verify, only_cancel), CodeField);
+        assert_eq!(keep_keyboard(code, false, Verify, locked), CodeField);
+        assert_eq!(keep_keyboard(code, false, CodeField, locked), CodeField);
+        // A field keeps the keyboard even while disabled: it takes typing again once enabled.
+        assert_eq!(keep_keyboard(busy, true, CodeField, only_cancel), CodeField);
+        let sending = SignInScreen::Start {
+            sending: true,
+            google_waiting: false,
+        };
+        assert_eq!(
+            keep_keyboard(sending, true, EmailField, only_cancel),
+            EmailField
+        );
+        // Send code pressed: the first code is on its way.
+        assert_eq!(
+            keep_keyboard(sending, true, SendCode, only_cancel),
+            EmailField
+        );
+        // An enabled holder on this screen keeps it (Tab order unchanged).
+        let all = |_: DialogFocus| true;
+        for f in [EmailField, SendCode, Google, Cancel] {
+            assert_eq!(keep_keyboard(start, true, f, all), f, "{f:?}");
+        }
+        for f in [CodeField, Verify, Resend, ChangeEmail, Cancel] {
+            assert_eq!(keep_keyboard(code, true, f, all), f, "{f:?}");
+        }
+        // A holder that is not on this screen: the screen's first control.
+        assert_eq!(keep_keyboard(code, true, SendCode, all), CodeField);
+        assert_eq!(keep_keyboard(start, true, Resend, all), EmailField);
+        assert_eq!(
+            keep_keyboard(start, false, Google, all),
+            EmailField,
+            "no Google client"
+        );
+        assert_eq!(
+            keep_keyboard(SignInScreen::SigningIn, true, CodeField, all),
+            Cancel
+        );
+        // Google pressed: its own rule stays (it holds the keyboard while "Waiting for Google…" shows).
+        let waiting = SignInScreen::Start {
+            sending: false,
+            google_waiting: true,
+        };
+        assert_eq!(
+            keep_keyboard(waiting, true, Google, |f| f != Google && f != SendCode),
+            Google
+        );
+    }
+
+    /// Review chunk 2 I-A: a click on a disabled control never takes the keyboard.
+    #[test]
+    fn a_click_on_a_disabled_control_leaves_the_keyboard_where_it_was() {
+        let start = SignInScreen::Start {
+            sending: false,
+            google_waiting: false,
+        };
+        let no_send = |f: DialogFocus| f != SendCode;
+        // Typing an address, a click on the disabled "Send code": the email field keeps it.
+        assert_eq!(
+            take_keyboard(start, true, EmailField, SendCode, no_send),
+            EmailField
+        );
+        assert_eq!(
+            take_keyboard(start, true, Cancel, SendCode, no_send),
+            Cancel
+        );
+        // An enabled control takes it.
+        assert_eq!(
+            take_keyboard(start, true, EmailField, Cancel, no_send),
+            Cancel
+        );
+        assert_eq!(
+            take_keyboard(start, true, Cancel, EmailField, no_send),
+            EmailField
+        );
+        // A locked Resend on the code step: the code field keeps it, or gets it back.
+        let code = SignInScreen::Code { busy: false };
+        let locked = |f: DialogFocus| f != Resend && f != Verify;
+        assert_eq!(
+            take_keyboard(code, true, CodeField, Resend, locked),
+            CodeField
+        );
+        assert_eq!(take_keyboard(code, true, Verify, Resend, locked), CodeField);
+    }
+
     /// The 2026-10-31 "cannot type" defect: a key-down that the dialog stops never becomes WM_CHAR on Windows (R2 §1).
     #[test]
     fn keys_the_dialog_does_not_act_on_pass_through() {
