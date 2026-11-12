@@ -185,6 +185,13 @@ pub struct StartMarker {
     pub mode: RenderMode,
 }
 
+/// Whether the marker's text was written by the process `pid` (an unreadable or missing one
+/// was not): a start removes only its own marker (B-1b review m-4).
+pub fn marker_written_by(text: Option<&str>, pid: u32) -> bool {
+    text.and_then(|t| serde_json::from_str::<StartMarker>(t).ok())
+        .is_some_and(|m| m.pid == pid)
+}
+
 /// The remembered mode from `render.json`'s text: missing or unreadable is standard.
 pub fn remembered_mode(text: Option<&str>) -> RenderMode {
     text.and_then(|t| serde_json::from_str::<RenderFile>(t).ok())

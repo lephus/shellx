@@ -187,13 +187,21 @@ pub(crate) fn start_in(
     }
 }
 
-/// Removes this start's marker, once; never another start's.
+/// Removes this start's marker, once; never another start's: the file is removed only while
+/// it still holds this process's pid (a retry may have written its own over it, B-1b review
+/// m-4).
 fn remove_own_marker(state: &StartState) {
     if !state.marker_on_disk.swap(false, Ordering::SeqCst) {
         return;
     }
-    if let Some(p) = &state.paths
-        && let Err(error) = std::fs::remove_file(&p.marker)
+    let Some(p) = &state.paths else {
+        return;
+    };
+    let text = read_text(&p.marker);
+    if !start_guard::marker_written_by(text.as_deref(), std::process::id()) {
+        return;
+    }
+    if let Err(error) = std::fs::remove_file(&p.marker)
         && error.kind() != io::ErrorKind::NotFound
     {
         log::warn!("the start marker could not be removed: {error}");
