@@ -149,6 +149,15 @@ pub fn remember_after_first_frame(plan: &StartPlan, remembered: RenderMode) -> O
     (rescue && plan.mode != remembered).then_some(plan.mode)
 }
 
+/// Whether a start that could not open its window, and reports it, resets `render.json` to
+/// standard: only when its compatible mode came from `render.json` (`Remembered`). Otherwise
+/// every later start would be compatible and fail the same way, and Settings › Display could
+/// never be reached; the next start tries standard and, if that fails, relaunches compatible
+/// (Ruling 7; B-1b review m-5).
+pub fn forget_remembered_after_report(plan: &StartPlan) -> bool {
+    plan.mode == RenderMode::Compatible && plan.reason == StartReason::Remembered
+}
+
 /// The log line for the decision (no digits: it survives the redactor as it is).
 pub fn start_line(plan: &StartPlan) -> String {
     let why = match plan.reason {

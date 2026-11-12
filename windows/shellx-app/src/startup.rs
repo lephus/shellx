@@ -231,6 +231,19 @@ pub(crate) fn orderly_quit_in(state: &StartState) {
     remove_own_marker(state);
 }
 
+/// A start that reports a failed open: a remembered compatible mode is forgotten, so the next
+/// start tries standard (B-1b review m-5).
+pub(crate) fn after_report_in(state: &StartState) {
+    if start_guard::forget_remembered_after_report(&state.plan)
+        && let Some(p) = &state.paths
+    {
+        match request_standard_in(p) {
+            Ok(()) => log::info!("the remembered compatible display mode is forgotten"),
+            Err(error) => log::warn!("the display mode could not be reset: {error}"),
+        }
+    }
+}
+
 /// "Try standard display mode again": the next start is standard.
 pub(crate) fn request_standard_in(paths: &StartPaths) -> io::Result<()> {
     let standard = RenderFile {
@@ -354,6 +367,9 @@ pub fn window_failed(error: &anyhow::Error) -> ! {
             }
             Err(error) => log::warn!("the compatible relaunch did not start: {error}"),
         }
+    }
+    if let Some(state) = START.get() {
+        after_report_in(state);
     }
     let ctx = crash::context()
         .cloned()
