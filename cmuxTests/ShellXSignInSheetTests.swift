@@ -369,14 +369,20 @@ import Testing
 
     /// The sheet's accessibility tree once it is laid out in a window. SwiftUI builds the tree only for an
     /// assistive client; `AXEnhancedUserInterface` on the application, the attribute such clients set, makes it
-    /// build one here, and it is turned off again afterwards.
+    /// build one here, and its previous value comes back afterwards.
     private static func accessibilityNodes(of sheet: SignInSheet) -> [AccessibilityNode] {
         _ = NSApplication.shared
         let enhanced = NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface")
+        guard NSApp.accessibilityIsAttributeSettable(enhanced) else {
+            Issue.record("AppKit must allow AXEnhancedUserInterface in this hosted test")
+            return []
+        }
+        // As SidebarAccessibilityTreeTests does: restore what was there, so a suite that set it keeps it.
+        let previous = (NSApp.accessibilityAttributeValue(enhanced) as? NSNumber)?.boolValue ?? false
         NSApp.accessibilitySetValue(true, forAttribute: enhanced)
         let (window, hosting) = offscreen(sheet)
         defer {
-            NSApp.accessibilitySetValue(false, forAttribute: enhanced)
+            NSApp.accessibilitySetValue(previous, forAttribute: enhanced)
             window.contentView = nil
             window.close()
         }
