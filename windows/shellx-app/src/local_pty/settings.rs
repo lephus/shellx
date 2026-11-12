@@ -733,6 +733,39 @@ mod tests {
     }
 
     #[test]
+    fn a_lookup_that_panics_does_not_stop_the_next_one() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let (_dir, path) = settings_path();
+        let files = exists_in(&[PWSH, WINPS, CMD]);
+        let failed_once = Arc::new(AtomicBool::new(false));
+        let exists: Exists = {
+            let failed_once = failed_once.clone();
+            Arc::new(move |p: &str| {
+                if !failed_once.swap(true, Ordering::SeqCst) {
+                    panic!("a file check failed (test)");
+                }
+                files(p)
+            })
+        };
+        let shells = windows(&path, exists, None, Duration::from_millis(100));
+        // the first lookup dies: the first pane gets the startup plan
+        assert_eq!(
+            shells.plan_for_new_pane().unwrap().first.label,
+            "Windows PowerShell"
+        );
+        // a later pane starts another lookup, which ends
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while shells.plan_for_new_pane().unwrap().first.label != "PowerShell 7" {
+            assert!(
+                Instant::now() < deadline,
+                "no lookup ran again after one panicked"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[test]
     fn only_the_first_pane_ever_waits() {
         let (_dir, path) = settings_path();
         let shells = windows(
