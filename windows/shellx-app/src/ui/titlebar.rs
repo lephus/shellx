@@ -1,7 +1,8 @@
-//! Custom title bar, laid out like the Mac's: sidebar toggle, bell, the "+"
+//! Custom title bar, laid out like the Mac's: sidebar toggle, the "+"
 //! new-workspace split button (its chevron opens a menu), focus Back /
 //! Forward, then a folder icon and the active workspace's name; on the right
-//! the search box, the settings gear and the Windows caption buttons.
+//! the settings gear and the Windows caption buttons. The Mac's search box
+//! and bell are not drawn until they do something (R2 F15, Ruling 22).
 //!
 //! The bar is the window's drag area (the name too); each control occludes
 //! it, and the caption buttons report their `WindowControlArea` so Windows
@@ -30,7 +31,6 @@ const BUTTON: Pixels = px(20.0);
 const BUTTON_ICON: Pixels = px(14.0);
 /// Back / Forward when there is nowhere to go.
 const UNAVAILABLE_OPACITY: f32 = 0.4;
-const SEARCH_W: Pixels = px(280.0);
 
 // Segoe Fluent Icons / Segoe MDL2 Assets caption glyphs.
 const GLYPH_MINIMIZE: &str = "\u{E921}";
@@ -43,13 +43,6 @@ const GLYPH_CLOSE: &str = "\u{E8BB}";
 /// panic, so `RootView::render` passes itself).
 pub fn render(root: &RootView, lang: Lang, window: &Window, cx: &mut Context<RootView>) -> Div {
     let title: SharedString = root.tab_title(root.active_pane(), lang, cx).into();
-    // Notifications are display-only in the MVP (no badge, no panel).
-    let bell = icon_button(
-        "titlebar-bell",
-        Icon::BellRing,
-        BUTTON,
-        t(lang, Str::ShowNotifications),
-    );
     let left = div()
         .flex()
         .flex_row()
@@ -69,7 +62,6 @@ pub fn render(root: &RootView, lang: Lang, window: &Window, cx: &mut Context<Roo
                 this.toggle_sidebar(window, cx);
             })),
         )
-        .child(bell)
         .child(new_workspace_button(root.new_menu_open(), lang, cx))
         .child(
             icon_button(
@@ -104,7 +96,6 @@ pub fn render(root: &RootView, lang: Lang, window: &Window, cx: &mut Context<Roo
         .items_center()
         .gap(px(8.0))
         .pr(px(8.0))
-        .child(search_box(lang))
         .child(
             icon_button(
                 "titlebar-settings",
@@ -288,39 +279,6 @@ fn workspace_name(title: SharedString) -> Div {
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(theme::text_hi())
                 .child(title),
-        )
-}
-
-/// Display only in the MVP: the command palette is a known cut, so a click
-/// does nothing (it still occludes the drag area).
-fn search_box(lang: Lang) -> Div {
-    div()
-        .occlude()
-        .flex()
-        .items_center()
-        .gap(px(6.0))
-        .w(SEARCH_W)
-        .min_w_0()
-        .h(px(24.0))
-        .px(px(8.0))
-        .bg(theme::raise())
-        .border_1()
-        .border_color(theme::border())
-        .rounded(px(6.0))
-        .text_size(px(12.0))
-        .text_color(theme::muted())
-        .child(
-            svg()
-                .path(Icon::Search.path())
-                .flex_none()
-                .size(px(12.0))
-                .text_color(theme::muted()),
-        )
-        .child(
-            div()
-                .min_w_0()
-                .truncate()
-                .child(t(lang, Str::SearchPlaceholder)),
         )
 }
 
