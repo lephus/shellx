@@ -226,6 +226,18 @@ mod tests {
     }
 
     #[test]
+    fn a_pending_paste_counts_its_lines_once() {
+        // the bar redraws on every output batch: the count is taken when the question opens
+        // and read from then on, never taken again (review m5)
+        let text = "echo 1\r\necho 2\r\necho 3\r\n".to_string();
+        let pending = PendingPaste::new(text.clone());
+        assert_eq!(pending.lines(), 3);
+        assert_eq!(pending.lines(), paste_line_count(&text));
+        // the text comes back as it was copied, without a copy of it
+        assert_eq!(pending.into_text(), text);
+    }
+
+    #[test]
     fn a_bracketed_paste_never_asks() {
         assert!(!needs_paste_confirmation("a\nb", true));
         assert!(!needs_paste_confirmation("echo 1\necho 2", true));
