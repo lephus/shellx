@@ -139,6 +139,18 @@ pub enum Str {
     NoShellFound,
     /// Under the multi-line paste question (`paste_lines_prompt`).
     PasteConfirmKeys,
+    /// Settings › Terminal: the section title.
+    Terminal,
+    /// Settings › Terminal: the last row.
+    CustomCommandLine,
+    /// Placeholder of the custom command line field.
+    CustomShellPlaceholder,
+    /// Under the shell rows.
+    AppliesToNewTerminals,
+    /// Shown while `SHELLX_SHELL` overrides the choice.
+    ShellEnvOverride,
+    /// `settings.json` could not be written (no `LOCALAPPDATA`, a full disk).
+    ShellChoiceNotSaved,
     /// Title of the sign-in dialog.
     SignInTitle,
     /// Label over the dialog's email field.
@@ -293,6 +305,12 @@ impl Str {
         Str::OpenCommandPrompt,
         Str::NoShellFound,
         Str::PasteConfirmKeys,
+        Str::Terminal,
+        Str::CustomCommandLine,
+        Str::CustomShellPlaceholder,
+        Str::AppliesToNewTerminals,
+        Str::ShellEnvOverride,
+        Str::ShellChoiceNotSaved,
         Str::SignInTitle,
         Str::EmailAddress,
         Str::SignInEllipsis,
@@ -437,6 +455,14 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::OpenCommandPrompt => "Mở Command Prompt",
             Str::NoShellFound => "Không tìm thấy shell nào trên máy này.",
             Str::PasteConfirmKeys => "Enter để dán, Esc để hủy",
+            Str::Terminal => "Terminal",
+            Str::CustomCommandLine => "Dòng lệnh tùy chỉnh",
+            Str::CustomShellPlaceholder => "Ví dụ: wsl.exe -d Ubuntu",
+            Str::AppliesToNewTerminals => "Áp dụng cho các terminal mở sau.",
+            Str::ShellEnvOverride => {
+                "SHELLX_SHELL đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này."
+            }
+            Str::ShellChoiceNotSaved => "Không lưu được lựa chọn shell trên máy này.",
             Str::SignInTitle => "Đăng nhập ShellX",
             Str::EmailAddress => "Địa chỉ email",
             Str::SignInEllipsis => "Đăng nhập…",
@@ -592,6 +618,14 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::OpenCommandPrompt => "Open Command Prompt",
             Str::NoShellFound => "No shell was found on this PC.",
             Str::PasteConfirmKeys => "Enter to paste, Esc to cancel",
+            Str::Terminal => "Terminal",
+            Str::CustomCommandLine => "Custom command line",
+            Str::CustomShellPlaceholder => "For example: wsl.exe -d Ubuntu",
+            Str::AppliesToNewTerminals => "Applies to terminals you open next.",
+            Str::ShellEnvOverride => {
+                "SHELLX_SHELL is set, so ShellX uses it instead of this choice."
+            }
+            Str::ShellChoiceNotSaved => "The shell choice couldn't be saved on this PC.",
             Str::SignInTitle => "Sign in to ShellX",
             Str::EmailAddress => "Email address",
             Str::SignInEllipsis => "Sign In…",
@@ -711,6 +745,24 @@ pub fn paste_lines_prompt(lang: Lang, n: usize) -> String {
     match lang {
         Lang::Vi => format!("Dán {n} dòng? Mỗi dòng sẽ chạy ngay như một lệnh."),
         Lang::En => format!("Paste {n} lines? Each line will run as a command right away."),
+    }
+}
+
+/// Settings › Terminal's first row: "Automatic", with the shell it starts when there is one.
+pub fn shell_auto_label(lang: Lang, name: Option<&str>) -> String {
+    match (lang, name) {
+        (Lang::Vi, Some(name)) => format!("Tự động ({name})"),
+        (Lang::Vi, None) => "Tự động".to_string(),
+        (Lang::En, Some(name)) => format!("Automatic ({name})"),
+        (Lang::En, None) => "Automatic".to_string(),
+    }
+}
+
+/// Under a custom command line that names a program: the program it runs.
+pub fn will_run(lang: Lang, program: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Sẽ chạy {program}."),
+        Lang::En => format!("Runs {program}."),
     }
 }
 

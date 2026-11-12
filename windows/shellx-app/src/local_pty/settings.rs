@@ -237,6 +237,46 @@ pub fn pane_start(
     }
 }
 
+/// A row of Settings › Terminal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ShellOption {
+    /// "Tự động", naming the shell it starts now (`None`: nothing Automatic is installed).
+    Auto { resolves_to: Option<String> },
+    /// One installed shell.
+    Known(ShellKind),
+    /// "Dòng lệnh tùy chỉnh".
+    Custom,
+}
+
+/// The rows: Automatic first, naming the first PowerShell 7, Windows PowerShell or Command
+/// Prompt found; then one row per shell found, in `find_shells` order; then the custom line.
+/// With nothing found (the Mac development build), Automatic and the custom line.
+pub fn shell_options(found: &[ShellLaunch]) -> Vec<ShellOption> {
+    let resolves_to = launch_plan(
+        &ShellChoice::Auto,
+        None,
+        found,
+        &ShellProbe::default(),
+        &|_| false,
+    )
+    .ok()
+    .map(|plan| launch_label(&plan.first));
+    std::iter::once(ShellOption::Auto { resolves_to })
+        .chain(found.iter().filter_map(|l| l.kind).map(ShellOption::Known))
+        .chain(std::iter::once(ShellOption::Custom))
+        .collect()
+}
+
+/// Whether a row shows the stored choice.
+pub fn is_selected(option: &ShellOption, choice: &ShellChoice) -> bool {
+    match (option, choice) {
+        (ShellOption::Auto { .. }, ShellChoice::Auto) => true,
+        (ShellOption::Known(kind), ShellChoice::Known { shell }) => kind == shell,
+        (ShellOption::Custom, ShellChoice::Custom { .. }) => true,
+        _ => false,
+    }
+}
+
 /// What the shell settings know now (Settings › Terminal, `--diagnose`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ShellSnapshot {
@@ -448,7 +488,6 @@ impl Shells {
     }
 }
 
-#[allow(dead_code)] // Settings › Terminal (Task A6) and --diagnose (Task B9)
 impl Shells {
     pub fn choice(&self) -> ShellChoice {
         self.inner.lock().choice.clone()
@@ -477,6 +516,7 @@ impl Shells {
     }
 
     /// Looks shells up again on a background thread.
+    #[allow(dead_code)] // in the A1 seam; no caller yet
     pub fn refresh(&self) {
         let mut state = self.inner.lock();
         self.spawn_lookup(&mut state);
