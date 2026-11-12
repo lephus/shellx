@@ -67,8 +67,7 @@ use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::modal::{Panel, Panels, RootKey};
 use shellx_model::palette::Status;
 use shellx_model::sidebar::{
-    Access, MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_panel_notes,
-    request_targets,
+    MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_picker,
 };
 use shellx_model::strings::Lang;
 use shellx_model::tabs::{CloseOutcome, PaneTarget, RespawnGuard, Tab, TabId, Tabs};
@@ -1052,15 +1051,15 @@ impl Render for RootView {
                 lang,
                 self.offer_rule,
             );
-            // The "+" list: only Macs that may be asked and have no link yet (granted or pending), and
-            // the sentences that say why it is short or empty (design §4.5; review M7).
+            // The "+" list and its sentences, as the model decides them (`request_picker`).
             let picker = pairing.picker_open().then(|| {
-                // A saved link, or a request waiting for the Mac's answer.
-                let has_link = |id: &str| {
-                    pairing.has_link(id) || matches!(pairing.access_for(id), Access::Pending { .. })
-                };
+                let (targets, notes) = request_picker(
+                    &machines,
+                    &|id: &str| pairing.access_for(id),
+                    self.offer_rule,
+                );
                 Picker {
-                    entries: request_targets(&machines, &has_link, self.offer_rule)
+                    entries: targets
                         .into_iter()
                         .map(|m| PickerEntry {
                             machine_id: m.machine_id.clone(),
@@ -1068,7 +1067,7 @@ impl Render for RootView {
                             online: m.online,
                         })
                         .collect(),
-                    notes: request_panel_notes(&machines, &has_link, self.offer_rule),
+                    notes,
                 }
             });
             let active = self.tabs.active().id;

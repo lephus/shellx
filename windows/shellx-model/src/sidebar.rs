@@ -109,6 +109,21 @@ pub fn request_panel_notes(
     }
 }
 
+/// The machines-header "+" list (design §4.5): the Macs that may be asked and have no access yet (no saved
+/// link, no request waiting: `access` is `None`), and the sentences that say why the list is short or
+/// empty (`request_panel_notes`). The window only draws it (review chunk 2 M-B).
+pub fn request_picker<'a>(
+    machines: &'a [MachineInfo],
+    access: &dyn Fn(&str) -> Access,
+    rule: OfferRule,
+) -> (Vec<&'a MachineInfo>, &'static [Str]) {
+    let has_access = |id: &str| access(id) != Access::None;
+    (
+        request_targets(machines, &has_access, rule),
+        request_panel_notes(machines, &has_access, rule),
+    )
+}
+
 fn null_as_zero<'de, D: serde::Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
     Ok(Option::<i64>::deserialize(d)?.unwrap_or(0))
 }
