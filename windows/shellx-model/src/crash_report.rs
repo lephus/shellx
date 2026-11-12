@@ -462,10 +462,16 @@ pub fn report_dialog(lang: Lang, kind: DialogKind, path: &str) -> DialogText {
 }
 
 /// `"<exe>" <flag> "<file>"`: the reporter's command line for `CreateProcessW` (B5's
-/// watchdog). Windows paths cannot hold `"`, and neither path ends in `\` (`.exe`, `.txt`),
-/// so plain quotes parse back to the same two paths.
+/// watchdog), parsed back by CommandLineToArgvW. Windows paths cannot hold `"`; trailing
+/// backslashes are doubled so the closing quote is not read as a literal one (2n backslashes
+/// before a quote are n backslashes and the quote ends the argument).
 pub fn reporter_command_line(exe: &str, flag: &str, file: &str) -> String {
-    format!("\"{exe}\" {flag} \"{file}\"")
+    format!("{} {flag} {}", quoted(exe), quoted(file))
+}
+
+fn quoted(path: &str) -> String {
+    let trailing = path.len() - path.trim_end_matches('\\').len();
+    format!("\"{path}{}\"", "\\".repeat(trailing))
 }
 
 #[cfg(test)]
