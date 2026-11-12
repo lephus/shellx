@@ -70,6 +70,9 @@ import org.robolectric.annotation.GraphicsMode
 class StoreScreenshotsRenderTest {
     companion object {
         const val STORE_QUALIFIERS = "w360dp-h640dp-xxhdpi"
+
+        /** The shell's history rows kept above its screen: a pane that shows the last rows starts on a whole one. */
+        const val HISTORY_ROWS = 3
     }
 
     private val voiceScope = CoroutineScope(SupervisorJob())
@@ -117,7 +120,7 @@ class StoreScreenshotsRenderTest {
     @Test
     fun store03Terminal() {
         val screen = TerminalScreen().apply {
-            apply(DemoTerminalScreens.SHELL.snapshot)
+            apply(DemoTerminalScreens.SHELL.copy(history = DemoTerminalScreens.SHELL.history.takeLast(HISTORY_ROWS)).snapshot)
             apply(DemoTerminalScreens.SHELL_TYPING)
         }
         shoot("store-03-terminal") {
