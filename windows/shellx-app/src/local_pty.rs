@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Context as _, Result};
 use cmux_pty::{Child, MasterPty, PtyCommand, PtySize};
 use shellx_model::shell::{
-    LaunchPlan, ShellKind, ShellLaunch, ShellProbe, is_absolute, launch_label,
+    LaunchPlan, ShellKind, ShellLaunch, ShellProbe, is_absolute, known_launch, launch_label,
 };
 
 use crate::term_core::PtyLink;
@@ -304,12 +304,7 @@ pub fn command_prompt_for(found: &[ShellLaunch], probe: &ShellProbe) -> ShellCmd
         .filter(|c| is_absolute(c))
         .map(String::from)
         .unwrap_or_else(|| format!(r"{}\System32\cmd.exe", settings::system_root(probe)));
-    ShellCmd::from_launch(&ShellLaunch {
-        kind: Some(ShellKind::Cmd),
-        program,
-        args: Vec::new(),
-        osc7_hook: false,
-    })
+    ShellCmd::from_launch(&known_launch(ShellKind::Cmd, program))
 }
 
 #[cfg(test)]

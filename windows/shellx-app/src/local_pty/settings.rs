@@ -15,8 +15,8 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
 
 use shellx_model::shell::{
-    LaunchPlan, POWERSHELL_PROMPT_HOOK, ShellChoice, ShellError, ShellKind, ShellLaunch,
-    ShellProbe, find_shells, is_absolute, launch_plan,
+    LaunchPlan, ShellChoice, ShellError, ShellKind, ShellLaunch, ShellProbe, find_shells,
+    is_absolute, known_launch, launch_plan,
 };
 
 use super::{PanePlan, ShellCmd, dev_bash};
@@ -166,20 +166,14 @@ pub(crate) fn system_root(probe: &ShellProbe) -> &str {
 pub fn startup_plan(probe: &ShellProbe) -> PanePlan {
     let root = system_root(probe);
     PanePlan {
-        first: ShellCmd::from_launch(&ShellLaunch {
-            kind: Some(ShellKind::WindowsPowerShell),
-            program: format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe"),
-            args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK]
-                .map(String::from)
-                .to_vec(),
-            osc7_hook: true,
-        }),
-        fallback: Some(ShellCmd::from_launch(&ShellLaunch {
-            kind: Some(ShellKind::Cmd),
-            program: format!(r"{root}\System32\cmd.exe"),
-            args: Vec::new(),
-            osc7_hook: false,
-        })),
+        first: ShellCmd::from_launch(&known_launch(
+            ShellKind::WindowsPowerShell,
+            format!(r"{root}\System32\WindowsPowerShell\v1.0\powershell.exe"),
+        )),
+        fallback: Some(ShellCmd::from_launch(&known_launch(
+            ShellKind::Cmd,
+            format!(r"{root}\System32\cmd.exe"),
+        ))),
     }
 }
 
@@ -536,10 +530,18 @@ mod tests {
         )
     }
 
-    fn hook_args() -> Vec<String> {
-        ["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK]
-            .map(String::from)
-            .to_vec()
+    /// The catalogue's entry for `kind` on `probe()` with every shell installed: what a
+    /// lookup would start.
+    fn catalogue_entry(kind: ShellKind) -> ShellCmd {
+        let all = exists_in(&[PWSH, WINPS, CMD]);
+        let found = find_shells(&probe(), &|p: &str| all(p));
+        ShellCmd::from_launch(found.iter().find(|l| l.kind == Some(kind)).unwrap())
+    }
+
+    /// The PowerShell arguments end with the OSC 7 prompt hook (R3 m1).
+    fn carries_the_prompt_hook(cmd: &ShellCmd) -> bool {
+        cmd.args
+            .ends_with(&["-Command".to_string(), POWERSHELL_PROMPT_HOOK.to_string()])
     }
 
     fn kinds(found: &[ShellLaunch]) -> Vec<Option<ShellKind>> {
@@ -640,7 +642,7 @@ mod tests {
         // the OSC 7 prompt hook travels in PowerShell's arguments
         let first = ShellCmd::from_launch(&plan.first);
         assert_eq!(first.program, PWSH);
-        assert_eq!(first.args, hook_args());
+        assert!(carries_the_prompt_hook(&first), "{:?}", first.args);
         assert!(first.env.is_empty());
         assert_eq!(first.label, "PowerShell 7");
         assert_eq!(first.kind, Some(ShellKind::Pwsh));
@@ -705,10 +707,10 @@ mod tests {
         let took = started.elapsed();
         assert!(took >= Duration::from_millis(90), "{took:?}");
         assert!(took < Duration::from_secs(1), "{took:?}");
+        // exactly what a lookup would start for Windows PowerShell, prompt hook included
+        assert_eq!(plan.first, catalogue_entry(ShellKind::WindowsPowerShell));
         assert_eq!(plan.first.program, WINPS);
-        assert_eq!(plan.first.args, hook_args());
-        assert_eq!(plan.first.label, "Windows PowerShell");
-        assert_eq!(plan.first.kind, Some(ShellKind::WindowsPowerShell));
+        assert!(carries_the_prompt_hook(&plan.first));
         let fallback = plan.fallback.unwrap();
         assert_eq!(fallback.program, SYSTEM32_CMD);
         assert!(fallback.args.is_empty());

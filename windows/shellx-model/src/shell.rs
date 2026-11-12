@@ -331,23 +331,23 @@ fn base(value: &Option<String>) -> Option<&str> {
         .map(|v| v.trim_end_matches('\\'))
 }
 
-fn powershell(kind: ShellKind, program: String) -> ShellLaunch {
-    ShellLaunch {
-        kind: Some(kind),
-        program,
-        args: ["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK]
-            .map(String::from)
-            .to_vec(),
-        osc7_hook: true,
-    }
-}
-
-fn plain(kind: ShellKind, program: String, args: &[&str]) -> ShellLaunch {
+/// A known shell at `program`, with the arguments ShellX starts it with: PowerShell 7 and
+/// Windows PowerShell `-NoLogo -NoExit -Command <POWERSHELL_PROMPT_HOOK>`, Git Bash
+/// `--login -i`, Command Prompt and WSL none. The one place these lists are written.
+pub fn known_launch(kind: ShellKind, program: String) -> ShellLaunch {
+    let (args, osc7_hook): (&[&str], bool) = match kind {
+        ShellKind::Pwsh | ShellKind::WindowsPowerShell => (
+            &["-NoLogo", "-NoExit", "-Command", POWERSHELL_PROMPT_HOOK],
+            true,
+        ),
+        ShellKind::GitBash => (&["--login", "-i"], false),
+        ShellKind::Cmd | ShellKind::Wsl => (&[], false),
+    };
     ShellLaunch {
         kind: Some(kind),
         program,
         args: args.iter().map(|a| a.to_string()).collect(),
-        osc7_hook: false,
+        osc7_hook,
     }
 }
 
@@ -363,12 +363,12 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         exists(&p).then_some(p)
     });
     if let Some(p) = pwsh {
-        found.push(powershell(ShellKind::Pwsh, p));
+        found.push(known_launch(ShellKind::Pwsh, p));
     }
 
     let winps = format!(r"{system_root}\System32\WindowsPowerShell\v1.0\powershell.exe");
     if exists(&winps) {
-        found.push(powershell(ShellKind::WindowsPowerShell, winps));
+        found.push(known_launch(ShellKind::WindowsPowerShell, winps));
     }
 
     let comspec = probe
@@ -382,7 +382,7 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         exists(&p).then_some(p)
     });
     if let Some(p) = cmd {
-        found.push(plain(ShellKind::Cmd, p, &[]));
+        found.push(known_launch(ShellKind::Cmd, p));
     }
 
     let git_candidates = [
@@ -390,12 +390,12 @@ pub fn find_shells(probe: &ShellProbe, exists: &dyn Fn(&str) -> bool) -> Vec<She
         program_files.map(|f| format!(r"{f}\Git\bin\bash.exe")),
     ];
     if let Some(p) = git_candidates.into_iter().flatten().find(|p| exists(p)) {
-        found.push(plain(ShellKind::GitBash, p, &["--login", "-i"]));
+        found.push(known_launch(ShellKind::GitBash, p));
     }
 
     let wsl = format!(r"{system_root}\System32\wsl.exe");
     if exists(&wsl) {
-        found.push(plain(ShellKind::Wsl, wsl, &[]));
+        found.push(known_launch(ShellKind::Wsl, wsl));
     }
     found
 }
