@@ -15,6 +15,7 @@ mod crash;
 #[cfg(windows)]
 mod crash_native;
 mod cwd;
+mod diagnose_run;
 mod fonts;
 mod icons;
 mod ime;
