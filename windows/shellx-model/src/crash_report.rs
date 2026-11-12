@@ -509,6 +509,161 @@ mod tests {
         assert_eq!(DialogKind::WindowFailed.reporter_flag(), "--report-window");
     }
 
+    fn native_header() -> String {
+        native_report_header(
+            "1.7.0",
+            COMMIT,
+            "release",
+            "10.0.26100",
+            Some(0x7FF6_A000_0000),
+        )
+    }
+
+    fn utf16(s: &str) -> Vec<u16> {
+        s.encode_utf16().collect()
+    }
+
+    /// The report written into a buffer far larger than any report.
+    fn full(f: &NativeFacts) -> String {
+        let mut big = vec![0u8; 65_536];
+        let n = write_native_report(&mut big, f);
+        String::from_utf8(big[..n].to_vec()).unwrap()
+    }
+
+    #[test]
+    fn native_report_formats_codes_addresses_module_and_time() {
+        let header = native_header();
+        assert_eq!(
+            header,
+            "ShellX crash report\nkind: native exception\nversion: 1.7.0\n\
+             commit: 5dd1e2dc6a9f8e7d6c5b4a39281706f5e4d3c2b1\nbuild: release\n\
+             windows: 10.0.26100\nexe base: 0x00007FF6A0000000\n"
+        );
+        let module =
+            utf16(r"C:\Users\Phú Lê\AppData\Local\Programs\ShellX Native\shellx-desktop.exe");
+        let f = NativeFacts {
+            utc: [2026, 11, 12, 8, 15, 30],
+            header: header.as_bytes(),
+            code: 0xC000_0005,
+            address: 0x0000_7FF6_A1B2_C3D4,
+            module: &module,
+            module_offset: Some(0x1B2_C3D4),
+            thread_id: 4242,
+        };
+        assert_eq!(
+            full(&f),
+            format!(
+                "{header}time: 2026-11-12 08:15:30 UTC\nexception: 0xC0000005\n\
+                 address: 0x00007FF6A1B2C3D4\n\
+                 module: C:\\Users\\Phú Lê\\AppData\\Local\\Programs\\ShellX Native\\shellx-desktop.exe +0x1B2C3D4\n\
+                 thread: 4242\n"
+            )
+        );
+        // No module name: `unknown`; no offset: no ` +0x…`; zeros keep their width.
+        let f = NativeFacts {
+            utc: [2026, 1, 2, 3, 4, 5],
+            header: b"",
+            code: 0,
+            address: 0,
+            module: &[],
+            module_offset: None,
+            thread_id: 0,
+        };
+        assert_eq!(
+            full(&f),
+            "time: 2026-01-02 03:04:05 UTC\nexception: 0x00000000\n\
+             address: 0x0000000000000000\nmodule: unknown\nthread: 0\n"
+        );
+        let module = utf16("a.dll");
+        let f = NativeFacts {
+            utc: [2026, 11, 12, 8, 15, 30],
+            header: b"",
+            code: 0xC000_001D,
+            address: u64::MAX,
+            module: &module,
+            module_offset: Some(0),
+            thread_id: u32::MAX,
+        };
+        let text = full(&f);
+        assert!(text.contains("exception: 0xC000001D\n"), "{text}");
+        assert!(text.contains("address: 0xFFFFFFFFFFFFFFFF\n"), "{text}");
+        assert!(text.contains("module: a.dll +0x0\n"), "{text}");
+        assert!(text.ends_with("thread: 4294967295\n"), "{text}");
+    }
+
+    #[test]
+    fn native_report_never_overruns_its_buffer() {
+        let header = native_header();
+        // Lone surrogates read as U+FFFD.
+        let lone = [0x43, 0xD800, 0x44, 0xDC00];
+        let f = NativeFacts {
+            utc: [2026, 11, 12, 8, 15, 30],
+            header: header.as_bytes(),
+            code: 0xC000_0005,
+            address: 0x7FF6_A1B2_C3D4,
+            module: &lone,
+            module_offset: Some(0x1B2_C3D4),
+            thread_id: 4242,
+        };
+        let whole = full(&f);
+        assert!(
+            whole.contains("module: C\u{FFFD}D\u{FFFD} +0x1B2C3D4\n"),
+            "{whole}"
+        );
+        // Every buffer size: the output is a prefix of the whole report, valid UTF-8, and no
+        // byte past the buffer changes.
+        for size in [0usize, 1, 10, 100, 250, 400, whole.len() - 1, whole.len()] {
+            let mut guarded = vec![0xAAu8; size + 16];
+            let n = write_native_report(&mut guarded[..size], &f);
+            assert!(n <= size, "{size}: {n}");
+            assert!(guarded[size..].iter().all(|&b| b == 0xAA), "{size}");
+            let text = std::str::from_utf8(&guarded[..n]).unwrap();
+            assert!(whole.starts_with(text), "{size}: {text}");
+        }
+        // A module path far longer than the filter's buffer (4 000 UTF-16 units of a
+        // two-byte letter, and of a surrogate pair) is cut at the buffer's end on a character
+        // boundary.
+        for unit in [utf16("é"), utf16("😀")] {
+            let long: Vec<u16> = unit.iter().copied().cycle().take(4_000).collect();
+            let f = NativeFacts {
+                module: &long,
+                ..f
+            };
+            let mut guarded = vec![0xAAu8; 1_536 + 16];
+            let n = write_native_report(&mut guarded[..1_536], &f);
+            assert!(n <= 1_536 && n > header.len(), "{n}");
+            assert!(guarded[1_536..].iter().all(|&b| b == 0xAA));
+            let text = std::str::from_utf8(&guarded[..n]).unwrap();
+            assert!(text.starts_with(&header));
+            assert!(!text.contains("thread:"), "the line after the cut is not written");
+        }
+        // The longest report the filter can make fits its 1 536-byte buffer: the longest
+        // build kind, a 260-unit module path of three-byte characters (GetModuleFileNameW
+        // fills at most 260), and the widest numbers.
+        let longest_header = native_report_header(
+            "1.7.0",
+            COMMIT,
+            "release abcdefghij",
+            "10.0.26100",
+            Some(u64::MAX),
+        );
+        let module: Vec<u16> = utf16("中").into_iter().cycle().take(260).collect();
+        let f = NativeFacts {
+            utc: [u16::MAX; 6],
+            header: longest_header.as_bytes(),
+            code: u32::MAX,
+            address: u64::MAX,
+            module: &module,
+            module_offset: Some(u64::MAX),
+            thread_id: u32::MAX,
+        };
+        let mut buf = [0u8; 1_536];
+        let n = write_native_report(&mut buf, &f);
+        let text = std::str::from_utf8(&buf[..n]).unwrap();
+        assert!(text.ends_with("thread: 4294967295\n"), "{n}: {text}");
+        assert!(text.contains("time: 65535-65535-65535 65535:65535:65535 UTC\n"));
+    }
+
     #[test]
     fn the_start_failure_report_has_the_header_the_render_line_and_the_chain() {
         let text = window_failure_report(&WindowFailureFacts {
