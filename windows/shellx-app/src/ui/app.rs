@@ -4,19 +4,24 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+#[cfg(windows)]
+use gpui::point;
 use gpui::{
     App, Application, Bounds, Global, TitlebarOptions, WindowBounds, WindowOptions, prelude::*, px,
     size,
 };
 use shellx_model::core_api::CoreCall;
+use shellx_model::start_guard::StartReason;
 use shellx_model::strings::Lang;
 
 use super::assets::Assets;
 use super::root::RootView;
 use crate::core_service::{ConfiguredCore, MachineFacts};
+use crate::crash::{self, CrashTest};
 use crate::fonts;
 use crate::os_info;
 use crate::shell_info::BASE_TITLE;
+use crate::startup;
 
 /// App-wide services the views read with `cx.global::<Services>()`.
 /// Later tasks add the remote client here.
@@ -42,13 +47,38 @@ fn background_requested(value: Option<&str>) -> bool {
     value == Some("1")
 }
 
+/// The first window: on Windows 1200x760 shrunk to the primary monitor's work area (R1 F2),
+/// maximized when it would be smaller than 720x420 or the work area is unknown; on a Mac
+/// (development) 1200x760 centred.
+#[cfg(windows)]
+fn first_window_bounds(_cx: &App) -> WindowBounds {
+    let fw = os_info::first_window_placement(os_info::primary_work_area());
+    let bounds = Bounds {
+        origin: point(px(fw.x), px(fw.y)),
+        size: size(px(fw.width), px(fw.height)),
+    };
+    if fw.maximized {
+        WindowBounds::Maximized(bounds)
+    } else {
+        WindowBounds::Windowed(bounds)
+    }
+}
+
+#[cfg(not(windows))]
+fn first_window_bounds(cx: &App) -> WindowBounds {
+    WindowBounds::Windowed(Bounds::centered(None, size(px(1200.0), px(760.0)), cx))
+}
+
 pub fn run() {
     Application::new().with_assets(Assets).run(|cx: &mut App| {
+        // GPUI has read GPUI_DISABLE_DIRECT_COMPOSITION (in `Application::new`): the shells in
+        // this window must not inherit a value this start set (plan review M-11).
+        startup::forget_render_variable();
         if let Err(error) = cx
             .text_system()
             .add_fonts(fonts::embedded().into_iter().map(Cow::Borrowed).collect())
         {
-            eprintln!("failed to register the embedded fonts: {error:#}");
+            log::warn!("failed to register the embedded fonts: {error:#}");
         }
         cx.set_global(Services {
             lang: Lang::from_system(
@@ -59,11 +89,18 @@ pub fn run() {
         });
 
         let background = dev_background();
-        let bounds = Bounds::centered(None, size(px(1200.0), px(760.0)), cx);
-        let window = cx
-            .open_window(
+        let window_bounds = first_window_bounds(cx);
+        let retry = startup::render_status().reason == StartReason::RetryAfterOpenFailed;
+        let opened = if crash::crash_test() == Some(CrashTest::Window) && !retry {
+            // `--crash-test window`: the open fails without being tried, except in the
+            // compatible relaunch it causes (Ruling 31).
+            Err(anyhow::anyhow!("crash test: the window was not opened"))
+        } else {
+            cx.open_window(
                 WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    window_bounds: Some(window_bounds),
+                    // The primary monitor (GPUI places in its workspace coordinates).
+                    display_id: None,
                     // `appears_transparent` hides the Windows caption; the
                     // title bar in ui/titlebar.rs marks its drag area and
                     // caption buttons for hit-testing (snap layouts work).
@@ -79,17 +116,52 @@ pub fn run() {
                 },
                 |window, cx| cx.new(|cx| RootView::new(window, cx)),
             )
-            .expect("failed to open the ShellX window");
+        };
+        let window = match opened {
+            Ok(window) => window,
+            Err(error) => startup::window_failed(&error),
+        };
         window
             .update(cx, |root, window, cx| {
                 root.focus_terminal(window, cx);
                 if !background {
                     cx.activate(true);
                 }
+                // The first frame (Ruling 6): GPUI runs next-frame callbacks at the start of a
+                // frame request, so the second one runs once the first frame was presented.
+                window.on_next_frame(|window, _| {
+                    window.on_next_frame(|_, _| startup::first_frame_drawn())
+                });
             })
             .ok();
+        // `--crash-test panic|native` (Ruling 31): a foreground task runs inside GPUI's window
+        // procedure (on a Mac its dispatcher trampoline), the path a real UI-thread crash takes.
+        match crash::crash_test() {
+            Some(CrashTest::Panic) => {
+                // The procedure cannot unwind: the hook writes the file, then the process
+                // aborts.
+                cx.spawn(async move |_| -> () {
+                    // A crash test never changes the next start's display mode (I-4).
+                    startup::orderly_quit();
+                    panic!("crash test: a panic on the UI thread (--crash-test panic)")
+                })
+                .detach();
+            }
+            Some(CrashTest::Native) => {
+                cx.spawn(async move |_| {
+                    startup::orderly_quit();
+                    // SAFETY: none; this is the deliberate access violation of `--crash-test
+                    // native`: a write into the first page, which is never mapped. Address 8,
+                    // not null, so debug builds' null-pointer check cannot turn it into a panic.
+                    unsafe { std::ptr::without_provenance_mut::<u8>(8).write_volatile(1) }
+                })
+                .detach();
+            }
+            _ => {}
+        }
         cx.on_window_closed(|cx| {
             if cx.windows().is_empty() {
+                startup::orderly_quit();
                 cx.quit();
             }
         })

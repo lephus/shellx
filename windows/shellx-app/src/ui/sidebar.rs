@@ -663,7 +663,8 @@ fn help_button(
         })
 }
 
-/// Settings…, Check for Updates, Docs and GitHub.
+/// Settings…, Check for Updates, Create Diagnostics Report (a separate `--diagnose`
+/// process, Ruling 35), Docs and GitHub.
 fn help_menu(
     account: &Entity<AccountService>,
     lang: Lang,
@@ -700,6 +701,16 @@ fn help_menu(
                     account.update(cx, |account, cx| account.check_update(cx));
                     root.update(cx, |this, cx| this.show_settings(window, cx))
                         .ok();
+                }
+            }),
+        },
+        MenuItem {
+            label: t(lang, Str::CreateDiagnosticsReport).into(),
+            shortcut: None,
+            // The report runs in its own process (`--diagnose`), so the window stays responsive.
+            on_click: Box::new(|_, _| {
+                if let Err(error) = crate::diagnose_run::spawn_report_process() {
+                    log::warn!("the diagnostics report did not start: {error}");
                 }
             }),
         },

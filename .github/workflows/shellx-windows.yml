@@ -140,6 +140,8 @@ jobs:
     env:
       TARGET: x86_64-pc-windows-msvc
       APP_EXE: windows/target/x86_64-pc-windows-msvc/release/shellx-desktop.exe
+      # libghostty-vt for the baseline x86-64 CPU (R1 F8, R3 M2), as the cross build.
+      CMUX_GHOSTTY_VT_ZIG_CPU: baseline
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -287,6 +289,13 @@ jobs:
           # reach a pipe; the exit code (set -e semantics above) is the
           # verdict and the text check is informational.
           grep -F "shellx-desktop $SHELLX_VERSION" version.log || echo "::warning::no version text captured (exit code was 0)"
+
+      - name: Diagnostics report
+        shell: bash
+        run: |
+          # --no-open: no Explorer window and no crash dialog on a desktop nobody sees (spec §5.4).
+          "./$APP_EXE" --diagnose --no-open
+          ls "$LOCALAPPDATA/ShellX/native/logs"/diagnostics.*.txt
 
   installer:
     name: installer (Inno Setup, unsigned)

@@ -1,3 +1,4 @@
+// Modified by ShellX: a VK_PACKET key-up is no longer translated as a second key-down, which repeated or garbled characters typed by Unikey and EVKey. See windows/vendor/README.md.
 use std::rc::Rc;
 
 use ::util::ResultExt;
@@ -354,6 +355,11 @@ impl WindowsWindowInner {
     }
 
     fn handle_syskeyup_msg(&self, handle: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<isize> {
+        // ShellX: a VK_PACKET key-up carries no new character; handle_key_event would translate it
+        // again as a forged WM_KEYDOWN. Same result as before for this key, without TranslateMessage.
+        if VIRTUAL_KEY(wparam.loword()) == VK_PACKET {
+            return None;
+        }
         let mut lock = self.state.borrow_mut();
         let input = handle_key_event(handle, wparam, lparam, &mut lock, |keystroke| {
             PlatformInput::KeyUp(KeyUpEvent { keystroke })
@@ -407,6 +413,11 @@ impl WindowsWindowInner {
     }
 
     fn handle_keyup_msg(&self, handle: HWND, wparam: WPARAM, lparam: LPARAM) -> Option<isize> {
+        // ShellX: a VK_PACKET key-up carries no new character; handle_key_event would translate it
+        // again as a forged WM_KEYDOWN. Same result as before for this key, without TranslateMessage.
+        if VIRTUAL_KEY(wparam.loword()) == VK_PACKET {
+            return Some(1);
+        }
         let mut lock = self.state.borrow_mut();
         let Some(input) = handle_key_event(handle, wparam, lparam, &mut lock, |keystroke| {
             PlatformInput::KeyUp(KeyUpEvent { keystroke })
@@ -1195,6 +1206,10 @@ impl WindowsWindowInner {
     #[inline]
     fn draw_window(&self, handle: HWND, force_render: bool) -> Option<isize> {
         let mut request_frame = self.state.borrow_mut().callbacks.request_frame.take()?;
+        // ShellX (patch (c)): the first frame after a device-lost recovery rebuilds the scene. The
+        // flag is taken first, so a frame that is forced anyway also clears it and is drawn.
+        let fresh = self.state.borrow_mut().renderer.take_needs_fresh_frame();
+        let force_render = force_render || fresh;
         request_frame(RequestFrameOptions {
             require_presentation: false,
             force_render,

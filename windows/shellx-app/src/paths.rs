@@ -40,6 +40,19 @@ fn native_dir_from(
     }
 }
 
+/// The logs folder: `native_dir()\logs` (`%LOCALAPPDATA%\ShellX\native\logs`), else
+/// `%TEMP%\ShellX\logs` when `LOCALAPPDATA` is unusable (Ruling 12). Not created.
+pub fn logs_dir() -> PathBuf {
+    logs_dir_from(native_dir(), std::env::temp_dir())
+}
+
+fn logs_dir_from(native: io::Result<PathBuf>, temp: PathBuf) -> PathBuf {
+    match native {
+        Ok(native) => native.join("logs"),
+        Err(_) => temp.join("ShellX").join("logs"),
+    }
+}
+
 /// Creates the directory (and parents). On unix it is 0700, which shellx-core
 /// requires of its state dir; Windows keeps the inherited ACL.
 fn ensure(path: PathBuf) -> io::Result<PathBuf> {
@@ -97,6 +110,21 @@ mod tests {
             let mode = std::fs::metadata(dir).unwrap().permissions().mode();
             assert_eq!(mode & 0o077, 0, "{} is {mode:o}", dir.display());
         }
+    }
+
+    #[test]
+    fn logs_live_under_native_else_under_temp() {
+        let native = PathBuf::from("/n/ShellX/native");
+        assert_eq!(
+            logs_dir_from(Ok(native.clone()), PathBuf::from("/t")),
+            native.join("logs")
+        );
+        let missing = io::Error::new(io::ErrorKind::NotFound, "LOCALAPPDATA is not set");
+        assert_eq!(
+            logs_dir_from(Err(missing), PathBuf::from("/t")),
+            PathBuf::from("/t").join("ShellX").join("logs")
+        );
+        assert!(logs_dir().ends_with("logs"));
     }
 
     #[test]

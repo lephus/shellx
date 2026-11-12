@@ -3,20 +3,55 @@
 // The window (cfg(windows)) is the main user; the Mac build only tests it.
 #![cfg_attr(not(windows), allow(dead_code))]
 
-/// Windows version like `10.0.26100`, `"unknown"` when unreadable or off Windows.
+use shellx_model::first_window::{FirstWindow, WorkArea, first_window};
+
+/// Windows version like `10.0.26100` (Ruling 28): `RtlGetVersion`, then the registry, then
+/// `10.0`; never `unknown`, which the relay refuses. `10.0` off Windows.
 pub fn os_version() -> String {
     #[cfg(windows)]
     {
-        windows_version().unwrap_or_else(|| "unknown".to_string())
+        os_version_from(rtl_version(), registry_version())
     }
     #[cfg(not(windows))]
     {
-        "unknown".to_string()
+        os_version_from(None, None)
     }
 }
 
+/// `major.minor.build` from `RtlGetVersion` when it answered, else the registry's value when
+/// it is not blank, else `10.0`.
+fn os_version_from(rtl: Option<(u32, u32, u32)>, registry: Option<String>) -> String {
+    if let Some((major, minor, build)) = rtl {
+        return format!("{major}.{minor}.{build}");
+    }
+    registry
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "10.0".to_string())
+}
+
+/// `RtlGetVersion`: the real version, whatever the manifest says (unlike `GetVersionEx`);
+/// `None` when it does not return `STATUS_SUCCESS` (0) or reports major 0.
 #[cfg(windows)]
-fn windows_version() -> Option<String> {
+fn rtl_version() -> Option<(u32, u32, u32)> {
+    use windows_sys::Wdk::System::SystemServices::RtlGetVersion;
+    use windows_sys::Win32::System::SystemInformation::OSVERSIONINFOW;
+    let mut info = OSVERSIONINFOW {
+        dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `info` is a live OSVERSIONINFOW whose size field is set, as the call requires.
+    let status = unsafe { RtlGetVersion(&mut info) };
+    (status == 0 && info.dwMajorVersion != 0).then_some((
+        info.dwMajorVersion,
+        info.dwMinorVersion,
+        info.dwBuildNumber,
+    ))
+}
+
+/// The registry's `CurrentMajorVersionNumber.CurrentMinorVersionNumber.CurrentBuildNumber`.
+#[cfg(windows)]
+fn registry_version() -> Option<String> {
     use winreg::RegKey;
     use winreg::enums::HKEY_LOCAL_MACHINE;
     let key = RegKey::predef(HKEY_LOCAL_MACHINE)
@@ -92,6 +127,76 @@ pub fn screen_reader_running() -> bool {
     }
 }
 
+/// The primary monitor's work area (the screen without the taskbar) as `(width px, height
+/// px, scale)`: physical pixels and the monitor's effective DPI / 96. `None` when any call
+/// fails (the first window then opens maximized) and off Windows.
+pub fn primary_work_area() -> Option<(f32, f32, f32)> {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Foundation::{POINT, S_OK};
+        use windows_sys::Win32::Graphics::Gdi::{
+            GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
+        };
+        use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+        // SAFETY: plain value arguments. The primary monitor contains (0, 0), and with
+        // MONITOR_DEFAULTTOPRIMARY the call returns that monitor rather than null.
+        let monitor = unsafe { MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY) };
+        if monitor.is_null() {
+            return None;
+        }
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: `info` is a live MONITORINFO whose cbSize is set, as the call requires.
+        if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {
+            return None;
+        }
+        let (mut dpi_x, mut dpi_y) = (0u32, 0u32);
+        // SAFETY: both out-pointers point at live u32s.
+        if unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) } != S_OK {
+            return None;
+        }
+        let r = info.rcWork;
+        work_area_from_rect(r.left, r.top, r.right, r.bottom, dpi_x)
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// `rcWork` (physical pixels) and the monitor's DPI -> `(width px, height px, scale)`; `None`
+/// for an empty or inverted rectangle. Only the size counts: GPUI places windows in workspace
+/// coordinates, whose (0, 0) is the work area's corner whatever side the taskbar is on.
+fn work_area_from_rect(
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    dpi: u32,
+) -> Option<(f32, f32, f32)> {
+    let width = i64::from(right) - i64::from(left);
+    let height = i64::from(bottom) - i64::from(top);
+    (width > 0 && height > 0).then(|| (width as f32, height as f32, dpi as f32 / 96.0))
+}
+
+/// Where the first window opens: the foundations' rule on the primary monitor's work area,
+/// maximized when the work area is unknown.
+pub fn first_window_placement(work: Option<(f32, f32, f32)>) -> FirstWindow {
+    match work {
+        Some((width, height, scale)) => {
+            first_window(WorkArea::primary_workspace(width, height, scale))
+        }
+        None => first_window(WorkArea {
+            x: 0.0,
+            y: 0.0,
+            width: 0.0,
+            height: 0.0,
+        }),
+    }
+}
+
 /// `GetTimeZoneInformation` result -> seconds east of UTC. The biases are
 /// minutes with UTC = local + bias; the id says which extra bias is in effect
 /// (1 = TIME_ZONE_ID_STANDARD, 2 = TIME_ZONE_ID_DAYLIGHT, 0 = no DST rules,
@@ -142,13 +247,73 @@ mod tests {
     }
 
     #[test]
-    fn os_version_is_never_empty() {
-        let v = os_version();
-        assert!(!v.is_empty());
+    fn the_first_window_is_placed_for_the_screens_of_r1() {
+        use shellx_model::first_window::FirstWindow;
+        let fw = |x, y, width, height, maximized| FirstWindow {
+            x,
+            y,
+            width,
+            height,
+            maximized,
+        };
+        // 1920x1080 @150 %, taskbar at the bottom: rcWork 1920x1008 physical pixels
+        assert_eq!(
+            first_window_placement(Some((1920.0, 1008.0, 1.5))),
+            fw(40.0, 0.0, 1200.0, 672.0, false)
+        );
+        // 1366x768 @100 %
+        assert_eq!(
+            first_window_placement(Some((1366.0, 720.0, 1.0))),
+            fw(83.0, 0.0, 1200.0, 720.0, false)
+        );
+        // 2160x1440 @200 %
+        assert_eq!(
+            first_window_placement(Some((2160.0, 1344.0, 2.0))),
+            fw(0.0, 0.0, 1080.0, 672.0, false)
+        );
+        // 2256x1504 @200 %
+        assert_eq!(
+            first_window_placement(Some((2256.0, 1408.0, 2.0))),
+            fw(0.0, 0.0, 1128.0, 704.0, false)
+        );
+        // Taskbar on top: rcWork (0, 72)-(1920, 1080) at 144 dpi gives the first case; the
+        // origin stays (0, 0) because GPUI places in workspace coordinates.
+        let top = work_area_from_rect(0, 72, 1920, 1080, 144);
+        assert_eq!(top, Some((1920.0, 1008.0, 1.5)));
+        assert_eq!(
+            first_window_placement(top),
+            fw(40.0, 0.0, 1200.0, 672.0, false)
+        );
+        // An empty or inverted rectangle is no work area.
+        assert_eq!(work_area_from_rect(0, 0, 0, 1080, 96), None);
+        assert_eq!(work_area_from_rect(0, 1080, 1920, 0, 96), None);
+        // Unknown: maximized.
+        assert!(first_window_placement(None).maximized);
         if cfg!(not(windows)) {
-            assert_eq!(v, "unknown");
+            assert_eq!(primary_work_area(), None);
+        }
+    }
+
+    #[test]
+    fn os_version_is_never_unknown() {
+        // Ruling 28: RtlGetVersion, then the registry, then 10.0; never "unknown" (the relay
+        // refuses it).
+        let v = os_version();
+        assert!(!v.is_empty() && v != "unknown", "{v}");
+        if cfg!(not(windows)) {
+            assert_eq!(v, "10.0");
         } else {
             assert!(v.starts_with("10."), "{v}");
         }
+        assert_eq!(
+            os_version_from(Some((10, 0, 26100)), Some("10.0.19045".into())),
+            "10.0.26100"
+        );
+        assert_eq!(
+            os_version_from(None, Some("10.0.19045".into())),
+            "10.0.19045"
+        );
+        assert_eq!(os_version_from(None, Some("  ".into())), "10.0");
+        assert_eq!(os_version_from(None, None), "10.0");
     }
 }

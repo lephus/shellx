@@ -297,7 +297,8 @@ impl<S: SessionApi> RemoteTabs<S> {
         self.planned.clear();
     }
 
-    /// The current session of a Mac (tests, smoke).
+    /// The current session of a Mac (tests).
+    #[cfg(test)]
     pub fn session(&self, machine_id: &str) -> Option<&Arc<S>> {
         self.sessions.get(machine_id).map(|s| &s.session)
     }

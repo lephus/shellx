@@ -149,6 +149,20 @@ pub enum Str {
     AppliesToNewTerminals,
     /// Shown while `SHELLX_SHELL` overrides the choice.
     ShellEnvOverride,
+    /// Settings › Display: the section title.
+    Display,
+    /// Settings › Display: this run uses the standard mode.
+    DisplayStandard,
+    /// Settings › Display: this run uses the compatible mode.
+    DisplayCompatible,
+    /// Under `DisplayCompatible` when the standard mode could not open the window.
+    DisplayCompatibleWhy,
+    /// Under `DisplayCompatible` when the person's environment variable chose it.
+    DisplayCompatibleByEnv,
+    /// The button that asks for the standard mode at the next start.
+    TryStandardDisplay,
+    /// Replaces the button once the request is stored.
+    TakesEffectNextStart,
     /// `settings.json` could not be written (no `LOCALAPPDATA`, a full disk).
     ShellChoiceNotSaved,
     /// Pairing failures (`pairing_failure_sentence`).
@@ -171,6 +185,8 @@ pub enum Str {
     /// The help menu's items (the Mac's wording).
     SettingsEllipsis,
     CheckForUpdates,
+    /// Help menu: starts the diagnostics report.
+    CreateDiagnosticsReport,
     Docs,
     GitHub,
     ContinueWithGoogle,
@@ -317,6 +333,13 @@ impl Str {
         Str::CustomShellPlaceholder,
         Str::AppliesToNewTerminals,
         Str::ShellEnvOverride,
+        Str::Display,
+        Str::DisplayStandard,
+        Str::DisplayCompatible,
+        Str::DisplayCompatibleWhy,
+        Str::DisplayCompatibleByEnv,
+        Str::TryStandardDisplay,
+        Str::TakesEffectNextStart,
         Str::ShellChoiceNotSaved,
         Str::MachineGone,
         Str::PairingSessionExpired,
@@ -331,6 +354,7 @@ impl Str {
         Str::Help,
         Str::SettingsEllipsis,
         Str::CheckForUpdates,
+        Str::CreateDiagnosticsReport,
         Str::Docs,
         Str::GitHub,
         Str::ContinueWithGoogle,
@@ -475,6 +499,17 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ShellEnvOverride => {
                 "SHELLX_SHELL đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này."
             }
+            Str::Display => "Hiển thị",
+            Str::DisplayStandard => "Chế độ hiển thị thường",
+            Str::DisplayCompatible => "Chế độ hiển thị tương thích",
+            Str::DisplayCompatibleWhy => {
+                "ShellX dùng chế độ này vì chế độ thường không mở được cửa sổ trên máy này."
+            }
+            Str::DisplayCompatibleByEnv => {
+                "Biến môi trường GPUI_DISABLE_DIRECT_COMPOSITION đang bật chế độ này."
+            }
+            Str::TryStandardDisplay => "Thử lại chế độ hiển thị thường",
+            Str::TakesEffectNextStart => "Áp dụng khi mở lại ShellX.",
             Str::ShellChoiceNotSaved => "Không lưu được lựa chọn shell trên máy này.",
             Str::MachineGone => "Máy này không còn trong tài khoản của bạn.",
             Str::PairingSessionExpired => "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
@@ -491,6 +526,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Help => "Trợ giúp",
             Str::SettingsEllipsis => "Cài đặt…",
             Str::CheckForUpdates => "Kiểm tra cập nhật",
+            Str::CreateDiagnosticsReport => "Tạo báo cáo chẩn đoán",
             Str::Docs => "Tài liệu",
             Str::GitHub => "GitHub",
             Str::ContinueWithGoogle => "Tiếp tục với Google",
@@ -646,6 +682,17 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::ShellEnvOverride => {
                 "SHELLX_SHELL is set, so ShellX uses it instead of this choice."
             }
+            Str::Display => "Display",
+            Str::DisplayStandard => "Standard display mode",
+            Str::DisplayCompatible => "Compatible display mode",
+            Str::DisplayCompatibleWhy => {
+                "ShellX uses this mode because the standard mode couldn't open its window on this PC."
+            }
+            Str::DisplayCompatibleByEnv => {
+                "The GPUI_DISABLE_DIRECT_COMPOSITION environment variable turns this mode on."
+            }
+            Str::TryStandardDisplay => "Try standard display mode again",
+            Str::TakesEffectNextStart => "Takes effect the next time ShellX opens.",
             Str::ShellChoiceNotSaved => "The shell choice couldn't be saved on this PC.",
             Str::MachineGone => "That machine is no longer in your account.",
             Str::PairingSessionExpired => "Your session expired. Sign in again, then try again.",
@@ -662,6 +709,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Help => "Help",
             Str::SettingsEllipsis => "Settings…",
             Str::CheckForUpdates => "Check for Updates",
+            Str::CreateDiagnosticsReport => "Create Diagnostics Report",
             Str::Docs => "Docs",
             Str::GitHub => "GitHub",
             Str::ContinueWithGoogle => "Continue with Google",
@@ -1035,7 +1083,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 145);
+        assert_eq!(Str::ALL.len(), 153);
     }
 
     #[test]
@@ -1952,5 +2000,51 @@ mod tests {
             t(Lang::En, Str::PasteTooLarge),
             "Paste too large (8 MB max)"
         );
+    }
+
+    #[test]
+    fn display_and_diagnostics_strings() {
+        let cases = [
+            (Str::Display, "Hiển thị", "Display"),
+            (
+                Str::DisplayStandard,
+                "Chế độ hiển thị thường",
+                "Standard display mode",
+            ),
+            (
+                Str::DisplayCompatible,
+                "Chế độ hiển thị tương thích",
+                "Compatible display mode",
+            ),
+            (
+                Str::DisplayCompatibleWhy,
+                "ShellX dùng chế độ này vì chế độ thường không mở được cửa sổ trên máy này.",
+                "ShellX uses this mode because the standard mode couldn't open its window on this PC.",
+            ),
+            (
+                Str::DisplayCompatibleByEnv,
+                "Biến môi trường GPUI_DISABLE_DIRECT_COMPOSITION đang bật chế độ này.",
+                "The GPUI_DISABLE_DIRECT_COMPOSITION environment variable turns this mode on.",
+            ),
+            (
+                Str::TryStandardDisplay,
+                "Thử lại chế độ hiển thị thường",
+                "Try standard display mode again",
+            ),
+            (
+                Str::TakesEffectNextStart,
+                "Áp dụng khi mở lại ShellX.",
+                "Takes effect the next time ShellX opens.",
+            ),
+            (
+                Str::CreateDiagnosticsReport,
+                "Tạo báo cáo chẩn đoán",
+                "Create Diagnostics Report",
+            ),
+        ];
+        for (key, vi, en) in cases {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
     }
 }

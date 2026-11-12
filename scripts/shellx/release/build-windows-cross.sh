@@ -21,6 +21,16 @@
 #   SHELLX_WINBUILD_KEEP_TARGET=1 keep the cargo target dir in the cache volume
 #   SHELLX_WINBUILD_MIN_FREE_GIB  free GiB the VPS needs in ~ to start (default 14: 4 stay free
 #                                 for deploys, up to 10 for the image, caches and target)
+#   SHELLX_BUILD_LABEL  a test label (a lower-case letter, then up to 9 lower-case letters or
+#                       digits): the installer becomes ShellX-Setup-<version>-<label>-<commit10>.exe
+#                       and About and reports show "ShellX <version> (<label> <commit10>)"; the
+#                       version inside the app and the installer stays <version> (Ruling 25)
+#
+# Output in OUT_DIR: the installer, its .sha256 and SHA256SUMS.remote, and a folder
+# <installer name without .exe>-symbols holding shellx-desktop.exe and shellx_desktop.pdb of the
+# same build (to map a crash file's addresses later, Ruling 11), each checked against the
+# remote sums. The PDB is never in the installer. A failed symbols download is a warning; the
+# last line names what the folder holds.
 #
 # The VPS is shared with a production service. Guards (the preflight), checked before every
 # build and alone with --preflight (read-only; exit 0 = a build may start, 1 = it must not):
@@ -188,6 +198,16 @@ volume=shellx-winbuild-cargo
 version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' windows/Cargo.toml)"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "cannot read windows/Cargo.toml version: '$version'" >&2; exit 1; }
 commit="$(git rev-parse HEAD)"
+label="${SHELLX_BUILD_LABEL:-}"
+file_label=""
+label_env=""
+if [[ -n "$label" ]]; then
+  [[ "$label" =~ ^[a-z][a-z0-9]{0,9}$ ]] || { echo "SHELLX_BUILD_LABEL must be a lower-case letter then up to 9 letters or digits: '$label'" >&2; exit 1; }
+  file_label="$label-${commit:0:10}"
+  label_env="-e SHELLX_BUILD_LABEL=$label"
+fi
+setup_name="ShellX-Setup-$version${file_label:+-$file_label}.exe"
+symbols_dir="${setup_name%.exe}-symbols"
 ghostty_sha="$(git ls-tree HEAD ghostty | awk '$2 == "commit" {print $3}')"
 [[ -n "$ghostty_sha" ]] || { echo "HEAD has no ghostty submodule entry" >&2; exit 1; }
 ghostty_url="$(git config -f .gitmodules submodule.ghostty.url)"
@@ -196,7 +216,7 @@ image="shellx-winbuild:$tag"
 if [[ -n "$(git status --porcelain -- windows cmux-tui shellx-core)" ]]; then
   echo "warning: uncommitted changes under windows/, cmux-tui/ or shellx-core/ are NOT built" >&2
 fi
-echo "ShellX for Windows $version from $commit (ghostty $ghostty_sha), image $image"
+echo "ShellX for Windows $version from $commit (ghostty $ghostty_sha), image $image${file_label:+, label $file_label}"
 
 tmp="$(mktemp -d)"
 locked=0
@@ -276,26 +296,54 @@ vssh "set -euo pipefail
   mkdir out
   docker volume create $volume >/dev/null
   docker run --rm --cpus 4 --memory 10g --name shellx-winbuild-run \
-    -e HOST_UID=\$(id -u) -e HOST_GID=\$(id -g) -e CMUX_TUI_BUILD_COMMIT=$commit \
+    -e HOST_UID=\$(id -u) -e HOST_GID=\$(id -g) -e CMUX_TUI_BUILD_COMMIT=$commit $label_env \
     -v $volume:/cache -v \$PWD/src:/src -v \$PWD/out:/out \
     $image bash /opt/winbuild/build-in-container.sh 2>&1 | tee build.log \
     | grep -E '^(==|error)|^test .* FAILED|test result|Successful compile' || true
-  test -f out/ShellX-Setup-$version.exe || { tail -60 build.log; exit 1; }"
+  test -f out/$setup_name || { tail -60 build.log; exit 1; }"
 
-# 4. Download.
+# 4. Download the installer (the deliverable).
 mkdir -p "$out_dir"
-vssh "cat ~/$remote/out/ShellX-Setup-$version.exe" > "$out_dir/ShellX-Setup-$version.exe"
+vssh "cat ~/$remote/out/$setup_name" > "$out_dir/$setup_name"
 vssh "cat ~/$remote/out/SHA256SUMS" > "$out_dir/SHA256SUMS.remote"
-(cd "$out_dir" && shasum -a 256 "ShellX-Setup-$version.exe" | tee "ShellX-Setup-$version.exe.sha256")
-grep -q "$(cut -d' ' -f1 "$out_dir/ShellX-Setup-$version.exe.sha256")" "$out_dir/SHA256SUMS.remote" \
+(cd "$out_dir" && shasum -a 256 "$setup_name" | tee "$setup_name.sha256")
+grep -q "$(cut -d' ' -f1 "$out_dir/$setup_name.sha256")" "$out_dir/SHA256SUMS.remote" \
   || { echo "checksum mismatch after download" >&2; exit 1; }
 
 # 5. Free the big intermediates; keep the registry, xwin and zig caches for the next run.
+# Before the symbols download: those files are in ~/<build dir>/out, not in the volume, and a
+# failure below must not leave the target in the volume (B-2 review m8).
 if [[ "${SHELLX_WINBUILD_KEEP_TARGET:-0}" != 1 ]]; then
   vssh "docker run --rm --name shellx-winbuild-run -v $volume:/cache $image rm -rf /cache/target /cache/zig-local"
 fi
 
-# 6. Disk: when under the minimum, remove older shellx-winbuild image tags (only those).
+# 6. The exe and its PDB, side by side, outside the installer (Ruling 11). Best effort: the
+# installer is the deliverable, so a failure here is a warning, never an exit. The folder is
+# emptied first, so a file from an earlier build is never taken for this build's.
+rm -rf "${out_dir:?}/$symbols_dir"
+mkdir -p "$out_dir/$symbols_dir"
+# <file in out/>: downloaded into the symbols folder, and its sum is in SHA256SUMS.remote.
+fetch_checked() {
+  local f="$1" sum
+  vssh "cat ~/$remote/out/$f" > "$out_dir/$symbols_dir/$f" </dev/null || return 1
+  sum="$(shasum -a 256 "$out_dir/$symbols_dir/$f" | cut -d' ' -f1)"
+  grep -q "$sum  $f" "$out_dir/SHA256SUMS.remote"
+}
+symbols=""
+if fetch_checked shellx-desktop.exe; then
+  symbols="exe"
+  if vssh "test -f ~/$remote/out/shellx_desktop.pdb" </dev/null && fetch_checked shellx_desktop.pdb; then
+    symbols="exe and PDB"
+  else
+    rm -f "$out_dir/$symbols_dir/shellx_desktop.pdb"
+    echo "warning: no intact shellx_desktop.pdb from this build; crash files cannot be mapped to code" >&2
+  fi
+else
+  rm -rf "${out_dir:?}/$symbols_dir"
+  echo "warning: the exe for the symbols folder did not download intact (the installer is fine)" >&2
+fi
+
+# 7. Disk: when under the minimum, remove older shellx-winbuild image tags (only those).
 free_after="$(vps_free_gib </dev/null || true)"
 echo "VPS: ${free_after:-?} GiB free after the build"
 if [[ "$free_after" =~ ^[0-9]+$ ]] && (( free_after < min_free )); then
@@ -310,4 +358,4 @@ if [[ "$free_after" =~ ^[0-9]+$ ]] && (( free_after < min_free )); then
   done
   echo "VPS: $(vps_free_gib </dev/null) GiB free"
 fi
-echo "Built $out_dir/ShellX-Setup-$version.exe (unsigned)"
+echo "Built $out_dir/$setup_name (unsigned)${symbols:+; $symbols in $out_dir/$symbols_dir}"

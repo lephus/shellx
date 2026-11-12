@@ -73,28 +73,30 @@ pub fn execute(core: &dyn CoreCall, job: &Job) -> JobResult {
 }
 
 /// `execute`, with a panic turned into an `internal` error, so the flow
-/// always gets its result.
+/// always gets its result. The panic still leaves a crash file, but starts no
+/// reporter dialog (`crash::expect_caught`, Ruling 8).
 pub fn execute_caught(core: &dyn CoreCall, job: &Job) -> JobResult {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(core, job))).unwrap_or_else(
-        |_| {
-            let err = CoreErr::new("internal", "shellx-core call panicked");
-            match job {
-                Job::Request { generation, .. } => JobResult::Requested {
-                    generation: *generation,
-                    result: Err(err),
-                },
-                Job::Poll {
-                    generation,
-                    pairing_id,
-                    ..
-                } => JobResult::Polled {
-                    generation: *generation,
-                    pairing_id: pairing_id.clone(),
-                    result: Err(err),
-                },
-            }
-        },
-    )
+    crate::crash::expect_caught(|| {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(core, job)))
+    })
+    .unwrap_or_else(|_| {
+        let err = CoreErr::new("internal", "shellx-core call panicked");
+        match job {
+            Job::Request { generation, .. } => JobResult::Requested {
+                generation: *generation,
+                result: Err(err),
+            },
+            Job::Poll {
+                generation,
+                pairing_id,
+                ..
+            } => JobResult::Polled {
+                generation: *generation,
+                pairing_id: pairing_id.clone(),
+                result: Err(err),
+            },
+        }
+    })
 }
 
 /// Longest id part of `invite-<id>.uri` that fits core's 64-byte limit.
@@ -233,7 +235,7 @@ impl PairingService {
     pub fn load_links(&mut self) {
         match self.store.load() {
             Ok(links) => self.links = links,
-            Err(e) => eprintln!("shellx: could not read the remote links: {e}"),
+            Err(e) => log::warn!("shellx: could not read the remote links: {e}"),
         }
     }
 
