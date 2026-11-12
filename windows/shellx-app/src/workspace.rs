@@ -184,22 +184,13 @@ impl std::fmt::Display for StartFailure {
     }
 }
 
-/// Longest reason a pane shows, in characters.
-const REASON_MAX_CHARS: usize = 160;
-
 /// Why a program did not start, as the operating system said it: the innermost error, from
 /// after its last "failed: " (portable-pty puts the whole command line, prompt hook
-/// included, before it on Windows), on one line and at most `REASON_MAX_CHARS` long
-/// (review M5).
+/// included, before it on Windows), on one line and at most 160 characters (review M5). The
+/// rule is `log_file::failure_reason`, which the log uses for portable-pty's own error line
+/// too (B-1a review I1).
 pub fn spawn_reason(error: &anyhow::Error) -> String {
-    let root = error.root_cause().to_string();
-    let reason = root.rsplit("failed: ").next().unwrap_or(&root);
-    let reason = reason.split_whitespace().collect::<Vec<_>>().join(" ");
-    if reason.chars().count() <= REASON_MAX_CHARS {
-        return reason;
-    }
-    let cut: String = reason.chars().take(REASON_MAX_CHARS - 1).collect();
-    format!("{cut}…")
+    shellx_model::log_file::failure_reason(&error.root_cause().to_string())
 }
 
 fn start_local(cmd: &ShellCmd, cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {

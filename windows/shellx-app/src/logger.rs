@@ -98,8 +98,10 @@ pub(crate) fn write_record(
     target: &str,
     message: &str,
 ) {
+    // portable-pty's records keep only the system's reason (review I1).
+    let message = log_file::record_message(target, message);
     let key = format!("{level}\u{1f}{target}\u{1f}{message}");
-    let line = log_file::format_record(timestamp, level, target, message);
+    let line = log_file::format_record(timestamp, level, target, &message);
     let text: String = state.dedup.push(&key, line, timestamp).concat();
     state.write_text(&text);
 }

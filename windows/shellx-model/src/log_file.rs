@@ -43,6 +43,41 @@ pub fn compact_utc(unix_secs: u64) -> String {
     format!("{y:04}{mo:02}{d:02}-{h:02}{mi:02}{s:02}")
 }
 
+/// Longest failure reason kept, in characters.
+pub const FAILURE_REASON_MAX_CHARS: usize = 160;
+
+/// Why something failed, as the operating system said it: the text after the last
+/// `failed: ` (portable-pty puts the whole command line, prompt hook and custom arguments
+/// included, and the cwd before it), on one line and at most `FAILURE_REASON_MAX_CHARS`
+/// long. The pane's reason (`workspace::spawn_reason`, A1 review M5) and the log share it.
+pub fn failure_reason(text: &str) -> String {
+    let reason = text.rsplit("failed: ").next().unwrap_or(text);
+    let reason = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    if reason.chars().count() <= FAILURE_REASON_MAX_CHARS {
+        return reason;
+    }
+    let cut: String = reason.chars().take(FAILURE_REASON_MAX_CHARS - 1).collect();
+    format!("{cut}…")
+}
+
+/// The message a record is written with (review I1). portable-pty's records go behind fixed
+/// text with only the system's reason: its `CreateProcessW` error carries the whole command
+/// line, which for a custom shell is the person's own arguments, and the cwd. Every other
+/// target is kept as it is (the redactor still runs over it).
+pub fn record_message<'a>(target: &str, message: &'a str) -> std::borrow::Cow<'a, str> {
+    if !target.starts_with("portable_pty") {
+        return std::borrow::Cow::Borrowed(message);
+    }
+    if message.contains("failed: ") {
+        std::borrow::Cow::Owned(format!(
+            "a process could not be started: {}",
+            failure_reason(message)
+        ))
+    } else {
+        std::borrow::Cow::Owned(format!("portable-pty: {}", failure_reason(message)))
+    }
+}
+
 /// One log record as text: `<ts> <LEVEL> <target>: <first line>` and `  <next line>` for
 /// each further line of the message, each ending in `\n` and each passed through `redact`.
 /// CRLF line ends and a trailing newline make no extra lines; a stray `\r` becomes a space.
