@@ -188,9 +188,14 @@ explorer.
 **Licence notices.** The app shows `shellx-android/app/src/main/assets/licenses/third_party_licenses.txt`, which
 `shellx-android/scripts/generate-licences.py` writes from `shellx-android/app/gradle.lockfile` and the POMs in
 the Gradle cache. Google's oss-licenses plugin is not used: its library needs compileSdk 37 and the project is at
-36. After any lockfile change run `python3 shellx-android/scripts/generate-licences.py` and commit the file.
+36. The file carries each library's licence, the Apache-2.0 text once, each non-Apache library's own licence
+text with its copyright line, any `META-INF/NOTICE*` file and the notices Google's AARs embed. The Android SDK
+and Play Core entries keep their name and URL, because they are terms of use. After any lockfile change run
+`python3 shellx-android/scripts/generate-licences.py` and commit the file. A new library whose artifact ships no
+licence text with a copyright line stops the generator by name: add the project's own text as
+`shellx-android/scripts/licence-texts/<group>_<artifact>.txt`, copied from its published licence.
 `generate-licences.py --check`, which `shellx-android/scripts/dev.sh` and `android.sh` run, refuses a stale
-file. The generator reads POMs from `~/.gradle/caches`: on a machine with an empty cache, run
+file. The generator reads POMs and artifacts from `~/.gradle/caches`: on a machine with an empty cache, run
 `shellx-android/scripts/dev.sh lock` and one build first.
 
 ## Android: upload key and tools
@@ -340,10 +345,9 @@ Google's test robot reaches only the sign-in screen and the demo. Note the warni
 
 ### Play 10. USER — testing tracks and the path to production
 
-Gate: internal testing (Play 7) may take the build as it is. Before closed testing or production, the in-app licence
-notices must carry the licence texts: MIT, BSD-3-Clause and Bouncy Castle with their copyright lines, the Apache-2.0
-text, any NOTICE file, and the notices Google's AARs embed. Today they list only each library's name and licence URL.
-This is an open item (see "Google Play: facts"); don't open either track until it is closed.
+Gate: internal testing (Play 7) may take the build as it is. The in-app licence notices carry each library's
+licence, the Apache-2.0 text, each MIT, BSD-3-Clause and Bouncy Castle text with its copyright line, every NOTICE
+file and the notices Google's AARs embed; `generate-licences.py --check` and the bundle check enforce it.
 
 Choose the path from Play 1:
 
@@ -496,4 +500,4 @@ Not secret. SHA-1s and OAuth client IDs live in `docs/superpowers/ledgers/shellx
 | App signing key certificate SHA-256 | pending (USER, Play 8) | Play 8 |
 | Internal testing opt-in link | pending (USER, Play 7) | Play 7 |
 | Closed test: day the 12th tester opted in (path B) | pending (USER, Play 10) | Play 10 |
-| Licence texts in the in-app notices (needed before closed testing or production) | open | Play 10 |
+| Licence texts in the in-app notices | done: `generate-licences.py --check` and the bundle check enforce them | Play 10 |
