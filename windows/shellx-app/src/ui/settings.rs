@@ -2,8 +2,9 @@
 //! area, opened by the title bar gear or Ctrl+, and closed by Esc or its
 //! close button. Sections: Tài khoản (where sign-in lives: "Đăng nhập…" asks
 //! RootView for the sign-in dialog), Terminal (the shell new tabs start, or a
-//! command line), Cập nhật, Ngôn ngữ (read-only) and Giới thiệu (with the CC
-//! BY 4.0 icon credit).
+//! command line), Hiển thị (the display mode, and "Thử lại chế độ hiển thị
+//! thường"), Cập nhật, Ngôn ngữ (read-only) and Giới thiệu (with the test label
+//! and the CC BY 4.0 icon credit).
 
 use gpui::{
     ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, FontWeight,

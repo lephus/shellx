@@ -27,7 +27,7 @@ const RETRY_VARIABLE: &str = "SHELLX_RENDER_RETRY";
 
 /// What Settings › Display shows (A10).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[allow(dead_code)] // Settings › Display reads `mode` and `reason`; `remembered` is kept for tests
+#[allow(dead_code)] // Settings › Display reads `mode` and `reason`; `remembered` is part of the plan's seam (RenderStatus) and has no reader yet
 pub struct RenderStatus {
     pub mode: RenderMode,
     pub reason: StartReason,

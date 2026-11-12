@@ -663,7 +663,8 @@ fn help_button(
         })
 }
 
-/// Settings…, Check for Updates, Docs and GitHub.
+/// Settings…, Check for Updates, Create Diagnostics Report (a separate `--diagnose`
+/// process, Ruling 35), Docs and GitHub.
 fn help_menu(
     account: &Entity<AccountService>,
     lang: Lang,
