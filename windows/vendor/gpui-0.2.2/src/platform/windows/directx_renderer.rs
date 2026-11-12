@@ -1,3 +1,4 @@
+// Modified by ShellX: a failed resize or device-lost recovery no longer leaves a dropped render target, releases objects twice or presents a frame that names the emptied atlas. See windows/vendor/README.md.
 use std::{
     mem::ManuallyDrop,
     sync::{Arc, OnceLock},
@@ -45,6 +46,14 @@ pub(crate) struct DirectXRenderer {
     pipelines: DirectXRenderPipelines,
     direct_composition: Option<DirectComposition>,
     font_info: &'static FontInfo,
+    /// ShellX: fixed at creation (`handle_device_lost_impl` used to derive it from a field it had taken).
+    disable_direct_composition: bool,
+    /// ShellX: `Some((width, height))` while the device-lost path has released the old devices and
+    /// resources and not yet created new ones.
+    released: Option<(u32, u32)>,
+    /// ShellX: set by a successful device-lost recovery: the atlas is empty, so nothing may be drawn
+    /// until `draw_window` forces a frame that rebuilds the scene (item 9).
+    needs_fresh_frame: bool,
 }
 
 /// Direct3D objects
@@ -60,7 +69,7 @@ pub(crate) struct DirectXRendererDevices {
 struct DirectXResources {
     // Direct3D rendering objects
     swap_chain: IDXGISwapChain1,
-    render_target: ManuallyDrop<ID3D11Texture2D>,
+    render_target: Option<ID3D11Texture2D>,
     render_target_view: [Option<ID3D11RenderTargetView>; 1],
 
     // Path intermediate textures (with MSAA)
@@ -164,6 +173,9 @@ impl DirectXRenderer {
             pipelines,
             direct_composition,
             font_info: Self::get_font_info(),
+            disable_direct_composition,
+            released: None,
+            needs_fresh_frame: false,
         })
     }
 
@@ -187,7 +199,7 @@ impl DirectXRenderer {
         )?;
         unsafe {
             self.devices.device_context.ClearRenderTargetView(
-                self.resources.render_target_view[0].as_ref().unwrap(),
+                self.resources.render_target_view[0].as_ref().context("no render target to draw into")?,
                 &[0.0; 4],
             );
             self.devices
@@ -224,37 +236,46 @@ impl DirectXRenderer {
     }
 
     fn handle_device_lost_impl(&mut self, directx_devices: &DirectXDevices) -> Result<()> {
-        let disable_direct_composition = self.direct_composition.is_none();
+        let disable_direct_composition = self.disable_direct_composition;
+        let (width, height) = match self.released {
+            Some(size) => size,
+            None => {
+                let size = (self.resources.width, self.resources.height);
+                unsafe {
+                    #[cfg(debug_assertions)]
+                    report_live_objects(&self.devices.device)
+                        .context("Failed to report live objects after device lost")
+                        .log_err();
 
-        unsafe {
-            #[cfg(debug_assertions)]
-            report_live_objects(&self.devices.device)
-                .context("Failed to report live objects after device lost")
-                .log_err();
+                    ManuallyDrop::drop(&mut self.resources);
+                    self.devices.device_context.OMSetRenderTargets(None, None);
+                    self.devices.device_context.ClearState();
+                    self.devices.device_context.Flush();
 
-            ManuallyDrop::drop(&mut self.resources);
-            self.devices.device_context.OMSetRenderTargets(None, None);
-            self.devices.device_context.ClearState();
-            self.devices.device_context.Flush();
+                    #[cfg(debug_assertions)]
+                    report_live_objects(&self.devices.device)
+                        .context("Failed to report live objects after device lost")
+                        .log_err();
 
-            #[cfg(debug_assertions)]
-            report_live_objects(&self.devices.device)
-                .context("Failed to report live objects after device lost")
-                .log_err();
+                    drop(self.direct_composition.take());
+                    ManuallyDrop::drop(&mut self.devices);
+                }
+                self.released = Some(size);
+                size
+            }
+        };
 
-            drop(self.direct_composition.take());
-            ManuallyDrop::drop(&mut self.devices);
-        }
-
-        let devices = DirectXRendererDevices::new(directx_devices, disable_direct_composition)
-            .context("Recreating DirectX devices")?;
-        let resources = DirectXResources::new(
+        let devices = ManuallyDrop::into_inner(
+            DirectXRendererDevices::new(directx_devices, disable_direct_composition)
+                .context("Recreating DirectX devices")?,
+        );
+        let resources = ManuallyDrop::into_inner(DirectXResources::new(
             &devices,
-            self.resources.width,
-            self.resources.height,
+            width,
+            height,
             self.hwnd,
             disable_direct_composition,
-        )?;
+        )?);
         let globals = DirectXGlobalElements::new(&devices.device)?;
         let pipelines = DirectXRenderPipelines::new(&devices.device)?;
 
@@ -269,8 +290,8 @@ impl DirectXRenderer {
 
         self.atlas
             .handle_device_lost(&devices.device, &devices.device_context);
-        self.devices = devices;
-        self.resources = resources;
+        self.devices = ManuallyDrop::new(devices);
+        self.resources = ManuallyDrop::new(resources);
         self.globals = globals;
         self.pipelines = pipelines;
         self.direct_composition = direct_composition;
@@ -280,10 +301,31 @@ impl DirectXRenderer {
                 .device_context
                 .OMSetRenderTargets(Some(&self.resources.render_target_view), None);
         }
+        self.released = None;
+        self.needs_fresh_frame = true;
         Ok(())
     }
 
+    /// ShellX: true once after a successful device-lost recovery; `draw_window` then forces a
+    /// frame that rebuilds the scene, which refills the atlas, before anything is presented.
+    pub(crate) fn take_needs_fresh_frame(&mut self) -> bool {
+        std::mem::take(&mut self.needs_fresh_frame)
+    }
+
     pub(crate) fn draw(&mut self, scene: &Scene) -> Result<()> {
+        if self.released.is_some() {
+            anyhow::bail!("the GPU device was lost; drawing resumes once it is recreated");
+        }
+        if self.needs_fresh_frame {
+            // ShellX: this scene was built before the recovery and names atlas textures that no
+            // longer exist; skip it until draw_window forces a fresh frame (item 9).
+            return Ok(());
+        }
+        if self.resources.render_target_view[0].is_none() {
+            // ShellX: the last resize failed; try it again at the size it recorded.
+            let (width, height) = (self.resources.width, self.resources.height);
+            self.resize(size(DevicePixels(width as i32), DevicePixels(height as i32)))?;
+        }
         self.pre_draw()?;
         for batch in scene.batches() {
             match batch {
@@ -318,7 +360,14 @@ impl DirectXRenderer {
     pub(crate) fn resize(&mut self, new_size: Size<DevicePixels>) -> Result<()> {
         let width = new_size.width.0.max(1) as u32;
         let height = new_size.height.0.max(1) as u32;
-        if self.resources.width == width && self.resources.height == height {
+        if let Some(size) = self.released.as_mut() {
+            *size = (width, height);
+            return Ok(());
+        }
+        if self.resources.width == width
+            && self.resources.height == height
+            && self.resources.render_target_view[0].is_some()
+        {
             return Ok(());
         }
         self.resources.width = width;
@@ -326,8 +375,8 @@ impl DirectXRenderer {
 
         // Clear the render target before resizing
         unsafe { self.devices.device_context.OMSetRenderTargets(None, None) };
-        unsafe { ManuallyDrop::drop(&mut self.resources.render_target) };
-        drop(self.resources.render_target_view[0].take().unwrap());
+        drop(self.resources.render_target.take());
+        drop(self.resources.render_target_view[0].take());
 
         // Resizing the swap chain requires a call to the underlying DXGI adapter, which can return the device removed error.
         // The app might have moved to a monitor that's attached to a different graphics device.
@@ -577,6 +626,9 @@ impl DirectXRenderer {
     }
 
     pub(crate) fn gpu_specs(&self) -> Result<GpuSpecs> {
+        if self.released.is_some() {
+            anyhow::bail!("the GPU device was lost");
+        }
         let desc = unsafe { self.devices.adapter.GetDesc1() }?;
         let is_software_emulated = (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32) != 0;
         let device_name = String::from_utf16_lossy(&desc.Description)
@@ -996,6 +1048,9 @@ struct PathSprite {
 
 impl Drop for DirectXRenderer {
     fn drop(&mut self) {
+        if self.released.is_some() {
+            return;
+        }
         #[cfg(debug_assertions)]
         report_live_objects(&self.devices.device).ok();
         unsafe {
@@ -1007,9 +1062,7 @@ impl Drop for DirectXRenderer {
 
 impl Drop for DirectXResources {
     fn drop(&mut self) {
-        unsafe {
-            ManuallyDrop::drop(&mut self.render_target);
-        }
+        drop(self.render_target.take());
     }
 }
 
@@ -1082,7 +1135,7 @@ fn create_resources(
     width: u32,
     height: u32,
 ) -> Result<(
-    ManuallyDrop<ID3D11Texture2D>,
+    Option<ID3D11Texture2D>,
     [Option<ID3D11RenderTargetView>; 1],
     ID3D11Texture2D,
     [Option<ID3D11ShaderResourceView>; 1],
@@ -1113,14 +1166,14 @@ fn create_render_target_and_its_view(
     swap_chain: &IDXGISwapChain1,
     device: &ID3D11Device,
 ) -> Result<(
-    ManuallyDrop<ID3D11Texture2D>,
+    Option<ID3D11Texture2D>,
     [Option<ID3D11RenderTargetView>; 1],
 )> {
     let render_target: ID3D11Texture2D = unsafe { swap_chain.GetBuffer(0) }?;
     let mut render_target_view = None;
     unsafe { device.CreateRenderTargetView(&render_target, None, Some(&mut render_target_view))? };
     Ok((
-        ManuallyDrop::new(render_target),
+        Some(render_target),
         [Some(render_target_view.unwrap())],
     ))
 }

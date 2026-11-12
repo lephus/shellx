@@ -1206,6 +1206,8 @@ impl WindowsWindowInner {
     #[inline]
     fn draw_window(&self, handle: HWND, force_render: bool) -> Option<isize> {
         let mut request_frame = self.state.borrow_mut().callbacks.request_frame.take()?;
+        // ShellX (patch (c)): the first frame after a device-lost recovery rebuilds the scene.
+        let force_render = force_render || self.state.borrow_mut().renderer.take_needs_fresh_frame();
         request_frame(RequestFrameOptions {
             require_presentation: false,
             force_render,
