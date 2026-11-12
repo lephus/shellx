@@ -208,4 +208,39 @@ mod tests {
             assert!(!count.contains(secret), "{count}");
         }
     }
+
+    /// portable-pty's own line when CreateProcessW fails (`win/psuedocon.rs:154-162`), with a
+    /// custom shell line holding a password and the home folder as cwd (review I1).
+    const PTY_FAILURE: &str = r#"CreateProcessW `"\"C:\\Program Files\\PuTTY\\plink.exe\" -ssh -pw hunter2pass a@b.co"` in cwd `Some("C:\\Users\\Phú Lê")` failed: The requested operation requires elevation. (os error 740)"#;
+
+    #[test]
+    fn a_failed_process_start_keeps_only_the_system_reason() {
+        let safe = record_message("portable_pty::win::psuedocon", PTY_FAILURE);
+        assert_eq!(
+            safe,
+            "a process could not be started: The requested operation requires elevation. (os error 740)"
+        );
+        let line = format_record("T", "ERROR", "portable_pty::win::psuedocon", &safe);
+        assert!(line.contains("os error 740"), "{line}");
+        for secret in ["hunter2pass", "plink", "Phú Lê", "a@b.co", "CreateProcessW"] {
+            assert!(!line.contains(secret), "{secret} in {line}");
+        }
+        // Every other target is kept as it is.
+        assert_eq!(record_message("shellx_desktop::workspace", PTY_FAILURE), PTY_FAILURE);
+        // A portable-pty line without a failure is still kept behind its own fixed text.
+        assert_eq!(
+            record_message("portable_pty::cmdbuilder", "$SHELL -> \"/bin/zsh\" is not executable"),
+            "portable-pty: $SHELL -> \"/bin/zsh\" is not executable"
+        );
+        // The pane's rule (A2's spawn_reason): after the last "failed: ", one line, at most
+        // 160 characters.
+        assert_eq!(
+            failure_reason("a failed: b failed:   c\r\n  d"),
+            "c d"
+        );
+        let long = format!("x failed: {}", "y".repeat(400));
+        assert_eq!(failure_reason(&long).chars().count(), 160);
+        assert!(failure_reason(&long).ends_with('…'));
+        assert_eq!(failure_reason("no marker here"), "no marker here");
+    }
 }

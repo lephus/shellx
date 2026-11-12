@@ -290,4 +290,22 @@ mod tests {
         write_record(&mut state, "T", "INFO", "shellx", "line");
         assert!(!install(&file.join("logs")));
     }
+
+    #[test]
+    fn a_failed_process_start_never_logs_the_command_line() {
+        // portable-pty's CreateProcessW error line (review I1), through the logger's write path.
+        let message = r#"CreateProcessW `"\"C:\\Program Files\\PuTTY\\plink.exe\" -ssh -pw hunter2pass a@b.co"` in cwd `Some("C:\\Users\\Phú Lê")` failed: The requested operation requires elevation. (os error 740)"#;
+        let tmp = tempfile::tempdir().unwrap();
+        let mut state = LogState::open(tmp.path());
+        write_record(&mut state, "T", "ERROR", "portable_pty::win::psuedocon", message);
+        drop(state);
+        let text = read(tmp.path(), "shellx.log");
+        assert_eq!(
+            text,
+            "T ERROR portable_pty::win::psuedocon: a process could not be started: The requested operation requires elevation. (os error 740)\n"
+        );
+        for secret in ["hunter2pass", "plink", "Phú Lê"] {
+            assert!(!text.contains(secret), "{secret} in {text}");
+        }
+    }
 }
