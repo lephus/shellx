@@ -77,6 +77,13 @@ impl TextField {
         cx.notify();
     }
 
+    /// Replaces the text (Settings › Terminal fills in the stored command line).
+    pub fn set_text(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.edit.set_text(text);
+        self.scroll_x = px(0.0);
+        cx.notify();
+    }
+
     /// A disabled field keeps its text and ignores edits (while signing in).
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         if self.disabled != disabled {

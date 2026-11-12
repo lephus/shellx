@@ -1,4 +1,7 @@
-//! Safe paste encoding: clipboard text always arrives as data.
+//! Safe paste encoding: clipboard text always arrives as data. A paste of several lines into
+//! a shell without bracketed paste asks first (`needs_paste_confirmation`, `confirm_key`).
+
+use crate::keys::KeyIn;
 
 const START: &str = "\x1b[200~";
 const END: &str = "\x1b[201~";
@@ -45,6 +48,63 @@ pub fn needs_paste_confirmation(text: &str, bracketed: bool) -> bool {
     match text.find(['\n', '\r']) {
         Some(i) => text[i..].chars().any(|c| !c.is_whitespace()),
         None => false,
+    }
+}
+
+/// How many command lines `text` holds, as the confirmation counts them: segments split at
+/// `\r\n`, `\n` or `\r`, less one empty segment at the end (a final newline ends the last
+/// line, it does not start a new one).
+pub fn paste_line_count(text: &str) -> usize {
+    let segments = text
+        .split("\r\n")
+        .flat_map(|s| s.split(['\n', '\r']))
+        .count();
+    let trailing_newline = text.ends_with(['\n', '\r']);
+    segments - usize::from(trailing_newline && segments > 1)
+}
+
+/// A paste waiting for its confirmation: the text, and its line count taken once, when the
+/// question opens (review m5). The pane redraws on every output batch; it reads `lines`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PendingPaste {
+    text: String,
+    lines: usize,
+}
+
+impl PendingPaste {
+    pub fn new(text: String) -> PendingPaste {
+        let lines = paste_line_count(&text);
+        PendingPaste { text, lines }
+    }
+
+    pub fn lines(&self) -> usize {
+        self.lines
+    }
+
+    pub fn into_text(self) -> String {
+        self.text
+    }
+}
+
+/// What a key does while the paste confirmation shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfirmKey {
+    /// Enter: paste.
+    Confirm,
+    /// Esc: drop the paste.
+    Cancel,
+    /// Any other key: drop the paste, then the key does what it always does.
+    CancelAndPass,
+}
+
+/// Enter or Esc without a modifier answer the confirmation; every other key cancels it and
+/// goes on.
+pub fn confirm_key(k: &KeyIn) -> ConfirmKey {
+    let plain = !(k.ctrl || k.alt || k.shift || k.win);
+    match k.key.to_lowercase().as_str() {
+        "enter" if plain => ConfirmKey::Confirm,
+        "escape" if plain => ConfirmKey::Cancel,
+        _ => ConfirmKey::CancelAndPass,
     }
 }
 
@@ -134,6 +194,70 @@ mod tests {
         ] {
             assert!(needs_paste_confirmation(t, false), "{t:?}");
         }
+    }
+
+    #[test]
+    fn paste_line_count_counts_what_the_shell_will_run() {
+        for (text, lines) in [
+            ("a\nb", 2),
+            ("a\r\nb\r\n", 2),
+            ("a\rb", 2),
+            ("\nb", 2),
+            ("echo 1\necho 2\necho 3\n", 3),
+            ("a\n\n\nb", 4),
+            ("a\nb\n\n", 3),
+            ("x", 1),
+            // a line copied from Notepad keeps its CRLF: still one line
+            ("dir\r\n", 1),
+        ] {
+            assert_eq!(paste_line_count(text), lines, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn confirm_keys_paste_cancel_or_pass() {
+        use crate::keys::KeyIn;
+        let key = |key, ctrl, alt, shift| KeyIn {
+            key,
+            ctrl,
+            alt,
+            shift,
+            win: false,
+        };
+        assert_eq!(
+            confirm_key(&key("enter", false, false, false)),
+            ConfirmKey::Confirm
+        );
+        assert_eq!(
+            confirm_key(&key("escape", false, false, false)),
+            ConfirmKey::Cancel
+        );
+        for k in [
+            key("enter", true, false, false),
+            key("enter", false, false, true),
+            key("a", false, false, false),
+            key("space", false, false, false),
+            key("c", true, false, false),
+            key("f4", false, true, false),
+            KeyIn {
+                win: true,
+                ..key("enter", false, false, false)
+            },
+        ] {
+            assert_eq!(confirm_key(&k), ConfirmKey::CancelAndPass, "{k:?}");
+        }
+    }
+
+    #[test]
+    fn a_pending_paste_counts_its_lines_once() {
+        // the bar redraws on every output batch: the count is taken when the question opens
+        // and read from then on, never taken again (review m5)
+        let text = "echo 1\r\necho 2\r\necho 3\r\n".to_string();
+        let pending = PendingPaste::new(text.clone());
+        assert_eq!(pending.lines(), 3);
+        assert_eq!(pending.lines(), paste_line_count(&text));
+        // the text comes back as it was copied, without a copy of it
+        assert_eq!(pending.into_text(), text);
     }
 
     #[test]

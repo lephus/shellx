@@ -71,6 +71,23 @@ pub fn wheel_action(lines: i32, modes: ScreenModes) -> WheelAction {
     }
 }
 
+/// At most one screen (`rows`, at least 1) per wheel event. Windows' "scroll one screen at a
+/// time" setting reaches GPUI as billions of lines a notch: that becomes one screen of history
+/// or `rows` arrow keys, never a thousand writes to the program.
+pub fn cap_to_screen(action: WheelAction, rows: u16) -> WheelAction {
+    let rows = rows.max(1);
+    match action {
+        WheelAction::None => WheelAction::None,
+        WheelAction::Scrollback(lines) => {
+            WheelAction::Scrollback(lines.clamp(-i32::from(rows), i32::from(rows)))
+        }
+        WheelAction::Arrows { key, count } => WheelAction::Arrows {
+            key,
+            count: count.min(u32::from(rows)),
+        },
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SecondaryButton {
     Right,
@@ -208,6 +225,49 @@ mod tests {
                 key: "down",
                 count: i32::MIN.unsigned_abs()
             }
+        );
+    }
+
+    #[test]
+    fn one_wheel_event_moves_at_most_one_screen() {
+        // Windows' "scroll one screen at a time" makes a notch billions of lines
+        // (review M8): never more than the pane's rows of history or arrow keys.
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(1000), 24),
+            WheelAction::Scrollback(24)
+        );
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(-1000), 24),
+            WheelAction::Scrollback(-24)
+        );
+        assert_eq!(
+            cap_to_screen(
+                WheelAction::Arrows {
+                    key: "up",
+                    count: 1000
+                },
+                24
+            ),
+            WheelAction::Arrows {
+                key: "up",
+                count: 24
+            }
+        );
+        // ordinary steps are untouched
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(3), 24),
+            WheelAction::Scrollback(3)
+        );
+        let three = WheelAction::Arrows {
+            key: "down",
+            count: 3,
+        };
+        assert_eq!(cap_to_screen(three, 24), three);
+        assert_eq!(cap_to_screen(WheelAction::None, 24), WheelAction::None);
+        // a pane not measured yet still moves one line
+        assert_eq!(
+            cap_to_screen(WheelAction::Scrollback(-5), 0),
+            WheelAction::Scrollback(-1)
         );
     }
 

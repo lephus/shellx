@@ -45,8 +45,10 @@ fi
 if [[ -n "$(git status --porcelain -- windows cmux-tui shellx-core)" ]]; then
   echo "warning: uncommitted changes under windows/, cmux-tui/ or shellx-core/ are NOT checked" >&2
 fi
+# The commit is named once; everything below reads that commit, so a commit made while the
+# check runs cannot be checked under the wrong name.
 commit="$(git rev-parse HEAD)"
-ghostty_sha="$(git ls-tree HEAD ghostty | awk '$2 == "commit" {print $3}')"
+ghostty_sha="$(git ls-tree "$commit" ghostty | awk '$2 == "commit" {print $3}')"
 [[ -n "$ghostty_sha" ]] || { echo "HEAD has no ghostty submodule entry" >&2; exit 1; }
 
 tmp_dirs=()
@@ -69,7 +71,7 @@ fi
 # 2. Sources: the three trees the windows workspace needs, plus the pinned ghostty.
 src="$(mktemp -d "${TMPDIR:-/tmp}/shellx-wincheck.XXXXXX")"
 tmp_dirs+=("$src")
-git archive HEAD windows cmux-tui shellx-core | tar -x -m -C "$src"
+git archive "$commit" windows cmux-tui shellx-core | tar -x -m -C "$src"
 candidates=()
 [[ -z "${CMUX_GHOSTTY_SRC:-}" ]] || candidates+=("$CMUX_GHOSTTY_SRC")
 candidates+=("$repo/ghostty")

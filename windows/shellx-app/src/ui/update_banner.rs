@@ -2,7 +2,8 @@
 //! and for the sidebar footer's "update available" pill (`sidebar.rs`). Only
 //! `https://` download links are opened (`shellx_model::update::is_https`).
 
-use gpui::{App, Div, FocusHandle, FontWeight, Stateful, div, prelude::*, px};
+use gpui::{App, Div, FocusHandle, FontWeight, KeyDownEvent, Stateful, div, prelude::*, px};
+use shellx_model::keys::{KeyIn, is_window_system_key};
 use shellx_model::strings::{Lang, Str, minimum_version, t};
 use shellx_model::update::is_https;
 
@@ -17,8 +18,8 @@ pub fn open_https(cx: &App, url: &str) {
 }
 
 /// Forced update: covers the window below the title bar, blocks mouse input
-/// to the terminals (`occlude`) and swallows keys (the focus is on `focus`).
-/// No way to skip it.
+/// to the terminals (`occlude`) and swallows keys (the focus is on `focus`)
+/// except the window's own Alt+F4 and Alt+Space. No way to skip it.
 pub fn required_overlay(
     lang: Lang,
     min: &str,
@@ -78,6 +79,20 @@ pub fn required_overlay(
         .items_center()
         .justify_center()
         .bg(theme::bg().opacity(0.85))
-        .on_key_down(|_, _, cx| cx.stop_propagation())
+        .on_key_down(|event: &KeyDownEvent, _, cx| {
+            let keystroke = &event.keystroke;
+            let mods = keystroke.modifiers;
+            let key = KeyIn {
+                key: keystroke.key.as_str(),
+                ctrl: mods.control,
+                alt: mods.alt,
+                shift: mods.shift,
+                win: mods.platform,
+            };
+            // Alt+F4 and Alt+Space go on to Windows (R2 F7, Ruling 37).
+            if !is_window_system_key(&key) {
+                cx.stop_propagation();
+            }
+        })
         .child(card)
 }

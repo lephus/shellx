@@ -55,8 +55,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render, ScrollHandle,
-    Subscription, Window, div, prelude::*, relative,
+    App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton,
+    MouseDownEvent, Render, ScrollHandle, Subscription, Window, div, prelude::*, relative,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
@@ -64,7 +64,7 @@ use shellx_model::history::FocusHistory;
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
-use shellx_model::modal::{Panel, Panels, RootKey};
+use shellx_model::modal::{Panel, Panels, RootKey, press_only_closes_dropdowns};
 use shellx_model::palette::Status;
 use shellx_model::sidebar::{
     MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_picker,
@@ -1011,7 +1011,13 @@ impl RootView {
     /// The path and git branch lines of a workspace card: a local pane's
     /// directory (from its shell's OSC 7) and the branch checked out there;
     /// a Mac pane shows the Mac's name and no branch (`cwd::row_lines`).
-    fn card_lines(&mut self, pane: PaneId, cx: &App) -> (Option<String>, Option<String>) {
+    /// The branch is read in the background, never here: the card shows the
+    /// last one known and redraws when a read answers (Ruling 23).
+    fn card_lines(
+        &mut self,
+        pane: PaneId,
+        cx: &mut Context<Self>,
+    ) -> (Option<String>, Option<String>) {
         let remote = self
             .pane_machine(pane)
             .map(|machine| self.machine_name(machine, cx));
@@ -1022,10 +1028,25 @@ impl RootView {
             .and_then(|url| cwd_from_osc7(&url));
         let (path, wants_branch) =
             row_lines(cwd.as_deref(), remote.as_deref(), self.home.as_deref());
-        let branch = cwd
-            .filter(|_| wants_branch)
-            .and_then(|cwd| self.branches.get(&cwd, Instant::now()));
-        (path, branch)
+        let Some(dir) = cwd.filter(|_| wants_branch) else {
+            return (path, None);
+        };
+        let lookup = self.branches.lookup(&dir, Instant::now());
+        if lookup.read {
+            cx.spawn(async move |this, cx| {
+                let read_dir = dir.clone();
+                let branch = cx
+                    .background_executor()
+                    .spawn(async move { crate::cwd::git_branch(std::path::Path::new(&read_dir)) })
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    this.branches.store(&dir, branch, Instant::now());
+                    cx.notify();
+                });
+            })
+            .detach();
+        }
+        (path, lookup.branch)
     }
 }
 
@@ -1154,6 +1175,15 @@ impl Render for RootView {
             .text_size(theme::UI_SIZE)
             .line_height(relative(1.4))
             .capture_key_down(cx.listener(Self::on_key_down_capture))
+            // A right or middle press that dismisses a dropdown goes no
+            // further, so the terminal under it does not paste (review I2).
+            .capture_any_mouse_down(cx.listener(|this, event: &MouseDownEvent, _, cx| {
+                let left = event.button == MouseButton::Left;
+                if press_only_closes_dropdowns(left, this.dropdown_open(cx)) {
+                    this.close_menus(cx);
+                    cx.stop_propagation();
+                }
+            }))
             .on_key_down(cx.listener(Self::on_key_down))
             .child(titlebar)
             .child(

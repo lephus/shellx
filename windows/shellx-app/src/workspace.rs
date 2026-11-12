@@ -7,7 +7,7 @@
 //! hands back the values of removed panes, whose drop kills their shell.
 //!
 //! Also here: the pane-area geometry the window lays out and `Tabs::focus_dir`
-//! uses, and the one way a local pane (PowerShell on ConPTY) is started.
+//! uses, and the one way a local pane (a shell on ConPTY) is started.
 
 // The window (cfg(windows)) is the main user; the Mac build only tests it.
 #![cfg_attr(not(windows), allow(dead_code))]
@@ -20,7 +20,7 @@ use anyhow::Result;
 use shellx_model::layout::{PaneId, Rect};
 use shellx_model::tabs::{PaneTarget, Tabs};
 
-use crate::local_pty::{LocalPty, default_shell};
+use crate::local_pty::{LocalPty, PanePlan, ShellCmd, default_shell};
 use crate::term_core::TermCore;
 
 /// Width of the line between split panes (`Layout::rects` divider), in px.
@@ -146,12 +146,108 @@ pub struct LocalPane {
     pub reader: Box<dyn Read + Send>,
 }
 
-/// Starts the default shell (PowerShell, or `SHELLX_SHELL`) with
-/// `extra_args` added, on a `cols` x `rows` pseudoconsole.
-pub fn spawn_local_pane(cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
-    let (link, reader) = default_shell().spawn(extra_args, cols, rows)?;
+/// A pane whose shell started: which one (`used`, a label) and, when the
+/// plan's first program could not start, its label and why.
+pub struct StartedPane {
+    pub pane: LocalPane,
+    pub used: String,
+    pub fell_back: Option<(String, String)>,
+}
+
+/// No program of the plan could start: each attempt's label, program and
+/// the system's reason (`spawn_reason`), in order.
+#[derive(Debug)]
+pub struct StartFailure {
+    pub attempts: Vec<(String, String, String)>,
+}
+
+impl StartFailure {
+    /// The pane's line per attempt: "label: reason".
+    pub fn lines(&self) -> Vec<String> {
+        self.attempts
+            .iter()
+            .map(|(label, _, reason)| format!("{label}: {reason}"))
+            .collect()
+    }
+}
+
+/// "label (program): reason; ..." on one line (`--smoke`'s error).
+impl std::fmt::Display for StartFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, (label, program, reason)) in self.attempts.iter().enumerate() {
+            if i > 0 {
+                f.write_str("; ")?;
+            }
+            write!(f, "{label} ({program}): {reason}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Longest reason a pane shows, in characters.
+const REASON_MAX_CHARS: usize = 160;
+
+/// Why a program did not start, as the operating system said it: the innermost error, from
+/// after its last "failed: " (portable-pty puts the whole command line, prompt hook
+/// included, before it on Windows), on one line and at most `REASON_MAX_CHARS` long
+/// (review M5).
+pub fn spawn_reason(error: &anyhow::Error) -> String {
+    let root = error.root_cause().to_string();
+    let reason = root.rsplit("failed: ").next().unwrap_or(&root);
+    let reason = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    if reason.chars().count() <= REASON_MAX_CHARS {
+        return reason;
+    }
+    let cut: String = reason.chars().take(REASON_MAX_CHARS - 1).collect();
+    format!("{cut}…")
+}
+
+fn start_local(cmd: &ShellCmd, cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
+    let (link, reader) = cmd.spawn(extra_args, cols, rows)?;
     let core = TermCore::new(link.clone(), cols, rows)?;
     Ok(LocalPane { core, link, reader })
+}
+
+/// Starts the plan's first shell with `extra_args` added, on a `cols` x
+/// `rows` pseudoconsole; when it cannot start, the fallback once (Ruling 15).
+pub fn spawn_local_pane_with(
+    plan: &PanePlan,
+    cols: u16,
+    rows: u16,
+    extra_args: &[&str],
+) -> Result<StartedPane, StartFailure> {
+    let mut attempts: Vec<(String, String, String)> = Vec::new();
+    for cmd in std::iter::once(&plan.first).chain(plan.fallback.as_ref()) {
+        match start_local(cmd, cols, rows, extra_args) {
+            Ok(pane) => {
+                let fell_back = attempts
+                    .first()
+                    .map(|(label, _, error)| (label.clone(), error.clone()));
+                return Ok(StartedPane {
+                    pane,
+                    used: cmd.label.clone(),
+                    fell_back,
+                });
+            }
+            Err(error) => {
+                attempts.push((cmd.label.clone(), cmd.program.clone(), spawn_reason(&error)))
+            }
+        }
+    }
+    Err(StartFailure { attempts })
+}
+
+/// Starts the default shell (`local_pty::default_shell`) with `extra_args`
+/// added, on a `cols` x `rows` pseudoconsole, without a fallback (`--smoke`
+/// checks that shell itself).
+pub fn spawn_local_pane(cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
+    let plan = PanePlan {
+        first: default_shell(),
+        fallback: None,
+    };
+    spawn_local_pane_with(&plan, cols, rows, extra_args)
+        .map(|started| started.pane)
+        .map_err(|failure| anyhow::anyhow!("{failure}"))
 }
 
 #[cfg(test)]
@@ -281,6 +377,156 @@ mod tests {
                 h: 720.0
             }
         );
+    }
+
+    #[cfg(unix)]
+    fn shell(program: &str, args: &[&str], label: &str) -> crate::local_pty::ShellCmd {
+        crate::local_pty::ShellCmd {
+            program: program.into(),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            env: Vec::new(),
+            label: label.into(),
+            kind: None,
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_fallback_starts_once_when_the_first_program_cannot_start() {
+        use crate::local_pty::{PanePlan, spawn_reader};
+        use crate::term_core::PtyLink;
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        let plan = PanePlan {
+            first: shell("/nonexistent/shell", &[], "nowhere"),
+            fallback: Some(shell("/bin/sh", &["-i"], "sh")),
+        };
+        let Ok(started) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
+            panic!("the fallback did not start");
+        };
+        assert_eq!(started.used, "sh");
+        let (tried, error) = started.fell_back.clone().expect("a fallback was used");
+        assert_eq!(tried, "nowhere");
+        assert!(!error.trim().is_empty());
+
+        let LocalPane {
+            mut core,
+            link,
+            reader,
+        } = started.pane;
+        let (tx, rx) = mpsc::channel();
+        spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
+        // the marker is computed by the shell: the typed text alone never contains it
+        link.write(b"echo ok-$((6*7))\n");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if let Ok(bytes) = rx.recv_timeout(Duration::from_millis(100)) {
+                core.feed(&bytes);
+            }
+            if core
+                .text_lines()
+                .unwrap()
+                .iter()
+                .any(|l| l.contains("ok-42"))
+            {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "no ok-42 from the fallback shell"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_first_program_that_starts_uses_no_fallback() {
+        use crate::local_pty::PanePlan;
+
+        let plan = PanePlan {
+            first: shell("/bin/sh", &["-i"], "sh"),
+            fallback: Some(shell("/bin/sh", &[], "fallback sh")),
+        };
+        let Ok(started) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
+            panic!("/bin/sh did not start");
+        };
+        assert_eq!(started.used, "sh");
+        assert_eq!(started.fell_back, None);
+    }
+
+    #[test]
+    fn a_failed_start_keeps_only_the_systems_reason() {
+        // what portable-pty reports on Windows: the whole command line, then the reason
+        let windows = anyhow::anyhow!(
+            "CreateProcessW `\"C:\\x.exe\" -NoLogo -NoExit -Command \"if ($function:prompt) {{ }}\"` in cwd `Some(\"C:\\Users\\Phú\")` failed: The system cannot find the file specified. (os error 2)"
+        )
+        .context("failed to start C:\\x.exe");
+        assert_eq!(
+            spawn_reason(&windows),
+            "The system cannot find the file specified. (os error 2)"
+        );
+        // the Mac's: the reason alone
+        let mac = anyhow::Error::new(std::io::Error::from_raw_os_error(2))
+            .context("failed to start /nonexistent/shell");
+        assert_eq!(spawn_reason(&mac), "No such file or directory (os error 2)");
+        // a reason far too long is cut, on a character boundary
+        let long = anyhow::anyhow!("{}", "é".repeat(500));
+        assert!(spawn_reason(&long).chars().count() <= 160);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn both_programs_failing_report_both() {
+        use crate::local_pty::PanePlan;
+
+        // the first one carries PowerShell's prompt hook, as a real plan does
+        let hook = shellx_model::shell::POWERSHELL_PROMPT_HOOK;
+        let plan = PanePlan {
+            first: shell(
+                "/nonexistent/one",
+                &["-NoLogo", "-NoExit", "-Command", hook],
+                "one",
+            ),
+            fallback: Some(shell("/nonexistent/two", &["-i"], "two")),
+        };
+        let Err(failure) = spawn_local_pane_with(&plan, 80, 24, &[]) else {
+            panic!("a missing program started");
+        };
+        let tried: Vec<(&str, &str)> = failure
+            .attempts
+            .iter()
+            .map(|(label, program, _)| (label.as_str(), program.as_str()))
+            .collect();
+        assert_eq!(
+            tried,
+            [("one", "/nonexistent/one"), ("two", "/nonexistent/two")]
+        );
+        assert!(
+            failure
+                .attempts
+                .iter()
+                .all(|(_, _, e)| !e.trim().is_empty())
+        );
+        // one short line per attempt: its label and the system's reason, never the
+        // command line with the prompt hook (review M5)
+        let lines = failure.lines();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("one: ") && lines[1].starts_with("two: "));
+        for line in &lines {
+            assert!(line.chars().count() < 200, "{line}");
+            assert!(!line.contains("-Command") && !line.contains('\n'), "{line}");
+        }
+
+        // no fallback: one attempt
+        let alone = PanePlan {
+            first: shell("/nonexistent/one", &[], "one"),
+            fallback: None,
+        };
+        let Err(failure) = spawn_local_pane_with(&alone, 80, 24, &[]) else {
+            panic!("a missing program started");
+        };
+        assert_eq!(failure.attempts.len(), 1);
     }
 
     #[test]

@@ -1,6 +1,8 @@
 //! UI strings: they follow the Windows display language (Vietnamese on a
 //! Vietnamese Windows, English otherwise); `SHELLX_LANG=en|vi` overrides it.
 
+use crate::shell::{CustomShellError, ShellError, is_absolute};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lang {
     Vi,
@@ -129,6 +131,33 @@ pub enum Str {
     ShellExitsAtStart,
     /// Under `ShellExitsAtStart`.
     PressAnyKeyToRetry,
+    /// A pane whose shell (and its fallback) could not start.
+    ShellCannotStart,
+    /// The failed or held pane's second button.
+    OpenCommandPrompt,
+    /// Automatic found no shell at all.
+    NoShellFound,
+    /// Under the multi-line paste question (`paste_lines_prompt`).
+    PasteConfirmKeys,
+    /// Settings › Terminal: the section title.
+    Terminal,
+    /// Settings › Terminal: the last row.
+    CustomCommandLine,
+    /// Placeholder of the custom command line field.
+    CustomShellPlaceholder,
+    /// Under the shell rows.
+    AppliesToNewTerminals,
+    /// Shown while `SHELLX_SHELL` overrides the choice.
+    ShellEnvOverride,
+    /// `settings.json` could not be written (no `LOCALAPPDATA`, a full disk).
+    ShellChoiceNotSaved,
+    /// Pairing failures (`pairing_failure_sentence`).
+    MachineGone,
+    PairingSessionExpired,
+    PairingRefused,
+    HostOffline,
+    RequestAlreadyAnswered,
+    RequestGone,
     /// Title of the sign-in dialog.
     SignInTitle,
     /// Label over the dialog's email field.
@@ -279,6 +308,22 @@ impl Str {
         Str::RemoteAttachFailed,
         Str::ShellExitsAtStart,
         Str::PressAnyKeyToRetry,
+        Str::ShellCannotStart,
+        Str::OpenCommandPrompt,
+        Str::NoShellFound,
+        Str::PasteConfirmKeys,
+        Str::Terminal,
+        Str::CustomCommandLine,
+        Str::CustomShellPlaceholder,
+        Str::AppliesToNewTerminals,
+        Str::ShellEnvOverride,
+        Str::ShellChoiceNotSaved,
+        Str::MachineGone,
+        Str::PairingSessionExpired,
+        Str::PairingRefused,
+        Str::HostOffline,
+        Str::RequestAlreadyAnswered,
+        Str::RequestGone,
         Str::SignInTitle,
         Str::EmailAddress,
         Str::SignInEllipsis,
@@ -413,8 +458,32 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::FingerprintMismatch => "Khóa của máy không khớp, không kết nối",
             Str::NeedsPairing => "Cần xin quyền truy cập lại",
             Str::RemoteAttachFailed => "Không mở được phiên trên máy kia, đang thử lại…",
-            Str::ShellExitsAtStart => "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL.",
+            Str::ShellExitsAtStart => {
+                "Shell thoát ngay khi khởi động. Chọn shell khác trong Cài đặt › Terminal."
+            }
             Str::PressAnyKeyToRetry => "Nhấn phím bất kỳ hoặc Thử lại.",
+            Str::ShellCannotStart => {
+                "Không khởi động được shell. Chọn shell khác trong Cài đặt › Terminal, hoặc mở Command Prompt."
+            }
+            Str::OpenCommandPrompt => "Mở Command Prompt",
+            Str::NoShellFound => "Không tìm thấy shell nào trên máy này.",
+            Str::PasteConfirmKeys => "Enter để dán, Esc để hủy",
+            Str::Terminal => "Terminal",
+            Str::CustomCommandLine => "Dòng lệnh tùy chỉnh",
+            Str::CustomShellPlaceholder => "Ví dụ: wsl.exe -d Ubuntu",
+            Str::AppliesToNewTerminals => "Áp dụng cho các terminal mở sau.",
+            Str::ShellEnvOverride => {
+                "SHELLX_SHELL đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này."
+            }
+            Str::ShellChoiceNotSaved => "Không lưu được lựa chọn shell trên máy này.",
+            Str::MachineGone => "Máy này không còn trong tài khoản của bạn.",
+            Str::PairingSessionExpired => "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+            Str::PairingRefused => {
+                "Máy chủ không nhận yêu cầu từ máy này. Đăng xuất rồi đăng nhập lại."
+            }
+            Str::HostOffline => "Máy kia đang ngoại tuyến. Mở ShellX trên máy đó rồi thử lại.",
+            Str::RequestAlreadyAnswered => "Máy kia đã trả lời yêu cầu này.",
+            Str::RequestGone => "Yêu cầu này không còn nữa. Hãy gửi lại.",
             Str::SignInTitle => "Đăng nhập ShellX",
             Str::EmailAddress => "Địa chỉ email",
             Str::SignInEllipsis => "Đăng nhập…",
@@ -560,8 +629,32 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::FingerprintMismatch => "The machine's key does not match; not connecting",
             Str::NeedsPairing => "Request access again",
             Str::RemoteAttachFailed => "Could not open the session on the other machine, retrying…",
-            Str::ShellExitsAtStart => "The shell exits as soon as it starts. Check SHELLX_SHELL.",
+            Str::ShellExitsAtStart => {
+                "The shell exits as soon as it starts. Choose another shell in Settings › Terminal."
+            }
             Str::PressAnyKeyToRetry => "Press any key or Retry.",
+            Str::ShellCannotStart => {
+                "The shell couldn't start. Choose another shell in Settings › Terminal, or open Command Prompt."
+            }
+            Str::OpenCommandPrompt => "Open Command Prompt",
+            Str::NoShellFound => "No shell was found on this PC.",
+            Str::PasteConfirmKeys => "Enter to paste, Esc to cancel",
+            Str::Terminal => "Terminal",
+            Str::CustomCommandLine => "Custom command line",
+            Str::CustomShellPlaceholder => "For example: wsl.exe -d Ubuntu",
+            Str::AppliesToNewTerminals => "Applies to terminals you open next.",
+            Str::ShellEnvOverride => {
+                "SHELLX_SHELL is set, so ShellX uses it instead of this choice."
+            }
+            Str::ShellChoiceNotSaved => "The shell choice couldn't be saved on this PC.",
+            Str::MachineGone => "That machine is no longer in your account.",
+            Str::PairingSessionExpired => "Your session expired. Sign in again, then try again.",
+            Str::PairingRefused => {
+                "The server didn't accept a request from this PC. Sign out and sign in again."
+            }
+            Str::HostOffline => "The other machine is offline. Open ShellX on it, then try again.",
+            Str::RequestAlreadyAnswered => "The other machine already answered this request.",
+            Str::RequestGone => "This request no longer exists. Send it again.",
             Str::SignInTitle => "Sign in to ShellX",
             Str::EmailAddress => "Email address",
             Str::SignInEllipsis => "Sign In…",
@@ -627,6 +720,81 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
     }
 }
 
+/// What is wrong with a custom command line (Settings › Terminal, `SHELLX_SHELL`), as what to
+/// do about it. A program typed with `\`, `/` or `:` but not as a full path is answered with
+/// the full-path form of its file name.
+pub fn custom_shell_error(lang: Lang, error: &CustomShellError) -> String {
+    match error {
+        CustomShellError::Empty => match lang {
+            Lang::Vi => "Nhập một dòng lệnh, ví dụ wsl.exe -d Ubuntu.".to_string(),
+            Lang::En => "Type a command line, for example wsl.exe -d Ubuntu.".to_string(),
+        },
+        CustomShellError::UnclosedQuote => match lang {
+            Lang::Vi => "Thiếu dấu ngoặc kép đóng.".to_string(),
+            Lang::En => "A closing quotation mark is missing.".to_string(),
+        },
+        CustomShellError::NotFound(program)
+            if program.contains(['\\', '/', ':']) && !is_absolute(program) =>
+        {
+            let file = program.rsplit(['\\', '/', ':']).next().unwrap_or(program);
+            match lang {
+                Lang::Vi => {
+                    format!("Hãy ghi đường dẫn đầy đủ, ví dụ C:\\…\\{file}, thay cho {program}.")
+                }
+                Lang::En => format!("Use a full path such as C:\\…\\{file} instead of {program}."),
+            }
+        }
+        CustomShellError::NotFound(program) => match lang {
+            Lang::Vi => format!("Không tìm thấy chương trình {program}."),
+            Lang::En => format!("Can't find the program {program}."),
+        },
+    }
+}
+
+/// Why a launch plan names no shell: `NoShellFound`, the custom line's problem, or the same
+/// for `SHELLX_SHELL` with its name in front.
+pub fn shell_plan_error(lang: Lang, error: &ShellError) -> String {
+    match error {
+        ShellError::NoShellFound => t(lang, Str::NoShellFound).to_string(),
+        ShellError::Custom(e) => custom_shell_error(lang, e),
+        ShellError::Override(e) => format!("SHELLX_SHELL: {}", custom_shell_error(lang, e)),
+    }
+}
+
+/// The pane's note after it started another shell than the one asked for.
+pub fn shell_fell_back(lang: Lang, tried: &str, used: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Không khởi động được {tried}, đang dùng {used}."),
+        Lang::En => format!("{tried} couldn't start, so {used} is running instead."),
+    }
+}
+
+/// The multi-line paste question: each line runs as a command at once (R2 F18).
+pub fn paste_lines_prompt(lang: Lang, n: usize) -> String {
+    match lang {
+        Lang::Vi => format!("Dán {n} dòng? Mỗi dòng sẽ chạy ngay như một lệnh."),
+        Lang::En => format!("Paste {n} lines? Each line will run as a command right away."),
+    }
+}
+
+/// Settings › Terminal's first row: "Automatic", with the shell it starts when there is one.
+pub fn shell_auto_label(lang: Lang, name: Option<&str>) -> String {
+    match (lang, name) {
+        (Lang::Vi, Some(name)) => format!("Tự động ({name})"),
+        (Lang::Vi, None) => "Tự động".to_string(),
+        (Lang::En, Some(name)) => format!("Automatic ({name})"),
+        (Lang::En, None) => "Automatic".to_string(),
+    }
+}
+
+/// Under a custom command line that names a program: the program it runs.
+pub fn will_run(lang: Lang, program: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Sẽ chạy {program}."),
+        Lang::En => format!("Runs {program}."),
+    }
+}
+
 /// "Thêm từ <thiết bị>" / "Added from <device>" (an Apple ID a phone linked).
 pub fn added_from(lang: Lang, device: &str) -> String {
     match lang {
@@ -661,6 +829,26 @@ pub fn failure_sentence(lang: Lang, code: &str) -> String {
         "switch_from_signed_in_device" => Str::SwitchFromSignedInDevice,
         // The server refused the session (review M2).
         "unauthorized" | "http_401" => Str::SessionExpired,
+        _ => Str::ServerProblem,
+    };
+    t(lang, key).to_string()
+}
+
+/// The pairing panel's line for a failed access request (Ruling 14, review M3): the pairing
+/// codes have sentences of their own; every other code, `not_found` and `http_404` included,
+/// reads as "ShellX is having a problem", never as a sign-in sentence, a code or server text.
+pub fn pairing_failure_sentence(lang: Lang, code: &str) -> String {
+    let key = match code {
+        "machine_not_found" => Str::MachineGone,
+        "unauthorized" | "http_401" | "not_logged_in" => Str::PairingSessionExpired,
+        "forbidden" | "desktop_only" => Str::PairingRefused,
+        "host_offline" => Str::HostOffline,
+        "pairing_not_pending" => Str::RequestAlreadyAnswered,
+        "pairing_removed" | "pairing_not_found" => Str::RequestGone,
+        "pairing_expired" => Str::Expired,
+        "not_granted" => Str::NeedsPairing,
+        "rate_limited" => Str::RateLimited,
+        "network" => Str::RelayUnreachable,
         _ => Str::ServerProblem,
     };
     t(lang, key).to_string()
@@ -813,6 +1001,13 @@ pub fn your_device_code(lang: Lang, fingerprint: &str) -> String {
     )
 }
 
+/// The pairing panel's line when an approved access could not be written to `links.json`:
+/// the sentence alone. The system's own text (in Windows' language) never reaches the panel
+/// (review m9); it belongs in the log.
+pub fn access_not_saved(lang: Lang) -> String {
+    t(lang, Str::SaveLinkFailed).to_string()
+}
+
 /// "Không lưu được quyền truy cập: <error>" (just the label without one).
 pub fn save_link_failed(lang: Lang, message: &str) -> String {
     let message = message.trim();
@@ -840,7 +1035,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 129);
+        assert_eq!(Str::ALL.len(), 145);
     }
 
     #[test]
@@ -1094,6 +1289,333 @@ mod tests {
     }
 
     #[test]
+    fn shell_start_sentences() {
+        let cases = [
+            (
+                Str::ShellCannotStart,
+                "Không khởi động được shell. Chọn shell khác trong Cài đặt › Terminal, hoặc mở Command Prompt.",
+                "The shell couldn't start. Choose another shell in Settings › Terminal, or open Command Prompt.",
+            ),
+            (
+                Str::ShellExitsAtStart,
+                "Shell thoát ngay khi khởi động. Chọn shell khác trong Cài đặt › Terminal.",
+                "The shell exits as soon as it starts. Choose another shell in Settings › Terminal.",
+            ),
+            (
+                Str::OpenCommandPrompt,
+                "Mở Command Prompt",
+                "Open Command Prompt",
+            ),
+            (
+                Str::NoShellFound,
+                "Không tìm thấy shell nào trên máy này.",
+                "No shell was found on this PC.",
+            ),
+        ];
+        for (key, vi, en) in cases {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            shell_fell_back(Lang::Vi, "nu.exe", "PowerShell 7"),
+            "Không khởi động được nu.exe, đang dùng PowerShell 7."
+        );
+        assert_eq!(
+            shell_fell_back(Lang::En, "nu.exe", "PowerShell 7"),
+            "nu.exe couldn't start, so PowerShell 7 is running instead."
+        );
+    }
+
+    #[test]
+    fn custom_shell_errors_say_what_to_do() {
+        use crate::shell::CustomShellError;
+        let e = |lang, error: CustomShellError| custom_shell_error(lang, &error);
+        assert_eq!(
+            e(Lang::Vi, CustomShellError::Empty),
+            "Nhập một dòng lệnh, ví dụ wsl.exe -d Ubuntu."
+        );
+        assert_eq!(
+            e(Lang::En, CustomShellError::Empty),
+            "Type a command line, for example wsl.exe -d Ubuntu."
+        );
+        assert_eq!(
+            e(Lang::Vi, CustomShellError::UnclosedQuote),
+            "Thiếu dấu ngoặc kép đóng."
+        );
+        assert_eq!(
+            e(Lang::En, CustomShellError::UnclosedQuote),
+            "A closing quotation mark is missing."
+        );
+        // a relative path: say to use a full one
+        let relative = || CustomShellError::NotFound(r".\pwsh.exe".into());
+        assert_eq!(
+            e(Lang::Vi, relative()),
+            r"Hãy ghi đường dẫn đầy đủ, ví dụ C:\…\pwsh.exe, thay cho .\pwsh.exe."
+        );
+        assert_eq!(
+            e(Lang::En, relative()),
+            r"Use a full path such as C:\…\pwsh.exe instead of .\pwsh.exe."
+        );
+        for lang in [Lang::Vi, Lang::En] {
+            let out = e(lang, relative());
+            assert!(
+                out.contains(r"C:\…\pwsh.exe") && out.contains(r".\pwsh.exe"),
+                "{out}"
+            );
+            // forward slashes and a drive-relative path are relative too
+            assert!(e(lang, CustomShellError::NotFound("tools/sh".into())).contains(r"C:\…\sh"));
+            let drive_relative = e(lang, CustomShellError::NotFound("C:x.exe".into()));
+            assert!(drive_relative.contains(r"C:\…\x.exe") && drive_relative.contains("C:x.exe"));
+        }
+        // a bare name or an absolute path that is not there
+        assert_eq!(
+            e(Lang::Vi, CustomShellError::NotFound("nope.exe".into())),
+            "Không tìm thấy chương trình nope.exe."
+        );
+        assert_eq!(
+            e(Lang::En, CustomShellError::NotFound("nope.exe".into())),
+            "Can't find the program nope.exe."
+        );
+        assert_eq!(
+            e(
+                Lang::En,
+                CustomShellError::NotFound(r"C:\tools\nu.exe".into())
+            ),
+            r"Can't find the program C:\tools\nu.exe."
+        );
+    }
+
+    #[test]
+    fn shell_plan_errors_name_shellx_shell() {
+        use crate::shell::{CustomShellError, ShellError};
+        for lang in [Lang::Vi, Lang::En] {
+            assert_eq!(
+                shell_plan_error(lang, &ShellError::NoShellFound),
+                t(lang, Str::NoShellFound)
+            );
+            let missing = CustomShellError::NotFound("nope.exe".into());
+            assert_eq!(
+                shell_plan_error(lang, &ShellError::Custom(missing.clone())),
+                custom_shell_error(lang, &missing)
+            );
+            assert_eq!(
+                shell_plan_error(lang, &ShellError::Override(missing.clone())),
+                format!("SHELLX_SHELL: {}", custom_shell_error(lang, &missing))
+            );
+        }
+    }
+
+    #[test]
+    fn paste_prompt_strings() {
+        assert_eq!(
+            paste_lines_prompt(Lang::Vi, 3),
+            "Dán 3 dòng? Mỗi dòng sẽ chạy ngay như một lệnh."
+        );
+        assert_eq!(
+            paste_lines_prompt(Lang::En, 3),
+            "Paste 3 lines? Each line will run as a command right away."
+        );
+        assert_eq!(
+            t(Lang::Vi, Str::PasteConfirmKeys),
+            "Enter để dán, Esc để hủy"
+        );
+        assert_eq!(
+            t(Lang::En, Str::PasteConfirmKeys),
+            "Enter to paste, Esc to cancel"
+        );
+    }
+
+    #[test]
+    fn terminal_settings_strings() {
+        let cases = [
+            (Str::Terminal, "Terminal", "Terminal"),
+            (
+                Str::CustomCommandLine,
+                "Dòng lệnh tùy chỉnh",
+                "Custom command line",
+            ),
+            (
+                Str::CustomShellPlaceholder,
+                "Ví dụ: wsl.exe -d Ubuntu",
+                "For example: wsl.exe -d Ubuntu",
+            ),
+            (
+                Str::AppliesToNewTerminals,
+                "Áp dụng cho các terminal mở sau.",
+                "Applies to terminals you open next.",
+            ),
+            (
+                Str::ShellEnvOverride,
+                "SHELLX_SHELL đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này.",
+                "SHELLX_SHELL is set, so ShellX uses it instead of this choice.",
+            ),
+            (
+                Str::ShellChoiceNotSaved,
+                "Không lưu được lựa chọn shell trên máy này.",
+                "The shell choice couldn't be saved on this PC.",
+            ),
+        ];
+        for (key, vi, en) in cases {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            shell_auto_label(Lang::Vi, Some("PowerShell 7")),
+            "Tự động (PowerShell 7)"
+        );
+        assert_eq!(shell_auto_label(Lang::Vi, None), "Tự động");
+        assert_eq!(
+            shell_auto_label(Lang::En, Some("Command Prompt")),
+            "Automatic (Command Prompt)"
+        );
+        assert_eq!(shell_auto_label(Lang::En, None), "Automatic");
+        assert_eq!(
+            will_run(Lang::Vi, r"C:\Windows\System32\wsl.exe"),
+            r"Sẽ chạy C:\Windows\System32\wsl.exe."
+        );
+        assert_eq!(
+            will_run(Lang::En, r"C:\Windows\System32\wsl.exe"),
+            r"Runs C:\Windows\System32\wsl.exe."
+        );
+    }
+
+    #[test]
+    fn an_access_that_could_not_be_saved_reads_as_a_sentence_alone() {
+        // the pairing panel's line after an approval that could not be written to
+        // links.json: the sentence only, never the system's text after it (review m9)
+        assert_eq!(access_not_saved(Lang::Vi), "Không lưu được quyền truy cập");
+        assert_eq!(access_not_saved(Lang::En), "Could not save the access");
+        for lang in [Lang::Vi, Lang::En] {
+            assert_eq!(access_not_saved(lang), save_link_failed(lang, ""));
+        }
+    }
+
+    #[test]
+    fn pairing_failures_have_their_own_sentences() {
+        let cases: &[(&str, &str, &str)] = &[
+            (
+                "machine_not_found",
+                "Máy này không còn trong tài khoản của bạn.",
+                "That machine is no longer in your account.",
+            ),
+            (
+                "unauthorized",
+                "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+                "Your session expired. Sign in again, then try again.",
+            ),
+            (
+                "http_401",
+                "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+                "Your session expired. Sign in again, then try again.",
+            ),
+            (
+                "not_logged_in",
+                "Phiên đăng nhập đã hết hạn. Đăng nhập lại rồi thử lại.",
+                "Your session expired. Sign in again, then try again.",
+            ),
+            (
+                "forbidden",
+                "Máy chủ không nhận yêu cầu từ máy này. Đăng xuất rồi đăng nhập lại.",
+                "The server didn't accept a request from this PC. Sign out and sign in again.",
+            ),
+            (
+                "desktop_only",
+                "Máy chủ không nhận yêu cầu từ máy này. Đăng xuất rồi đăng nhập lại.",
+                "The server didn't accept a request from this PC. Sign out and sign in again.",
+            ),
+            (
+                "host_offline",
+                "Máy kia đang ngoại tuyến. Mở ShellX trên máy đó rồi thử lại.",
+                "The other machine is offline. Open ShellX on it, then try again.",
+            ),
+            (
+                "pairing_not_pending",
+                "Máy kia đã trả lời yêu cầu này.",
+                "The other machine already answered this request.",
+            ),
+            (
+                "pairing_removed",
+                "Yêu cầu này không còn nữa. Hãy gửi lại.",
+                "This request no longer exists. Send it again.",
+            ),
+            (
+                "pairing_not_found",
+                "Yêu cầu này không còn nữa. Hãy gửi lại.",
+                "This request no longer exists. Send it again.",
+            ),
+        ];
+        for (code, vi, en) in cases {
+            assert_eq!(pairing_failure_sentence(Lang::Vi, code), *vi, "{code}");
+            assert_eq!(pairing_failure_sentence(Lang::En, code), *en, "{code}");
+        }
+        // codes with sentences of the catalogue
+        for lang in [Lang::Vi, Lang::En] {
+            let reused = [
+                ("pairing_expired", Str::Expired),
+                ("not_granted", Str::NeedsPairing),
+                ("rate_limited", Str::RateLimited),
+                ("network", Str::RelayUnreachable),
+                // never "this way of signing in isn't available" (Ruling 14)
+                ("not_found", Str::ServerProblem),
+                ("http_404", Str::ServerProblem),
+                ("not_configured", Str::ServerProblem),
+                ("internal_error", Str::ServerProblem),
+            ];
+            for (code, key) in reused {
+                assert_eq!(pairing_failure_sentence(lang, code), t(lang, key), "{code}");
+            }
+        }
+    }
+
+    #[test]
+    fn pairing_failures_never_show_codes() {
+        let codes = [
+            "unauthorized",
+            "desktop_only",
+            "payload_too_large",
+            "rate_limited",
+            "bad_request",
+            "machine_not_found",
+            "forbidden",
+            "internal_error",
+            "http_400",
+            "http_401",
+            "http_404",
+            "http_500",
+            "http_502",
+            "not_logged_in",
+            "not_configured",
+            "not_registered",
+            "invalid_params",
+            "network",
+            "server",
+            "io",
+            "crypto",
+            "state_dir_insecure",
+            "state_file_insecure",
+            "unknown_method",
+            "bad_response",
+            "internal",
+            "pairing_expired",
+            "pairing_not_pending",
+            "pairing_removed",
+            "pairing_not_found",
+            "not_granted",
+            "host_offline",
+            "relay_v2_unavailable",
+            "not_found",
+            "",
+        ];
+        for lang in [Lang::Vi, Lang::En] {
+            for code in codes {
+                let out = pairing_failure_sentence(lang, code);
+                assert!(!out.trim().is_empty(), "{code}");
+                assert!(!out.contains('_') && !out.contains("http"), "{code}: {out}");
+            }
+        }
+    }
+
+    #[test]
     fn exact_vi_strings() {
         assert_eq!(t(Lang::Vi, Str::MachinesHeader), "Máy của bạn");
         assert_eq!(t(Lang::Vi, Str::Reconnecting), "đang kết nối lại…");
@@ -1121,7 +1643,7 @@ mod tests {
         assert_eq!(t(Lang::Vi, Str::IconCredits), t(Lang::En, Str::IconCredits));
         assert_eq!(
             t(Lang::Vi, Str::ShellExitsAtStart),
-            "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL."
+            "Shell thoát ngay khi khởi động. Chọn shell khác trong Cài đặt › Terminal."
         );
         assert_eq!(t(Lang::Vi, Str::Retry), "Thử lại");
     }
