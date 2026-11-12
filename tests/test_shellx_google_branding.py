@@ -131,7 +131,11 @@ class GoogleBrandingCheck(unittest.TestCase):
         git(self.root, "commit", "-q", "--allow-empty", "-m", "empty")
         r = subprocess.run(
             [str(ROOT / "scripts/shellx/release/build-windows-cross.sh"), self.root.as_posix() + "/out"],
-            capture_output=True, text=True, env={**os.environ, "SHELLX_GOOGLE_BRANDING_ROOT": str(self.root)})
+            capture_output=True, text=True, env={
+                **os.environ, "SHELLX_GOOGLE_BRANDING_ROOT": str(self.root),
+                # Made-up Desktop OAuth client, so the build reaches the branding check (a build needs one).
+                "SHELLX_GOOGLE_DESKTOP_CLIENT_ID": "123456789012-fakefakefake.apps.googleusercontent.com",
+                "SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET": "GOCSPX-fake-0123456"})
         self.assertEqual(r.returncode, 1)
         self.assertIn(f"missing: {WIN_PNG}", r.stderr)
 
