@@ -306,7 +306,10 @@ unsafe extern "system" fn filter(info: *const EXCEPTION_POINTERS) -> i32 {
     let mut report = [0u8; REPORT_BYTES];
     let len = crash_report::write_native_report(&mut report, &facts);
     write_report(&targets.path, report.get(..len).unwrap_or(&[]));
-    if targets.go != 0 {
+    // The panic hook and the filter share one dialog per process: a panic that ends as an
+    // unhandled exception (0xE06D7363), or a native crash after a panic's dialog, gets its
+    // file but no second dialog (B-1a review §6). `claim_reporter` is one atomic swap.
+    if targets.go != 0 && crate::crash::claim_reporter() {
         // SAFETY: both events were created at install and are never closed afterwards.
         // Process creation runs on the watchdog's stack, so a stack overflow can still report.
         unsafe {

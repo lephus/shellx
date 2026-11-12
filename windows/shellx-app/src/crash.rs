@@ -377,6 +377,14 @@ fn spawn_reporter(ctx: &CrashContext, kind: DialogKind, file: &Path) -> bool {
         .is_ok()
 }
 
+/// Claims the process's one reporter dialog: true for the first caller only (the panic hook,
+/// `start_reporter` and the native filter share it, so one crash never shows two dialogs).
+/// One atomic swap: no allocation, no lock, safe inside the exception filter.
+#[cfg_attr(not(windows), allow(dead_code))] // the native filter (Windows) is its caller
+pub(crate) fn claim_reporter() -> bool {
+    HOOK_STATE.claim_reporter()
+}
+
 /// Starts `<this exe> --report-crash|--report-window <file>`, at most once per process
 /// (shared with the panic hook). False when it already ran or could not start.
 pub fn start_reporter(ctx: &CrashContext, kind: DialogKind, file: &Path) -> bool {
