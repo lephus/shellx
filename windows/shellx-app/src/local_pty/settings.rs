@@ -267,6 +267,21 @@ pub fn shell_options(found: &[ShellLaunch]) -> Vec<ShellOption> {
         .collect()
 }
 
+/// The choice Settings shows as in effect. A stored known shell that the last lookup did not
+/// find is not what new tabs start (they start Automatic, `launch_plan`), so Automatic shows
+/// as chosen; `settings.json` keeps the stored one, and the row comes back if the shell is
+/// installed again (review m2). Before the first lookup ends (`looked_up`), the stored choice.
+pub fn shown_choice(choice: &ShellChoice, found: &[ShellLaunch], looked_up: bool) -> ShellChoice {
+    match choice {
+        ShellChoice::Known { shell }
+            if looked_up && !found.iter().any(|l| l.kind == Some(*shell)) =>
+        {
+            ShellChoice::Auto
+        }
+        _ => choice.clone(),
+    }
+}
+
 /// Whether a row shows the stored choice.
 pub fn is_selected(option: &ShellOption, choice: &ShellChoice) -> bool {
     match (option, choice) {

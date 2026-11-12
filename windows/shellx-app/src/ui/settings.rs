@@ -28,7 +28,7 @@ use super::text_field::{TextField, TextFieldEvent};
 use super::theme;
 use super::update_banner::open_https;
 use crate::local_pty::settings::{
-    ShellOption, is_program_file, is_selected, shell_options, shells,
+    ShellOption, is_program_file, is_selected, shell_options, shells, shown_choice,
 };
 
 pub const WIDTH: f32 = 360.0;
@@ -507,13 +507,14 @@ impl SettingsPanel {
     /// to terminals opened next.
     fn terminal_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
         let snapshot = shells().snapshot();
+        let shown = shown_choice(&snapshot.choice, &snapshot.found, snapshot.plan.is_some());
         let custom_selected = self.custom_open || self.stored_custom();
         let rows: Vec<Stateful<Div>> = shell_options(&snapshot.found)
             .into_iter()
             .map(|option| {
                 let selected = match option {
                     ShellOption::Custom => custom_selected,
-                    _ => !self.custom_open && is_selected(&option, &snapshot.choice),
+                    _ => !self.custom_open && is_selected(&option, &shown),
                 };
                 let (id, label) = match &option {
                     ShellOption::Auto { resolves_to } => (
