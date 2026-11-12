@@ -1,0 +1,1 @@
+Bản đầu tiên của ShellX cho Android: ghép cặp với Mac, trả lời agent AI, trò chuyện, nói và dùng terminal ngay trên điện thoại.

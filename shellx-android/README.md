@@ -160,4 +160,4 @@ applies only when both files exist; until then push stays off and `build-release
 
 ## Releasing
 
-Google Play builds will be made with `release/mobile/android.sh` (plan 3H), which is not written yet.
+Google Play bundles are built and signed on the maintainer's Mac with `release/mobile/android.sh`, never in CI and never uploaded by a script. [release/mobile/README.md](../release/mobile/README.md) has the checks, the Play Console steps, the Data safety answers, the store listing and the device checklist. `dev.sh build-release` is the unsigned check that every `dev.sh test all` runs; `dev.sh` never signs with the upload key.

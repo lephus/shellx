@@ -49,6 +49,8 @@
                 <data android:scheme="shellx-link" />
             </intent-filter>
         </activity>
+        <!-- Settings › About › Licenses: the bundled open-source licence notices (plan 3H). -->
+        <activity android:name=".ui.settings.LicencesActivity" android:exported="false" />
         <!-- FCM's data-only messages from paired Macs: "needs you" alerts and their removal (contracts §8). -->
         <service android:name=".platform.ShellXMessagingService" android:exported="false">
             <intent-filter>

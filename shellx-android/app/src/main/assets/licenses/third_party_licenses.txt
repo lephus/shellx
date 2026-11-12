@@ -1,0 +1,639 @@
+Open-source software in ShellX for Android
+
+Activity (androidx.activity:activity:1.13.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Activity Compose (androidx.activity:activity-compose:1.13.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Activity Kotlin Extensions (androidx.activity:activity-ktx:1.13.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Annotation (androidx.annotation:annotation:1.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Experimental annotation (androidx.annotation:annotation-experimental:1.4.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Annotation (androidx.annotation:annotation-jvm:1.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android AppCompat Library v7 (androidx.appcompat:appcompat:1.2.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Resources Library (androidx.appcompat:appcompat-resources:1.2.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Arch-Common (androidx.arch.core:core-common:2.2.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Arch-Runtime (androidx.arch.core:core-runtime:2.2.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+AndroidX Autofill (androidx.autofill:autofill:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Biometric (androidx.biometric:biometric:1.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera2 (androidx.camera:camera-camera2:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera2 Pipe (androidx.camera:camera-camera2-pipe:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera Core (androidx.camera:camera-core:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+License: BSD-3-Clause https://opensource.org/licenses/BSD-3-Clause
+
+Camera Lifecycle (androidx.camera:camera-lifecycle:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera Video (androidx.camera:camera-video:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera View (androidx.camera:camera-view:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera Feature Combination Query (androidx.camera.featurecombinationquery:featurecombinationquery:1.6.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Camera Viewfinder Core (androidx.camera.viewfinder:viewfinder-core:1.5.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+collections (androidx.collection:collection:1.6.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+collections (androidx.collection:collection-jvm:1.6.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Collections Kotlin Extensions (androidx.collection:collection-ktx:1.6.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Jetpack Compose Libraries BOM (androidx.compose:compose-bom:2026.06.01)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Animation (androidx.compose.animation:animation:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Animation (androidx.compose.animation:animation-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Animation Core (androidx.compose.animation:animation-core:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Animation Core (androidx.compose.animation:animation-core-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Foundation (androidx.compose.foundation:foundation:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Foundation (androidx.compose.foundation:foundation-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Layouts (androidx.compose.foundation:foundation-layout:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Layouts (androidx.compose.foundation:foundation-layout-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material Icons Core (androidx.compose.material:material-icons-core:1.7.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material Icons Core (androidx.compose.material:material-icons-core-android:1.7.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material Icons Extended (androidx.compose.material:material-icons-extended:1.7.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material Icons Extended (androidx.compose.material:material-icons-extended-android:1.7.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material Ripple (androidx.compose.material:material-ripple:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material Ripple (androidx.compose.material:material-ripple-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material3 Components (androidx.compose.material3:material3:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Material3 Components (androidx.compose.material3:material3-android:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Runtime (androidx.compose.runtime:runtime:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Runtime (androidx.compose.runtime:runtime-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Runtime Annotation (androidx.compose.runtime:runtime-annotation:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Runtime Annotation (androidx.compose.runtime:runtime-annotation-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Runtime Retain (androidx.compose.runtime:runtime-retain:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Runtime Retain (androidx.compose.runtime:runtime-retain-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Saveable (androidx.compose.runtime:runtime-saveable:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Saveable (androidx.compose.runtime:runtime-saveable-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose UI (androidx.compose.ui:ui:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose UI (androidx.compose.ui:ui-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Geometry (androidx.compose.ui:ui-geometry:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Geometry (androidx.compose.ui:ui-geometry-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Graphics (androidx.compose.ui:ui-graphics:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Graphics (androidx.compose.ui:ui-graphics-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose UI Text (androidx.compose.ui:ui-text:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose UI Text (androidx.compose.ui:ui-text-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Unit (androidx.compose.ui:ui-unit:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Unit (androidx.compose.ui:ui-unit-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Util (androidx.compose.ui:ui-util:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Util (androidx.compose.ui:ui-util-android:1.11.4)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+AndroidX Futures (androidx.concurrent:concurrent-futures:1.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+AndroidX Futures Kotlin Extensions (androidx.concurrent:concurrent-futures-ktx:1.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Core (androidx.core:core:1.18.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+androidx.core:core-backported-fixes (androidx.core:core-backported-fixes:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Core Kotlin Extensions (androidx.core:core-ktx:1.18.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+androidx.core:core-viewtree (androidx.core:core-viewtree:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Credentials (androidx.credentials:credentials:1.6.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Credentials Play Services Auth (androidx.credentials:credentials-play-services-auth:1.6.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Cursor Adapter (androidx.cursoradapter:cursoradapter:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Custom View (androidx.customview:customview:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+androidx.customview:poolingcontainer (androidx.customview:customview-poolingcontainer:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+DataStore (androidx.datastore:datastore:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+DataStore (androidx.datastore:datastore-android:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+DataStore Core (androidx.datastore:datastore-core:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+DataStore Core (androidx.datastore:datastore-core-android:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+DataStore Core Okio (androidx.datastore:datastore-core-okio:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+DataStore Core Okio (androidx.datastore:datastore-core-okio-jvm:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Preferences DataStore (androidx.datastore:datastore-preferences:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Preferences DataStore (androidx.datastore:datastore-preferences-android:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Preferences DataStore Core (androidx.datastore:datastore-preferences-core:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Preferences DataStore Core (androidx.datastore:datastore-preferences-core-android:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Preferences External Protobuf (androidx.datastore:datastore-preferences-external-protobuf:1.3.0)
+License: BSD-3-Clause https://opensource.org/licenses/BSD-3-Clause
+
+Preferences DataStore Proto (androidx.datastore:datastore-preferences-proto:1.3.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Document File (androidx.documentfile:documentfile:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Drawer Layout (androidx.drawerlayout:drawerlayout:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support DynamicAnimation (androidx.dynamicanimation:dynamicanimation:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Emoji2 (androidx.emoji2:emoji2:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+ExifInterface (androidx.exifinterface:exifinterface:1.4.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library fragment (androidx.fragment:fragment:1.5.7)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Graphics Path (androidx.graphics:graphics-path:1.0.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Interpolators (androidx.interpolator:interpolator:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library core utils (androidx.legacy:legacy-support-core-utils:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle-Common (androidx.lifecycle:lifecycle-common:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle-Common for Java 8 (androidx.lifecycle:lifecycle-common-java8:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle-Common (androidx.lifecycle:lifecycle-common-jvm:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle LiveData (androidx.lifecycle:lifecycle-livedata:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle LiveData Core (androidx.lifecycle:lifecycle-livedata-core:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+LiveData Core Kotlin Extensions (androidx.lifecycle:lifecycle-livedata-core-ktx:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Process (androidx.lifecycle:lifecycle-process:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Runtime (androidx.lifecycle:lifecycle-runtime:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Runtime (androidx.lifecycle:lifecycle-runtime-android:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Runtime Compose (androidx.lifecycle:lifecycle-runtime-compose:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Runtime Compose (androidx.lifecycle:lifecycle-runtime-compose-android:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Kotlin Extensions (androidx.lifecycle:lifecycle-runtime-ktx:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle Kotlin Extensions (androidx.lifecycle:lifecycle-runtime-ktx-android:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel (androidx.lifecycle:lifecycle-viewmodel:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel (androidx.lifecycle:lifecycle-viewmodel-android:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel Compose (androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel Compose (androidx.lifecycle:lifecycle-viewmodel-compose-android:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel Kotlin Extensions (androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel with SavedState (androidx.lifecycle:lifecycle-viewmodel-savedstate:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Lifecycle ViewModel with SavedState (androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.10.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library loader (androidx.loader:loader:1.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Local Broadcast Manager (androidx.localbroadcastmanager:localbroadcastmanager:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Media3 common module (androidx.media3:media3-common:1.9.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Media3 Container module (androidx.media3:media3-container:1.9.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Media3 Muxer module (androidx.media3:media3-muxer:1.9.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Navigation Common (androidx.navigation:navigation-common:2.9.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Navigation Common (androidx.navigation:navigation-common-android:2.9.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Navigation (androidx.navigation:navigation-compose:2.9.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Compose Navigation (androidx.navigation:navigation-compose-android:2.9.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Navigation Runtime (androidx.navigation:navigation-runtime:2.9.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Navigation Runtime (androidx.navigation:navigation-runtime-android:2.9.8)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Navigation Event (androidx.navigationevent:navigationevent:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Navigation Event (androidx.navigationevent:navigationevent-android:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+NavigationEvent Compose (androidx.navigationevent:navigationevent-compose:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+NavigationEvent Compose (androidx.navigationevent:navigationevent-compose-android:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library Print (androidx.print:print:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Profile Installer (androidx.profileinstaller:profileinstaller:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Saved State (androidx.savedstate:savedstate:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Saved State (androidx.savedstate:savedstate-android:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Saved State Compose (androidx.savedstate:savedstate-compose:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Saved State Compose (androidx.savedstate:savedstate-compose-android:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+SavedState Kotlin Extensions (androidx.savedstate:savedstate-ktx:1.4.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Startup Runtime (androidx.startup:startup-runtime:1.2.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Tracing (androidx.tracing:tracing:2.0.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Tracing (androidx.tracing:tracing-android:2.0.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Tracing Kotlin Extensions (androidx.tracing:tracing-ktx:2.0.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Transition (androidx.transition:transition:1.6.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support VectorDrawable (androidx.vectordrawable:vectordrawable:1.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support AnimatedVectorDrawable (androidx.vectordrawable:vectordrawable-animated:1.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+VersionedParcelable (androidx.versionedparcelable:versionedparcelable:1.1.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Android Support Library View Pager (androidx.viewpager:viewpager:1.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+WindowManager (androidx.window:window:1.5.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+WindowManager Core (androidx.window:window-core:1.5.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+WindowManager Core (androidx.window:window-core-android:1.5.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+transport-api (com.google.android.datatransport:transport-api:5.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+transport-backend-cct (com.google.android.datatransport:transport-backend-cct:5.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+transport-runtime (com.google.android.datatransport:transport-runtime:5.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+play-services-auth (com.google.android.gms:play-services-auth:21.1.1)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-auth-api-phone (com.google.android.gms:play-services-auth-api-phone:18.0.2)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-auth-base (com.google.android.gms:play-services-auth-base:18.0.10)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-auth-blockstore (com.google.android.gms:play-services-auth-blockstore:16.4.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-base (com.google.android.gms:play-services-base:18.9.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-basement (com.google.android.gms:play-services-basement:18.9.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-cloud-messaging (com.google.android.gms:play-services-cloud-messaging:17.4.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-fido (com.google.android.gms:play-services-fido:21.0.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-identity-credentials (com.google.android.gms:play-services-identity-credentials:16.0.0-alpha08)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-stats (com.google.android.gms:play-services-stats:17.0.2)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+play-services-tasks (com.google.android.gms:play-services-tasks:18.4.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+googleid (com.google.android.libraries.identity.googleid:googleid:1.2.1)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+app-update (com.google.android.play:app-update:2.1.0)
+License: Play Core Software Development Kit Terms of Service https://developer.android.com/guide/playcore/license
+
+core-common (com.google.android.play:core-common:2.0.3)
+License: Play Core Software Development Kit Terms of Service https://developer.android.com/guide/playcore/license
+
+AutoValue Annotations (com.google.auto.value:auto-value-annotations:1.6.3)
+License: Apache 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+FindBugs-jsr305 (com.google.code.findbugs:jsr305:3.0.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Dagger (com.google.dagger:dagger:2.59)
+License: Apache 2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+error-prone annotations (com.google.errorprone:error_prone_annotations:2.28.0)
+License: Apache 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-annotations (com.google.firebase:firebase-annotations:18.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-bom (com.google.firebase:firebase-bom:35.1.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-common (com.google.firebase:firebase-common:23.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-components (com.google.firebase:firebase-components:20.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-datatransport (com.google.firebase:firebase-datatransport:21.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-encoders (com.google.firebase:firebase-encoders:18.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-encoders-json (com.google.firebase:firebase-encoders-json:19.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-encoders-proto (com.google.firebase:firebase-encoders-proto:17.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-iid-interop (com.google.firebase:firebase-iid-interop:17.1.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+firebase-installations (com.google.firebase:firebase-installations:20.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-installations-interop (com.google.firebase:firebase-installations-interop:18.0.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+firebase-measurement-connector (com.google.firebase:firebase-measurement-connector:19.0.0)
+License: Android Software Development Kit License https://developer.android.com/studio/terms.html
+
+firebase-messaging (com.google.firebase:firebase-messaging:26.0.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Guava InternalFutureFailureAccess and InternalFutures (com.google.guava:failureaccess:1.0.2)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Guava: Google Core Libraries for Java (com.google.guava:guava:33.3.1-android)
+License: Apache License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Guava ListenableFuture only (com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+J2ObjC Annotations (com.google.j2objc:j2objc-annotations:3.0.0)
+License: Apache License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+ZXing Core (com.google.zxing:core:3.5.4)
+License: The Apache Software License, Version 2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+okhttp (com.squareup.okhttp3:okhttp:5.4.0)
+License: The Apache Software License, Version 2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+okhttp (com.squareup.okhttp3:okhttp-android:5.4.0)
+License: The Apache Software License, Version 2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+okio (com.squareup.okio:okio:3.17.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+okio (com.squareup.okio:okio-jvm:3.17.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Jakarta Dependency Injection (jakarta.inject:jakarta.inject-api:2.0.1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+javax.inject (javax.inject:javax.inject:1)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Bouncy Castle Provider (org.bouncycastle:bcprov-jdk18on:1.86)
+License: Bouncy Castle Licence https://www.bouncycastle.org/licence.html
+
+Checker Qual (org.checkerframework:checker-qual:3.43.0)
+License: The MIT License http://opensource.org/licenses/MIT
+
+JetBrains Java Annotations (org.jetbrains:annotations:23.0.0)
+License: The Apache Software License, Version 2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+Kotlin Libraries bill-of-materials (org.jetbrains.kotlin:kotlin-bom:1.8.0)
+License: The Apache Software License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Kotlin Stdlib (org.jetbrains.kotlin:kotlin-stdlib:2.4.21)
+License: Apache-2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Kotlin Stdlib Common (org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21)
+License: Apache-2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Kotlin Stdlib Jdk7 (org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.21)
+License: The Apache License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+Kotlin Stdlib Jdk8 (org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.21)
+License: The Apache License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+
+atomicfu (org.jetbrains.kotlinx:atomicfu:0.28.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+atomicfu (org.jetbrains.kotlinx:atomicfu-jvm:0.28.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-coroutines-android (org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-coroutines-bom (org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.11.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-coroutines-core (org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-coroutines-core (org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-coroutines-play-services (org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-serialization-bom (org.jetbrains.kotlinx:kotlinx-serialization-bom:1.12.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-serialization-core (org.jetbrains.kotlinx:kotlinx-serialization-core:1.12.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-serialization-core (org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-serialization-json (org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+kotlinx-serialization-json (org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0)
+License: Apache-2.0 https://www.apache.org/licenses/LICENSE-2.0.txt
+
+JSpecify annotations (org.jspecify:jspecify:1.0.0)
+License: The Apache License, Version 2.0 http://www.apache.org/licenses/LICENSE-2.0.txt
+

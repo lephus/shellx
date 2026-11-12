@@ -1,55 +1,24 @@
 package com.shellx.app.ui.settings
 
-import android.content.ActivityNotFoundException
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.shellx.app.R
-import com.shellx.core.platform.CoreLog
-
-/** Where "Licenses" goes, and the host it shows (a web address is never translated). */
-object AboutLinks {
-    const val WEBSITE = "https://shellx.pro"
-    const val WEBSITE_HOST = "shellx.pro"
-}
 
 /** The version as Settings shows it: "1.0.0 (100)". */
 fun versionText(versionName: String, versionCode: Long): String = "$versionName ($versionCode)"
 
-/**
- * Opens [AboutLinks.WEBSITE]. With no app to open a web page (no browser, some work profiles) nothing happens: the
- * platform handler throws IllegalArgumentException (ActivityNotFoundException inside), and only a name is logged.
- */
-private fun openWebsite(uriHandler: UriHandler) {
-    try {
-        uriHandler.openUri(AboutLinks.WEBSITE)
-    } catch (_: IllegalArgumentException) {
-        CoreLog.log("website_open_failed")
-    } catch (_: ActivityNotFoundException) {
-        CoreLog.log("website_open_failed")
-    }
-}
-
-/** Settings › About (`AboutSection.swift`): the version, and "Licenses", which opens shellx.pro in the browser. */
+/** Settings › About: the version, and "Licenses", which opens the open-source licence notices inside the app (plan 3H). */
 @Composable
 fun AboutSection(version: String) {
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
     SettingsSection(title = stringResource(R.string.settings_about_title)) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_about_version)) },
@@ -62,23 +31,7 @@ fun AboutSection(version: String) {
         SettingsDivider()
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_about_license)) },
-            modifier = Modifier.clickable { openWebsite(uriHandler) }.testTag("settings.about.license"),
-            trailingContent = {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        AboutLinks.WEBSITE_HOST,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Only tells the eye that the row leaves the app.
-                    Icon(
-                        Icons.AutoMirrored.Outlined.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
+            modifier = Modifier.clickable { openLicences(context) }.testTag("settings.about.license"),
             colors = settingsRowColors(),
         )
     }

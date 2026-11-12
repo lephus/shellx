@@ -1,14 +1,10 @@
 package com.shellx.app.ui.settings
 
-import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -60,7 +56,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** A recognizer that hears nothing (not 3E's FakeSpeechEngine). */
@@ -477,32 +472,5 @@ class SettingsScreenTest {
         rule.onNodeWithText(string(R.string.settings_appearance_dark)).performClick()
 
         assertEquals(listOf(AppAppearance.DARK), appearances)
-    }
-
-    @Test
-    fun licensesOpensTheWebsite() {
-        val opened = mutableListOf<String>()
-        val handler = object : UriHandler {
-            override fun openUri(uri: String) {
-                opened += uri
-            }
-        }
-        rule.setContent { CompositionLocalProvider(LocalUriHandler provides handler) { Screen() } }
-
-        rule.onNodeWithTag("settings.about.license").performClick()
-
-        assertEquals(listOf("https://shellx.pro"), opened)
-    }
-
-    /** Review D m-6: with no app to open a web page (no browser, some work profiles), Licenses does nothing, no crash. */
-    @Test
-    fun licensesWithNoBrowserDoesNotCrash() {
-        shadowOf(ApplicationProvider.getApplicationContext<Application>()).checkActivities(true)
-        rule.setContent { Screen() }
-
-        rule.onNodeWithTag("settings.about.license").performClick()
-        rule.waitForIdle()
-
-        rule.onNodeWithTag("settings.about.license").assertIsDisplayed()
     }
 }
