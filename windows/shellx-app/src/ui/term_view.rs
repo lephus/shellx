@@ -61,6 +61,7 @@ use std::sync::Arc;
 
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
+use shellx_model::mouse::{ScreenModes, ScrollAccumulator, WheelAction, wheel_action};
 use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
@@ -269,6 +270,8 @@ pub(super) struct TermView {
     cell_lines: Vec<String>,
     /// Scale factor the metrics were last computed at.
     scale: f32,
+    /// Wheel and touchpad lines not scrolled yet (fractions of a line).
+    scroll: ScrollAccumulator,
     _window_bounds: Subscription,
     cell_width: Pixels,
     line_height: Pixels,
@@ -302,6 +305,7 @@ impl TermView {
             grid: None,
             cell_lines: Vec::new(),
             scale: window.scale_factor(),
+            scroll: ScrollAccumulator::default(),
             _window_bounds: window_bounds,
             cell_width: px(8.0),
             line_height: px(18.0),
@@ -793,16 +797,38 @@ impl TermView {
         }
     }
 
+    /// The wheel and the touchpad (`mouse::wheel_action`): the fractions of a
+    /// line a touchpad sends add up in this pane's accumulator (R2 F2); the
+    /// primary screen scrolls its history, a full-screen program gets cursor
+    /// keys unless it asked for mouse reporting (R2 F13).
     fn on_scroll(&mut self, event: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let Some(modes) = self.backend.core().map(|core| ScreenModes {
+            alternate: core.alternate_screen(),
+            mouse_reporting: core.mouse_tracking(),
+        }) else {
+            return;
+        };
         let delta = event.delta.pixel_delta(self.line_height);
-        let lines = (f32::from(delta.y) / f32::from(self.line_height)).round() as isize;
-        if lines != 0 && !matches!(self.backend, Backend::None) {
-            self.follow_viewport(false, |backend| {
-                if let Some(core) = backend.core() {
-                    core.scroll_lines(-lines);
+        let lines = f64::from(f32::from(delta.y) / f32::from(self.line_height));
+        match wheel_action(self.scroll.add(lines), modes) {
+            WheelAction::None => {}
+            WheelAction::Scrollback(n) => {
+                self.follow_viewport(false, |backend| {
+                    if let Some(core) = backend.core() {
+                        core.scroll_lines(-(n as isize));
+                    }
+                });
+                cx.notify();
+            }
+            // The encoder honours the program's cursor-key mode (DECCKM); a
+            // remote link that is not attached drops the keys.
+            WheelAction::Arrows { key, count } => {
+                if let Some(core) = self.backend.core() {
+                    for _ in 0..count {
+                        core.send_chord(key);
+                    }
                 }
-            });
-            cx.notify();
+            }
         }
     }
 }

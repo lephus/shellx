@@ -174,6 +174,17 @@ impl TermCore {
         self.terminal.scroll_delta(delta);
     }
 
+    /// A full-screen program (less, vim, htop) switched to the alternate
+    /// screen: the wheel sends it arrow keys (`mouse::wheel_action`).
+    pub fn alternate_screen(&self) -> bool {
+        self.terminal.active_screen() == ghostty_vt::Screen::Alternate
+    }
+
+    /// The program enabled a mouse tracking mode (1000, 1002, 1003, ...).
+    pub fn mouse_tracking(&self) -> bool {
+        self.terminal.mouse_tracking()
+    }
+
     pub fn vt_cols_rows(&self) -> (u16, u16) {
         (self.terminal.cols(), self.terminal.rows())
     }
