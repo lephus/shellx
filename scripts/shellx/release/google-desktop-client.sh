@@ -23,6 +23,8 @@ shellx_require_google_desktop_client() {
 # value reaches grep through a pipe (-f <(...)), never as an argument.
 shellx_binary_has_google_desktop_client() {
   local path="$1"
+  # An empty value is an empty grep pattern, which matches any line: never "present".
+  [[ -n "${SHELLX_GOOGLE_DESKTOP_CLIENT_ID:-}" && -n "${SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET:-}" ]] || return 1
   grep -r -q -a -F -f <(printf '%s\n' "${SHELLX_GOOGLE_DESKTOP_CLIENT_ID:-}") "$path" 2>/dev/null || return 1
   grep -r -q -a -F -f <(printf '%s\n' "${SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET:-}") "$path" 2>/dev/null || return 1
 }

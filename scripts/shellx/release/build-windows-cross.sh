@@ -22,8 +22,14 @@
 #   SHELLX_WINBUILD_MIN_FREE_GIB  free GiB the VPS needs in ~ to start (default 14: 4 stay free
 #                                 for deploys, up to 10 for the image, caches and target)
 #   SHELLX_GOOGLE_DESKTOP_CLIENT_ID, SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET  required for a build: the
-#                       Desktop OAuth client compiled into the exe. They reach the container on
-#                       stdin of one ssh call, never in a command line or a file.
+#                       Desktop OAuth client compiled into the exe. They travel on stdin of one ssh
+#                       call and into the container as environment variables, never in a command
+#                       line. They are still readable on the VPS: while the container runs, `docker
+#                       inspect` shows its environment; cargo writes them into its dep-info and
+#                       fingerprint files under /cache/target in the cargo volume (step 5 deletes
+#                       them unless SHELLX_WINBUILD_KEEP_TARGET=1 or a run stops before step 5); and
+#                       the exe and installer carry them by design. Root and the docker group can read
+#                       all of that.
 #   SHELLX_BUILD_LABEL  a test label (a lower-case letter, then up to 9 lower-case letters or
 #                       digits): the installer becomes ShellX-Setup-<version>-<label>-<commit10>.exe
 #                       and About and reports show "ShellX <version> (<label> <commit10>)"; the
