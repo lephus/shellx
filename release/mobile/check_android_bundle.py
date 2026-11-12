@@ -317,6 +317,27 @@ LICENCE_APACHE_MARKER = b"LICENCE TEXT: Apache License, Version 2.0"
 LICENCE_APACHE_TITLE = b"Version 2.0, January 2004"
 LICENCE_EMBEDDED_MARKER = b"== Notices embedded in Google libraries =="
 LICENCE_PLAY_SERVICES = b"com.google.android.gms:play-services-"
+LICENCE_APACHE_LAST_LINE = b"limitations under the License."
+LICENCE_COUNT_RE = re.compile(rb"^Libraries: (\d+)$", re.MULTILINE)
+LICENCE_LIBRARY_RE = re.compile(rb"^.+ \([^()\s]+:[^()\s]+:[^()\s]+\)$", re.MULTILINE)
+
+
+def _library_count_problems(asset: bytes) -> list:
+    """The 'Libraries: N' line generate-licences.py writes must agree with the library sections it lists."""
+    path = "assets/licenses/third_party_licenses.txt"
+    start = asset.find(b"== Libraries ==")
+    end = asset.find(b"== Licence texts ==")
+    sections = LICENCE_LIBRARY_RE.findall(asset[start:end if end > start else len(asset)]) if start >= 0 else []
+    declared = LICENCE_COUNT_RE.search(asset)
+    if declared is None:
+        return ["%s says no 'Libraries: N' line but has %d library sections: regenerate it with generate-licences.py"
+                % (path, len(sections))]
+    if not sections:
+        return ["%s lists no library: regenerate it with generate-licences.py" % path]
+    if int(declared.group(1)) != len(sections):
+        return ["%s says %s libraries but has %d library sections: regenerate it with generate-licences.py"
+                % (path, declared.group(1).decode(), len(sections))]
+    return []
 
 
 def licence_notice_problems(resources: bytes, res_files: dict, asset) -> list:
@@ -324,10 +345,12 @@ def licence_notice_problems(resources: bytes, res_files: dict, asset) -> list:
     if asset:
         problems = []
         marker_at = asset.find(LICENCE_APACHE_MARKER)
-        if marker_at < 0 or LICENCE_APACHE_TITLE not in asset[marker_at:]:
-            problems.append("%s lacks the Apache-2.0 licence text (the line \"%s\" and its title): regenerate it with "
-                            "generate-licences.py" % ("assets/licenses/third_party_licenses.txt",
-                                                      LICENCE_APACHE_MARKER.decode()))
+        tail = asset[marker_at:] if marker_at >= 0 else b""
+        if not (LICENCE_APACHE_TITLE in tail and LICENCE_APACHE_LAST_LINE in tail):
+            problems.append("%s lacks the Apache-2.0 licence text (the line \"%s\" and the whole text after it): "
+                            "regenerate it with generate-licences.py" % ("assets/licenses/third_party_licenses.txt",
+                                                                         LICENCE_APACHE_MARKER.decode()))
+        problems.extend(_library_count_problems(asset))
         if LICENCE_PLAY_SERVICES in asset and LICENCE_EMBEDDED_MARKER not in asset:
             problems.append("assets/licenses/third_party_licenses.txt lists a Google Play services library but has no "
                             "section \"%s\": regenerate it with generate-licences.py" % LICENCE_EMBEDDED_MARKER.decode())
