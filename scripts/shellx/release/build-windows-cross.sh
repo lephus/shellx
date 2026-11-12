@@ -21,6 +21,15 @@
 #   SHELLX_WINBUILD_KEEP_TARGET=1 keep the cargo target dir in the cache volume
 #   SHELLX_WINBUILD_MIN_FREE_GIB  free GiB the VPS needs in ~ to start (default 14: 4 stay free
 #                                 for deploys, up to 10 for the image, caches and target)
+#   SHELLX_GOOGLE_DESKTOP_CLIENT_ID, SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET  required for a build: the
+#                       Desktop OAuth client compiled into the exe. They travel on stdin of one ssh
+#                       call and into the container as environment variables, never in a command
+#                       line. They are still readable on the VPS: while the container runs, `docker
+#                       inspect` shows its environment; cargo writes them into its dep-info and
+#                       fingerprint files under /cache/target in the cargo volume (step 5 deletes
+#                       them unless SHELLX_WINBUILD_KEEP_TARGET=1 or a run stops before step 5); and
+#                       the exe and installer carry them by design. Root and the docker group can read
+#                       all of that.
 #   SHELLX_BUILD_LABEL  a test label (a lower-case letter, then up to 9 lower-case letters or
 #                       digits): the installer becomes ShellX-Setup-<version>-<label>-<commit10>.exe
 #                       and About and reports show "ShellX <version> (<label> <commit10>)"; the
@@ -59,6 +68,8 @@
 # - Same as CI: Rust from cmux-tui/rust-toolchain.toml, zig from ghostty/build.zig.zon,
 #   --locked, static CRT (checked), Inno Setup 6.7.1, unsigned.
 set -euo pipefail
+# shellcheck source=google-desktop-client.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/google-desktop-client.sh"
 
 usage() {
   cat <<'EOF'
@@ -188,6 +199,9 @@ case "$mode" in
   unlock) unlock; exit 0 ;;
 esac
 
+# A build needs the Desktop OAuth client; checked before the first ssh call.
+shellx_require_google_desktop_client || exit 1
+
 # The sign-in button needs Google's official mark in the commit being built.
 branding_args=()
 [[ -z "${SHELLX_GOOGLE_BRANDING_ROOT:-}" ]] || branding_args=(--root "$SHELLX_GOOGLE_BRANDING_ROOT")
@@ -290,13 +304,17 @@ vssh "set -euo pipefail
   fi"
 
 # 3. Build, host tests, installer.
-vssh "set -euo pipefail
+# The client reaches the remote shell on stdin (two lines), so it is in no command line.
+printf '%s\n%s\n' "$SHELLX_GOOGLE_DESKTOP_CLIENT_ID" "$SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET" | vssh "set -euo pipefail
+  IFS= read -r SHELLX_GOOGLE_DESKTOP_CLIENT_ID
+  IFS= read -r SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET
+  export SHELLX_GOOGLE_DESKTOP_CLIENT_ID SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET
   cd ~/$remote
   rm -rf out
   mkdir out
   docker volume create $volume >/dev/null
   docker run --rm --cpus 4 --memory 10g --name shellx-winbuild-run \
-    -e HOST_UID=\$(id -u) -e HOST_GID=\$(id -g) -e CMUX_TUI_BUILD_COMMIT=$commit $label_env \
+    -e HOST_UID=\$(id -u) -e HOST_GID=\$(id -g) -e CMUX_TUI_BUILD_COMMIT=$commit -e SHELLX_GOOGLE_DESKTOP_CLIENT_ID -e SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET $label_env \
     -v $volume:/cache -v \$PWD/src:/src -v \$PWD/out:/out \
     $image bash /opt/winbuild/build-in-container.sh 2>&1 | tee build.log \
     | grep -E '^(==|error)|^test .* FAILED|test result|Successful compile' || true

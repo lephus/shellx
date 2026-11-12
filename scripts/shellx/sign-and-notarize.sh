@@ -18,6 +18,9 @@
 #   SHELLX_SIGNING_IDENTITY  default "Developer ID Application: Phu Le huu (W4RF3W4VTZ)"
 #   SHELLX_NOTARY_PROFILE    default shellx-notary
 #   SHELLX_UNIVERSAL=1       --build makes an arm64 + x86_64 app (public releases)
+# Required for --build (the Desktop OAuth client compiled into the app; never printed):
+#   SHELLX_GOOGLE_DESKTOP_CLIENT_ID, SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET
+#       set -a; . ~/.shellx-release/google-desktop-oauth.env; set +a
 #
 # Signing writes the Sparkle update key from scripts/shellx/release/sparkle-ed25519.pub
 # into SUPublicEDKey first, so the signature covers it and the app can verify updates.
@@ -25,6 +28,8 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=release/google-desktop-client.sh
+source "$SCRIPT_DIR/release/google-desktop-client.sh"
 
 IDENTITY="${SHELLX_SIGNING_IDENTITY:-Developer ID Application: Phu Le huu (W4RF3W4VTZ)}"
 NOTARY_PROFILE="${SHELLX_NOTARY_PROFILE:-shellx-notary}"
@@ -38,6 +43,7 @@ usage() {
 }
 
 build_app() {
+  shellx_require_google_desktop_client || exit 1
   local derived="${1:-$REPO_ROOT/build-shellx}"
   local archs=(ARCHS=arm64 ONLY_ACTIVE_ARCH=YES)
   [[ "${SHELLX_UNIVERSAL:-0}" == 1 ]] && archs=("ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
@@ -65,6 +71,11 @@ build_app() {
   # PRODUCT_NAME ShellX), so the build produces ShellX.app directly. The Cloud
   # tunnel system extension is no longer embedded in the app.
   local products="$derived/Build/Products/Release"
+  if ! shellx_binary_has_google_desktop_client "$products/$PRODUCT_NAME.app/Contents/MacOS"; then
+    echo "error: $products/$PRODUCT_NAME.app does not carry the Google Desktop OAuth client; rebuild with the client loaded" >&2
+    exit 1
+  fi
+  echo "==> Google Desktop OAuth client: present" >&2
   echo "$products/$PRODUCT_NAME.app"
 }
 

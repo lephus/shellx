@@ -384,6 +384,10 @@ scripts/shellx/release/build-windows-cross.sh --preflight
 SHELLX_BUILD_LABEL=test scripts/shellx/release/build-windows-cross.sh <output folder>
 ```
 
+- The build compiles in the Google Desktop OAuth client, so it needs `SHELLX_GOOGLE_DESKTOP_CLIENT_ID` and
+  `SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET` in the environment and refuses without them. Load them from
+  `~/.shellx-release/google-desktop-oauth.env` with `set -a; . ~/.shellx-release/google-desktop-oauth.env; set +a`.
+  That file is never printed or committed, and a good build prints `== Google Desktop OAuth client: present`.
 - `--preflight` is read-only: it checks that the host has enough free disk (default 14 GiB,
   `SHELLX_WINBUILD_MIN_FREE_GIB`) and that no other Windows build holds the lock or runs. Exit 0 means a
   build may start.

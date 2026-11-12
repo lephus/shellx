@@ -16,6 +16,9 @@ if [[ -n "${HOST_UID:-}" ]]; then
 fi
 unset CMUX_GHOSTTY_SRC
 cd /src/windows
+# The Desktop OAuth client is compiled in (option_env!); build-windows-cross.sh passes it.
+[[ "${SHELLX_GOOGLE_DESKTOP_CLIENT_ID:-}" =~ ^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$ && "${SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET:-}" =~ ^[A-Za-z0-9_-]+$ ]] \
+  || { echo "error: SHELLX_GOOGLE_DESKTOP_CLIENT_ID / SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET missing or malformed (build-windows-cross.sh passes them)" >&2; exit 1; }
 # /src is a git archive, so cmux-remote's build.rs cannot ask git for HEAD: the driver passes
 # the exported commit (what a clean checkout reports).
 [[ "${CMUX_TUI_BUILD_COMMIT:-}" =~ ^[0-9a-f]{40}$ ]] || { echo "set CMUX_TUI_BUILD_COMMIT to the exported commit" >&2; exit 1; }
@@ -63,6 +66,13 @@ cargo xwin build --release --locked -p shellx-remote --target "$TARGET"
 
 exe="$CARGO_TARGET_DIR/$TARGET/release/shellx-desktop.exe"
 pdb="$CARGO_TARGET_DIR/$TARGET/release/shellx_desktop.pdb"
+if grep -q -a -F -f <(printf '%s\n' "$SHELLX_GOOGLE_DESKTOP_CLIENT_ID") "$exe" \
+  && grep -q -a -F -f <(printf '%s\n' "$SHELLX_GOOGLE_DESKTOP_CLIENT_SECRET") "$exe"; then
+  echo "== Google Desktop OAuth client: present"
+else
+  echo "error: shellx-desktop.exe does not carry the Google Desktop OAuth client" >&2
+  exit 1
+fi
 stage=/work/staged
 rm -rf "$stage" /work/dist
 mkdir -p "$stage" /work/dist
