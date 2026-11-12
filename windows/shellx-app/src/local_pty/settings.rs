@@ -946,6 +946,53 @@ mod tests {
     }
 
     #[test]
+    fn choices_made_while_a_lookup_runs_start_one_more_lookup_not_one_each() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+        let (_dir, path) = settings_path();
+        let files = exists_in(&[PWSH, WINPS, CMD]);
+        let gate_open = Arc::new(AtomicBool::new(true));
+        // lookups standing at the shut gate right now
+        let waiting = Arc::new(AtomicUsize::new(0));
+        let exists: Exists = {
+            let (gate_open, waiting) = (gate_open.clone(), waiting.clone());
+            Arc::new(move |p: &str| {
+                if !gate_open.load(Ordering::SeqCst) {
+                    waiting.fetch_add(1, Ordering::SeqCst);
+                    while !gate_open.load(Ordering::SeqCst) {
+                        std::thread::sleep(Duration::from_millis(2));
+                    }
+                    waiting.fetch_sub(1, Ordering::SeqCst);
+                }
+                files(p)
+            })
+        };
+        let shells = windows(&path, exists, None, Duration::ZERO);
+        shells.refresh_now();
+        gate_open.store(false, Ordering::SeqCst);
+        for choice in [
+            ShellChoice::Known {
+                shell: ShellKind::Cmd,
+            },
+            ShellChoice::Auto,
+            ShellChoice::Custom {
+                command_line: CMD.into(),
+            },
+        ] {
+            shells.set_choice(choice).unwrap();
+        }
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(waiting.load(Ordering::SeqCst), 1, "one lookup at a time");
+        // the last choice still arrives
+        gate_open.store(true, Ordering::SeqCst);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while shells.plan_for_new_pane().unwrap().first.kind.is_some() {
+            assert!(Instant::now() < deadline, "the custom line never applied");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[test]
     fn a_lookup_that_panics_does_not_stop_the_next_one() {
         use std::sync::atomic::{AtomicBool, Ordering};
 
