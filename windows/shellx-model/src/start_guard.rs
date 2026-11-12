@@ -485,8 +485,14 @@ mod tests {
 
     #[test]
     fn only_a_marker_with_this_pid_is_this_starts() {
-        assert!(marker_written_by(Some(r#"{"pid":42,"mode":"standard"}"#), 42));
-        assert!(!marker_written_by(Some(r#"{"pid":43,"mode":"compatible"}"#), 42));
+        assert!(marker_written_by(
+            Some(r#"{"pid":42,"mode":"standard"}"#),
+            42
+        ));
+        assert!(!marker_written_by(
+            Some(r#"{"pid":43,"mode":"compatible"}"#),
+            42
+        ));
         assert!(!marker_written_by(Some("garbage"), 42));
         assert!(!marker_written_by(None, 42));
     }
@@ -495,8 +501,12 @@ mod tests {
     fn a_remembered_compatible_mode_that_cannot_open_is_forgotten() {
         // B-1b review m-5: otherwise every start is compatible and fails, with no way back
         // from inside the app.
-        assert!(forget_remembered_after_report(&plan(Compatible, Remembered, true)));
-        assert!(forget_remembered_after_report(&plan(Compatible, Remembered, false)));
+        assert!(forget_remembered_after_report(&plan(
+            Compatible, Remembered, true
+        )));
+        assert!(forget_remembered_after_report(&plan(
+            Compatible, Remembered, false
+        )));
         for p in [
             plan(Standard, Default, true),
             plan(Compatible, RetryAfterOpenFailed, true),
