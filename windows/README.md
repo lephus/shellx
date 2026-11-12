@@ -177,7 +177,7 @@ The same actions are on screen: the title bar has the sidebar toggle, the "+ ▾
 menu, Back / Forward (focus history across workspaces and regions) and the settings gear (there is
 no search box and no bell: they come back when they work); each region has a tab bar
 with a close box per tab and the New terminal / Split right / Split down buttons; the
-sidebar footer has the `?` help menu (Settings…, Check for Updates, Docs, GitHub), the
+sidebar footer has the `?` help menu (Settings…, Check for Updates, Create diagnostics report, Docs, GitHub), the
 version and, when a newer version exists, the "Update Available" pill.
 
 While any panel is open (settings, pairing, sign-in, forced-update overlay), app shortcuts are
@@ -271,10 +271,10 @@ Everything is in `%LOCALAPPDATA%\ShellX\native\logs`:
 
 | File | What it is |
 |---|---|
-| `shellx.log` | The log of the app, GPUI (GPU name, feature level, device loss, font errors) and the core. First line of a start: `ShellX 1.7.0 starting on Windows 10.0.<build>`. Rotated at 1 MB, 3 files kept |
+| `shellx.log` | The log of the app, GPUI (GPU name, feature level, device loss, font errors) and the core. First line of a start: `ShellX 1.7.0 starting on Windows 10.0.<build>` (`ShellX 1.7.0 (<label> <commit10>) starting on Windows …` on a test installer), then `render mode: …`, decided before GPUI starts, then GPUI's `Using GPU:` lines. Rotated at 1 MB, 3 files kept |
 | `crash.<time>.<pid>.txt` | A panic: message, location, thread, backtrace, version, commit, Windows build. The last line `then: panic in a function that cannot unwind (the process aborts)` means the process was then ended by Windows (a panic inside a window procedure ends in a fast fail, exit code `0xC0000409`) |
 | `crash-native.<time>.<pid>.txt` | A crash that is not a panic (for example `0xC0000005`, a bad memory access): exception code, address, module, thread. No minidump |
-| `start-failed.<time>.<pid>.txt` | ShellX could not open its window in either display mode |
+| `start-failed.<time>.<pid>.txt` | ShellX could not open its window and had no other display mode left to try |
 | `diagnostics.<time>.<pid>.txt` | A [diagnostics report](#the-diagnostics-report) |
 
 If the logs folder cannot be written, a crash file is written to the **temp folder** (`%TEMP%`) with the same
@@ -288,7 +288,7 @@ exe read `<unknown>` in a crash file until the addresses are mapped with it.
 A panic or a crash writes its file first, then ShellX starts itself once more as a separate small process (no
 GPUI) that shows a box: "ShellX gặp lỗi và đã lưu chi tiết vào: <file> … Mở thư mục chứa file này? Hãy gửi file cho
 đội ShellX để được giúp." (English: "ShellX ran into a problem and saved the details to: …"), with Yes (opens
-Explorer with the file selected) and No. If the window cannot open in either display mode the box reads
+Explorer with the file selected) and No. If the window cannot open and no other display mode is left to try the box reads
 "ShellX không mở được cửa sổ" / "ShellX couldn't open its window" and names the `start-failed` file. A start never
 shows more than one box.
 
@@ -325,10 +325,11 @@ it. `--smoke` is different: it always starts Windows PowerShell.
 
 ### Display and the compatible mode
 
-ShellX normally draws with DirectComposition ("standard mode"). If the window cannot be opened, or the last
-start died before its first frame, ShellX starts itself again once with `GPUI_DISABLE_DIRECT_COMPOSITION=1`
-("compatible mode") and writes that in the log. When the compatible mode draws its first frame, the choice is
-**remembered** in `%LOCALAPPDATA%\ShellX\native\render.json` for later starts. If both modes fail the dialog
+ShellX normally draws with DirectComposition ("standard mode"). If the window cannot be opened, ShellX
+starts itself again once with `GPUI_DISABLE_DIRECT_COMPOSITION=1` ("compatible mode") and writes that in the
+log. If the last start died before its first frame, the next start is the compatible one itself (no second
+process) and the log says `previous start died before its first frame`. When the compatible mode draws its first frame, the choice is
+**remembered** in `%LOCALAPPDATA%\ShellX\native\render.json` for later starts. If no display mode is left to try the dialog
 names `start-failed.*.txt`. A remembered compatible mode resets itself to standard after one start in which
 the window could not be opened.
 
@@ -396,7 +397,7 @@ SHELLX_BUILD_LABEL=test scripts/shellx/release/build-windows-cross.sh <output fo
   of the same build, for mapping a crash file's addresses. **The PDB is never in the installer.**
 - Pass signs: the filtered output has Inno Setup's `Successful compile`; the last line is
   `Built <output folder>/ShellX-Setup-<version>-<label>-<commit10>.exe (unsigned); exe and PDB in …-symbols`;
-  no `warning: the build produced no shellx_desktop.pdb`; and no lock is left (`--preflight` afterwards says
+  no PDB warning (the texts are `warning: no intact shellx_desktop.pdb from this build; …`, `warning: the exe for the symbols folder did not download intact …`, and the container's `warning: no …pdb; …`); and no lock is left (`--preflight` afterwards says
   `no Windows build running`). If a run was cut off (lost connection) and the next run refuses because of a held
   lock, `scripts/shellx/release/build-windows-cross.sh --unlock` prints the owner and removes the lock; it
   refuses while a build container runs or the owner is a live process on this Mac.
