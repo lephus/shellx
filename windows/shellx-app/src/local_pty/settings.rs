@@ -24,6 +24,9 @@ use super::{PanePlan, ShellCmd, dev_bash};
 /// How long the first pane waits for the first lookup (Ruling 16).
 const FIRST_WAIT: Duration = Duration::from_secs(2);
 
+/// A larger `settings.json` is not read: Automatic.
+const SETTINGS_MAX_BYTES: u64 = 64 * 1024;
+
 type Exists = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
 /// Where the window runs.
@@ -85,8 +88,18 @@ impl SettingsFile {
         written
     }
 
+    /// The file's JSON object. The first `shells()` call reads it on the UI thread, so a file
+    /// over `SETTINGS_MAX_BYTES` counts as unreadable and is not read through (review M7).
     fn read_object(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
-        let text = std::fs::read_to_string(self.path.as_ref()?).ok()?;
+        use std::io::Read as _;
+        let file = std::fs::File::open(self.path.as_ref()?).ok()?;
+        let mut text = String::new();
+        file.take(SETTINGS_MAX_BYTES + 1)
+            .read_to_string(&mut text)
+            .ok()?;
+        if text.len() as u64 > SETTINGS_MAX_BYTES {
+            return None;
+        }
         match serde_json::from_str(&text).ok()? {
             serde_json::Value::Object(object) => Some(object),
             _ => None,
