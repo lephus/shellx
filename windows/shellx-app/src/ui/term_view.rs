@@ -67,7 +67,7 @@ use shellx_model::mouse::{
     secondary_click, wheel_action,
 };
 use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
-use shellx_model::paste::{ConfirmKey, confirm_key, needs_paste_confirmation, paste_line_count};
+use shellx_model::paste::{ConfirmKey, PendingPaste, confirm_key, needs_paste_confirmation};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
@@ -266,7 +266,7 @@ pub(super) struct TermView {
     flash_seq: u64,
     /// Clipboard text of several lines waiting for "Dán" (Enter) or "Hủy"
     /// (Esc): the bar at the bottom of the pane asks.
-    pending_paste: Option<String>,
+    pending_paste: Option<PendingPaste>,
     /// IME composition text (preedit), shown inline at the cursor and never
     /// sent to the PTY until committed.
     marked: Option<String>,
@@ -332,7 +332,7 @@ impl TermView {
         // Development only (Ruling 24): every new pane asks about a 3-line paste.
         #[cfg(target_os = "macos")]
         if std::env::var("SHELLX_DEV_PREVIEW").as_deref() == Ok("paste") {
-            view.pending_paste = Some("echo 1\necho 2\necho 3\n".to_string());
+            view.pending_paste = Some(PendingPaste::new("echo 1\necho 2\necho 3\n".into()));
         }
         view
     }
@@ -656,7 +656,7 @@ impl TermView {
             return;
         };
         if needs_paste_confirmation(&text, bracketed) {
-            self.pending_paste = Some(text);
+            self.pending_paste = Some(PendingPaste::new(text));
             cx.notify();
         } else {
             self.paste_now(&text, cx);
@@ -687,6 +687,13 @@ impl TermView {
         }
         self.clear_selection(cx);
         cx.notify();
+    }
+
+    /// "Dán" or Enter on the paste question: the waiting text goes in.
+    fn confirm_paste(&mut self, cx: &mut Context<Self>) {
+        if let Some(pending) = self.pending_paste.take() {
+            self.paste_now(&pending.into_text(), cx);
+        }
     }
 
     fn cancel_paste(&mut self, cx: &mut Context<Self>) {
@@ -892,12 +899,10 @@ impl TermView {
         }
         // A paste waits for Enter or Esc; any other key drops it and goes on.
         // While the IME composes, the question stays.
-        if let Some(text) = self.pending_paste.clone()
-            && !ctx.composing
-        {
+        if self.pending_paste.is_some() && !ctx.composing {
             match confirm_key(&key) {
                 ConfirmKey::Confirm => {
-                    self.paste_now(&text, cx);
+                    self.confirm_paste(cx);
                     cx.stop_propagation();
                     return;
                 }
@@ -1138,9 +1143,7 @@ fn paste_bar(lang: Lang, lines: usize, cx: &mut Context<TermView>) -> Div {
                         .child(
                             button("paste-confirm", t(lang, Str::Paste), Kind::Primary, false)
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    if let Some(text) = this.pending_paste.clone() {
-                                        this.paste_now(&text, cx);
-                                    }
+                                    this.confirm_paste(cx);
                                 })),
                         )
                         .child(
@@ -1196,7 +1199,7 @@ impl Render for TermView {
             _ => self.failed.clone(),
         };
         let flash = self.flash.clone();
-        let pending = self.pending_paste.as_deref().map(paste_line_count);
+        let pending = self.pending_paste.as_ref().map(PendingPaste::lines);
         let root = div()
             .relative()
             .size_full()

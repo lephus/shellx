@@ -63,6 +63,29 @@ pub fn paste_line_count(text: &str) -> usize {
     segments - usize::from(trailing_newline && segments > 1)
 }
 
+/// A paste waiting for its confirmation: the text, and its line count taken once, when the
+/// question opens (review m5). The pane redraws on every output batch; it reads `lines`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PendingPaste {
+    text: String,
+    lines: usize,
+}
+
+impl PendingPaste {
+    pub fn new(text: String) -> PendingPaste {
+        let lines = paste_line_count(&text);
+        PendingPaste { text, lines }
+    }
+
+    pub fn lines(&self) -> usize {
+        self.lines
+    }
+
+    pub fn into_text(self) -> String {
+        self.text
+    }
+}
+
 /// What a key does while the paste confirmation shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfirmKey {
