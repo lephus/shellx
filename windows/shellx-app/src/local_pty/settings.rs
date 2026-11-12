@@ -607,6 +607,27 @@ mod tests {
             std::fs::write(&path, text).unwrap();
             assert_eq!(file.load(), ShellChoice::Auto, "{text}");
         }
+        // over 64 KiB counts as unreadable: it is read on the UI thread (review M7)
+        let padding = " ".repeat(64 * 1024);
+        std::fs::write(
+            &path,
+            format!(r#"{{"shell":{{"kind":"known","shell":"cmd"}}}}{padding}"#),
+        )
+        .unwrap();
+        assert_eq!(file.load(), ShellChoice::Auto);
+        // ... while a file just under the bound is read
+        let fits = " ".repeat(64 * 1024 - 64);
+        std::fs::write(
+            &path,
+            format!(r#"{{"shell":{{"kind":"known","shell":"cmd"}}}}{fits}"#),
+        )
+        .unwrap();
+        assert_eq!(
+            file.load(),
+            ShellChoice::Known {
+                shell: ShellKind::Cmd
+            }
+        );
         // saving over an unreadable file leaves a readable one
         std::fs::write(&path, "[]").unwrap();
         let cmd = ShellChoice::Known {
