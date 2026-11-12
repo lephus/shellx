@@ -1097,6 +1097,77 @@ mod tests {
     }
 
     #[test]
+    fn shell_options_list_auto_found_and_custom() {
+        use ShellKind::*;
+        let all = find_shells(&probe(), &|p: &str| {
+            [
+                PWSH,
+                WINPS,
+                CMD,
+                r"C:\Program Files\Git\bin\bash.exe",
+                r"C:\Windows\System32\wsl.exe",
+            ]
+            .contains(&p)
+        });
+        assert_eq!(
+            shell_options(&all),
+            [
+                ShellOption::Auto {
+                    resolves_to: Some("PowerShell 7".into())
+                },
+                ShellOption::Known(Pwsh),
+                ShellOption::Known(WindowsPowerShell),
+                ShellOption::Known(Cmd),
+                ShellOption::Known(GitBash),
+                ShellOption::Known(Wsl),
+                ShellOption::Custom,
+            ]
+        );
+        let cmd_only = find_shells(&probe(), &|p: &str| p == CMD);
+        assert_eq!(
+            shell_options(&cmd_only),
+            [
+                ShellOption::Auto {
+                    resolves_to: Some("Command Prompt".into())
+                },
+                ShellOption::Known(Cmd),
+                ShellOption::Custom,
+            ]
+        );
+        // Git Bash alone: Automatic starts nothing it could name
+        let git_only = find_shells(&probe(), &|p: &str| {
+            p == r"C:\Program Files\Git\bin\bash.exe"
+        });
+        assert_eq!(
+            shell_options(&git_only)[0],
+            ShellOption::Auto { resolves_to: None }
+        );
+        // nothing found (and the Mac): Automatic and the custom line
+        assert_eq!(
+            shell_options(&[]),
+            [ShellOption::Auto { resolves_to: None }, ShellOption::Custom]
+        );
+
+        let auto = ShellOption::Auto { resolves_to: None };
+        let custom = ShellChoice::Custom {
+            command_line: "wsl.exe".into(),
+        };
+        assert!(is_selected(&auto, &ShellChoice::Auto));
+        assert!(!is_selected(&auto, &custom));
+        assert!(is_selected(
+            &ShellOption::Known(Cmd),
+            &ShellChoice::Known { shell: Cmd }
+        ));
+        assert!(!is_selected(
+            &ShellOption::Known(Cmd),
+            &ShellChoice::Known { shell: Pwsh }
+        ));
+        assert!(!is_selected(&ShellOption::Known(Cmd), &ShellChoice::Auto));
+        assert!(is_selected(&ShellOption::Custom, &custom));
+        assert!(!is_selected(&ShellOption::Custom, &ShellChoice::Auto));
+    }
+
+    #[test]
     fn command_prompt_prefers_the_catalogue_then_comspec_then_system32() {
         let found = vec![ShellLaunch {
             kind: Some(ShellKind::Cmd),

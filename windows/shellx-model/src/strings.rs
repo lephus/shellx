@@ -927,7 +927,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 133);
+        assert_eq!(Str::ALL.len(), 139);
     }
 
     #[test]
@@ -1314,6 +1314,60 @@ mod tests {
         assert_eq!(
             t(Lang::En, Str::PasteConfirmKeys),
             "Enter to paste, Esc to cancel"
+        );
+    }
+
+    #[test]
+    fn terminal_settings_strings() {
+        let cases = [
+            (Str::Terminal, "Terminal", "Terminal"),
+            (
+                Str::CustomCommandLine,
+                "Dòng lệnh tùy chỉnh",
+                "Custom command line",
+            ),
+            (
+                Str::CustomShellPlaceholder,
+                "Ví dụ: wsl.exe -d Ubuntu",
+                "For example: wsl.exe -d Ubuntu",
+            ),
+            (
+                Str::AppliesToNewTerminals,
+                "Áp dụng cho các terminal mở sau.",
+                "Applies to terminals you open next.",
+            ),
+            (
+                Str::ShellEnvOverride,
+                "SHELLX_SHELL đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này.",
+                "SHELLX_SHELL is set, so ShellX uses it instead of this choice.",
+            ),
+            (
+                Str::ShellChoiceNotSaved,
+                "Không lưu được lựa chọn shell trên máy này.",
+                "The shell choice couldn't be saved on this PC.",
+            ),
+        ];
+        for (key, vi, en) in cases {
+            assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
+            assert_eq!(t(Lang::En, key), en, "{key:?}");
+        }
+        assert_eq!(
+            shell_auto_label(Lang::Vi, Some("PowerShell 7")),
+            "Tự động (PowerShell 7)"
+        );
+        assert_eq!(shell_auto_label(Lang::Vi, None), "Tự động");
+        assert_eq!(
+            shell_auto_label(Lang::En, Some("Command Prompt")),
+            "Automatic (Command Prompt)"
+        );
+        assert_eq!(shell_auto_label(Lang::En, None), "Automatic");
+        assert_eq!(
+            will_run(Lang::Vi, r"C:\Windows\System32\wsl.exe"),
+            r"Sẽ chạy C:\Windows\System32\wsl.exe."
+        );
+        assert_eq!(
+            will_run(Lang::En, r"C:\Windows\System32\wsl.exe"),
+            r"Runs C:\Windows\System32\wsl.exe."
         );
     }
 
