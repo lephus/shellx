@@ -347,4 +347,14 @@ mod tests {
         assert_eq!(moved_highlight(9, 0, 3), 2);
         assert_eq!(moved_highlight(0, 1, 0), 0);
     }
+
+    /// GPUI-Windows sends no mouse-up when the capture is lost mid-drag (Alt+Tab, the Win
+    /// key, a dialog): a move without the left button ends the drag instead of moving the knob.
+    #[test]
+    fn a_slider_drag_ends_when_the_left_button_is_no_longer_down() {
+        assert_eq!(slider_drag_move(true, true), DragMove::Follow);
+        assert_eq!(slider_drag_move(true, false), DragMove::End);
+        assert_eq!(slider_drag_move(false, true), DragMove::Ignore);
+        assert_eq!(slider_drag_move(false, false), DragMove::Ignore);
+    }
 }
