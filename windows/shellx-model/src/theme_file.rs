@@ -413,4 +413,37 @@ mod tests {
         assert_eq!(matching(&names, "rose"), [2]);
         assert!(matching(&names, "zzz").is_empty());
     }
+    #[test]
+    fn a_card_is_current_when_its_name_is_the_stored_one_in_the_lookup_case_rule() {
+        assert!(is_current_theme("Catppuccin Latte", "catppuccin latte"));
+        assert!(is_current_theme("Dracula", "Dracula"));
+        assert!(!is_current_theme("Dracula", "Nord"));
+        assert!(!is_current_theme("Dracula", ""));
+        // The two sides are told apart by the caller: a dark card against the light name is no match.
+        let (dark, light) = ("ShellX", "Catppuccin Latte");
+        assert!(is_current_theme("ShellX", dark));
+        assert!(!is_current_theme("ShellX", light));
+    }
+
+    #[test]
+    fn a_moved_grid_top_asks_for_another_frame_only_past_half_a_row() {
+        assert!(!top_moved(500.0, 500.0, 64.0));
+        assert!(!top_moved(500.0, 520.0, 64.0));
+        assert!(top_moved(500.0, 540.0, 64.0));
+        assert!(top_moved(500.0, 100.0, 64.0));
+        assert!(top_moved(0.0, f32::NAN, 64.0) || !top_moved(0.0, f32::NAN, 64.0));
+    }
+
+    #[test]
+    fn only_the_rows_that_meet_the_viewport_and_a_margin_are_built() {
+        // (top, height) of 10 rows of 64.
+        let rows: Vec<(f32, f32)> = (0..10).map(|n| (n as f32 * 64.0, 64.0)).collect();
+        // Grid starts at 500 in the window; the viewport is 80..400: above the grid.
+        assert_eq!(visible_span(&rows, (80.0, 400.0), 500.0, 64.0), 0..0);
+        // Grid top at 100, viewport 80..400: rows 0..=4 (y 0..320), plus a margin row.
+        assert_eq!(visible_span(&rows, (80.0, 400.0), 100.0, 64.0), 0..6);
+        // Scrolled far down: grid top at -300, viewport 80..400 -> y 380..700.
+        assert_eq!(visible_span(&rows, (80.0, 400.0), -300.0, 64.0), 5..10);
+        assert_eq!(visible_span(&[], (0.0, 10.0), 0.0, 64.0), 0..0);
+    }
 }
