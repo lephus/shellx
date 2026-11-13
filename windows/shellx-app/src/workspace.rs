@@ -14,6 +14,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -195,8 +196,14 @@ pub fn spawn_reason(error: &anyhow::Error) -> String {
     shellx_model::log_file::failure_reason(&error.root_cause().to_string())
 }
 
-fn start_local(cmd: &ShellCmd, cols: u16, rows: u16, extra_args: &[&str]) -> Result<LocalPane> {
-    let (link, reader) = cmd.spawn(extra_args, cols, rows)?;
+fn start_local(
+    cmd: &ShellCmd,
+    cols: u16,
+    rows: u16,
+    extra_args: &[&str],
+    dir: Option<&Path>,
+) -> Result<LocalPane> {
+    let (link, reader) = cmd.spawn_in(extra_args, cols, rows, dir)?;
     let core = TermCore::new(link.clone(), cols, rows)?;
     Ok(LocalPane { core, link, reader })
 }
@@ -209,9 +216,20 @@ pub fn spawn_local_pane_with(
     rows: u16,
     extra_args: &[&str],
 ) -> Result<StartedPane, StartFailure> {
+    spawn_local_pane_in(plan, cols, rows, extra_args, None)
+}
+
+/// `spawn_local_pane_with`, the shell starting in `dir` (the user's home when `None`).
+pub fn spawn_local_pane_in(
+    plan: &PanePlan,
+    cols: u16,
+    rows: u16,
+    extra_args: &[&str],
+    dir: Option<&Path>,
+) -> Result<StartedPane, StartFailure> {
     let mut attempts: Vec<(String, String, String)> = Vec::new();
     for cmd in std::iter::once(&plan.first).chain(plan.fallback.as_ref()) {
-        match start_local(cmd, cols, rows, extra_args) {
+        match start_local(cmd, cols, rows, extra_args, dir) {
             Ok(pane) => {
                 let fell_back = attempts
                     .first()

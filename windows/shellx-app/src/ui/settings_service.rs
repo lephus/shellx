@@ -22,6 +22,7 @@ use shellx_model::keymap::{Action, Chord, Keymap};
 use shellx_model::settings::{Accent, Key, Settings};
 use shellx_model::theme_file::{ThemeSet, is_dark_mode};
 
+use super::app::{Services, resolve_lang};
 use super::theme::{self, Active};
 use crate::os_info;
 use crate::settings_store::SettingsStore;
@@ -76,6 +77,7 @@ impl SettingsService {
         // A stored user theme name resolves from the first frame.
         service.themes = ThemeSet::new(user_themes::read());
         theme::set_active(service.resolve_theme());
+        cx.global_mut::<Services>().lang = resolve_lang(service.settings.language);
         let service = cx.new(|_| service);
         cx.set_global(SharedSettings(service));
     }
@@ -162,6 +164,7 @@ impl SettingsService {
         self.follow(Key::Bindings);
         self.timers.clear();
         self.apply_theme(cx);
+        self.apply_language(cx);
         for key in Key::ALL {
             self.writes.wait(key.path(), None);
         }
@@ -182,6 +185,9 @@ impl SettingsService {
         self.timers.insert(key, timer);
         if THEME_KEYS.contains(&key) {
             self.apply_theme(cx);
+        }
+        if key == Key::Language {
+            self.apply_language(cx);
         }
         cx.notify();
     }
@@ -205,6 +211,16 @@ impl SettingsService {
             self.system_dark,
             system_accent,
         )
+    }
+
+    /// The language the settings choose is the one every view reads (`Services.lang`) from
+    /// now on, and every window draws again in it, at once.
+    fn apply_language(&self, cx: &mut App) {
+        let lang = resolve_lang(self.settings.language);
+        if cx.global::<Services>().lang != lang {
+            cx.global_mut::<Services>().lang = lang;
+            cx.refresh_windows();
+        }
     }
 
     /// Makes the settings' theme the active one and redraws every window (Settings included);

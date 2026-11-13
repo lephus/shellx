@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, VecDeque};
 
 use crate::keys::Dir;
 use crate::layout::{Axis, Close, Layout, PaneId, Rect, SlotId};
+use crate::settings::Placement;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PaneTarget {
@@ -137,15 +138,22 @@ impl Tabs {
 
     /// Appended after the active tab and made active.
     pub fn new_tab(&mut self, target: PaneTarget) -> (TabId, PaneId) {
+        self.new_tab_at(target, Placement::AfterCurrent)
+    }
+
+    /// A new tab made active: first (`Top`), right after the active tab
+    /// (`AfterCurrent`) or last (`End`).
+    pub fn new_tab_at(&mut self, target: PaneTarget, placement: Placement) -> (TabId, PaneId) {
         let pane = self.alloc_pane();
         let slot = self.alloc_slot();
         let id = TabId(self.next_tab);
         self.next_tab += 1;
         self.targets.insert(pane, target);
-        let at = if self.tabs.is_empty() {
-            0
-        } else {
-            self.active + 1
+        let at = match placement {
+            _ if self.tabs.is_empty() => 0,
+            Placement::Top => 0,
+            Placement::AfterCurrent => self.active + 1,
+            Placement::End => self.tabs.len(),
         };
         self.tabs.insert(
             at,
@@ -256,6 +264,47 @@ impl Tabs {
             }
             Close::NotFound => CloseOutcome::NotFound,
         }
+    }
+
+    /// `split_focused`, with every region of the split's run along `axis`
+    /// made the same size when `equalize`.
+    pub fn split_focused_with(&mut self, axis: Axis, target: PaneTarget, equalize: bool) -> PaneId {
+        let pane = self.alloc_pane();
+        let slot = self.alloc_slot();
+        let tab = &mut self.tabs[self.active];
+        let ok = tab
+            .layout
+            .split_with(tab.focused_slot(), axis, slot, equalize);
+        debug_assert!(ok, "the focused slot is always in its layout");
+        tab.stacks.insert(slot, Stack::one(pane));
+        tab.focused = pane;
+        self.targets.insert(pane, target);
+        pane
+    }
+
+    /// `close_pane`; with `keep_workspace_open` the only terminal of a
+    /// workspace is replaced by a fresh local one in the same workspace
+    /// (`Respawned` with its id) instead of closing the workspace. The last
+    /// workspace is refilled either way.
+    pub fn close_pane_with(&mut self, pane: PaneId, keep_workspace_open: bool) -> CloseOutcome {
+        if keep_workspace_open
+            && let Some(i) = self.tabs.iter().position(|t| t.contains(pane))
+            && self.tabs[i].panes() == [pane]
+        {
+            let fresh = self.alloc_pane();
+            let tab = &mut self.tabs[i];
+            let slot = tab.slot_of(pane).expect("the tab contains the pane");
+            tab.stacks.insert(slot, Stack::one(fresh));
+            tab.focused = fresh;
+            let id = tab.id;
+            self.targets.remove(&pane);
+            self.targets.insert(fresh, PaneTarget::Local);
+            return CloseOutcome::Respawned {
+                tab: id,
+                pane: fresh,
+            };
+        }
+        self.close_pane(pane)
     }
 
     /// Focuses `pane`: activates its tab and selects it in its stack.

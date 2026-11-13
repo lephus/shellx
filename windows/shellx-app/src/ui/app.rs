@@ -11,6 +11,7 @@ use gpui::{
     size,
 };
 use shellx_model::core_api::CoreCall;
+use shellx_model::settings::LanguageChoice;
 use shellx_model::start_guard::StartReason;
 use shellx_model::strings::Lang;
 
@@ -35,6 +36,16 @@ pub struct Services {
 }
 
 impl Global for Services {}
+
+/// The language the settings choose now: `SHELLX_LANG`, else the Language setting, else
+/// the Windows display language.
+pub fn resolve_lang(choice: LanguageChoice) -> Lang {
+    Lang::from_choice(
+        choice,
+        std::env::var("SHELLX_LANG").ok().as_deref(),
+        os_info::ui_language_id(),
+    )
+}
 
 /// The windows' `app_id` (the main window and Settings share it).
 pub const APP_ID: &str = "pro.shellx.desktop";

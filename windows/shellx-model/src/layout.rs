@@ -97,6 +97,71 @@ impl Node {
         }
     }
 
+    /// Whether `slot` is in this node or reachable through splits along `axis` only.
+    fn run_contains(&self, slot: SlotId, axis: Axis) -> bool {
+        match self {
+            Node::Leaf(p) => *p == slot,
+            Node::Split {
+                axis: a,
+                first,
+                second,
+                ..
+            } => *a == axis && (first.run_contains(slot, axis) || second.run_contains(slot, axis)),
+        }
+    }
+
+    /// The regions of this run along `axis`, left to right.
+    fn run_regions(self, axis: Axis, out: &mut Vec<Node>) {
+        match self {
+            Node::Split {
+                axis: a,
+                first,
+                second,
+                ..
+            } if a == axis => {
+                first.run_regions(axis, out);
+                second.run_regions(axis, out);
+            }
+            other => out.push(other),
+        }
+    }
+
+    /// Gives every region of the run along `axis` that holds `slot` the same share.
+    fn equalize(&mut self, slot: SlotId, axis: Axis) {
+        let Node::Split {
+            axis: a,
+            first,
+            second,
+            ..
+        } = self
+        else {
+            return;
+        };
+        if *a != axis || !(first.run_contains(slot, axis) || second.run_contains(slot, axis)) {
+            first.equalize(slot, axis);
+            second.equalize(slot, axis);
+            return;
+        }
+        let mut regions = Vec::new();
+        std::mem::replace(self, Node::Leaf(SlotId(0))).run_regions(axis, &mut regions);
+        *self = Node::even_run(regions, axis);
+    }
+
+    /// `regions` side by side along `axis`, each the same share.
+    fn even_run(mut regions: Vec<Node>, axis: Axis) -> Node {
+        if regions.len() == 1 {
+            return regions.remove(0);
+        }
+        let first = regions.remove(0);
+        let ratio = (1.0 / (regions.len() + 1) as f32).clamp(0.1, 0.9);
+        Node::Split {
+            axis,
+            ratio,
+            first: Box::new(first),
+            second: Box::new(Node::even_run(regions, axis)),
+        }
+    }
+
     /// Removes `slot`; returns the focus target when it was found in a split.
     fn close(&mut self, slot: SlotId) -> Option<SlotId> {
         let Node::Split { first, second, .. } = self else {
@@ -171,6 +236,22 @@ impl Layout {
 
     pub fn split(&mut self, target: SlotId, axis: Axis, new_slot: SlotId) -> bool {
         self.root.split(target, axis, new_slot)
+    }
+
+    /// `split`; with `equalize` every region of the split's run along `axis`
+    /// gets the same size afterwards.
+    pub fn split_with(
+        &mut self,
+        target: SlotId,
+        axis: Axis,
+        new_slot: SlotId,
+        equalize: bool,
+    ) -> bool {
+        let ok = self.root.split(target, axis, new_slot);
+        if ok && equalize {
+            self.root.equalize(new_slot, axis);
+        }
+        ok
     }
 
     pub fn close(&mut self, slot: SlotId) -> Close {

@@ -96,7 +96,10 @@ pub fn catalogue_row(
         return None;
     }
     let lang = cx.global::<Services>().lang;
-    let disabled = !shown.enabled;
+    // `SHELLX_LANG` decides the language while it is set: the Language row can change nothing.
+    let env_decides = key == Key::Language
+        && Lang::env_decides(std::env::var("SHELLX_LANG").ok().as_deref());
+    let disabled = !shown.enabled || env_decides;
     let control: AnyElement = match row.control {
         // Drawn by its section file.
         Control::Custom => return None,
@@ -121,7 +124,9 @@ pub fn catalogue_row(
         Control::Picker(options) => {
             let choice = shown.choice?;
             let picker = picker(row, key, options, choice, lang, view, cx);
+            let labelled = picker_labels(options, lang);
             picker.update(cx, |picker, cx| {
+                picker.set_labels(labelled, cx);
                 picker.set_value(choice, cx);
                 picker.set_disabled(disabled, cx);
             });
@@ -202,7 +207,10 @@ pub fn catalogue_row(
         }
     };
     let title = t(lang, row.title).into();
-    let subtitle = row.subtitle.map(|s| SharedString::from(t(lang, s)));
+    let subtitle = row
+        .subtitle
+        .or(env_decides.then_some(Str::SettingsLanguageEnvOverride))
+        .map(|s| SharedString::from(t(lang, s)));
     let line = view.anchored(row.id, card_row(title, subtitle, control, disabled));
     Some(div().child(line))
 }
@@ -295,17 +303,24 @@ fn picker(
     {
         return picker.clone();
     }
-    let labelled = options
-        .iter()
-        .map(|(label, value)| (t(lang, *label).into(), SharedString::from(*value)))
-        .collect();
-    let picker = cx.new(|cx| Picker::new(labelled, choice, cx));
+    let picker = cx.new(|cx| Picker::new(picker_labels(options, lang), choice, cx));
     let subscription = cx.subscribe(&picker, move |_, _, event: &PickerEvent, cx| {
         let PickerEvent::Picked(value) = event;
         write(key, choice_value(key, value), cx);
     });
     keep(view, row, RowControl::Picker(picker.clone()), subscription);
     picker
+}
+
+/// The picker's (label, value) options in `lang`.
+fn picker_labels(
+    options: &'static [(Str, &'static str)],
+    lang: Lang,
+) -> Vec<(SharedString, SharedString)> {
+    options
+        .iter()
+        .map(|(label, value)| (t(lang, *label).into(), SharedString::from(*value)))
+        .collect()
 }
 
 fn slider(
