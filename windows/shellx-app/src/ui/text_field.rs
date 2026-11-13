@@ -70,6 +70,13 @@ impl TextField {
         }
     }
 
+    /// Makes the field a stop of `Window::focus_next` / `focus_prev` (Settings moves the
+    /// focus with them on Tab).
+    pub fn tab_stop(mut self) -> Self {
+        self.focus_handle = self.focus_handle.tab_stop(true);
+        self
+    }
+
     pub fn text(&self) -> &str {
         self.edit.text()
     }

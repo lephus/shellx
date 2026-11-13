@@ -55,10 +55,6 @@ impl Picker {
         }
     }
 
-    pub fn value(&self) -> &SharedString {
-        &self.value
-    }
-
     /// Shows `value` as chosen; emits nothing.
     pub fn set_value(&mut self, value: impl Into<SharedString>, cx: &mut Context<Self>) {
         let value = value.into();

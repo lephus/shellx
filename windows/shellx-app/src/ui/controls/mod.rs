@@ -15,10 +15,6 @@
 //! the key-up click GPUI also reports for a focused element. A disabled control is drawn at
 //! half opacity, takes no input and is not a tab stop.
 
-// Used from A5 (the Settings view draws its rows with this kit), which removes this line.
-// `unused_imports`: the re-exports below have no user before A5 either.
-#![allow(dead_code, unused_imports)]
-
 mod card;
 mod color_well;
 mod picker;
@@ -46,8 +42,8 @@ const CONTROL_H: Pixels = px(22.0);
 const CONTROL_TEXT: Pixels = px(12.0);
 const DISABLED_OPACITY: f32 = 0.5;
 
-/// The key as `shellx_model::controls` reads it.
-fn key_in(event: &KeyDownEvent) -> KeyIn<'_> {
+/// The key as `shellx_model::controls` reads it (the Settings view reads its own keys so too).
+pub(super) fn key_in(event: &KeyDownEvent) -> KeyIn<'_> {
     let mods = event.keystroke.modifiers;
     KeyIn {
         key: event.keystroke.key.as_str(),

@@ -1,7 +1,8 @@
 //! Custom title bar, laid out like the Mac's: sidebar toggle, the "+"
 //! new-workspace split button (its chevron opens a menu), focus Back /
 //! Forward, then a folder icon and the active workspace's name; on the right
-//! the settings gear and the Windows caption buttons. The Mac's search box
+//! the settings gear and the Windows caption buttons. The Settings window has
+//! a bar of its own: its title and the close button (`settings_caption`). The Mac's search box
 //! and bell are not drawn until they do something (R2 F15, Ruling 22).
 //!
 //! The bar is the window's drag area (the name too); each control occludes
@@ -127,6 +128,39 @@ pub fn render(root: &RootView, lang: Lang, window: &Window, cx: &mut Context<Roo
         .child(right)
         .when(cfg!(windows), |bar| {
             bar.child(caption_buttons(window.is_maximized()))
+        })
+}
+
+/// The Settings window's caption (spec §5.3): its title and the close button only (no
+/// minimize; maximize stays the drag area's double-click). The whole bar is the drag area.
+pub fn settings_caption(title: SharedString) -> Div {
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .flex_none()
+        .w_full()
+        .h(HEIGHT)
+        .bg(theme::panel())
+        .border_b_1()
+        .border_color(theme::line())
+        .window_control_area(WindowControlArea::Drag)
+        .when(cfg!(target_os = "macos"), |bar| {
+            bar.child(div().flex_none().w(px(MAC_TRAFFIC_LIGHTS_W)))
+        })
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .when(!cfg!(target_os = "macos"), |name| name.pl(px(12.0)))
+                .text_size(px(13.0))
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(theme::text_hi())
+                .child(title),
+        )
+        .when(cfg!(windows), |bar| {
+            bar.child(caption(GLYPH_CLOSE, WindowControlArea::Close, true))
         })
 }
 

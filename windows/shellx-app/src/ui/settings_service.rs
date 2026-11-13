@@ -53,7 +53,6 @@ impl SettingsService {
         cx.set_global(SharedSettings(service));
     }
 
-    #[allow(dead_code)] // first called by the Settings view (A5)
     pub fn entity(cx: &App) -> Entity<SettingsService> {
         cx.global::<SharedSettings>().0.clone()
     }
@@ -65,7 +64,6 @@ impl SettingsService {
     /// Applies `value` (clamped; one of the wrong type changes nothing), notifies the
     /// observers, and writes the key 300 ms after its last change. A value equal to the
     /// default removes the key from the file.
-    #[allow(dead_code)] // first called by the Settings view (A5)
     pub fn set(&mut self, key: Key, value: Value, cx: &mut Context<Self>) {
         if self.settings.set_from_value(key, &value) {
             self.changed(key, cx);
@@ -73,7 +71,6 @@ impl SettingsService {
     }
 
     /// The key back to its default, which removes it from the file; written like `set`.
-    #[allow(dead_code)] // first called by the Settings view (A5)
     pub fn reset(&mut self, key: Key, cx: &mut Context<Self>) {
         self.settings.reset(key);
         self.changed(key, cx);
@@ -107,7 +104,6 @@ impl SettingsService {
 }
 
 /// The current settings, for any view: `current(cx).font_size`.
-#[allow(dead_code)] // first read by the Settings view (A5) and the terminal (R1)
 pub fn current(cx: &App) -> &Settings {
     cx.global::<SharedSettings>().0.read(cx).settings()
 }

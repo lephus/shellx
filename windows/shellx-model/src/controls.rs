@@ -79,6 +79,39 @@ pub fn format_value(value: f32, unit: Unit) -> String {
     }
 }
 
+/// What a number field (Scrollback Limit) keeps of the text typed into it: the ASCII digits.
+pub fn digits(text: &str) -> String {
+    text.chars().filter(char::is_ascii_digit).collect()
+}
+
+/// The value a number field commits (Enter, or leaving it): its digits as a whole number,
+/// clamped to the row's range. `None` while it holds no digit; the field then shows the
+/// stored value again.
+pub fn number_entry(text: &str, min: f32, max: f32) -> Option<f32> {
+    let digits = digits(text);
+    if digits.is_empty() {
+        return None;
+    }
+    // f64 reads any number of digits (a huge one is then clamped, not refused).
+    let value: f64 = digits.parse().ok()?;
+    Some((value as f32).max(min).min(max))
+}
+
+/// A number field's text for a stored value.
+pub fn number_text(value: f32) -> String {
+    format!("{}", f64::from(value).round())
+}
+
+/// The unit written after a number field.
+pub fn unit_suffix(unit: Unit) -> &'static str {
+    match unit {
+        Unit::Points => "pt",
+        Unit::Times => "×",
+        Unit::Percent => "%",
+        Unit::Megabytes => "MB",
+    }
+}
+
 /// At most two decimals and no trailing zero, like the Mac's `formattedFontSize`.
 fn points(value: f32) -> String {
     let text = format!("{value:.2}");
@@ -117,6 +150,29 @@ pub fn stepper_key(k: &KeyIn) -> Option<i32> {
 /// colour well.
 pub fn activates(k: &KeyIn) -> bool {
     no_modifier(k) && matches!(k.key, "space" | "enter")
+}
+
+/// A key the Settings view handles itself, once no control or field has used it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ViewKey {
+    /// A plain Esc: the host closes Settings (an open popover has taken its Esc already).
+    Close,
+    /// Tab: the focus moves to the next control.
+    Next,
+    /// Shift+Tab: the focus moves to the previous control.
+    Prev,
+}
+
+pub fn view_key(k: &KeyIn) -> Option<ViewKey> {
+    if k.ctrl || k.alt || k.win {
+        return None;
+    }
+    match (k.key, k.shift) {
+        ("escape", false) => Some(ViewKey::Close),
+        ("tab", false) => Some(ViewKey::Next),
+        ("tab", true) => Some(ViewKey::Prev),
+        _ => None,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

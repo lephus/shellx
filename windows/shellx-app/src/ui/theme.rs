@@ -78,6 +78,11 @@ pub fn primary_line() -> Hsla {
 pub fn primary_text() -> Hsla {
     hsla(palette::PRIMARY_TEXT)
 }
+/// The primary colour as a colour well takes it (a Settings colour row with no colour of its
+/// own, Selection Highlight's "Default", shows it).
+pub fn primary_rgba() -> Rgba {
+    palette::PRIMARY
+}
 pub fn error() -> Hsla {
     hsla(palette::ERROR)
 }

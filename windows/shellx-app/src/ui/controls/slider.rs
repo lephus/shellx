@@ -69,10 +69,6 @@ impl Slider {
         }
     }
 
-    pub fn value(&self) -> f32 {
-        self.value
-    }
-
     /// Shows `value`; emits nothing.
     pub fn set_value(&mut self, value: f32, cx: &mut Context<Self>) {
         if self.value != value {

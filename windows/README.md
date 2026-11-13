@@ -81,9 +81,14 @@ exits non-zero if no window appeared. The first release build takes about 5 minu
 - `SHELLX_DEV_BACKGROUND=1` (Mac development build only) opens the window unfocused and without
   activating the app, so a check run does not steal the keyboard. Start the built binary with a scratch
   `HOME` as well, so it never shares state with another run.
-- `SHELLX_DEV_PREVIEW=paste|settings` (development only) puts a pending 3-line paste in each new pane
-  (`paste`), or opens Settings at start (`settings`), so the multi-line paste bar and the Settings
-  panels can be drawn without a person clicking.
+- `SHELLX_DEV_PREVIEW=paste|settings|settings:<section>` (development only) puts a pending 3-line
+  paste in each new pane (`paste`), or opens Settings at start (`settings`), on a given section with
+  `settings:<section>` (`account`, `app`, `themes`, `terminal`, `workspaceColors`, `sidebar`,
+  `keyboardShortcuts`, `reset`, `updates`, `about`; a section with no working row yet is not
+  shown), so the multi-line paste bar and the Settings sections can be drawn without a person
+  clicking. Settings opens in its own window, which `dev/mac-shot.sh` captures (it is in front).
+- `SHELLX_SETTINGS_HOST=panel` (every build) draws Settings over the main window instead of in a
+  window of its own, as ShellX also does by itself when that window cannot open.
 - `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch|expired` (Mac development build only)
   opens the sign-in dialog on that screen for screenshots, with a made-up address and no network
   call: `start` as this build has it (no Google: a Mac build has no Google client), `google` the

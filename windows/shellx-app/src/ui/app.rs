@@ -16,6 +16,7 @@ use shellx_model::strings::Lang;
 
 use super::assets::Assets;
 use super::root::RootView;
+use super::settings::host::{close_settings_windows, is_settings_window};
 use super::settings_service::SettingsService;
 use crate::core_service::{ConfiguredCore, MachineFacts};
 use crate::crash::{self, CrashTest};
@@ -35,11 +36,14 @@ pub struct Services {
 
 impl Global for Services {}
 
+/// The windows' `app_id` (the main window and Settings share it).
+pub const APP_ID: &str = "pro.shellx.desktop";
+
 /// Development on a Mac only: `SHELLX_DEV_BACKGROUND=1` opens the window without
 /// taking the keyboard or coming to the front. An automated run of the built window
 /// uses it, so the terminal in that window can never catch what a person is typing
 /// in another app. Windows builds ignore the variable.
-fn dev_background() -> bool {
+pub fn dev_background() -> bool {
     cfg!(target_os = "macos")
         && background_requested(std::env::var("SHELLX_DEV_BACKGROUND").ok().as_deref())
 }
@@ -112,7 +116,7 @@ pub fn run() {
                         ..Default::default()
                     }),
                     window_min_size: Some(size(px(720.0), px(420.0))),
-                    app_id: Some("pro.shellx.desktop".into()),
+                    app_id: Some(APP_ID.into()),
                     focus: !background,
                     ..Default::default()
                 },
@@ -134,6 +138,8 @@ pub fn run() {
                 window.on_next_frame(|window, _| {
                     window.on_next_frame(|_, _| startup::first_frame_drawn())
                 });
+                #[cfg(target_os = "macos")]
+                root.dev_settings_preview(window, cx);
             })
             .ok();
         // `--crash-test panic|native` (Ruling 31): a foreground task runs inside GPUI's window
@@ -161,8 +167,11 @@ pub fn run() {
             }
             _ => {}
         }
+        // The last window but Settings closed: Settings closes with it (keeping its frame) and
+        // the app quits.
         cx.on_window_closed(|cx| {
-            if cx.windows().is_empty() {
+            if cx.windows().iter().all(is_settings_window) {
+                close_settings_windows(cx);
                 startup::orderly_quit();
                 cx.quit();
             }

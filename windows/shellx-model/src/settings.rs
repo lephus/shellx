@@ -308,9 +308,12 @@ const APPEARANCES: &[(&str, Appearance)] = &[
     ("dark", Appearance::Dark),
 ];
 
+fn name<T: Copy + PartialEq>(table: &[(&'static str, T)], v: T) -> Option<&'static str> {
+    table.iter().find(|(_, t)| *t == v).map(|(n, _)| *n)
+}
+
 fn name_of<T: Copy + PartialEq>(table: &[(&'static str, T)], v: T) -> Value {
-    let name = table.iter().find(|(_, t)| *t == v).map(|(n, _)| *n);
-    Value::String(name.unwrap_or_default().to_string())
+    Value::String(name(table, v).unwrap_or_default().to_string())
 }
 
 fn from_name<T: Copy>(table: &[(&str, T)], v: &Value) -> Option<T> {
@@ -531,6 +534,117 @@ impl Settings {
         let default = Settings::default().raw(key);
         self.set_from_value(key, &default);
     }
+
+    // Typed access for the Settings rows (`shellx-app/src/ui/settings/rows.rs`): a row reads
+    // the value it shows with one of these and writes it back with the matching `*_value`
+    // function, so no control spells a key's JSON itself (Keep Workspace Open is stored
+    // inverted, Middle-Click Paste as a word, the scrollback in bytes).
+
+    /// Whether a switch row shows on. `None` for a key that is not a switch.
+    pub fn flag(&self, key: Key) -> Option<bool> {
+        // Read through the stored form, so the key-to-field table is `flag_field` alone.
+        let on = flag_value(key, true)?;
+        Some(self.raw(key) == on)
+    }
+
+    /// The number a slider, stepper or number row shows: megabytes for the scrollback. `None`
+    /// for a key that is not a number.
+    pub fn number(&self, key: Key) -> Option<f32> {
+        Some(match key {
+            Key::TabBarFontSize => self.tab_bar_font_size,
+            Key::ScrollSpeed => self.scroll_speed,
+            Key::FontSize => self.font_size,
+            Key::PaddingX => self.padding_x as f32,
+            Key::PaddingY => self.padding_y as f32,
+            Key::ScrollbackMb => self.scrollback_mb as f32,
+            Key::UnselectedFillOpacity => self.unselected_fill_opacity,
+            Key::SidebarFontSize => self.sidebar_font_size,
+            _ => return None,
+        })
+    }
+
+    /// The option a segmented or picker row shows, spelled as its JSON value (the catalogue's
+    /// option values). `None` for a key without options.
+    pub fn choice(&self, key: Key) -> Option<&'static str> {
+        match key {
+            Key::Language => name(LANGUAGES, self.language),
+            Key::Appearance => name(APPEARANCES, self.appearance),
+            Key::NewWorkspacePlacement => name(PLACEMENTS, self.new_workspace_placement),
+            Key::CursorStyle => name(CURSORS, self.cursor_style),
+            Key::IndicatorStyle => name(INDICATORS, self.indicator_style),
+            Key::SidebarBackground => name(SIDEBAR_BACKGROUNDS, self.sidebar_background),
+            _ => None,
+        }
+    }
+
+    /// The colour a colour row shows; `None` when none is set (Selection Highlight's
+    /// "Default") or the key is not a colour.
+    pub fn colour(&self, key: Key) -> Option<Rgba> {
+        match key {
+            Key::SelectionColor => self.selection_color,
+            Key::SidebarColor => Some(self.sidebar_color),
+            _ => None,
+        }
+    }
+
+    /// The field behind a switch row's key.
+    fn flag_field(&mut self, key: Key) -> Option<&mut bool> {
+        Some(match key {
+            Key::InheritWorkingDirectory => &mut self.inherit_working_directory,
+            Key::KeepWorkspaceOpen => &mut self.keep_workspace_open,
+            Key::FocusHistoryIncludesPanes => &mut self.focus_history_includes_panes,
+            Key::EqualizeSplits => &mut self.equalize_splits,
+            Key::HideTabCloseButton => &mut self.hide_tab_close_button,
+            Key::CopyOnSelect => &mut self.copy_on_select,
+            Key::ConfirmUnsafePaste => &mut self.confirm_unsafe_paste,
+            Key::MiddleClickPaste => &mut self.middle_click_paste,
+            Key::SubtleSelection => &mut self.subtle_selection,
+            Key::BrightenInDark => &mut self.brighten_in_dark,
+            Key::HideSidebarDetails => &mut self.hide_sidebar_details,
+            Key::WrapWorkspaceTitles => &mut self.wrap_workspace_titles,
+            Key::TruncatePathFromStart => &mut self.truncate_path_from_start,
+            Key::ShowBranchDirectory => &mut self.show_branch_directory,
+            _ => return None,
+        })
+    }
+}
+
+/// The JSON `SettingsService::set` takes for a switch row turned on or off.
+pub fn flag_value(key: Key, on: bool) -> Option<Value> {
+    let mut s = Settings::default();
+    *s.flag_field(key)? = on;
+    Some(s.raw(key))
+}
+
+/// The JSON for a number row set to `shown` (megabytes for the scrollback, written in bytes).
+/// `None` for a key that is not a number, or a value that is not finite.
+pub fn number_value(key: Key, shown: f32) -> Option<Value> {
+    Settings::default().number(key)?;
+    if !shown.is_finite() {
+        return None;
+    }
+    Some(match key {
+        Key::ScrollbackMb => {
+            let mb = f64::from(shown).max(0.0).round() as u64;
+            Value::from(mb.saturating_mul(BYTES_PER_MB))
+        }
+        _ => num(shown),
+    })
+}
+
+/// The JSON for picking `choice` in a segmented or picker row; `None` when the key has no such
+/// option.
+pub fn choice_value(key: Key, choice: &str) -> Option<Value> {
+    Settings::default().choice(key)?;
+    let value = Value::String(choice.to_string());
+    Settings::default()
+        .set_from_value(key, &value)
+        .then_some(value)
+}
+
+/// The JSON for a colour row set to `colour`.
+pub fn colour_value(key: Key, colour: Rgba) -> Option<Value> {
+    matches!(key, Key::SelectionColor | Key::SidebarColor).then(|| hex_value(colour))
 }
 
 pub fn get<'a>(root: &'a Map<String, Value>, path: &str) -> Option<&'a Value> {

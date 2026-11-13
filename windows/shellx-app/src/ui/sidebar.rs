@@ -29,6 +29,7 @@ use shellx_model::core_api::GooglePurpose;
 use shellx_model::palette::{
     PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
 };
+use shellx_model::settings_catalog::Section;
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
 use shellx_model::strings::{Lang, Str, pairing_code_display, t};
 use shellx_model::tabs::TabId;
@@ -684,7 +685,7 @@ fn help_menu(
                 let root = root.clone();
                 // Opens Settings, never closes it (Ctrl+, toggles).
                 move |window, cx| {
-                    root.update(cx, |this, cx| this.show_settings(window, cx))
+                    root.update(cx, |this, cx| this.show_settings(None, window, cx))
                         .ok();
                 }
             }),
@@ -699,8 +700,10 @@ fn help_menu(
                 // shows in Settings -> Updates, so that opens too.
                 move |window, cx| {
                     account.update(cx, |account, cx| account.check_update(cx));
-                    root.update(cx, |this, cx| this.show_settings(window, cx))
-                        .ok();
+                    root.update(cx, |this, cx| {
+                        this.show_settings(Some(Section::Updates), window, cx)
+                    })
+                    .ok();
                 }
             }),
         },

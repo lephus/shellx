@@ -60,10 +60,6 @@ impl ColorWell {
         }
     }
 
-    pub fn value(&self) -> Rgba {
-        self.value
-    }
-
     /// Shows `value`; emits nothing.
     pub fn set_value(&mut self, value: Rgba, cx: &mut Context<Self>) {
         if self.value != value {
@@ -78,10 +74,6 @@ impl ColorWell {
             self.open = false;
             cx.notify();
         }
-    }
-
-    pub fn is_open(&self) -> bool {
-        self.open
     }
 
     fn open_popover(&mut self, window: &mut Window, cx: &mut Context<Self>) {

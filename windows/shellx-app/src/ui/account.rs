@@ -336,7 +336,7 @@ impl AccountService {
         self.apply(AccountEvent::RemoveSignInMethodRequested(identity_id), cx);
     }
 
-    /// Sign out (the settings panel's button).
+    /// Sign out (Settings › Account's button).
     pub fn logout(&mut self, cx: &mut Context<Self>) {
         self.apply(AccountEvent::LogoutRequested, cx);
     }

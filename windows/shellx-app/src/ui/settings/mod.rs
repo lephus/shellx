@@ -1,837 +1,464 @@
-//! Settings / About panel (spec §7.1): a 360 px right panel over the main
-//! area, opened by the title bar gear or Ctrl+, and closed by Esc or its
-//! close button. Sections: Tài khoản (where sign-in lives: "Đăng nhập…" asks
-//! RootView for the sign-in dialog), Terminal (the shell new tabs start, or a
-//! command line), Hiển thị (the display mode, and "Thử lại chế độ hiển thị
-//! thường"), Cập nhật, Ngôn ngữ (read-only) and Giới thiệu (with the test label
-//! and the CC BY 4.0 icon credit).
+//! The Settings view (spec §5.3, inventory §D): a column 210 wide with the search field on top
+//! and the grouped sections below it, and a pane showing one section at a time as cards
+//! (padding 20, 14 between cards). It does not know where it is drawn: `host.rs` puts it in a
+//! window of its own, or over the main window as a panel.
+//!
+//! A section is listed only when one of its catalogue rows is wired, and a group only when one
+//! of its sections is listed. A section with a file in `sections/` is drawn by that file's
+//! `render(view, cx) -> Div`, dispatched in `section_content`; any other is its title and one
+//! card of its catalogue rows (`rows::section_card`). The search field filters nothing yet
+//! (search comes with F1). The section shown is kept in `ui-state.json`; the first one ever is
+//! Account.
+//!
+//! Keys (`shellx_model::controls::view_key`): a plain Esc that no control used (an open picker
+//! or colour well takes it first) asks the host to close; Tab and Shift+Tab move the focus, as
+//! GPUI binds no Tab. Nothing else is stopped: on Windows a stopped key-down yields no WM_CHAR,
+//! so a letter or digit always reaches the field that has the keyboard.
+
+pub mod host;
+mod rows;
+mod sections {
+    pub(super) mod about;
+    pub(super) mod account;
+    pub(super) mod terminal_cards;
+    pub(super) mod updates;
+}
+
+use std::collections::HashMap;
 
 use gpui::{
-    ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, FontWeight,
-    IntoElement, KeyDownEvent, Render, SharedString, Stateful, Subscription, Window, div,
-    prelude::*, px, svg,
+    AnyWindowHandle, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable,
+    FontWeight, IntoElement, KeyDownEvent, Render, ScrollAnchor, ScrollHandle, SharedString,
+    Stateful, Subscription, Window, div, point, prelude::*, px, relative, svg,
 };
-use shellx_model::account::AccountState;
-use shellx_model::account::DELETE_ACCOUNT_URL;
-use shellx_model::palette;
-use shellx_model::shell::{CustomShellError, ShellChoice, ShellKind, custom_launch, kind_label};
-use shellx_model::strings::{
-    Lang, Str, added_from, custom_shell_error, shell_auto_label, sign_in_method_label, t,
-    update_available, will_run,
+use shellx_model::controls::{ViewKey, view_key};
+use shellx_model::core_api::GooglePurpose;
+use shellx_model::settings_catalog::{
+    Group, Row, Section, group_title, groups, row, rows, section_title,
 };
-use shellx_model::update::{UpdateStatus, download_url};
+use shellx_model::strings::{Lang, Str, t};
 
-use crate::{build_info, startup};
+pub use host::SettingsHost;
 
+use self::rows::RowEntry;
+use self::sections::terminal_cards::TerminalCards;
 use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
-use super::button::{Kind, button};
+use super::controls::key_in;
+use super::settings_service::{SettingsService, current};
 use super::text_field::{TextField, TextFieldEvent};
 use super::theme;
-use super::update_banner::open_https;
-use crate::local_pty::settings::{
-    ShellOption, is_program_file, is_selected, shell_options, shells, shown_choice,
-};
+use crate::ui_state;
 
-pub const WIDTH: f32 = 360.0;
-pub const SOURCE_URL: &str = "https://github.com/lephus/shellx";
+/// The left column (inventory §D: `navigationSplitViewColumnWidth(210)`).
+const SIDEBAR_W: f32 = 210.0;
+/// The detail pane's padding and the space between its cards.
+const PANE_PADDING: f32 = 20.0;
+const CARD_SPACING: f32 = 14.0;
+/// A section row of the left column: its icon slot, and the gap to its title.
+const ICON_SLOT: f32 = 16.0;
+const ICON_GAP: f32 = 10.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SettingsEvent {
-    /// Esc / close button: RootView gives the keyboard back to the terminal.
-    Closed,
-    /// "Đăng nhập…" (signed out): RootView opens the sign-in dialog.
-    SignInRequested,
-    /// "Chuyển…" (signed in with a password): RootView opens the dialog that switches to Google.
-    SwitchToGoogleRequested,
+pub enum SettingsViewEvent {
+    /// Esc, or the panel's close button: the host closes Settings.
+    Close,
+    /// "Đăng nhập…" or "Chuyển…" in Account: the main window comes to the front and opens the
+    /// sign-in dialog there.
+    OpenSignIn(GooglePurpose),
+    /// "Check for updates" in Updates: the main window runs the check.
+    CheckForUpdates,
 }
 
-pub struct SettingsPanel {
+pub struct SettingsView {
     account: Entity<AccountService>,
     focus: FocusHandle,
-    open: bool,
-    /// Settings › Terminal's custom command line.
-    shell_field: Entity<TextField>,
-    /// The custom row was clicked and no line of it is stored yet.
-    custom_open: bool,
-    /// The line last sent to the check, its number, and the answer for it
-    /// (the program it runs, or what is wrong); `None` while it runs.
-    shell_line: String,
-    shell_seq: u64,
-    shell_check: Option<Result<String, CustomShellError>>,
-    /// Lines to the checking thread (started at the first check).
-    shell_checker: Option<async_channel::Sender<(u64, String)>>,
-    /// A shell lookup started by `open` has not ended.
-    refreshing: bool,
-    /// The last choice could not be saved.
-    shell_not_saved: bool,
-    /// "Try standard display mode again" was stored for the next start.
-    standard_requested: bool,
+    section: Section,
+    search: Entity<TextField>,
+    sidebar_scroll: ScrollHandle,
+    detail_scroll: ScrollHandle,
+    /// The window Settings was last opened in: a field's Tab moves the focus there.
+    window: Option<AnyWindowHandle>,
+    /// The kit controls of the catalogue rows, made the first time their row is drawn.
+    controls: HashMap<&'static str, RowEntry>,
+    /// The rows drawn in the last frame, by id, so `show_row` can scroll to one.
+    anchors: HashMap<&'static str, ScrollAnchor>,
+    /// The row `show_row` asked for, scrolled to once it has been drawn.
+    pending_row: Option<&'static str>,
+    /// The Shell and Display cards of Settings › Terminal.
+    terminal: TerminalCards,
     _subscriptions: Vec<Subscription>,
 }
 
-impl EventEmitter<SettingsEvent> for SettingsPanel {}
+impl EventEmitter<SettingsViewEvent> for SettingsView {}
 
-impl Focusable for SettingsPanel {
+impl Focusable for SettingsView {
     fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
     }
 }
 
-impl SettingsPanel {
+impl SettingsView {
     pub fn new(account: Entity<AccountService>, cx: &mut Context<Self>) -> Self {
-        cx.observe(&account, |_, _, cx| cx.notify()).detach();
         let lang = cx.global::<Services>().lang;
-        let shell_field =
-            cx.new(|cx| TextField::new(false, t(lang, Str::CustomShellPlaceholder), cx));
-        let subscriptions = vec![
-            cx.observe(&shell_field, |this, _, cx| {
-                this.shell_line_changed(false, cx)
-            }),
-            cx.subscribe(&shell_field, |this, _, event: &TextFieldEvent, cx| {
-                if *event == TextFieldEvent::Cancel {
-                    this.close(cx);
-                }
-            }),
-        ];
-        let panel = SettingsPanel {
+        let search =
+            cx.new(|cx| TextField::new(false, t(lang, Str::SettingsSearch), cx).tab_stop());
+        let (terminal, mut subscriptions) = TerminalCards::new(cx);
+        subscriptions.extend([
+            cx.observe(&account, |_, _, cx| cx.notify()),
+            // A setting changed here or in the other window: the rows show it.
+            cx.observe(&SettingsService::entity(cx), |_, _, cx| cx.notify()),
+            cx.subscribe(&search, |this, _, event, cx| this.field_event(*event, cx)),
+        ]);
+        let listed = listed_sections();
+        let first = listed
+            .first()
+            .and_then(|(_, sections)| sections.first().copied())
+            .unwrap_or(Section::Account);
+        let section = ui_state::load()
+            .settings_section
+            .as_deref()
+            .and_then(Section::from_id)
+            .filter(|section| is_listed(&listed, *section))
+            .unwrap_or(first);
+        SettingsView {
             account,
             focus: cx.focus_handle(),
-            open: false,
-            shell_field,
-            custom_open: false,
-            shell_line: String::new(),
-            shell_seq: 0,
-            shell_check: None,
-            shell_checker: None,
-            refreshing: false,
-            shell_not_saved: false,
-            standard_requested: false,
+            section,
+            search,
+            sidebar_scroll: ScrollHandle::new(),
+            detail_scroll: ScrollHandle::new(),
+            window: None,
+            controls: HashMap::new(),
+            anchors: HashMap::new(),
+            pending_row: None,
+            terminal,
             _subscriptions: subscriptions,
+        }
+    }
+
+    /// Shows `section` from its top and keeps it for the next start. A section that is not
+    /// listed (no wired row) is not shown.
+    pub fn show_section(&mut self, section: Section, cx: &mut Context<Self>) {
+        if !is_listed(&listed_sections(), section) {
+            return;
+        }
+        if self.section != section {
+            self.section = section;
+            let mut state = ui_state::load();
+            state.settings_section = Some(section.id().to_string());
+            ui_state::save(&state);
+        }
+        self.pending_row = None;
+        self.detail_scroll.set_offset(point(px(0.0), px(0.0)));
+        cx.notify();
+    }
+
+    /// Shows the row's section and scrolls the row into view (F1 adds the highlight). A row
+    /// its settings hide shows its section from the top.
+    #[allow(dead_code)] // first called by search (F1)
+    pub fn show_row(&mut self, row_id: &'static str, cx: &mut Context<Self>) {
+        let Some(row) = row(row_id).filter(|row| row.wired) else {
+            return;
         };
-        // Development only (Ruling 24): Settings is open at start.
-        #[cfg(target_os = "macos")]
-        let panel = {
-            let mut panel = panel;
-            if std::env::var("SHELLX_DEV_PREVIEW").as_deref() == Ok("settings") {
-                panel.open = true;
-                panel.fill_stored_line(cx);
-                panel.refresh_shells(cx);
-            }
-            panel
-        };
-        panel
-    }
-
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.open = true;
-        window.focus(&self.focus);
-        if matches!(self.account.read(cx).state(), AccountState::LoggedIn { .. }) {
-            self.account
-                .update(cx, |a, cx| a.refresh_sign_in_methods(cx));
+        self.show_section(row.section, cx);
+        if self.section == row.section && (row.visible)(current(cx)) {
+            self.pending_row = Some(row.id);
         }
-        self.fill_stored_line(cx);
-        self.refresh_shells(cx);
+    }
+
+    /// The host opened Settings in `window`: the sections that read something when Settings
+    /// opens read it again.
+    fn opened(&mut self, window: AnyWindowHandle, cx: &mut Context<Self>) {
+        self.window = Some(window);
+        sections::account::opened(self, cx);
+        sections::terminal_cards::opened(self, cx);
         cx.notify();
     }
 
-    /// The custom row starts from what is stored.
-    fn fill_stored_line(&mut self, cx: &mut Context<Self>) {
-        self.custom_open = false;
-        self.shell_not_saved = false;
-        if let ShellChoice::Custom { command_line } = shells().choice() {
-            self.shell_field
-                .update(cx, |field, cx| field.set_text(&command_line, cx));
+    /// The panel's close button: the host closes Settings.
+    fn request_close(&mut self, cx: &mut Context<Self>) {
+        cx.emit(SettingsViewEvent::Close);
+    }
+
+    /// Esc, Tab or Shift+Tab in one of the view's text fields (the field stops them).
+    fn field_event(&mut self, event: TextFieldEvent, cx: &mut Context<Self>) {
+        match event {
+            TextFieldEvent::Cancel => cx.emit(SettingsViewEvent::Close),
+            TextFieldEvent::Next => self.move_focus(false, cx),
+            TextFieldEvent::Prev => self.move_focus(true, cx),
+            TextFieldEvent::Submit => {}
         }
     }
 
-    /// Looks the shells up again on a thread of its own (a slow PATH can take
-    /// minutes), then redraws from `shells().snapshot()`.
-    fn refresh_shells(&mut self, cx: &mut Context<Self>) {
-        if self.refreshing {
-            return;
-        }
-        let (done, ended) = async_channel::bounded::<()>(1);
-        let started = std::thread::Builder::new()
-            .name("shell-refresh".into())
-            .spawn(move || {
-                shells().refresh_now();
-                let _ = done.send_blocking(());
-            });
-        if started.is_err() {
-            return;
-        }
-        self.refreshing = true;
-        cx.spawn(async move |this, cx| {
-            let _ = ended.recv().await;
-            let _ = this.update(cx, |this, cx| {
-                this.refreshing = false;
-                cx.notify();
-            });
-        })
-        .detach();
-    }
-
-    /// A row of Settings › Terminal was clicked. Every row but the custom one
-    /// is stored at once; the custom one waits for a line that names a program.
-    fn choose(&mut self, option: ShellOption, window: &mut Window, cx: &mut Context<Self>) {
-        match option {
-            ShellOption::Auto { .. } => {
-                self.custom_open = false;
-                self.store_choice(ShellChoice::Auto);
-            }
-            ShellOption::Known(shell) => {
-                self.custom_open = false;
-                self.store_choice(ShellChoice::Known { shell });
-            }
-            ShellOption::Custom => {
-                self.custom_open = true;
-                window.focus(&self.shell_field.focus_handle(cx));
-                self.shell_line_changed(true, cx);
-            }
-        }
-        cx.notify();
-    }
-
-    fn store_choice(&mut self, choice: ShellChoice) {
-        self.shell_not_saved = shells().set_choice(choice).is_err();
-    }
-
-    /// The field's text changed (or `again`: check it anyway). Each line is
-    /// checked off the UI thread; on the Mac nothing is checked (Ruling 19).
-    fn shell_line_changed(&mut self, again: bool, cx: &mut Context<Self>) {
-        let field = self.shell_field.read(cx);
-        if field.composing() {
-            return;
-        }
-        let text = field.text().to_string();
-        if text == self.shell_line && !again {
-            return;
-        }
-        self.shell_line = text.clone();
-        self.shell_check = None;
-        self.shell_seq += 1;
-        cx.notify();
-        if cfg!(windows) {
-            self.check_shell_line(self.shell_seq, text, cx);
-        }
-    }
-
-    /// Sends a line to the checking thread, which answers only the newest of
-    /// the lines waiting for it: typing on a PC with a slow PATH never piles
-    /// up checks.
-    fn check_shell_line(&mut self, seq: u64, line: String, cx: &mut Context<Self>) {
-        if self.shell_checker.is_none() {
-            let (requests, waiting) = async_channel::unbounded::<(u64, String)>();
-            let (answers, answered) = async_channel::unbounded();
-            let probe = shells().probe();
-            let started = std::thread::Builder::new()
-                .name("shell-line-check".into())
-                .spawn(move || {
-                    while let Ok(mut request) = waiting.recv_blocking() {
-                        while let Ok(newer) = waiting.try_recv() {
-                            request = newer;
-                        }
-                        let (seq, line) = request;
-                        let answer =
-                            custom_launch(&line, &probe, &is_program_file).map(|l| l.program);
-                        if answers.send_blocking((seq, line, answer)).is_err() {
-                            return;
-                        }
-                    }
-                });
-            if started.is_err() {
-                return;
-            }
-            cx.spawn(async move |this, cx| {
-                while let Ok((seq, line, answer)) = answered.recv().await {
-                    let updated = this.update(cx, |this, cx| {
-                        this.shell_line_checked(seq, line, answer, cx);
-                    });
-                    if updated.is_err() {
-                        return;
-                    }
-                }
-            })
-            .detach();
-            self.shell_checker = Some(requests);
-        }
-        if let Some(requests) = &self.shell_checker {
-            let _ = requests.try_send((seq, line));
-        }
-    }
-
-    /// A line that names a program is stored as the choice; any other keeps
-    /// the stored choice and says what is wrong.
-    fn shell_line_checked(
-        &mut self,
-        seq: u64,
-        line: String,
-        answer: Result<String, CustomShellError>,
-        cx: &mut Context<Self>,
-    ) {
-        if seq != self.shell_seq {
-            return;
-        }
-        let stores = answer.is_ok() && (self.custom_open || self.stored_custom());
-        self.shell_check = Some(answer);
-        if stores {
-            let choice = ShellChoice::Custom { command_line: line };
-            if shells().choice() != choice {
-                self.store_choice(choice);
-            }
-            self.custom_open = false;
-        }
-        cx.notify();
-    }
-
-    fn stored_custom(&self) -> bool {
-        matches!(shells().choice(), ShellChoice::Custom { .. })
-    }
-
-    pub fn close(&mut self, cx: &mut Context<Self>) {
-        if self.open {
-            self.open = false;
-            cx.emit(SettingsEvent::Closed);
-            cx.notify();
-        }
-    }
-
-    fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if event.keystroke.key == "escape" {
-            cx.stop_propagation();
-            self.close(cx);
-        }
-    }
-
-    fn section(title: &str) -> Div {
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(8.0))
-            .px(px(16.0))
-            .py(px(14.0))
-            .border_b_1()
-            .border_color(theme::border())
-            .child(
-                div()
-                    .text_size(theme::PILL_SIZE)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme::muted())
-                    .child(title.to_uppercase()),
-            )
-    }
-
-    fn muted(text: impl Into<SharedString>) -> Div {
-        div()
-            .text_size(theme::SMALL_SIZE)
-            .text_color(theme::muted())
-            .child(text.into())
-    }
-
-    fn account_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
-        let account = self.account.read(cx);
-        // Everything below comes from the view (Ruling 33): no code and no text from the core is drawn.
-        let view = account.view(lang);
-        let signed_in = matches!(account.state(), AccountState::LoggedIn { .. });
-        let who = if signed_in {
-            account
-                .email()
-                .map_or_else(|| t(lang, Str::SignedIn).to_string(), str::to_string)
-        } else {
-            t(lang, Str::NotLoggedIn).to_string()
-        };
-        Self::section(t(lang, Str::Account))
-            .child(div().text_color(theme::text_hi()).truncate().child(who))
-            .when(!signed_in, |s| {
-                s.child(Self::muted(t(lang, Str::SignInSubtitle)))
-            })
-            .when(view.google_switch, |s| {
-                s.child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(px(4.0))
-                        .child(
-                            div()
-                                .text_color(theme::text_hi())
-                                .child(t(lang, Str::SwitchToGoogle)),
-                        )
-                        .child(Self::muted(t(lang, Str::SwitchToGoogleIntro)))
-                        .child(
-                            div().flex().child(
-                                button(
-                                    "settings-switch-google",
-                                    t(lang, Str::SwitchEllipsis),
-                                    Kind::Primary,
-                                    false,
-                                )
-                                .on_click(cx.listener(
-                                    |_, _: &ClickEvent, _, cx| {
-                                        cx.emit(SettingsEvent::SwitchToGoogleRequested);
-                                    },
-                                )),
-                            ),
-                        ),
-                )
-            })
-            .when(signed_in, |s| s.child(self.methods_block(lang, cx)))
-            // A failed sign-out or methods list, else why the account is not working (offline at
-            // start, a state-folder problem): the sidebar does not show these.
-            .children(view.error.map(|m| {
-                div()
-                    .text_size(theme::SMALL_SIZE)
-                    .text_color(theme::hsla(palette::ERROR))
-                    .child(m)
-            }))
-            .when(view.session_expired, |s| {
-                s.child(Self::muted(t(lang, Str::SessionExpired)))
-            })
-            .when_some(view.sign_in, |s, label| {
-                s.child(div().flex().child(
-                    button("settings-sign-in", t(lang, label), Kind::Primary, false).on_click(
-                        cx.listener(|_, _: &ClickEvent, _, cx| {
-                            cx.emit(SettingsEvent::SignInRequested);
-                        }),
-                    ),
-                ))
-            })
-            .when(view.sign_out, |s| {
-                s.child(
-                    div().flex().child(
-                        button(
-                            "settings-logout",
-                            t(lang, Str::Logout),
-                            Kind::Secondary,
-                            false,
-                        )
-                        .on_click(cx.listener(
-                            |this, _: &ClickEvent, _, cx| {
-                                this.account.update(cx, |a, cx| a.logout(cx));
-                            },
-                        )),
-                    ),
-                )
-            })
-    }
-
-    /// "Sign-in methods": one row per identity; an Apple ID can be removed; the link to delete the account.
-    fn methods_block(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
-        let account = self.account.read(cx);
-        let removing = account.removing_sign_in_method().map(str::to_string);
-        let rows: Vec<Div> = account
-            .sign_in_methods()
-            .unwrap_or_default()
-            .iter()
-            .map(|m| {
-                let hidden = m.email.is_empty() || m.is_private_email;
-                let who = if m.is_apple() {
-                    if hidden {
-                        t(lang, Str::HiddenEmail).to_string()
+    /// Tab (or Shift+Tab, `back`) from a field: the field's own window moves the focus.
+    fn move_focus(&self, back: bool, cx: &mut Context<Self>) {
+        if let Some(window) = self.window {
+            window
+                .update(cx, |_, window, _| {
+                    if back {
+                        window.focus_prev()
                     } else {
-                        m.email.clone()
+                        window.focus_next()
                     }
-                } else {
-                    m.email.clone()
-                };
-                let kind = sign_in_method_label(&m.provider);
-                let id = m.identity_id.clone();
-                let busy = removing.as_deref() == Some(m.identity_id.as_str());
+                })
+                .ok();
+        }
+    }
+
+    fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(action) = view_key(&key_in(event)) else {
+            return;
+        };
+        cx.stop_propagation();
+        match action {
+            ViewKey::Close => cx.emit(SettingsViewEvent::Close),
+            ViewKey::Next => window.focus_next(),
+            ViewKey::Prev => window.focus_prev(),
+        }
+    }
+
+    /// `element` (a row, or a section file's card) as the place of the catalogue row `id`, so
+    /// `show_row` can scroll to it.
+    fn anchored(&mut self, id: &'static str, element: Div) -> Stateful<Div> {
+        let anchor = self
+            .anchors
+            .entry(id)
+            .or_insert_with(|| ScrollAnchor::for_handle(self.detail_scroll.clone()))
+            .clone();
+        element.id(id).anchor_scroll(Some(anchor))
+    }
+
+    /// The section shown, drawn by its file, else as one card of its rows.
+    fn section_content(&mut self, cx: &mut Context<Self>) -> Div {
+        match self.section {
+            Section::Account => sections::account::render(self, cx),
+            Section::Terminal => sections::terminal_cards::render(self, cx),
+            Section::Updates => sections::updates::render(self, cx),
+            Section::About => sections::about::render(self, cx),
+            section => rows::section_card(section, self, cx),
+        }
+    }
+
+    fn sidebar(&self, listed: &[(Group, Vec<Section>)], lang: Lang, cx: &mut Context<Self>) -> Div {
+        let mut list = div()
+            .id("settings-sections")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .track_scroll(&self.sidebar_scroll)
+            .px(px(8.0))
+            .pb(px(10.0));
+        for (group, sections) in listed {
+            list = list.child(
                 div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(8.0))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .min_w_0()
-                            .child(div().text_color(theme::text()).child(t(lang, kind)))
-                            .child(Self::muted(who))
-                            .children(
-                                m.linked_via_device_name
-                                    .as_deref()
-                                    .filter(|_| m.is_apple())
-                                    .map(|d| Self::muted(added_from(lang, d))),
-                            ),
-                    )
-                    .when(m.is_apple(), |row| {
-                        row.child(
-                            button(
-                                SharedString::from(format!("settings-remove-{id}")),
-                                t(lang, Str::RemoveMethod),
-                                Kind::Secondary,
-                                busy,
-                            )
-                            .when(!busy, |b| {
-                                let id = id.clone();
-                                b.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                    this.account.update(cx, |a, cx| {
-                                        a.remove_sign_in_method(id.clone(), cx)
-                                    });
-                                }))
-                            }),
-                        )
-                    })
-            })
-            .collect();
+                    .px(px(8.0))
+                    .pt(px(10.0))
+                    .pb(px(4.0))
+                    .text_size(theme::SMALL_SIZE)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme::muted())
+                    .child(t(lang, group_title(*group))),
+            );
+            for section in sections {
+                list = list.child(self.section_row(*section, lang, cx));
+            }
+        }
         div()
             .flex()
             .flex_col()
-            .gap(px(6.0))
-            .pt(px(6.0))
-            .child(
-                div()
-                    .text_size(theme::PILL_SIZE)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme::muted())
-                    .child(t(lang, Str::SignInMethods).to_uppercase()),
-            )
-            .children(rows)
-            .child(
-                div().flex().child(
-                    button(
-                        "settings-delete-account",
-                        t(lang, Str::DeleteAccount),
-                        Kind::Secondary,
-                        false,
-                    )
-                    .on_click(|_, _, cx| open_https(cx, DELETE_ACCOUNT_URL)),
-                ),
-            )
-    }
-
-    /// Settings › Terminal (spec §4.4): one row per shell found, Automatic
-    /// first and the custom line last; the chosen one is checked. It applies
-    /// to terminals opened next.
-    fn terminal_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
-        let snapshot = shells().snapshot();
-        let shown = shown_choice(&snapshot.choice, &snapshot.found, snapshot.plan.is_some());
-        let custom_selected = self.custom_open || self.stored_custom();
-        let rows: Vec<Stateful<Div>> = shell_options(&snapshot.found)
-            .into_iter()
-            .map(|option| {
-                let selected = match option {
-                    ShellOption::Custom => custom_selected,
-                    _ => !self.custom_open && is_selected(&option, &shown),
-                };
-                let (id, label) = match &option {
-                    ShellOption::Auto { resolves_to } => (
-                        "settings-shell-auto".to_string(),
-                        shell_auto_label(lang, resolves_to.as_deref()),
-                    ),
-                    ShellOption::Known(kind) => (
-                        format!("settings-shell-{}", kind_id(*kind)),
-                        kind_label(*kind).to_string(),
-                    ),
-                    ShellOption::Custom => (
-                        "settings-shell-custom".to_string(),
-                        t(lang, Str::CustomCommandLine).to_string(),
-                    ),
-                };
-                shell_row(id, label, selected).on_click(cx.listener(
-                    move |this, _: &ClickEvent, window, cx| {
-                        this.choose(option.clone(), window, cx);
-                    },
-                ))
-            })
-            .collect();
-        let check = if let Some(note) = mac_preview_note() {
-            Some(Self::muted(note))
-        } else {
-            match &self.shell_check {
-                Some(Err(error)) => Some(
-                    div()
-                        .text_size(theme::SMALL_SIZE)
-                        .text_color(theme::hsla(palette::ERROR))
-                        .child(custom_shell_error(lang, error)),
-                ),
-                Some(Ok(program)) => Some(Self::muted(will_run(lang, program))),
-                None => None,
-            }
-        };
-        Self::section(t(lang, Str::Terminal))
-            .children(rows)
-            .when(custom_selected, |s| {
-                s.child(div().pl(px(22.0)).child(self.shell_field.clone()))
-                    .children(check.map(|line| line.pl(px(22.0))))
-            })
-            .child(Self::muted(t(lang, Str::AppliesToNewTerminals)))
-            .when(snapshot.env_override.is_some(), |s| {
-                s.child(
-                    div()
-                        .text_size(theme::SMALL_SIZE)
-                        .text_color(theme::text())
-                        .child(t(lang, Str::ShellEnvOverride)),
-                )
-            })
-            .when(self.shell_not_saved, |s| {
-                s.child(
-                    div()
-                        .text_size(theme::SMALL_SIZE)
-                        .text_color(theme::hsla(palette::ERROR))
-                        .child(t(lang, Str::ShellChoiceNotSaved)),
-                )
-            })
-    }
-
-    /// Settings › Display (spec §4.2): the mode this run uses and, when it is the compatible
-    /// one, why and a way to try the standard one at the next start.
-    fn display_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
-        let view = startup::display_view(&startup::render_status(), self.standard_requested);
-        Self::section(t(lang, Str::Display))
-            .child(div().text_color(theme::text()).child(t(lang, view.mode)))
-            .children(view.explanation.map(|why| Self::muted(t(lang, why))))
-            .when(view.offer_standard, |s| {
-                s.child(
-                    div().flex().child(
-                        button(
-                            "settings-try-standard",
-                            t(lang, Str::TryStandardDisplay),
-                            Kind::Secondary,
-                            false,
-                        )
-                        .on_click(cx.listener(
-                            |this, _: &ClickEvent, _, cx| {
-                                match startup::request_standard_next_start() {
-                                    Ok(()) => this.standard_requested = true,
-                                    Err(error) => {
-                                        log::warn!(
-                                            "the standard display mode was not stored: {error}"
-                                        )
-                                    }
-                                }
-                                cx.notify();
-                            },
-                        )),
-                    ),
-                )
-            })
-            .when(view.takes_effect_note, |s| {
-                s.child(Self::muted(t(lang, Str::TakesEffectNextStart)))
-            })
-    }
-
-    fn update_section(&self, lang: Lang, cx: &mut Context<Self>) -> Div {
-        let account = self.account.read(cx);
-        let status = account.update_status().clone();
-        let checking = account.checking();
-        let text = if checking {
-            t(lang, Str::Checking).to_string()
-        } else {
-            match &status {
-                UpdateStatus::UpToDate => t(lang, Str::UpToDate).to_string(),
-                UpdateStatus::Available { version, .. } => update_available(lang, version),
-                UpdateStatus::Required { .. } => t(lang, Str::UpdateRequired).to_string(),
-                UpdateStatus::Unknown if account.checked() => t(lang, Str::CheckFailed).to_string(),
-                UpdateStatus::Unknown => String::new(),
-            }
-        };
-        let url = download_url(&status).map(str::to_string);
-        Self::section(t(lang, Str::Updates))
-            .child(div().text_color(theme::text()).child(format!(
-                "{} {}",
-                t(lang, Str::Version),
-                shellx_model::VERSION
-            )))
-            .when(!text.is_empty(), |s| s.child(Self::muted(text)))
+            .flex_none()
+            .w(px(SIDEBAR_W))
+            .h_full()
+            .bg(theme::panel())
+            .border_r_1()
+            .border_color(theme::line())
             .child(
                 div()
                     .flex()
-                    .flex_row()
-                    .gap(px(8.0))
-                    .when_some(url, |row, url| {
-                        row.child(
-                            button(
-                                "settings-download",
-                                t(lang, Str::Download),
-                                Kind::Primary,
-                                false,
-                            )
-                            .on_click(move |_, _, cx| open_https(cx, &url)),
-                        )
-                    })
-                    .child(
-                        button(
-                            "settings-check-update",
-                            t(lang, Str::CheckUpdate),
-                            Kind::Secondary,
-                            checking,
-                        )
-                        .when(!checking, |b| {
-                            b.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.account.update(cx, |a, cx| a.check_update(cx));
-                            }))
-                        }),
-                    ),
+                    .flex_col()
+                    .flex_none()
+                    .p(px(10.0))
+                    .child(self.search.clone()),
             )
+            .child(list)
     }
 
-    fn language_section(lang: Lang) -> Div {
-        Self::section(t(lang, Str::Language))
-            .child(
-                div()
-                    .text_color(theme::text())
-                    .child(t(lang, Str::LanguageName)),
-            )
-            .child(Self::muted(t(lang, Str::LanguageHint)))
-    }
-
-    fn about_section(lang: Lang) -> Div {
-        Self::section(t(lang, Str::About))
-            .child(
-                div()
-                    .text_color(theme::text_hi())
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(build_info::about_version()),
-            )
-            .child(Self::muted(t(lang, Str::CmuxCredits)))
-            .child(Self::muted(t(lang, Str::IconCredits)))
-            .child(Self::muted(t(lang, Str::FontCredits)))
-            .child(
-                div()
-                    .id("settings-source")
-                    .text_size(theme::SMALL_SIZE)
-                    .text_color(theme::hsla(palette::PRIMARY_TEXT))
-                    .cursor_pointer()
-                    .child(SOURCE_URL)
-                    .on_click(|_, _, cx| open_https(cx, SOURCE_URL)),
-            )
-    }
-}
-
-impl Render for SettingsPanel {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let lang = cx.global::<Services>().lang;
-        let header = div()
+    fn section_row(
+        &self,
+        section: Section,
+        lang: Lang,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let selected = section == self.section;
+        div()
+            .id(SharedString::from(format!(
+                "settings-section-{}",
+                section.id()
+            )))
             .flex()
             .flex_row()
             .items_center()
-            .justify_between()
-            .flex_none()
-            .h(px(40.0))
-            .px(px(16.0))
-            .border_b_1()
-            .border_color(theme::border())
+            .gap(px(ICON_GAP))
+            .h(px(28.0))
+            .px(px(8.0))
+            .rounded(px(6.0))
+            .cursor_pointer()
+            .when(selected, |row| row.bg(theme::primary_soft()))
+            .when(!selected, |row| row.hover(|row| row.bg(theme::raise())))
             .child(
                 div()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme::text_hi())
-                    .child(t(lang, Str::Settings)),
+                    .flex()
+                    .flex_none()
+                    .justify_center()
+                    .w(px(ICON_SLOT))
+                    .child(
+                        svg()
+                            .path(section_icon(section).path())
+                            .size(px(14.0))
+                            .text_color(if selected {
+                                theme::primary_text()
+                            } else {
+                                theme::muted()
+                            }),
+                    ),
             )
             .child(
                 div()
-                    .id("settings-close")
-                    .px(px(8.0))
-                    .cursor_pointer()
-                    .text_color(theme::muted())
-                    .hover(|s| s.text_color(theme::text()))
-                    .child("×")
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close(cx))),
-            );
+                    .min_w_0()
+                    .truncate()
+                    .text_color(if selected {
+                        theme::text_hi()
+                    } else {
+                        theme::text()
+                    })
+                    .child(t(lang, section_title(section))),
+            )
+            .on_click(
+                cx.listener(move |this, _: &ClickEvent, _, cx| this.show_section(section, cx)),
+            )
+    }
+}
+
+impl Render for SettingsView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let lang = cx.global::<Services>().lang;
+        rows::commit_left_numbers(self, window, cx);
+        self.anchors.clear();
+        let listed = listed_sections();
+        let sidebar = self.sidebar(&listed, lang, cx);
+        let content = self.section_content(cx);
+        if let Some(anchor) = self.pending_row.take().and_then(|id| self.anchors.get(id)) {
+            // It is placed once this frame is laid out; the scroll lands on the next one.
+            anchor.scroll_to(window, cx);
+            window.on_next_frame(|window, _| window.refresh());
+        }
         div()
-            .id("settings-panel")
+            .id("settings-view")
+            .key_context("SettingsView")
             .track_focus(&self.focus)
-            .occlude()
-            .absolute()
-            .top(px(crate::workspace::TITLEBAR_H))
-            .right_0()
-            .bottom_0()
-            .w(px(WIDTH))
-            .flex()
-            .flex_col()
-            .bg(theme::raise())
-            .border_l_1()
-            .border_color(theme::border())
             .on_key_down(cx.listener(Self::on_key_down))
-            .child(header)
+            .size_full()
+            .flex()
+            .flex_row()
+            .bg(theme::bg())
+            .text_color(theme::text())
+            .font(theme::ui_font())
+            .text_size(theme::UI_SIZE)
+            .line_height(relative(1.4))
+            .child(sidebar)
             .child(
                 div()
-                    .id("settings-body")
+                    .id("settings-detail")
                     .flex_1()
-                    .min_h_0()
+                    .min_w_0()
+                    .h_full()
                     .overflow_y_scroll()
-                    .child(self.account_section(lang, cx))
-                    .child(self.terminal_section(lang, cx))
-                    .child(self.display_section(lang, cx))
-                    .child(self.update_section(lang, cx))
-                    .child(Self::language_section(lang))
-                    .child(Self::about_section(lang)),
+                    .track_scroll(&self.detail_scroll)
+                    .child(div().p(px(PANE_PADDING)).child(content)),
             )
     }
 }
 
-/// The Mac development build always starts bash (Ruling 19): its custom line
-/// is not checked, and this says why. Development text: only the Mac build has it.
-#[cfg(target_os = "macos")]
-const MAC_PREVIEW_NOTE: &str =
-    "Mac development build: new terminals always run bash; this line applies on Windows.";
-
-/// `MAC_PREVIEW_NOTE` on the Mac, nothing elsewhere.
-#[cfg(target_os = "macos")]
-fn mac_preview_note() -> Option<&'static str> {
-    Some(MAC_PREVIEW_NOTE)
+/// The pane's column: a section's header and cards, 14 apart.
+fn stack() -> Div {
+    div().flex().flex_col().gap(px(CARD_SPACING))
 }
 
-#[cfg(not(target_os = "macos"))]
-fn mac_preview_note() -> Option<&'static str> {
-    None
+/// The content of a card moved from the 1.7.1 panel: its lines 8 apart, inside a row's
+/// padding.
+fn card_body() -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(8.0))
+        .px(px(14.0))
+        .py(px(12.0))
 }
 
-/// The stable part of a shell row's id.
-fn kind_id(kind: ShellKind) -> &'static str {
-    match kind {
-        ShellKind::Pwsh => "pwsh",
-        ShellKind::WindowsPowerShell => "windows_powershell",
-        ShellKind::Cmd => "cmd",
-        ShellKind::GitBash => "git_bash",
-        ShellKind::Wsl => "wsl",
+/// A secondary line of a card (the 1.7.1 panel's).
+fn muted(text: impl Into<SharedString>) -> Div {
+    div()
+        .text_size(theme::SMALL_SIZE)
+        .text_color(theme::muted())
+        .child(text.into())
+}
+
+/// The groups and sections the column lists: a section with a wired row, a group with a
+/// listed section, in the catalogue's order.
+fn listed_sections() -> Vec<(Group, Vec<Section>)> {
+    listed_with(|row| row.wired)
+}
+
+fn listed_with(wired: impl Fn(&Row) -> bool) -> Vec<(Group, Vec<Section>)> {
+    groups()
+        .iter()
+        .filter_map(|(group, sections)| {
+            let shown: Vec<Section> = sections
+                .iter()
+                .copied()
+                .filter(|section| rows(*section).any(&wired))
+                .collect();
+            (!shown.is_empty()).then_some((*group, shown))
+        })
+        .collect()
+}
+
+fn is_listed(listed: &[(Group, Vec<Section>)], section: Section) -> bool {
+    listed
+        .iter()
+        .any(|(_, sections)| sections.contains(&section))
+}
+
+/// The icon of a section's row (the Mac's SF Symbol, from the icons ShellX has).
+fn section_icon(section: Section) -> Icon {
+    match section {
+        Section::Account => Icon::Users,
+        Section::App => Icon::Settings,
+        Section::Themes => Icon::Desktop,
+        Section::Terminal => Icon::Terminal,
+        Section::WorkspaceColors => Icon::Columns,
+        Section::Sidebar => Icon::WindowSidebar,
+        Section::KeyboardShortcuts => Icon::Command,
+        Section::Reset => Icon::ArrowLeftMd,
+        Section::Updates => Icon::Cloud,
+        Section::About => Icon::CircleHelp,
     }
 }
 
-/// A clickable row of Settings › Terminal; the chosen one carries the check.
-fn shell_row(id: String, label: String, selected: bool) -> Stateful<Div> {
-    let mark = div().flex_none().size(px(14.0)).when(selected, |mark| {
-        mark.child(
-            svg()
-                .path(Icon::CircleCheck.path())
-                .size(px(14.0))
-                .text_color(theme::hsla(palette::PRIMARY)),
-        )
-    });
-    div()
-        .id(SharedString::from(id))
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap(px(8.0))
-        .px(px(6.0))
-        .py(px(4.0))
-        .rounded(px(6.0))
-        .cursor_pointer()
-        .hover(|row| row.bg(theme::bg()))
-        .child(mark)
-        .child(
-            div()
-                .min_w_0()
-                .truncate()
-                .text_color(if selected {
-                    theme::text_hi()
-                } else {
-                    theme::text()
-                })
-                .child(label),
-        )
+/// `SHELLX_DEV_PREVIEW` (Mac development build): `settings` opens Settings at start,
+/// `settings:<section id>` opens it on that section. `None`: no Settings preview; `Some(None)`:
+/// open on the section it shows anyway (also for an id it does not know).
+#[cfg(any(test, target_os = "macos"))]
+pub fn preview(value: Option<&str>) -> Option<Option<Section>> {
+    let rest = value?.trim().strip_prefix("settings")?;
+    if rest.is_empty() {
+        return Some(None);
+    }
+    let id = rest.strip_prefix(':')?;
+    Some(Section::from_id(id.trim()))
 }
-
-mod host;
 
 #[cfg(test)]
 mod tests {

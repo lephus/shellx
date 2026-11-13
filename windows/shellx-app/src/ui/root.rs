@@ -29,8 +29,13 @@
 //! feeds the sessions' online flags; signing out closes every session and
 //! every remote pane.
 //!
+//! Settings opens in a window of its own (`settings::host`); its events come
+//! here, so "Đăng nhập…" opens the sign-in dialog in this window. Only when
+//! that window cannot open (or with `SHELLX_SETTINGS_HOST=panel`) is Settings
+//! a panel over this one.
+//!
 //! One modal rule (`shellx_model::modal`): while a panel is open (forced
-//! update overlay, sign-in dialog, settings, pairing) the topmost one holds
+//! update overlay, sign-in dialog, settings as a panel, pairing) the topmost one holds
 //! the keyboard, app commands and pane clicks are swallowed, Esc closes the
 //! topmost closable one, and the terminal gets the keyboard back when the
 //! last one closes. The overlay closes settings. Typed text is never
@@ -66,6 +71,7 @@ use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::modal::{Panel, Panels, RootKey, press_only_closes_dropdowns};
 use shellx_model::palette::Status;
+use shellx_model::settings_catalog::Section;
 use shellx_model::sidebar::{
     MachineInfo, OfferRule, build_groups_with, offer_rule_from_env, request_picker,
 };
@@ -78,7 +84,7 @@ use super::app::Services;
 use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
-use super::settings::{SettingsEvent, SettingsPanel};
+use super::settings::{self, SettingsHost, SettingsViewEvent};
 use super::sidebar::{self, Picker, PickerEntry, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
@@ -106,7 +112,8 @@ pub struct RootView {
     branches: BranchCache,
     account: Entity<AccountService>,
     sign_in: Entity<SignInDialog>,
-    settings: Entity<SettingsPanel>,
+    /// Settings, in its own window or as a panel over this one (`settings::host`).
+    settings: SettingsHost,
     pairing: Entity<PairingPanel>,
     /// The remote panes' sessions (one per Mac) and pane ids.
     remotes: RemoteTabs<RemoteSession>,
@@ -147,13 +154,18 @@ impl RootView {
         let pairing = cx.new(|cx| PairingPanel::new(core.clone(), cx));
         let account = cx.new(|cx| AccountService::new(core, MachineFacts::this_pc(), cx));
         let sign_in = cx.new(|cx| SignInDialog::new(account.clone(), window, cx));
-        let settings = cx.new(|cx| SettingsPanel::new(account.clone(), cx));
+        let settings = SettingsHost::new(account.clone(), cx);
+        let settings_view = settings.view().clone();
         let subscriptions = vec![
             // A forced update takes the keyboard from the terminals and
-            // closes the settings panel and the dropdowns.
+            // closes Settings (its window too) and the dropdowns.
             cx.observe_in(&account, window, |this, _, window, cx| {
-                if this.panels(cx).must_close() == Some(Panel::Settings) {
-                    this.settings.update(cx, |panel, cx| panel.close(cx));
+                let panels = Panels {
+                    settings: this.settings.is_open(cx),
+                    ..this.panels(cx)
+                };
+                if panels.must_close() == Some(Panel::Settings) {
+                    this.settings.close(cx);
                 }
                 if this.required(cx).is_some() {
                     this.close_menus(cx);
@@ -174,16 +186,22 @@ impl RootView {
                     }
                 },
             ),
+            // Settings' events, from its window or its panel; `window` is this one.
             cx.subscribe_in(
-                &settings,
+                &settings_view,
                 window,
-                |this, _, event: &SettingsEvent, window, cx| match event {
-                    SettingsEvent::Closed => this.after_focus_change(window, cx),
-                    SettingsEvent::SignInRequested => {
-                        this.open_sign_in(GooglePurpose::SignIn, window, cx)
+                |this, _, event: &SettingsViewEvent, window, cx| match event {
+                    SettingsViewEvent::Close => {
+                        this.settings.close(cx);
+                        this.after_focus_change(window, cx);
                     }
-                    SettingsEvent::SwitchToGoogleRequested => {
-                        this.open_sign_in(GooglePurpose::Link, window, cx);
+                    SettingsViewEvent::OpenSignIn(purpose) => {
+                        window.activate_window();
+                        this.open_sign_in(*purpose, window, cx);
+                    }
+                    SettingsViewEvent::CheckForUpdates => {
+                        this.account
+                            .update(cx, |account, cx| account.check_update(cx));
                     }
                 },
             ),
@@ -286,7 +304,7 @@ impl RootView {
         Panels {
             forced_update: self.required(cx).is_some(),
             sign_in: self.sign_in.read(cx).is_open(),
-            settings: self.settings.read(cx).is_open(),
+            settings: self.settings.is_open_as_panel(),
             pairing: pairing.is_open(),
         }
     }
@@ -297,7 +315,10 @@ impl RootView {
         let handle = match self.panels(cx).top() {
             Some(Panel::ForcedUpdate) => self.overlay_focus.clone(),
             Some(Panel::SignIn) => self.sign_in.read(cx).focus_target(cx),
-            Some(Panel::Settings) => self.settings.read(cx).focus_handle(cx),
+            Some(Panel::Settings) => match self.settings.panel_view() {
+                Some(view) => view.read(cx).focus_handle(cx),
+                None => return,
+            },
             Some(Panel::Pairing) => self.pairing.read(cx).focus_handle(cx),
             None => match self.host.get(self.tabs.active().focused) {
                 Some(live) => live.view.read(cx).focus_handle(cx),
@@ -312,7 +333,7 @@ impl RootView {
     fn close_top_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         match self.panels(cx).esc_target() {
             Some(Panel::SignIn) => self.sign_in.update(cx, |p, cx| p.close(cx)),
-            Some(Panel::Settings) => self.settings.update(cx, |p, cx| p.close(cx)),
+            Some(Panel::Settings) => self.settings.close(cx),
             Some(Panel::Pairing) => self.pairing.update(cx, |p, cx| p.close(cx)),
             Some(Panel::ForcedUpdate) | None => return false,
         }
@@ -867,30 +888,54 @@ impl RootView {
     }
 
     /// Title bar Settings button and `AppCommand::OpenSettings` (Ctrl+,):
-    /// toggles the settings panel.
+    /// toggles the settings panel; the Settings window opens, or comes to the
+    /// front.
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let open = !self.settings.read(cx).is_open();
-        self.set_settings_open(open, window, cx);
+        let open = !self.settings.is_open_as_panel();
+        self.set_settings_open(open, None, window, cx);
     }
 
-    /// The help menu's "Settings…" and "Check for Updates" (whose result
-    /// shows in Settings -> Updates): opens the settings panel, never closes
-    /// it.
-    pub fn show_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.set_settings_open(true, window, cx);
+    /// The help menu's "Settings…" (no section) and "Check for Updates" (whose
+    /// result shows in Settings -> Updates): opens Settings, never closes it.
+    pub fn show_settings(
+        &mut self,
+        section: Option<Section>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.set_settings_open(true, section, window, cx);
     }
 
-    /// Opens or closes the settings panel (blocked while a forced update or
-    /// the sign-in dialog shows, both drawn above it). Closes the dropdowns.
-    fn set_settings_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
+    /// Opens Settings (on `section` when given) or closes it (blocked while a
+    /// forced update or the sign-in dialog shows, both drawn above it). Closes
+    /// the dropdowns.
+    fn set_settings_open(
+        &mut self,
+        open: bool,
+        section: Option<Section>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.close_menus(cx);
         if !self.panels(cx).may_open(Panel::Settings) {
             return;
         }
         if open {
-            self.settings.update(cx, |panel, cx| panel.open(window, cx));
+            self.settings.open(section, window, cx);
         } else {
-            self.settings.update(cx, |panel, cx| panel.close(cx));
+            self.settings.close(cx);
+            self.after_focus_change(window, cx);
+        }
+    }
+
+    /// Mac development build only: `SHELLX_DEV_PREVIEW=settings` opens Settings at start,
+    /// `settings:<section id>` on that section (screenshots). Called once the window is open,
+    /// so the Settings window does not open inside this one's construction.
+    #[cfg(target_os = "macos")]
+    pub fn dev_settings_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let value = std::env::var("SHELLX_DEV_PREVIEW").ok();
+        if let Some(section) = settings::preview(value.as_deref()) {
+            self.show_settings(section, window, cx);
         }
     }
 
@@ -1136,9 +1181,8 @@ impl Render for RootView {
         });
         let settings = self
             .settings
-            .read(cx)
-            .is_open()
-            .then(|| self.settings.clone());
+            .panel_view()
+            .map(|view| settings::host::panel(view, lang));
         let sign_in = self
             .sign_in
             .read(cx)
