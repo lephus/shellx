@@ -60,6 +60,8 @@ pub struct Tab {
     pub stacks: BTreeMap<SlotId, Stack>,
     /// Always the selected pane of its slot.
     pub focused: PaneId,
+    /// The palette name of the workspace colour (`workspace_colors`); `None` is the default.
+    pub color: Option<String>,
 }
 
 impl Tab {
@@ -154,6 +156,7 @@ impl Tabs {
                 layout: Layout::new(slot),
                 stacks: BTreeMap::from([(slot, Stack::one(pane))]),
                 focused: pane,
+                color: None,
             },
         );
         self.active = at;
@@ -280,6 +283,18 @@ impl Tabs {
         match tab.layout.neighbor(from, dir, bounds, divider) {
             Some(slot) => {
                 tab.focused = tab.stacks[&slot].selected_pane();
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Sets a tab's workspace colour by palette name (`None` is the default). False for an
+    /// unknown tab.
+    pub fn set_color(&mut self, tab: TabId, name: Option<String>) -> bool {
+        match self.tabs.iter_mut().find(|t| t.id == tab) {
+            Some(t) => {
+                t.color = name;
                 true
             }
             None => false,

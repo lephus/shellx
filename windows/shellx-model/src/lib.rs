@@ -34,6 +34,7 @@ pub mod tabs;
 pub mod text_edit;
 pub mod theme_file;
 pub mod update;
+pub mod workspace_colors;
 
 pub use keys::Dir;
 
