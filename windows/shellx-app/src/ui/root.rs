@@ -205,6 +205,15 @@ impl RootView {
                     }
                 },
             ),
+            // Settings as a panel: when the control with the keyboard is no longer drawn (a
+            // row its settings now hide, a closed popover's field), GPUI sends the keys to the
+            // window's root node, where no handler is, so Esc would not close the panel. The
+            // panel takes the keyboard back (`focus_terminal` gives it to the topmost panel).
+            cx.on_focus_lost(window, |this, window, cx| {
+                if this.settings.is_open_as_panel() {
+                    this.focus_terminal(window, cx);
+                }
+            }),
             // `open_sign_in` checked the modal rule before the dialog opened.
             cx.subscribe_in(&sign_in, window, |this, _, _: &SignInEvent, window, cx| {
                 this.after_focus_change(window, cx)

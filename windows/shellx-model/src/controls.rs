@@ -8,7 +8,7 @@
 
 use crate::keys::KeyIn;
 use crate::palette::Rgba;
-use crate::settings_catalog::Unit;
+use crate::settings_catalog::{Section, Unit};
 
 /// The value at `fraction` of a slider's track: clamped to the track, snapped to `step`.
 pub fn slider_value(fraction: f32, min: f32, max: f32, step: f32) -> f32 {
@@ -173,6 +173,15 @@ pub fn view_key(k: &KeyIn) -> Option<ViewKey> {
         ("tab", true) => Some(ViewKey::Prev),
         _ => None,
     }
+}
+
+/// Whether the Settings view takes the keyboard before it draws `shown`, `drawn` being the
+/// section of its last draw (`None` before the first): the control that had the keyboard
+/// belongs to the section that was on screen, and once it is not drawn GPUI sends the keys
+/// nowhere, so Esc and Tab would stop working. Not on the first draw (the host has just given
+/// the view the keyboard), and not while the same section stays.
+pub fn view_takes_focus(drawn: Option<Section>, shown: Section) -> bool {
+    drawn.is_some_and(|drawn| drawn != shown)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -523,7 +532,6 @@ mod tests {
     /// given it the keyboard, and not while the same section stays.
     #[test]
     fn the_view_takes_the_keyboard_when_its_section_changes() {
-        use crate::settings_catalog::Section;
         assert!(view_takes_focus(Some(Section::Terminal), Section::About));
         assert!(view_takes_focus(Some(Section::About), Section::Updates));
         assert!(!view_takes_focus(

@@ -10,8 +10,8 @@
 
 use gpui::{
     AnyWindowHandle, App, Bounds, ClickEvent, Context, Entity, Focusable, FontWeight, IntoElement,
-    Pixels, Render, TitlebarOptions, Window, WindowBounds, WindowHandle, WindowOptions, div, point,
-    prelude::*, px, relative, size,
+    Pixels, Render, Subscription, TitlebarOptions, Window, WindowBounds, WindowHandle,
+    WindowOptions, div, point, prelude::*, px, relative, size,
 };
 use shellx_model::settings_catalog::Section;
 use shellx_model::strings::{Lang, Str, t};
@@ -212,6 +212,7 @@ fn placement(
 /// The Settings window's root: its caption above the view.
 pub struct SettingsWindow {
     view: Entity<SettingsView>,
+    _focus_lost: Subscription,
 }
 
 impl SettingsWindow {
@@ -221,7 +222,18 @@ impl SettingsWindow {
             remember_frame(window);
             true
         });
-        SettingsWindow { view }
+        // The control with the keyboard is no longer drawn (a row its settings now hide, a
+        // closed popover's field): GPUI would send the keys to the window's root node, where
+        // no handler is (a handler on this view's root div sits one node below it), so Esc and
+        // Tab would do nothing. The view takes the keyboard back instead. A new section is
+        // handled before it is drawn (`view_takes_focus`).
+        let focus_lost = cx.on_focus_lost(window, |this, window, cx| {
+            window.focus(&this.view.focus_handle(cx));
+        });
+        SettingsWindow {
+            view,
+            _focus_lost: focus_lost,
+        }
     }
 
     /// Esc, Settings closed from the main window, or the app quitting.

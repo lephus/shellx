@@ -31,7 +31,7 @@ use gpui::{
     FontWeight, IntoElement, KeyDownEvent, Render, ScrollAnchor, ScrollHandle, SharedString,
     Stateful, Subscription, Window, div, point, prelude::*, px, relative, svg,
 };
-use shellx_model::controls::{ViewKey, view_key};
+use shellx_model::controls::{ViewKey, view_key, view_takes_focus};
 use shellx_model::core_api::GooglePurpose;
 use shellx_model::settings_catalog::{
     Group, Row, Section, group_title, groups, row, rows, section_title,
@@ -75,6 +75,8 @@ pub struct SettingsView {
     account: Entity<AccountService>,
     focus: FocusHandle,
     section: Section,
+    /// The section of the last draw: when another one is drawn, the view takes the keyboard.
+    drawn_section: Option<Section>,
     search: Entity<TextField>,
     sidebar_scroll: ScrollHandle,
     detail_scroll: ScrollHandle,
@@ -126,6 +128,7 @@ impl SettingsView {
             account,
             focus: cx.focus_handle(),
             section,
+            drawn_section: None,
             search,
             sidebar_scroll: ScrollHandle::new(),
             detail_scroll: ScrollHandle::new(),
@@ -344,6 +347,13 @@ impl SettingsView {
 impl Render for SettingsView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
+        // Every way to another section (its row, `show_section`, `show_row`, the host opening
+        // Settings on a section) ends here: the control that had the keyboard is not drawn any
+        // more, so the view takes it, and Esc and Tab keep working.
+        if view_takes_focus(self.drawn_section, self.section) {
+            window.focus(&self.focus);
+        }
+        self.drawn_section = Some(self.section);
         rows::commit_left_numbers(self, window, cx);
         self.anchors.clear();
         let listed = listed_sections();
