@@ -3,8 +3,8 @@
 //! the observers; the file gets it 300 ms after the last change to that key, on the
 //! background executor, key by key (`settings_store`). `startup::orderly_quit` writes what
 //! still waits. A failed write is one log line naming the error's kind (no path, no value);
-//! the value then keeps waiting and is tried again by the next write and by the quit flush. Nothing here panics or blocks the UI
-//! on the file. The theme settings (and, for Appearance System, the main window's appearance)
+//! the value then keeps waiting and is tried again by the next change to that key, by a
+//! Reset All and by the quit flush. Nothing here panics or blocks the UI on the file. The theme settings (and, for Appearance System, the main window's appearance)
 //! choose the active theme (`theme::set_active`); a change to them redraws every window.
 //!
 //! The service also holds the keymap built from `shortcuts.bindings`, rebuilt when they change
@@ -310,8 +310,8 @@ impl PendingWrites {
     }
 
     /// Writes the value waiting at `path`, if one still waits. A write that fails (a virus
-    /// scanner can hold the file for a moment) leaves the value waiting, for the quit flush
-    /// or the next write.
+    /// scanner can hold the file for a moment) leaves the value waiting, for the next change
+    /// to that key, a Reset All or the quit flush.
     fn write(&self, path: &'static str) {
         let _writing = lock(&self.writing);
         let Some(value) = lock(&self.waiting).remove(path) else {
@@ -351,7 +351,7 @@ fn log_failure(result: io::Result<()>) -> bool {
         return false;
     };
     log::warn!(
-        "shellx: settings.json could not be written ({:?}); the change is tried again at the next write and when ShellX quits",
+        "shellx: settings.json could not be written ({:?}); the change is tried again when the setting changes again and when ShellX quits",
         error.kind()
     );
     true
@@ -442,12 +442,14 @@ mod tests {
         writes.write("app.language");
         writes.wait("app.language", Some(json!("en")));
         writes.flush();
-        // the value is not lost: it waits for the next write or the quit flush
+        // the value is not lost: it waits for the next change to the key or the quit flush
         assert_eq!(lock(&writes.waiting).len(), 1);
     }
 
     #[test]
     fn reset_all_leaves_only_unknown_keys_in_the_file() {
+        // `shell` is not part of this: Reset All sets it back through `Shells::set_choice`,
+        // which writes `{"kind":"auto"}` and replans the shells.
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.json");
         let store = SettingsStore::new(path.clone());
