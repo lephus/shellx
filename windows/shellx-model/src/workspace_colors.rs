@@ -28,20 +28,22 @@ pub const BUILT_IN: [(&str, u32); 16] = [
     ("Charcoal", 0x3E4B5E),
 ];
 
-/// The colour a new workspace starts with (Mac: `newWorkspaceColorHex`, line 73).
+/// The colour a new workspace starts with (Mac: `newWorkspaceColorHex`, lines 74-75).
 pub const DEFAULT_NAME: &str = "Purple";
 
 /// The rail's alpha (Mac: `SidebarWorkspaceRowCellView.swift:547`).
 const RAIL_ALPHA: f32 = 0.95;
-/// Unselected Solid Fill opacity when the setting is not a number (Mac: `SidebarAppearanceSupport.swift:575`).
+/// Unselected Solid Fill opacity when the setting is not a number (Mac: `SidebarAppearanceSupport.swift:580`, default `:500`).
 const FALLBACK_UNSELECTED_OPACITY: f32 = 0.7;
 /// Subtle selection fill alpha, emphasized: dark 0.14, light 0.11; edge 0.60
-/// (Mac: `SidebarAppearanceSupport.swift:317-322`).
+/// (Mac: `SidebarAppearanceSupport.swift:323-324`).
 const SUBTLE_FILL_DARK: f32 = 0.14;
 const SUBTLE_FILL_LIGHT: f32 = 0.11;
 const SUBTLE_EDGE: f32 = 0.60;
 /// The tint of a non-subtle selection on a dark sidebar: the accent at 22% over the sidebar
-/// (Mac: `ShellXSelectionTint.sidebarFill`, ShellXSelectionTint.swift:42).
+/// (Mac: `ShellXSelectionTint.sidebarFill`, ShellXSelectionTint.swift:43). The Mac mixes over
+/// the fixed ShellX panel; Windows mixes over the sidebar's own background on purpose, so a
+/// dark Custom sidebar gets a tint of its own colour. Both give #222d4e for the ShellX theme.
 const TINT: f32 = 0.22;
 /// The outline of the selected Solid Fill card: the label colour at 50%
 /// (Mac: `SidebarWorkspaceRowCellView.swift:253-254`; 1.5 pt wide).
@@ -75,7 +77,7 @@ pub fn palette(settings: &Settings) -> Vec<Entry> {
 }
 
 /// The colour of a palette name. `None` or an unknown name is the current Purple
-/// (Mac: `newWorkspaceColorHex`, line 73).
+/// (Mac: `newWorkspaceColorHex`, lines 74-75).
 pub fn workspace_color(settings: &Settings, name: Option<&str>) -> Rgba {
     let by_name = |n: &str| {
         settings.palette.get(n).copied().or_else(|| {
@@ -106,7 +108,7 @@ pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: b
     let dark = is_dark_surface(chrome.sidebar_bg);
     let accent = chrome.primary;
     let rail_style = settings.indicator_style == IndicatorStyle::LeftRail;
-    // `sidebarUsesSubtleSelection` (SidebarAppearanceSupport.swift:439): a chosen selection
+    // `sidebarUsesSubtleSelection` (SidebarAppearanceSupport.swift:434-442): a chosen selection
     // colour is an explicit request for a solid fill.
     let subtle =
         settings.subtle_selection && rail_style && settings.selection_color.is_none();
@@ -130,7 +132,7 @@ pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: b
                 border: Some(accent.with_alpha(SUBTLE_EDGE)),
             };
         }
-        // `sidebarSelectedWorkspaceBackgroundNSColor` (SidebarAppearanceSupport.swift:342-373):
+        // `sidebarSelectedWorkspaceBackgroundNSColor` (SidebarAppearanceSupport.swift:347-385):
         // a chosen colour first, then ShellX's tint on a dark sidebar, otherwise the accent.
         let fill = match settings.selection_color {
             Some(c) => c,
