@@ -516,4 +516,20 @@ mod tests {
             None
         );
     }
+
+    /// The control that has the keyboard belongs to the section on screen. When another
+    /// section is drawn, that control is gone and GPUI would send the keys nowhere (no Esc, no
+    /// Tab): the view takes the keyboard first. Not on its first draw, where the host has just
+    /// given it the keyboard, and not while the same section stays.
+    #[test]
+    fn the_view_takes_the_keyboard_when_its_section_changes() {
+        use crate::settings_catalog::Section;
+        assert!(view_takes_focus(Some(Section::Terminal), Section::About));
+        assert!(view_takes_focus(Some(Section::About), Section::Updates));
+        assert!(!view_takes_focus(
+            Some(Section::Terminal),
+            Section::Terminal
+        ));
+        assert!(!view_takes_focus(None, Section::Account));
+    }
 }
