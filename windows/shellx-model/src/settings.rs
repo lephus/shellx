@@ -1,3 +1,582 @@
+//! The typed settings of the Windows app and their sparse `settings.json` form.
+//!
+//! Every field has a dotted JSON path (a [`Key`]); a field equal to its default is
+//! absent from the file. Defaults and value spellings follow the Mac.
+
+use std::collections::BTreeMap;
+
+use serde_json::{Map, Number, Value};
+
+use crate::palette::Rgba;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LanguageChoice {
+    System,
+    En,
+    Vi,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Appearance {
+    System,
+    Light,
+    Dark,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Accent {
+    ShellxBlue,
+    System,
+    Custom(Rgba),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Placement {
+    Top,
+    AfterCurrent,
+    End,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CursorStyle {
+    Block,
+    Bar,
+    Underline,
+    Hollow,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IndicatorStyle {
+    LeftRail,
+    SolidFill,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SidebarBackground {
+    FollowTheme,
+    MatchTerminal,
+    Custom,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Settings {
+    pub language: LanguageChoice,
+    pub appearance: Appearance,
+    pub accent: Accent,
+    pub new_workspace_placement: Placement,
+    pub inherit_working_directory: bool,
+    pub keep_workspace_open: bool,
+    pub focus_history_includes_panes: bool,
+    pub equalize_splits: bool,
+    pub hide_tab_close_button: bool,
+    pub theme_light: String,
+    pub theme_dark: String,
+    pub tab_bar_font_size: f32,
+    pub scroll_speed: f32,
+    pub copy_on_select: bool,
+    pub confirm_unsafe_paste: bool,
+    pub font_family: Option<String>,
+    pub font_size: f32,
+    pub cursor_style: CursorStyle,
+    pub padding_x: u32,
+    pub padding_y: u32,
+    pub scrollback_mb: u32,
+    pub middle_click_paste: bool,
+    pub indicator_style: IndicatorStyle,
+    pub subtle_selection: bool,
+    pub brighten_in_dark: bool,
+    pub unselected_fill_opacity: f32,
+    pub selection_color: Option<Rgba>,
+    /// Overrides of the built-in 16 workspace colours only (name to colour).
+    pub palette: BTreeMap<String, Rgba>,
+    pub sidebar_background: SidebarBackground,
+    pub sidebar_color: Rgba,
+    pub sidebar_font_size: f32,
+    pub hide_sidebar_details: bool,
+    pub wrap_workspace_titles: bool,
+    pub truncate_path_from_start: bool,
+    pub show_branch_directory: bool,
+    /// Action id to chord text; `None` is an unbound action.
+    pub bindings: BTreeMap<String, Option<String>>,
+}
+
+impl Default for Settings {
+    fn default() -> Settings {
+        Settings {
+            language: LanguageChoice::System,
+            appearance: Appearance::Dark,
+            accent: Accent::ShellxBlue,
+            new_workspace_placement: Placement::AfterCurrent,
+            inherit_working_directory: true,
+            keep_workspace_open: false,
+            focus_history_includes_panes: false,
+            equalize_splits: false,
+            hide_tab_close_button: false,
+            theme_light: "Catppuccin Latte".into(),
+            theme_dark: "ShellX".into(),
+            tab_bar_font_size: 11.0,
+            scroll_speed: 1.0,
+            copy_on_select: false,
+            // The one default that differs from the Mac: pastes stay confirmed.
+            confirm_unsafe_paste: true,
+            font_family: None,
+            font_size: 13.0,
+            cursor_style: CursorStyle::Block,
+            padding_x: 2,
+            padding_y: 2,
+            scrollback_mb: 50,
+            middle_click_paste: true,
+            indicator_style: IndicatorStyle::LeftRail,
+            subtle_selection: true,
+            brighten_in_dark: true,
+            unselected_fill_opacity: 0.70,
+            selection_color: None,
+            palette: BTreeMap::new(),
+            sidebar_background: SidebarBackground::FollowTheme,
+            sidebar_color: Rgba::rgb(0x100B1D),
+            sidebar_font_size: 12.5,
+            hide_sidebar_details: false,
+            wrap_workspace_titles: false,
+            truncate_path_from_start: false,
+            show_branch_directory: true,
+            bindings: BTreeMap::new(),
+        }
+    }
+}
+
+/// One variant per field of [`Settings`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Key {
+    Language,
+    Appearance,
+    Accent,
+    NewWorkspacePlacement,
+    InheritWorkingDirectory,
+    KeepWorkspaceOpen,
+    FocusHistoryIncludesPanes,
+    EqualizeSplits,
+    HideTabCloseButton,
+    ThemeLight,
+    ThemeDark,
+    TabBarFontSize,
+    ScrollSpeed,
+    CopyOnSelect,
+    ConfirmUnsafePaste,
+    FontFamily,
+    FontSize,
+    CursorStyle,
+    PaddingX,
+    PaddingY,
+    ScrollbackMb,
+    MiddleClickPaste,
+    IndicatorStyle,
+    SubtleSelection,
+    BrightenInDark,
+    UnselectedFillOpacity,
+    SelectionColor,
+    Palette,
+    SidebarBackground,
+    SidebarColor,
+    SidebarFontSize,
+    HideSidebarDetails,
+    WrapWorkspaceTitles,
+    TruncatePathFromStart,
+    ShowBranchDirectory,
+    Bindings,
+}
+
+impl Key {
+    pub const ALL: &'static [Key] = &[
+        Key::Language,
+        Key::Appearance,
+        Key::Accent,
+        Key::NewWorkspacePlacement,
+        Key::InheritWorkingDirectory,
+        Key::KeepWorkspaceOpen,
+        Key::FocusHistoryIncludesPanes,
+        Key::EqualizeSplits,
+        Key::HideTabCloseButton,
+        Key::ThemeLight,
+        Key::ThemeDark,
+        Key::TabBarFontSize,
+        Key::ScrollSpeed,
+        Key::CopyOnSelect,
+        Key::ConfirmUnsafePaste,
+        Key::FontFamily,
+        Key::FontSize,
+        Key::CursorStyle,
+        Key::PaddingX,
+        Key::PaddingY,
+        Key::ScrollbackMb,
+        Key::MiddleClickPaste,
+        Key::IndicatorStyle,
+        Key::SubtleSelection,
+        Key::BrightenInDark,
+        Key::UnselectedFillOpacity,
+        Key::SelectionColor,
+        Key::Palette,
+        Key::SidebarBackground,
+        Key::SidebarColor,
+        Key::SidebarFontSize,
+        Key::HideSidebarDetails,
+        Key::WrapWorkspaceTitles,
+        Key::TruncatePathFromStart,
+        Key::ShowBranchDirectory,
+        Key::Bindings,
+    ];
+
+    /// The dotted path of the key in `settings.json`.
+    pub fn path(self) -> &'static str {
+        match self {
+            Key::Language => "app.language",
+            Key::Appearance => "app.appearance",
+            Key::Accent => "app.accentColor",
+            Key::NewWorkspacePlacement => "app.newWorkspacePlacement",
+            Key::InheritWorkingDirectory => "app.workspaceInheritWorkingDirectory",
+            Key::KeepWorkspaceOpen => "app.keepWorkspaceOpenWhenClosingLastSurface",
+            Key::FocusHistoryIncludesPanes => "app.focusHistoryIncludesPanesAndTabs",
+            Key::EqualizeSplits => "app.equalizeSplitsOnCreate",
+            Key::HideTabCloseButton => "app.hideTabCloseButton",
+            Key::ThemeLight => "terminalConfig.theme.light",
+            Key::ThemeDark => "terminalConfig.theme.dark",
+            Key::TabBarFontSize => "terminalConfig.surface-tab-bar-font-size",
+            Key::ScrollSpeed => "terminal.scrollSpeed",
+            Key::CopyOnSelect => "terminal.copyOnSelect",
+            Key::ConfirmUnsafePaste => "terminal.confirmUnsafePaste",
+            Key::FontFamily => "terminalConfig.font-family",
+            Key::FontSize => "terminalConfig.font-size",
+            Key::CursorStyle => "terminalConfig.cursor-style",
+            Key::PaddingX => "terminalConfig.window-padding-x",
+            Key::PaddingY => "terminalConfig.window-padding-y",
+            Key::ScrollbackMb => "terminalConfig.scrollback-limit",
+            Key::MiddleClickPaste => "terminalConfig.middle-click-action",
+            Key::IndicatorStyle => "workspaceColors.indicatorStyle",
+            Key::SubtleSelection => "workspaceColors.subtleSelection",
+            Key::BrightenInDark => "workspaceColors.brightenInDarkMode",
+            Key::UnselectedFillOpacity => "workspaceColors.unselectedFillOpacity",
+            Key::SelectionColor => "workspaceColors.selectionColor",
+            Key::Palette => "workspaceColors.colors",
+            Key::SidebarBackground => "sidebarAppearance.background",
+            Key::SidebarColor => "sidebarAppearance.tintColor",
+            Key::SidebarFontSize => "terminalConfig.sidebar-font-size",
+            Key::HideSidebarDetails => "sidebar.hideAllDetails",
+            Key::WrapWorkspaceTitles => "sidebar.wrapWorkspaceTitles",
+            Key::TruncatePathFromStart => "sidebar.truncatePathFromStart",
+            Key::ShowBranchDirectory => "sidebar.showBranchDirectory",
+            Key::Bindings => "shortcuts.bindings",
+        }
+    }
+}
+
+// Scrollback is stored in bytes, as the Mac writes it (TerminalGhosttyOptionsCard.swift:
+// `bytesPerMegabyte = 1_000_000`); the row shows megabytes.
+const BYTES_PER_MB: u64 = 1_000_000;
+
+// Enum spellings. Mac files: WorkspacePlacement.swift (`top`, `end`, `afterCurrent`),
+// GhosttyCursorStyle.swift (`block`, `bar`, `underline`, `block_hollow`),
+// WorkspaceIndicatorStyle.swift (`leftRail`, `solidFill`). The sidebar background
+// strings are a Windows key; the middle-click values come from
+// GhosttyTerminalOptionChange.swift (`primary-paste`, `ignore`).
+const PLACEMENTS: &[(&str, Placement)] = &[
+    ("top", Placement::Top),
+    ("afterCurrent", Placement::AfterCurrent),
+    ("end", Placement::End),
+];
+const CURSORS: &[(&str, CursorStyle)] = &[
+    ("block", CursorStyle::Block),
+    ("bar", CursorStyle::Bar),
+    ("underline", CursorStyle::Underline),
+    ("block_hollow", CursorStyle::Hollow),
+];
+const INDICATORS: &[(&str, IndicatorStyle)] = &[
+    ("leftRail", IndicatorStyle::LeftRail),
+    ("solidFill", IndicatorStyle::SolidFill),
+];
+const SIDEBAR_BACKGROUNDS: &[(&str, SidebarBackground)] = &[
+    ("theme", SidebarBackground::FollowTheme),
+    ("terminal", SidebarBackground::MatchTerminal),
+    ("custom", SidebarBackground::Custom),
+];
+const LANGUAGES: &[(&str, LanguageChoice)] = &[
+    ("system", LanguageChoice::System),
+    ("en", LanguageChoice::En),
+    ("vi", LanguageChoice::Vi),
+];
+const APPEARANCES: &[(&str, Appearance)] = &[
+    ("system", Appearance::System),
+    ("light", Appearance::Light),
+    ("dark", Appearance::Dark),
+];
+
+fn name_of<T: Copy + PartialEq>(table: &[(&'static str, T)], v: T) -> Value {
+    let name = table.iter().find(|(_, t)| *t == v).map(|(n, _)| *n);
+    Value::String(name.unwrap_or_default().to_string())
+}
+
+fn from_name<T: Copy>(table: &[(&str, T)], v: &Value) -> Option<T> {
+    let s = v.as_str()?;
+    table.iter().find(|(n, _)| *n == s).map(|(_, t)| *t)
+}
+
+fn parse_hex(s: &str) -> Option<Rgba> {
+    let digits = s.strip_prefix('#')?;
+    if digits.len() != 6 || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    u32::from_str_radix(digits, 16).ok().map(Rgba::rgb)
+}
+
+fn hex_value(c: Rgba) -> Value {
+    Value::String(c.hex())
+}
+
+fn num(x: f32) -> Value {
+    // Four decimals keep 0.7 from being written as 0.699999988.
+    let x = (f64::from(x) * 1e4).round() / 1e4;
+    Number::from_f64(x).map_or(Value::Null, Value::Number)
+}
+
+/// A JSON number, or a string holding one (Ghostty config values are text).
+fn as_f64(v: &Value) -> Option<f64> {
+    match v {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }
+    .filter(|x| x.is_finite())
+}
+
+fn snapped(v: &Value, min: f64, max: f64, step: f64) -> Option<f32> {
+    let x = as_f64(v)?.clamp(min, max);
+    Some(((x / step).round() * step).clamp(min, max) as f32)
+}
+
+fn whole(v: &Value, max: u32) -> Option<u32> {
+    Some(as_f64(v)?.round().clamp(0.0, f64::from(max)) as u32)
+}
+
+impl Settings {
+    /// Reads each key on its own: one bad value never affects another.
+    pub fn from_json(root: &Map<String, Value>) -> Settings {
+        let mut s = Settings::default();
+        for key in Key::ALL {
+            if let Some(v) = get(root, key.path()) {
+                s.set_from_value(*key, v);
+            }
+        }
+        s
+    }
+
+    /// `None` when the field equals its default: the key is then absent from the file.
+    pub fn to_value(&self, key: Key) -> Option<Value> {
+        let value = self.raw(key);
+        (value != Settings::default().raw(key)).then_some(value)
+    }
+
+    /// The JSON form of a field, default or not.
+    fn raw(&self, key: Key) -> Value {
+        match key {
+            Key::Language => name_of(LANGUAGES, self.language),
+            Key::Appearance => name_of(APPEARANCES, self.appearance),
+            Key::Accent => Value::String(match self.accent {
+                Accent::ShellxBlue => "cmux".into(),
+                Accent::System => "system".into(),
+                Accent::Custom(c) => c.hex(),
+            }),
+            Key::NewWorkspacePlacement => name_of(PLACEMENTS, self.new_workspace_placement),
+            Key::InheritWorkingDirectory => self.inherit_working_directory.into(),
+            Key::KeepWorkspaceOpen => (!self.keep_workspace_open).into(),
+            Key::FocusHistoryIncludesPanes => self.focus_history_includes_panes.into(),
+            Key::EqualizeSplits => self.equalize_splits.into(),
+            Key::HideTabCloseButton => self.hide_tab_close_button.into(),
+            Key::ThemeLight => self.theme_light.clone().into(),
+            Key::ThemeDark => self.theme_dark.clone().into(),
+            Key::TabBarFontSize => num(self.tab_bar_font_size),
+            Key::ScrollSpeed => num(self.scroll_speed),
+            Key::CopyOnSelect => self.copy_on_select.into(),
+            Key::ConfirmUnsafePaste => self.confirm_unsafe_paste.into(),
+            Key::FontFamily => self.font_family.clone().map_or(Value::Null, Value::String),
+            Key::FontSize => num(self.font_size),
+            Key::CursorStyle => name_of(CURSORS, self.cursor_style),
+            Key::PaddingX => self.padding_x.into(),
+            Key::PaddingY => self.padding_y.into(),
+            Key::ScrollbackMb => (u64::from(self.scrollback_mb) * BYTES_PER_MB).into(),
+            Key::MiddleClickPaste => if self.middle_click_paste {
+                "primary-paste"
+            } else {
+                "ignore"
+            }
+            .into(),
+            Key::IndicatorStyle => name_of(INDICATORS, self.indicator_style),
+            Key::SubtleSelection => self.subtle_selection.into(),
+            Key::BrightenInDark => self.brighten_in_dark.into(),
+            Key::UnselectedFillOpacity => num(self.unselected_fill_opacity),
+            Key::SelectionColor => self.selection_color.map_or(Value::Null, hex_value),
+            Key::Palette => Value::Object(
+                self.palette
+                    .iter()
+                    .map(|(k, c)| (k.clone(), hex_value(*c)))
+                    .collect(),
+            ),
+            Key::SidebarBackground => name_of(SIDEBAR_BACKGROUNDS, self.sidebar_background),
+            Key::SidebarColor => hex_value(self.sidebar_color),
+            Key::SidebarFontSize => num(self.sidebar_font_size),
+            Key::HideSidebarDetails => self.hide_sidebar_details.into(),
+            Key::WrapWorkspaceTitles => self.wrap_workspace_titles.into(),
+            Key::TruncatePathFromStart => self.truncate_path_from_start.into(),
+            Key::ShowBranchDirectory => self.show_branch_directory.into(),
+            Key::Bindings => Value::Object(
+                self.bindings
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone().map_or(Value::Null, Value::String)))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Clamps to the range; `false` (and no change) for a value of the wrong type.
+    pub fn set_from_value(&mut self, key: Key, value: &Value) -> bool {
+        self.try_set(key, value).is_some()
+    }
+
+    fn try_set(&mut self, key: Key, v: &Value) -> Option<()> {
+        match key {
+            Key::Language => self.language = from_name(LANGUAGES, v)?,
+            Key::Appearance => self.appearance = from_name(APPEARANCES, v)?,
+            Key::Accent => {
+                self.accent = match v.as_str()? {
+                    "cmux" => Accent::ShellxBlue,
+                    "system" => Accent::System,
+                    hex => Accent::Custom(parse_hex(hex)?),
+                }
+            }
+            Key::NewWorkspacePlacement => self.new_workspace_placement = from_name(PLACEMENTS, v)?,
+            Key::InheritWorkingDirectory => self.inherit_working_directory = v.as_bool()?,
+            Key::KeepWorkspaceOpen => self.keep_workspace_open = !v.as_bool()?,
+            Key::FocusHistoryIncludesPanes => self.focus_history_includes_panes = v.as_bool()?,
+            Key::EqualizeSplits => self.equalize_splits = v.as_bool()?,
+            Key::HideTabCloseButton => self.hide_tab_close_button = v.as_bool()?,
+            Key::ThemeLight => self.theme_light = v.as_str()?.to_string(),
+            Key::ThemeDark => self.theme_dark = v.as_str()?.to_string(),
+            Key::TabBarFontSize => self.tab_bar_font_size = snapped(v, 8.0, 14.0, 0.5)?,
+            Key::ScrollSpeed => self.scroll_speed = snapped(v, 0.25, 3.0, 0.05)?,
+            Key::CopyOnSelect => self.copy_on_select = v.as_bool()?,
+            Key::ConfirmUnsafePaste => self.confirm_unsafe_paste = v.as_bool()?,
+            Key::FontFamily => {
+                self.font_family = match v {
+                    Value::Null => None,
+                    other => Some(other.as_str()?.to_string()).filter(|s| !s.is_empty()),
+                }
+            }
+            Key::FontSize => self.font_size = snapped(v, 4.0, 96.0, 0.5)?,
+            Key::CursorStyle => self.cursor_style = from_name(CURSORS, v)?,
+            Key::PaddingX => self.padding_x = whole(v, 200)?,
+            Key::PaddingY => self.padding_y = whole(v, 200)?,
+            Key::ScrollbackMb => {
+                let bytes = as_f64(v)?.max(0.0);
+                let mb = (bytes / BYTES_PER_MB as f64).round();
+                self.scrollback_mb = mb.min(100_000.0) as u32;
+            }
+            Key::MiddleClickPaste => {
+                self.middle_click_paste = match v.as_str()? {
+                    "primary-paste" => true,
+                    "ignore" => false,
+                    _ => return None,
+                }
+            }
+            Key::IndicatorStyle => self.indicator_style = from_name(INDICATORS, v)?,
+            Key::SubtleSelection => self.subtle_selection = v.as_bool()?,
+            Key::BrightenInDark => self.brighten_in_dark = v.as_bool()?,
+            Key::UnselectedFillOpacity => {
+                self.unselected_fill_opacity = snapped(v, 0.0, 1.0, 0.05)?
+            }
+            Key::SelectionColor => {
+                self.selection_color = match v {
+                    Value::Null => None,
+                    other => Some(parse_hex(other.as_str()?)?),
+                }
+            }
+            Key::Palette => {
+                self.palette = v
+                    .as_object()?
+                    .iter()
+                    .filter_map(|(k, c)| Some((k.clone(), parse_hex(c.as_str()?)?)))
+                    .collect()
+            }
+            Key::SidebarBackground => {
+                self.sidebar_background = from_name(SIDEBAR_BACKGROUNDS, v)?
+            }
+            Key::SidebarColor => self.sidebar_color = parse_hex(v.as_str()?)?,
+            Key::SidebarFontSize => self.sidebar_font_size = snapped(v, 10.0, 20.0, 0.5)?,
+            Key::HideSidebarDetails => self.hide_sidebar_details = v.as_bool()?,
+            Key::WrapWorkspaceTitles => self.wrap_workspace_titles = v.as_bool()?,
+            Key::TruncatePathFromStart => self.truncate_path_from_start = v.as_bool()?,
+            Key::ShowBranchDirectory => self.show_branch_directory = v.as_bool()?,
+            Key::Bindings => {
+                self.bindings = v
+                    .as_object()?
+                    .iter()
+                    .filter_map(|(k, c)| match c {
+                        Value::Null => Some((k.clone(), None)),
+                        Value::String(s) => Some((k.clone(), Some(s.clone()))),
+                        _ => None,
+                    })
+                    .collect()
+            }
+        }
+        Some(())
+    }
+
+    pub fn reset(&mut self, key: Key) {
+        let default = Settings::default().raw(key);
+        self.set_from_value(key, &default);
+    }
+}
+
+pub fn get<'a>(root: &'a Map<String, Value>, path: &str) -> Option<&'a Value> {
+    let mut parts = path.split('.');
+    let mut cur = root.get(parts.next()?)?;
+    for part in parts {
+        cur = cur.as_object()?.get(part)?;
+    }
+    Some(cur)
+}
+
+/// Inserts along a dotted path; `None` removes the key and prunes parents it leaves empty.
+pub fn put(root: &mut Map<String, Value>, path: &str, value: Option<Value>) {
+    let parts: Vec<&str> = path.split('.').collect();
+    put_parts(root, &parts, value);
+}
+
+fn put_parts(map: &mut Map<String, Value>, parts: &[&str], value: Option<Value>) {
+    let [head, rest @ ..] = parts else { return };
+    if rest.is_empty() {
+        match value {
+            Some(v) => {
+                map.insert((*head).to_string(), v);
+            }
+            None => {
+                map.remove(*head);
+            }
+        }
+        return;
+    }
+    if value.is_none() && !map.get(*head).is_some_and(Value::is_object) {
+        return;
+    }
+    let child = map
+        .entry((*head).to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !child.is_object() {
+        *child = Value::Object(Map::new());
+    }
+    let inner = child.as_object_mut().expect("just made an object");
+    put_parts(inner, rest, value);
+    if inner.is_empty() {
+        map.remove(*head);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
