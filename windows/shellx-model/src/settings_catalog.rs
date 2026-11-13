@@ -250,7 +250,10 @@ const fn toggle(
 }
 
 const fn palette(id: &'static str, name: Str, synonyms: &'static str) -> Row {
-    custom(id, Section::WorkspaceColors, name, synonyms)
+    Row {
+        wired: true,
+        ..custom(id, Section::WorkspaceColors, name, synonyms)
+    }
 }
 
 static ROWS: &[Row] = &[
@@ -563,18 +566,22 @@ static ROWS: &[Row] = &[
         )
     },
     // Workspace Colors.
-    setting(
-        Key::IndicatorStyle,
-        Section::WorkspaceColors,
-        Str::SettingsWorkspaceColorIndicator,
-        None,
-        Control::Picker(&[
-            (Str::SettingsLeftRail, "leftRail"),
-            (Str::SettingsSolidFill, "solidFill"),
-        ]),
-        "workspace color indicator left rail solid fill style stripe chi bao mau phien vach ben trai to dac",
-    ),
     Row {
+        wired: true,
+        ..setting(
+            Key::IndicatorStyle,
+            Section::WorkspaceColors,
+            Str::SettingsWorkspaceColorIndicator,
+            None,
+            Control::Picker(&[
+                (Str::SettingsLeftRail, "leftRail"),
+                (Str::SettingsSolidFill, "solidFill"),
+            ]),
+            "workspace color indicator left rail solid fill style stripe chi bao mau phien vach ben trai to dac",
+        )
+    },
+    Row {
+        wired: true,
         enabled: not_solid_fill,
         ..toggle(
             Key::SubtleSelection,
@@ -585,6 +592,7 @@ static ROWS: &[Row] = &[
         )
     },
     Row {
+        wired: true,
         enabled: not_left_rail,
         ..toggle(
             Key::BrightenInDark,
@@ -595,6 +603,7 @@ static ROWS: &[Row] = &[
         )
     },
     Row {
+        wired: true,
         enabled: not_left_rail,
         ..setting(
             Key::UnselectedFillOpacity,
@@ -611,14 +620,17 @@ static ROWS: &[Row] = &[
             "unselected fill opacity transparency alpha solid fill inactive workspace row do mo duc to mau chua chon",
         )
     },
-    setting(
-        Key::SelectionColor,
-        Section::WorkspaceColors,
-        Str::SettingsSelectionHighlight,
-        Some(Str::SettingsSelectionHighlightSubtitle),
-        Control::Color { resettable: true },
-        "selection highlight selected workspace color background active mau lam noi bat muc chon",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::SelectionColor,
+            Section::WorkspaceColors,
+            Str::SettingsSelectionHighlight,
+            Some(Str::SettingsSelectionHighlightSubtitle),
+            Control::Color { resettable: true },
+            "selection highlight selected workspace color background active mau lam noi bat muc chon",
+        )
+    },
     palette(
         "paletteRed",
         Str::SettingsColorRed,
@@ -700,6 +712,7 @@ static ROWS: &[Row] = &[
         "palette workspace color charcoal bang mau xam than",
     ),
     Row {
+        wired: true,
         subtitle: Some(Str::SettingsResetPaletteSubtitle),
         ..custom(
             "resetPalette",
@@ -1397,6 +1410,28 @@ mod tests {
                 "terminalConfig.window-padding-y",
                 "terminalConfig.scrollback-limit",
                 "terminalConfig.middle-click-action",
+                "workspaceColors.indicatorStyle",
+                "workspaceColors.subtleSelection",
+                "workspaceColors.brightenInDarkMode",
+                "workspaceColors.unselectedFillOpacity",
+                "workspaceColors.selectionColor",
+                "paletteRed",
+                "paletteCrimson",
+                "paletteOrange",
+                "paletteAmber",
+                "paletteOlive",
+                "paletteGreen",
+                "paletteTeal",
+                "paletteAqua",
+                "paletteBlue",
+                "paletteNavy",
+                "paletteIndigo",
+                "palettePurple",
+                "paletteMagenta",
+                "paletteRose",
+                "paletteBrown",
+                "paletteCharcoal",
+                "resetPalette",
                 "sidebarAppearance.background",
                 "sidebarAppearance.tintColor",
                 "terminalConfig.sidebar-font-size",

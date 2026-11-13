@@ -168,6 +168,7 @@ impl Picker {
                     on_click: Box::new(move |_, cx| {
                         picker.update(cx, |this, cx| this.pick(ix, cx)).ok();
                     }),
+                    ..Default::default()
                 }
             })
             .collect();

@@ -22,6 +22,7 @@ use shellx_model::palette::Rgba;
 use shellx_model::settings::{Key, Settings, choice_value, colour_value, flag_value, number_value};
 use shellx_model::settings_catalog::{Control, Row, Section, Unit, row, rows, section_title};
 use shellx_model::strings::{Lang, Str, t};
+use shellx_model::workspace_colors::{BUILT_IN, palette_edit};
 
 use super::{SettingsView, stack};
 use crate::ui::app::Services;
@@ -535,6 +536,33 @@ fn colour_well(
     let subscription = cx.subscribe(&well, move |_, _, event: &ColorEvent, cx| {
         let ColorEvent::Picked(colour) = *event;
         write(key, colour_value(key, colour), cx);
+    });
+    keep(view, row, RowControl::Color(well.clone()), subscription);
+    well
+}
+
+/// The colour well of a palette row (Settings › Workspace Colors): `name`'s colour, with the
+/// built-in colours as swatches. A pick writes the whole palette through `palette_edit`.
+pub(super) fn palette_well(
+    row: &'static Row,
+    name: &'static str,
+    colour: Rgba,
+    view: &mut SettingsView,
+    cx: &mut Context<SettingsView>,
+) -> Entity<ColorWell> {
+    if let Some(RowEntry {
+        control: RowControl::Color(well),
+        ..
+    }) = view.controls.get(row.id)
+    {
+        return well.clone();
+    }
+    let swatches = BUILT_IN.iter().map(|&(_, hex)| Rgba::rgb(hex)).collect();
+    let well = cx.new(|cx| ColorWell::new(colour, swatches, cx));
+    let subscription = cx.subscribe(&well, move |_, _, event: &ColorEvent, cx| {
+        let ColorEvent::Picked(colour) = *event;
+        let value = palette_edit(current(cx), name, colour);
+        write(Key::Palette, Some(value), cx);
     });
     keep(view, row, RowControl::Color(well.clone()), subscription);
     well

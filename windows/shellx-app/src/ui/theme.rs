@@ -8,9 +8,10 @@ use std::sync::{LazyLock, PoisonError, RwLock};
 
 use gpui::{Font, FontFallbacks, FontWeight, Hsla, Pixels, font, px};
 use shellx_model::chrome::{Chrome, accent_color, chrome as derive_chrome};
-use shellx_model::palette::{self, Rgba};
+use shellx_model::palette::Rgba;
 use shellx_model::settings::Settings;
 use shellx_model::theme_file::{self, TermTheme, ThemeSet, is_dark_mode};
+use shellx_model::workspace_colors::{self, CardStyle};
 
 use crate::fonts;
 
@@ -197,19 +198,9 @@ pub fn sidebar_text() -> Hsla {
 pub fn sidebar_muted() -> Hsla {
     hsla(chrome().sidebar_muted)
 }
-/// The sidebar's edge and footer line, and the selected card's border.
+/// The sidebar's edge and footer line.
 pub fn sidebar_line() -> Hsla {
     hsla(chrome().sidebar_line)
-}
-pub fn sidebar_border() -> Hsla {
-    hsla(chrome().sidebar_border)
-}
-/// The selected workspace card's fill and title.
-pub fn session_selected() -> Hsla {
-    hsla(chrome().session_selected)
-}
-pub fn sidebar_selection_title() -> Hsla {
-    hsla(chrome().sidebar_selection_title)
 }
 /// A workspace card under the pointer.
 pub fn session_hover() -> Hsla {
@@ -223,9 +214,20 @@ pub fn sidebar_primary_text() -> Hsla {
 pub fn sidebar_icon_hover() -> Hsla {
     hsla(chrome().sidebar_icon_hover)
 }
-/// The purple rail of a workspace card, at 0.95 (the same on every theme, spec §5.4).
-pub fn rail_purple() -> Hsla {
-    hsla(palette::RAIL_PURPLE.with_alpha(0.95))
+/// What a workspace card of palette colour `color` draws (rail, fill, outline) on this theme's
+/// sidebar, as the model decides it.
+pub fn card_style(settings: &Settings, color: Rgba, selected: bool) -> CardStyle {
+    workspace_colors::card_style(settings, &chrome(), color, selected)
+}
+/// The title and secondary text of an unselected card under the pointer (on the hover fill).
+pub fn hover_card_text() -> (Hsla, Hsla) {
+    let (title, muted) = workspace_colors::hover_card_text(&chrome());
+    (hsla(title), hsla(muted))
+}
+/// The title and secondary text of a card with `fill`, made to read on it.
+pub fn card_text(fill: Option<Rgba>, selected: bool) -> (Hsla, Hsla) {
+    let (title, muted) = workspace_colors::card_text(&chrome(), fill, selected);
+    (hsla(title), hsla(muted))
 }
 /// The terminal's default background and text.
 pub fn term_bg() -> Hsla {
@@ -264,7 +266,9 @@ mod tests {
     use shellx_model::settings::{Accent, Appearance, Settings, SidebarBackground};
     use shellx_model::theme_file::{ThemeSet, shellx};
 
-    use super::{Active, Rgba, palette};
+    use shellx_model::palette;
+
+    use super::{Active, Rgba};
 
     #[test]
     fn the_default_settings_give_the_shellx_theme() {

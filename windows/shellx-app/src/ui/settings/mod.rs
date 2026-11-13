@@ -24,6 +24,7 @@ mod sections {
     pub(super) mod terminal_cards;
     pub(super) mod themes;
     pub(super) mod updates;
+    pub(super) mod workspace_colors;
 }
 
 use std::collections::HashMap;
@@ -272,6 +273,7 @@ impl SettingsView {
             Section::KeyboardShortcuts => sections::shortcuts::render(self, cx),
             Section::Updates => sections::updates::render(self, cx),
             Section::About => sections::about::render(self, cx),
+            Section::WorkspaceColors => sections::workspace_colors::render(self, cx),
             section => rows::section_card(section, self, cx),
         }
     }
