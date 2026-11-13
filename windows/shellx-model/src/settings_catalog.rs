@@ -831,12 +831,15 @@ static ROWS: &[Row] = &[
         )
     },
     // Reset.
-    custom(
-        "resetAll",
-        Section::Reset,
-        Str::SettingsResetAllSettings,
-        "reset all settings factory reset restore defaults clear preferences dat lai tat ca cai dat mac dinh",
-    ),
+    Row {
+        wired: true,
+        ..custom(
+            "resetAll",
+            Section::Reset,
+            Str::SettingsResetAllSettings,
+            "reset all settings factory reset restore defaults clear preferences dat lai tat ca cai dat mac dinh",
+        )
+    },
     // Updates and About (the existing panels).
     Row {
         wired: true,

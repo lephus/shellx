@@ -188,6 +188,15 @@ pub fn opened(view: &mut SettingsView, cx: &mut Context<SettingsView>) {
     view.refresh_shells(cx);
 }
 
+/// Reset All Settings: the shell choice is Automatic again, and the custom line starts
+/// from it. A file that cannot be written keeps the old choice and the section says so.
+pub fn reset_shell(view: &mut SettingsView, cx: &mut Context<SettingsView>) {
+    let saved = shells().set_choice(ShellChoice::Auto).is_ok();
+    view.fill_stored_line(cx);
+    view.terminal.shell_not_saved = !saved;
+    view.refresh_shells(cx);
+}
+
 /// A card's title: the catalogue row's title, as a row's title is drawn.
 fn card_title(text: &'static str) -> Div {
     div()

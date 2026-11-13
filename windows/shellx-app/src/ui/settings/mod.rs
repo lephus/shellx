@@ -20,6 +20,7 @@ mod rows;
 mod sections {
     pub(super) mod about;
     pub(super) mod account;
+    pub(super) mod reset;
     pub(super) mod shortcuts;
     pub(super) mod terminal_cards;
     pub(super) mod themes;
@@ -274,6 +275,7 @@ impl SettingsView {
             Section::Updates => sections::updates::render(self, cx),
             Section::About => sections::about::render(self, cx),
             Section::WorkspaceColors => sections::workspace_colors::render(self, cx),
+            Section::Reset => sections::reset::render(self, cx),
             section => rows::section_card(section, self, cx),
         }
     }
