@@ -80,6 +80,8 @@ pub enum Control {
         max: f32,
         step: f32,
         unit: Unit,
+        /// A "Reset" button beside the slider, where the Mac's row has one.
+        reset: bool,
     },
     Stepper {
         min: f32,
@@ -385,6 +387,7 @@ static ROWS: &[Row] = &[
             max: 14.0,
             step: 0.5,
             unit: Unit::Points,
+            reset: true,
         },
         "tab bar font size title text points pt bigger smaller co chu thanh tab",
     ),
@@ -398,6 +401,7 @@ static ROWS: &[Row] = &[
             max: 3.0,
             step: 0.05,
             unit: Unit::Times,
+            reset: true,
         },
         "scroll speed multiplier wheel mouse touchpad trackpad sensitivity faster slower toc do cuon con lan",
     ),
@@ -536,6 +540,7 @@ static ROWS: &[Row] = &[
                 max: 1.0,
                 step: 0.05,
                 unit: Unit::Percent,
+                reset: false,
             },
             "unselected fill opacity transparency alpha solid fill inactive workspace row do mo duc to mau chua chon",
         )
@@ -671,6 +676,7 @@ static ROWS: &[Row] = &[
             max: 20.0,
             step: 0.5,
             unit: Unit::Points,
+            reset: true,
         },
         "sidebar font size workspace titles text points pt bigger smaller co chu thanh ben",
     ),
