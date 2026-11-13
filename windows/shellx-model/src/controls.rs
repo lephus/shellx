@@ -114,15 +114,17 @@ pub enum NumberEsc {
 }
 
 pub fn number_escape(text: &str, stored: f32) -> NumberEsc {
-    let _ = (text, stored);
-    unimplemented!()
+    if digits(text) == number_text(stored) {
+        NumberEsc::Close
+    } else {
+        NumberEsc::Restore
+    }
 }
 
 /// The value to write when the window closes with `text` in the field: its clamped number,
 /// only when it differs from the stored one.
 pub fn number_pending(text: &str, stored: f32, min: f32, max: f32) -> Option<f32> {
-    let _ = (text, stored, min, max);
-    unimplemented!()
+    number_entry(text, min, max).filter(|value| *value != stored)
 }
 
 /// The unit written after a number field.
@@ -834,7 +836,10 @@ mod tests {
     #[test]
     fn closing_with_an_edit_in_a_number_field_commits_it_clamped() {
         assert_eq!(number_pending("75", 50.0, 0.0, 100_000.0), Some(75.0));
-        assert_eq!(number_pending("999999", 50.0, 0.0, 100_000.0), Some(100_000.0));
+        assert_eq!(
+            number_pending("999999", 50.0, 0.0, 100_000.0),
+            Some(100_000.0)
+        );
         assert_eq!(number_pending("50", 50.0, 0.0, 100_000.0), None);
         assert_eq!(number_pending("", 50.0, 0.0, 100_000.0), None);
         // An edit that clamps to the stored value changes nothing.

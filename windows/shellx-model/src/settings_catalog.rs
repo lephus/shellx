@@ -377,20 +377,23 @@ static ROWS: &[Row] = &[
             "display rendering mode standard compatible gpu direct composition hien thi che do thuong tuong thich",
         )
     },
-    setting(
-        Key::TabBarFontSize,
-        Section::Terminal,
-        Str::SettingsTabBarFontSize,
-        Some(Str::SettingsTabBarFontSizeSubtitle),
-        Control::Slider {
-            min: 8.0,
-            max: 14.0,
-            step: 0.5,
-            unit: Unit::Points,
-            reset: true,
-        },
-        "tab bar font size title text points pt bigger smaller co chu thanh tab",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::TabBarFontSize,
+            Section::Terminal,
+            Str::SettingsTabBarFontSize,
+            Some(Str::SettingsTabBarFontSizeSubtitle),
+            Control::Slider {
+                min: 8.0,
+                max: 14.0,
+                step: 0.5,
+                unit: Unit::Points,
+                reset: true,
+            },
+            "tab bar font size title text points pt bigger smaller co chu thanh tab",
+        )
+    },
     setting(
         Key::ScrollSpeed,
         Section::Terminal,
@@ -420,75 +423,93 @@ static ROWS: &[Row] = &[
         "confirm unsafe paste protection warning multi-line multiple lines newline clipboard xac nhan dan nhieu dong",
     ),
     // "Default" plus the installed monospaced families, known only at run time.
-    setting(
-        Key::FontFamily,
-        Section::Terminal,
-        Str::SettingsFont,
-        None,
-        Control::Custom,
-        "font family typeface monospaced monospace terminal font jetbrains mono phong chu",
-    ),
-    setting(
-        Key::FontSize,
-        Section::Terminal,
-        Str::SettingsFontSize,
-        None,
-        Control::Stepper {
-            min: 4.0,
-            max: 96.0,
-            step: 0.5,
-        },
-        "font size text size points pt bigger smaller zoom co chu",
-    ),
-    setting(
-        Key::CursorStyle,
-        Section::Terminal,
-        Str::SettingsCursorStyle,
-        None,
-        Control::Segmented(&[
-            (Str::SettingsCursorBlock, "block"),
-            (Str::SettingsCursorBar, "bar"),
-            (Str::SettingsCursorUnderline, "underline"),
-            (Str::SettingsCursorHollow, "block_hollow"),
-        ]),
-        "cursor style shape block bar beam underline hollow caret kieu con tro",
-    ),
-    setting(
-        Key::PaddingX,
-        Section::Terminal,
-        Str::SettingsPaddingX,
-        None,
-        Control::Stepper {
-            min: 0.0,
-            max: 200.0,
-            step: 1.0,
-        },
-        "horizontal padding left right margin inset spacing dem ngang le",
-    ),
-    setting(
-        Key::PaddingY,
-        Section::Terminal,
-        Str::SettingsPaddingY,
-        None,
-        Control::Stepper {
-            min: 0.0,
-            max: 200.0,
-            step: 1.0,
-        },
-        "vertical padding top bottom margin inset spacing dem doc le",
-    ),
-    setting(
-        Key::ScrollbackMb,
-        Section::Terminal,
-        Str::SettingsScrollbackLimit,
-        Some(Str::SettingsScrollbackLimitSubtitle),
-        Control::Number {
-            min: 0.0,
-            max: 100_000.0,
-            unit: Unit::Megabytes,
-        },
-        "scrollback limit history buffer lines memory megabytes mb gioi han lich su bo nho",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::FontFamily,
+            Section::Terminal,
+            Str::SettingsFont,
+            None,
+            Control::Custom,
+            "font family typeface monospaced monospace terminal font jetbrains mono phong chu",
+        )
+    },
+    Row {
+        wired: true,
+        ..setting(
+            Key::FontSize,
+            Section::Terminal,
+            Str::SettingsFontSize,
+            None,
+            Control::Stepper {
+                min: 4.0,
+                max: 96.0,
+                step: 0.5,
+            },
+            "font size text size points pt bigger smaller zoom co chu",
+        )
+    },
+    Row {
+        wired: true,
+        ..setting(
+            Key::CursorStyle,
+            Section::Terminal,
+            Str::SettingsCursorStyle,
+            None,
+            Control::Segmented(&[
+                (Str::SettingsCursorBlock, "block"),
+                (Str::SettingsCursorBar, "bar"),
+                (Str::SettingsCursorUnderline, "underline"),
+                (Str::SettingsCursorHollow, "block_hollow"),
+            ]),
+            "cursor style shape block bar beam underline hollow caret kieu con tro",
+        )
+    },
+    Row {
+        wired: true,
+        ..setting(
+            Key::PaddingX,
+            Section::Terminal,
+            Str::SettingsPaddingX,
+            None,
+            Control::Stepper {
+                min: 0.0,
+                max: 200.0,
+                step: 1.0,
+            },
+            "horizontal padding left right margin inset spacing dem ngang le",
+        )
+    },
+    Row {
+        wired: true,
+        ..setting(
+            Key::PaddingY,
+            Section::Terminal,
+            Str::SettingsPaddingY,
+            None,
+            Control::Stepper {
+                min: 0.0,
+                max: 200.0,
+                step: 1.0,
+            },
+            "vertical padding top bottom margin inset spacing dem doc le",
+        )
+    },
+    Row {
+        wired: true,
+        ..setting(
+            Key::ScrollbackMb,
+            Section::Terminal,
+            Str::SettingsScrollbackLimit,
+            Some(Str::SettingsScrollbackLimitSubtitle),
+            Control::Number {
+                min: 0.0,
+                max: 100_000.0,
+                unit: Unit::Megabytes,
+            },
+            "scrollback limit history buffer lines memory megabytes mb gioi han lich su bo nho",
+        )
+    },
     toggle(
         Key::MiddleClickPaste,
         Section::Terminal,
@@ -1294,6 +1315,13 @@ mod tests {
                 "account",
                 "shell",
                 "display",
+                "terminalConfig.surface-tab-bar-font-size",
+                "terminalConfig.font-family",
+                "terminalConfig.font-size",
+                "terminalConfig.cursor-style",
+                "terminalConfig.window-padding-x",
+                "terminalConfig.window-padding-y",
+                "terminalConfig.scrollback-limit",
                 "resetShortcuts",
                 "shortcutList",
                 "updates",

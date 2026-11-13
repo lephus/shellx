@@ -50,11 +50,11 @@ use ghostty_vt::{CellWidth, CursorShape, Rgb};
 use gpui::{
     App, BorderStyle, Bounds, ClickEvent, ClipboardItem, Context, DispatchPhase, Div, Element,
     ElementId, ElementInputHandler, Entity, EntityInputHandler, EventEmitter, FocusHandle,
-    Focusable, Font, FontFallbacks, GlobalElementId, Hitbox, HitboxBehavior, Hsla,
-    InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, Render, ScrollWheelEvent, ShapedLine,
-    SharedString, StrikethroughStyle, Style, Subscription, TextRun, UTF16Selection, UnderlineStyle,
-    Window, div, fill, font, outline, point, prelude::*, px, relative, size,
+    Focusable, Font, GlobalElementId, Hitbox, HitboxBehavior, Hsla, InspectorElementId,
+    IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    PaintQuad, Pixels, Point, Render, ScrollWheelEvent, ShapedLine, SharedString,
+    StrikethroughStyle, Style, Subscription, TextRun, UTF16Selection, UnderlineStyle, Window, div,
+    fill, outline, point, prelude::*, px, relative, size,
 };
 
 use std::sync::Arc;
@@ -71,6 +71,7 @@ use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
+use shellx_model::settings::{CursorPaint, CursorStyle, cursor_paint, cursor_shape};
 use shellx_model::shell::ShellError;
 use shellx_model::strings::{
     Lang, Str, paste_lines_prompt, save_link_failed, shell_fell_back, shell_plan_error, t,
@@ -78,7 +79,7 @@ use shellx_model::strings::{
 
 use super::app::Services;
 use super::button::{Kind, button};
-use super::settings_service::current_keymap;
+use super::settings_service::{current, current_keymap, font_revision};
 use super::theme;
 use crate::fonts;
 use crate::ime::{self, ImeTarget};
@@ -109,9 +110,7 @@ pub(super) enum TermEvent {
     Retry,
 }
 
-const FONT_SIZE: f32 = 14.0;
 const LINE_HEIGHT: f32 = 1.3;
-const PADDING: f32 = 6.0;
 /// How long a status flash ("Mất kết nối, tạm ngừng nhập") stays up.
 const FLASH: Duration = Duration::from_millis(2500);
 
@@ -200,17 +199,14 @@ fn utf8_to_utf16(s: &str, utf8: usize) -> usize {
     utf16_len(&s[..utf8.min(s.len())])
 }
 
-/// The embedded JetBrains Mono, with system fallbacks for glyphs it lacks.
-fn terminal_font() -> Font {
-    let mut f = font(fonts::TERMINAL_FAMILY);
-    f.fallbacks = Some(FontFallbacks::from_fonts(vec![
-        "Cascadia Mono".into(),
-        "Consolas".into(),
-        "Segoe UI".into(),
-        "Segoe UI Emoji".into(),
-        "Segoe UI Symbol".into(),
-    ]));
-    f
+/// The setting's name for the shape ghostty reports.
+fn cursor_style_of(shape: CursorShape) -> CursorStyle {
+    match shape {
+        CursorShape::Block => CursorStyle::Block,
+        CursorShape::Bar => CursorStyle::Bar,
+        CursorShape::Underline => CursorStyle::Underline,
+        CursorShape::BlockHollow => CursorStyle::Hollow,
+    }
 }
 
 /// The grid as last laid out (prepaint): mouse cells and IME geometry.
@@ -289,6 +285,8 @@ pub(super) struct TermView {
     /// `theme::generation` when the terminal last took the active theme's colours (`u64::MAX`:
     /// never).
     theme_generation: u64,
+    /// `settings_service::font_revision` when `font` was last built.
+    font_revision: u64,
 }
 
 impl TermView {
@@ -304,7 +302,7 @@ impl TermView {
         });
         TermView {
             focus_handle: cx.focus_handle(),
-            font: terminal_font(),
+            font: fonts::terminal_font(current(cx).font_family.as_deref(), cx),
             backend: Backend::None,
             failure: None,
             held: false,
@@ -326,6 +324,7 @@ impl TermView {
             title: BASE_TITLE.to_string(),
             // None yet: the first frame sets them, whenever the core was made.
             theme_generation: u64::MAX,
+            font_revision: font_revision(cx),
         }
     }
 
@@ -1204,13 +1203,18 @@ impl Render for TermView {
             _ => self.failed.clone(),
         };
         let flash = self.flash.clone();
+        let (padding_x, padding_y) = {
+            let settings = current(cx);
+            (settings.padding_x as f32, settings.padding_y as f32)
+        };
         let pending = self.pending_paste.as_ref().map(PendingPaste::lines);
         let root = div()
             .relative()
             .size_full()
             .bg(theme::term_bg())
             .text_color(theme::term_fg())
-            .p(px(PADDING))
+            .px(px(padding_x))
+            .py(px(padding_y))
             .cursor_text()
             .track_focus(&self.focus_handle)
             .key_context("Terminal")
@@ -1510,20 +1514,31 @@ impl Element for TermElement {
         cx: &mut App,
     ) -> Self::PrepaintState {
         let hitbox = window.insert_hitbox(bounds, HitboxBehavior::Normal);
+        // A new font family (Settings › Terminal › Font) rebuilds the pane's `Font` once.
+        let revision = font_revision(cx);
+        if self.view.read(cx).font_revision != revision {
+            let font = fonts::terminal_font(current(cx).font_family.as_deref(), cx);
+            self.view.update(cx, |view, _| {
+                view.font = font;
+                view.font_revision = revision;
+            });
+        }
+        let look = current(cx);
+        let (font_px, cursor_style) = (look.font_size, look.cursor_style);
         let base_font = self.view.read(cx).font.clone();
-        let font_size = px(FONT_SIZE);
+        let font_size = px(font_px);
         let text_system = cx.text_system().clone();
         let font_id = text_system.resolve_font(&base_font);
         let cell_w = text_system
             .advance(font_id, font_size, 'M')
             .map(|s| s.width)
-            .unwrap_or(px(FONT_SIZE * 0.6));
+            .unwrap_or(px(font_px * 0.6));
         // Metrics come from the scale factor of THIS frame (per-monitor
         // DPI): whole device pixels per row, and the grid origin snapped to
         // a device pixel, so rows never blur at 125/150/200 %.
         let scale = window.scale_factor();
         let snap = |v: Pixels| px((f32::from(v) * scale).round() / scale);
-        let line_h = px((FONT_SIZE * LINE_HEIGHT * scale).round() / scale);
+        let line_h = px((font_px * LINE_HEIGHT * scale).round() / scale);
         let grid_origin = point(snap(bounds.origin.x), snap(bounds.origin.y));
         let cols = (f32::from(bounds.size.width) / f32::from(cell_w))
             .floor()
@@ -1534,7 +1549,7 @@ impl Element for TermElement {
         let cell_w_px = (f32::from(cell_w) * scale).round() as u32;
         let cell_h_px = (f32::from(line_h) * scale).round() as u32;
 
-        let (frame, ime_cell, selection, marked, focused, title) =
+        let (frame, ime_cell, selection, marked, focused, title, program_cursor) =
             self.view.update(cx, |view, _| {
                 view.cell_width = cell_w;
                 view.line_height = line_h;
@@ -1542,7 +1557,7 @@ impl Element for TermElement {
                 let focused = view.focus_handle.is_focused(window);
                 // This frame's core (a remote reset may have replaced it).
                 let Some(session) = view.backend.core() else {
-                    return (None, None, None, None, focused, None);
+                    return (None, None, None, None, focused, None, None);
                 };
                 // The theme was replaced since this terminal took its colours.
                 let generation = theme::generation();
@@ -1556,6 +1571,12 @@ impl Element for TermElement {
                 let reflowed = session.vt_cols_rows() != size_before;
                 let title = session.title();
                 let frame = session.frame().ok();
+                // A shape the program asked for (DECSCUSR) wins over the setting.
+                let program_cursor = frame
+                    .as_ref()
+                    .zip(session.cursor_overridden().then_some(()))
+                    .map(|(frame, ())| frame.cursor_visual.0)
+                    .map(cursor_style_of);
                 // The live cursor, not the viewport one: see `ime_cell`.
                 let ime_cell = frame
                     .as_ref()
@@ -1572,6 +1593,7 @@ impl Element for TermElement {
                     view.marked.clone(),
                     focused,
                     title,
+                    program_cursor,
                 )
             });
         let mut out = Prepaint {
@@ -1757,29 +1779,28 @@ impl Element for TermElement {
                 out.preedit = Some(TextPaint { origin, line });
             }
             let cell = Bounds::new(cursor_origin, size(cell_w, line_h));
-            let shape = match (&marked, frame.cursor) {
-                (None, Some(cursor)) => cursor.shape,
-                _ => CursorShape::Bar,
+            // Composing shows a bar; otherwise the program's shape, else the setting's. An
+            // unfocused pane keeps the hollow block.
+            let style = match (&marked, focused) {
+                (Some(_), true) => CursorStyle::Bar,
+                (_, false) => CursorStyle::Hollow,
+                (None, true) => cursor_shape(cursor_style, program_cursor),
             };
-            out.cursor = Some(match (focused, shape) {
-                (false, _) | (true, CursorShape::BlockHollow) => {
-                    outline(cell, color, BorderStyle::Solid)
-                }
-                (true, CursorShape::Bar) => {
-                    fill(Bounds::new(cursor_origin, size(px(2.0), line_h)), color)
-                }
-                (true, CursorShape::Underline) => fill(
-                    Bounds::new(
-                        point(cursor_origin.x, cursor_origin.y + line_h - px(2.0)),
-                        size(cell_w, px(2.0)),
-                    ),
-                    color,
-                ),
-                (true, CursorShape::Block) => {
+            let rect = Rect {
+                x: f32::from(cell.origin.x),
+                y: f32::from(cell.origin.y),
+                w: f32::from(cell.size.width),
+                h: f32::from(cell.size.height),
+            };
+            let bounds = |r: Rect| Bounds::new(point(px(r.x), px(r.y)), size(px(r.w), px(r.h)));
+            out.cursor = Some(match cursor_paint(style, rect) {
+                CursorPaint::Outline(r) => outline(bounds(r), color, BorderStyle::Solid),
+                CursorPaint::Fill(r) if style == CursorStyle::Block => {
                     let mut block = color;
                     block.a = 0.55;
-                    fill(cell, block)
+                    fill(bounds(r), block)
                 }
+                CursorPaint::Fill(r) => fill(bounds(r), color),
             });
         }
 

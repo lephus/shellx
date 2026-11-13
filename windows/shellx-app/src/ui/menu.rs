@@ -15,14 +15,16 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, ClickEvent, Corner, IntoElement, MouseDownEvent, Pixels, SharedString, Window, anchored,
-    deferred, div, point, prelude::*, px,
+    App, ClickEvent, Corner, IntoElement, MouseDownEvent, Pixels, ScrollHandle, SharedString,
+    Window, anchored, deferred, div, point, prelude::*, px,
 };
 
 use super::theme;
 
 /// Narrowest the menu gets, in px.
 const MIN_W: f32 = 220.0;
+/// Tallest a scrolling menu gets (`popover_highlighted`), in px: about ten rows.
+const MAX_SCROLLING_H: f32 = 280.0;
 
 /// A row's action, and `on_close`.
 type Action = dyn Fn(&mut Window, &mut App);
@@ -43,13 +45,22 @@ pub(super) fn popover(
     menu(items, None, on_close, Corner::TopLeft, px(4.0))
 }
 
-/// `popover` with row `highlighted` marked as the hovered row is.
+/// `popover` with row `highlighted` marked as the hovered row is. A list taller than
+/// `MAX_SCROLLING_H` scrolls (mouse wheel, and `scroll.scroll_to_item` keeps the highlighted
+/// row in view); a shorter one looks as `popover` does.
 pub(super) fn popover_highlighted(
     items: Vec<MenuItem>,
     highlighted: usize,
+    scroll: &ScrollHandle,
     on_close: impl Fn(&mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    menu(items, Some(highlighted), on_close, Corner::TopLeft, px(4.0))
+    menu(
+        items,
+        Some((highlighted, scroll)),
+        on_close,
+        Corner::TopLeft,
+        px(4.0),
+    )
 }
 
 /// Opens up from the anchor point, 4 px above it.
@@ -63,13 +74,18 @@ pub(super) fn popover_above(
 /// `corner` of the menu goes `gap` (down is positive) from the anchor point.
 fn menu(
     items: Vec<MenuItem>,
-    highlighted: Option<usize>,
+    highlighted: Option<(usize, &ScrollHandle)>,
     on_close: impl Fn(&mut Window, &mut App) + 'static,
     corner: Corner,
     gap: Pixels,
 ) -> impl IntoElement {
     let on_close: Rc<Action> = Rc::new(on_close);
+    let (highlighted, scroll) = match highlighted {
+        Some((ix, scroll)) => (Some(ix), Some(scroll)),
+        None => (None, None),
+    };
     let mut list = div()
+        .id("menu-list")
         .occlude()
         .flex()
         .flex_col()
@@ -84,6 +100,11 @@ fn menu(
         .on_mouse_down_out({
             let on_close = on_close.clone();
             move |_: &MouseDownEvent, window, cx| on_close(window, cx)
+        })
+        .when_some(scroll, |list, scroll| {
+            list.max_h(px(MAX_SCROLLING_H))
+                .overflow_y_scroll()
+                .track_scroll(scroll)
         });
     for (ix, item) in items.into_iter().enumerate() {
         let on_close = on_close.clone();
@@ -95,6 +116,7 @@ fn menu(
         list = list.child(
             div()
                 .id(("menu-item", ix))
+                .flex_none()
                 .flex()
                 .flex_row()
                 .items_center()

@@ -11,11 +11,15 @@ use gpui::{
     ClickEvent, Context, Div, Entity, Focusable, FontWeight, SharedString, Stateful, Subscription,
     Window, div, prelude::*, px, svg,
 };
+use serde_json::Value;
+use shellx_model::settings::Key;
+use shellx_model::settings_catalog::{Row, row};
 use shellx_model::shell::{CustomShellError, ShellChoice, ShellKind, custom_launch, kind_label};
 use shellx_model::strings::{Lang, Str, custom_shell_error, shell_auto_label, t, will_run};
 
-use super::super::rows::rows_card;
+use super::super::rows::{catalogue_row, rows_card};
 use super::super::{SettingsView, card_body, muted, stack};
+use crate::fonts;
 use crate::local_pty::settings::{
     ShellOption, is_program_file, is_selected, shell_options, shells, shown_choice,
 };
@@ -23,7 +27,8 @@ use crate::startup;
 use crate::ui::app::Services;
 use crate::ui::assets::Icon;
 use crate::ui::button::{Kind, button};
-use crate::ui::controls::{card, section_header};
+use crate::ui::controls::{Picker, PickerEvent, card, row as card_row, section_header};
+use crate::ui::settings_service::{SettingsService, current};
 use crate::ui::text_field::TextField;
 use crate::ui::theme;
 
@@ -35,8 +40,8 @@ const BEHAVIOUR_ROWS: &[&str] = &[
     "terminal.confirmUnsafePaste",
 ];
 
-/// The Mac's second card (`TerminalGhosttyOptionsCard.swift`). The Font row is drawn by the
-/// task that wires it (its options exist only at run time); `rows_card` skips it until then.
+/// The Mac's second card (`TerminalGhosttyOptionsCard.swift`). The Font row is drawn here
+/// (`font_row`: its options exist only at run time), the others by `catalogue_row`.
 const OPTION_ROWS: &[&str] = &[
     "terminalConfig.font-family",
     "terminalConfig.font-size",
@@ -66,6 +71,9 @@ pub struct TerminalCards {
     shell_not_saved: bool,
     /// "Try standard display mode again" was stored for the next start.
     standard_requested: bool,
+    /// The Font row's picker, made the first time the section is drawn (it lists the installed
+    /// monospaced families, which are measured once).
+    font_picker: Option<(Entity<Picker>, Subscription)>,
 }
 
 impl TerminalCards {
@@ -93,6 +101,7 @@ impl TerminalCards {
             refreshing: false,
             shell_not_saved: false,
             standard_requested: false,
+            font_picker: None,
         };
         (cards, subscriptions)
     }
@@ -105,13 +114,75 @@ pub fn render(view: &mut SettingsView, cx: &mut Context<SettingsView>) -> Div {
     let display = card().child(view.display_body(lang, cx));
     let display = view.anchored("display", display);
     let behaviour = rows_card(BEHAVIOUR_ROWS, view, cx);
-    let options = rows_card(OPTION_ROWS, view, cx);
+    let options = options_card(view, cx);
     stack()
         .child(section_header(t(lang, Str::Terminal).into()))
         .child(shell)
         .child(display)
         .children(behaviour)
         .children(options)
+}
+
+/// The second card: the catalogue rows that are wired, the Font row among them.
+fn options_card(view: &mut SettingsView, cx: &mut Context<SettingsView>) -> Option<Div> {
+    let drawn: Vec<Div> = OPTION_ROWS
+        .iter()
+        .filter_map(|id| row(id))
+        .filter_map(|row| {
+            if row.key == Some(Key::FontFamily) {
+                font_row(row, view, cx)
+            } else {
+                catalogue_row(row, view, cx)
+            }
+        })
+        .collect();
+    (!drawn.is_empty()).then(|| card().children(drawn))
+}
+
+/// The Font row: "Default" and the installed monospaced families. A stored family that is not
+/// installed is listed, selected, with "(not installed)" after it, and draws with the default.
+fn font_row(
+    row: &'static Row,
+    view: &mut SettingsView,
+    cx: &mut Context<SettingsView>,
+) -> Option<Div> {
+    if !row.wired {
+        return None;
+    }
+    let lang = cx.global::<Services>().lang;
+    let stored = current(cx).font_family.clone().unwrap_or_default();
+    let picker = match &view.terminal.font_picker {
+        Some((picker, _)) => picker.clone(),
+        None => {
+            let families = fonts::monospace_families(cx);
+            let mut options: Vec<(SharedString, SharedString)> = vec![(
+                t(lang, Str::SettingsDefault).into(),
+                SharedString::default(),
+            )];
+            if !stored.is_empty()
+                && !families
+                    .iter()
+                    .any(|family| family.as_ref() == stored.as_str())
+            {
+                let label = format!("{stored} {}", t(lang, Str::SettingsFontNotInstalled));
+                options.push((label.into(), stored.clone().into()));
+            }
+            options.extend(families.into_iter().map(|family| (family.clone(), family)));
+            let picker = cx.new(|cx| Picker::new(options, stored.clone(), cx));
+            let subscription = cx.subscribe(&picker, |_, _, event: &PickerEvent, cx| {
+                let PickerEvent::Picked(family) = event;
+                let family = Value::String(family.to_string());
+                SettingsService::entity(cx)
+                    .update(cx, |service, cx| service.set(Key::FontFamily, family, cx));
+            });
+            view.terminal.font_picker = Some((picker.clone(), subscription));
+            picker
+        }
+    };
+    picker.update(cx, |picker, cx| picker.set_value(stored, cx));
+    let title = t(lang, row.title).into();
+    let line = view.anchored(row.id, card_row(title, None, picker, false));
+    Some(div().child(line))
 }
 
 /// Settings was opened: the custom row starts from what is stored and the shells are looked

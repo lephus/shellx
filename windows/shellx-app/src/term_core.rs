@@ -4,15 +4,31 @@
 //! shared. No UI here, so `--smoke` and the window drive the same code.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context as _, Result};
 use ghostty_vt::{Callbacks, KeyEncoder, RenderFrame, RenderState, Rgb, Terminal};
 use shellx_model::palette::Rgba;
 use shellx_model::paste::encode_paste;
 use shellx_model::selection::Viewport;
+use shellx_model::settings::Settings;
 use shellx_model::theme_file::TermTheme;
 
-pub const SCROLLBACK_BYTES: usize = 10 * 1024 * 1024;
+/// The scrollback of terminals made from now on, in bytes (0: not set, the setting's default).
+/// Settings › Terminal › Scrollback Limit sets it (`set_scrollback_bytes`); a terminal already
+/// open keeps the limit it was made with.
+static SCROLLBACK_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+pub fn set_scrollback_bytes(bytes: usize) {
+    SCROLLBACK_BYTES.store(bytes, Ordering::Relaxed);
+}
+
+fn scrollback_bytes() -> usize {
+    match SCROLLBACK_BYTES.load(Ordering::Relaxed) {
+        0 => shellx_model::settings::scrollback_bytes(Settings::default().scrollback_mb),
+        set => set,
+    }
+}
 
 /// The byte link under a terminal pane. `&self` everywhere so libghostty's
 /// `on_pty_write` callback (DSR/DA replies) can hold an `Arc<dyn PtyLink>`.
@@ -77,7 +93,7 @@ impl TermCore {
             },
             ..Default::default()
         };
-        let terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)
+        let terminal = Terminal::new(cols, rows, scrollback_bytes(), callbacks)
             .context("failed to create libghostty-vt terminal")?;
         let render = RenderState::new().context("failed to create render state")?;
         let encoder = KeyEncoder::new().context("failed to create key encoder")?;
@@ -235,6 +251,11 @@ impl TermCore {
 
     pub fn scroll_to_bottom(&mut self) {
         self.terminal.scroll_to_bottom();
+    }
+
+    /// The program set the cursor shape itself (DECSCUSR) and has not reset it.
+    pub fn cursor_overridden(&self) -> bool {
+        self.terminal.cursor_overridden()
     }
 
     /// Cursor (col, row) in the active screen, also while the cursor is

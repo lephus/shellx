@@ -290,8 +290,8 @@ mod tests {
 
     #[test]
     fn unwired_rows_are_not_found() {
-        assert!(!everything("font size", Lang::En).is_empty());
-        assert!(search("font size", Lang::En).is_empty());
+        assert!(!everything("scroll speed", Lang::En).is_empty());
+        assert!(search("scroll speed", Lang::En).is_empty());
         // A section without a wired row is not offered either.
         assert!(
             search("themes", Lang::En)

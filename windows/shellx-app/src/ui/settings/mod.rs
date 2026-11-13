@@ -189,13 +189,19 @@ impl SettingsView {
 
     /// The panel's close button: the host closes Settings.
     fn request_close(&mut self, cx: &mut Context<Self>) {
+        self.commit_edits(cx);
         cx.emit(SettingsViewEvent::Close);
+    }
+
+    /// Settings is closing (by any way): a number field holding an edit keeps it.
+    fn commit_edits(&mut self, cx: &mut Context<Self>) {
+        rows::commit_pending_numbers(self, cx);
     }
 
     /// Esc, Tab or Shift+Tab in one of the view's text fields (the field stops them).
     fn field_event(&mut self, event: TextFieldEvent, cx: &mut Context<Self>) {
         match event {
-            TextFieldEvent::Cancel => cx.emit(SettingsViewEvent::Close),
+            TextFieldEvent::Cancel => self.request_close(cx),
             TextFieldEvent::Next => self.move_focus(false, cx),
             TextFieldEvent::Prev => self.move_focus(true, cx),
             TextFieldEvent::Submit => {}
@@ -223,7 +229,7 @@ impl SettingsView {
         };
         cx.stop_propagation();
         match action {
-            ViewKey::Close => cx.emit(SettingsViewEvent::Close),
+            ViewKey::Close => self.request_close(cx),
             ViewKey::Next => window.focus_next(),
             ViewKey::Prev => window.focus_prev(),
         }
