@@ -29,8 +29,8 @@ pub mod sidebar;
 pub mod start_guard;
 pub mod strings;
 pub mod tabs;
-pub mod theme_file;
 pub mod text_edit;
+pub mod theme_file;
 pub mod update;
 
 pub use keys::Dir;

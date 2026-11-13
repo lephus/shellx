@@ -72,7 +72,7 @@ fi
 # 2. Sources: the three trees the windows workspace needs, plus the pinned ghostty.
 src="$(mktemp -d "${TMPDIR:-/tmp}/shellx-wincheck.XXXXXX")"
 tmp_dirs+=("$src")
-git archive "$commit" windows cmux-tui shellx-core | tar -x -m -C "$src"
+git archive "$commit" windows cmux-tui shellx-core Resources/ghostty/themes | tar -x -m -C "$src"
 candidates=()
 [[ -z "${CMUX_GHOSTTY_SRC:-}" ]] || candidates+=("$CMUX_GHOSTTY_SRC")
 candidates+=("$repo/ghostty")
