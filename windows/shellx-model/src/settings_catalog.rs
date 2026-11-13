@@ -681,7 +681,8 @@ static ROWS: &[Row] = &[
         Str::SettingsHideAllSidebarDetailsSubtitle,
         "hide all sidebar details compact only titles minimal an moi chi tiet thanh ben",
     ),
-    // The Mac leaves this one on while details are hidden: the titles still show.
+    // Stays enabled while details are hidden, since the titles still show (as the Mac's
+    // SidebarSection.swift does).
     toggle(
         Key::WrapWorkspaceTitles,
         Section::Sidebar,
@@ -1240,7 +1241,10 @@ mod tests {
             assert!(enabled(id, &defaults), "{id}");
             assert!(!enabled(id, &hidden), "{id}");
         }
-        // As on the Mac (SidebarSection.swift): titles still show, so wrapping them stays on.
+        // While Hide All Sidebar Details is on, Truncate Path From Start and Show Branch +
+        // Directory are disabled (above) but Wrap Workspace Titles stays enabled: the titles
+        // still show. The Mac does the same (Packages/macOS/CmuxSettingsUI/Sources/
+        // CmuxSettingsUI/Sections/SidebarSection.swift: no `.disabled(hideAll.current)` on it).
         assert!(enabled("sidebar.wrapWorkspaceTitles", &hidden));
         assert!(enabled("sidebar.hideAllDetails", &hidden));
     }

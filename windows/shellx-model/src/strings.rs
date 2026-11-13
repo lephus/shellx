@@ -1886,6 +1886,43 @@ mod tests {
         assert_eq!(Str::ALL.len(), 308);
     }
 
+    /// Settings copy names only what the Windows app has: no Mac keys or menus, no browser,
+    /// no Ghostty config, no `shellx.json`.
+    #[test]
+    fn settings_strings_name_only_what_windows_has() {
+        const WORDS: &[&str] = &[
+            "mac", "macos", "cmd", "finder", "trackpad", "ghostty", "browser", "dock",
+        ];
+        const PHRASES: &[&str] = &[
+            "⌘",
+            "shellx.json",
+            "menu bar",
+            "thanh menu",
+            "trình duyệt",
+            "choose custom color",
+            "custom n",
+            "app settings",
+            "cài đặt ứng dụng",
+        ];
+        let settings = Str::ALL
+            .iter()
+            .copied()
+            .filter(|s| format!("{s:?}").starts_with("Settings"))
+            // Spec §5.3 names this group "Sidebar & Dock", as the Mac does.
+            .filter(|s| *s != Str::SettingsGroupSidebarAndDock);
+        for s in settings {
+            for lang in [Lang::En, Lang::Vi] {
+                let text = t(lang, s).to_lowercase();
+                for word in text.split(|c: char| !c.is_alphanumeric()) {
+                    assert!(!WORDS.contains(&word), "{s:?} {lang:?}: {text}");
+                }
+                for phrase in PHRASES {
+                    assert!(!text.contains(phrase), "{s:?} {lang:?}: {text}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn settings_sentences_with_a_value() {
         assert_eq!(
