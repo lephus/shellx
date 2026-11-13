@@ -59,6 +59,7 @@ use gpui::{
 
 use std::sync::Arc;
 
+use shellx_model::keymap::Keymap;
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
 use shellx_model::modal::{StoppedPaneKey, stopped_pane_key};
@@ -91,6 +92,14 @@ use crate::remote_tabs::{OpenError, Overlay, Tone, coalesce, failed_overlay, ove
 use crate::shell_info::{BASE_TITLE, ScreenReaderProbe, a11y_title_env, window_title};
 use crate::term_core::{PtyLink, TermCore, rgb};
 use crate::workspace::spawn_local_pane_with;
+
+/// The keymap the panes and the root read keys with: the defaults (1.7.1's
+/// shortcuts), built once. K2 replaces it with the settings service's keymap,
+/// which follows `shortcuts.bindings`.
+pub(super) fn default_keymap() -> &'static Keymap {
+    static KEYMAP: OnceLock<Keymap> = OnceLock::new();
+    KEYMAP.get_or_init(|| Keymap::from_bindings(&Default::default()))
+}
 
 /// What a pane tells RootView.
 pub(super) enum TermEvent {
@@ -883,7 +892,7 @@ impl TermView {
         // No shell runs (held, or it could not start): a fresh key retries
         // (`modal::stopped_pane_key`; never its auto-repeat).
         if self.held || self.failure.is_some() {
-            match stopped_pane_key(&key, &ctx, event.is_held) {
+            match stopped_pane_key(&key, default_keymap(), &ctx, event.is_held) {
                 StoppedPaneKey::Command(command) => {
                     cx.emit(TermEvent::Command(command));
                     cx.stop_propagation();
@@ -914,7 +923,7 @@ impl TermView {
                 ConfirmKey::CancelAndPass => self.cancel_paste(cx),
             }
         }
-        match map_key(&key, &ctx) {
+        match map_key(&key, default_keymap(), &ctx) {
             KeyAction::App(command @ (AppCommand::Copy | AppCommand::Paste)) => {
                 self.clipboard_command(command, cx);
                 cx.stop_propagation();

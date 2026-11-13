@@ -1,4 +1,7 @@
-//! Key mapping following Windows Terminal conventions.
+//! Key mapping following Windows Terminal conventions. Which chords are app
+//! commands is the keymap's (`keymap::Keymap`).
+
+use crate::keymap::Keymap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dir {
@@ -40,6 +43,9 @@ pub enum AppCommand {
     FocusPane(Dir),
     ToggleSidebar,
     OpenSettings,
+    /// The title bar's Back and Forward (focus history); no default chord.
+    FocusBack,
+    FocusForward,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -75,35 +81,6 @@ fn is_named(key: &str) -> bool {
         .is_some_and(|n| (1..=24).contains(&n))
 }
 
-fn app_binding(key: &str, ctrl: bool, alt: bool, shift: bool, ctx: &KeyCtx) -> Option<AppCommand> {
-    use AppCommand::*;
-    match (ctrl, alt, shift, key) {
-        (true, false, true, "c") => Some(Copy),
-        (true, false, false, "c") if ctx.has_selection => Some(Copy),
-        (true, false, true, "v") => Some(Paste),
-        (false, false, true, "insert") => Some(Paste),
-        (true, false, true, "n") => Some(NewWorkspace),
-        (true, false, true, "t") => Some(NewTerminal),
-        (true, false, true, "w") => Some(ClosePane),
-        (true, false, false, "tab") => Some(NextTab),
-        (true, false, true, "tab") => Some(PrevTab),
-        (true, false, false, "pagedown") => Some(NextTab),
-        (true, false, false, "pageup") => Some(PrevTab),
-        (false, true, true, "=" | "+") => Some(SplitRight),
-        (false, true, true, "-" | "_") => Some(SplitDown),
-        // GPUI-Windows reports Alt+Shift+= as "+" and Alt+Shift+- as "_" with shift consumed.
-        (false, true, false, "+") => Some(SplitRight),
-        (false, true, false, "_") => Some(SplitDown),
-        (false, true, false, "left") => Some(FocusPane(Dir::Left)),
-        (false, true, false, "right") => Some(FocusPane(Dir::Right)),
-        (false, true, false, "up") => Some(FocusPane(Dir::Up)),
-        (false, true, false, "down") => Some(FocusPane(Dir::Down)),
-        (true, false, true, "b") => Some(ToggleSidebar),
-        (true, false, false, ",") => Some(OpenSettings),
-        _ => None,
-    }
-}
-
 /// Alt+F4 and Alt+Space (Alt held alone) belong to Windows: close the window, open the
 /// system menu. The terminal must neither send them nor swallow them.
 pub fn is_window_system_key(k: &KeyIn) -> bool {
@@ -114,20 +91,23 @@ pub fn is_window_system_key(k: &KeyIn) -> bool {
         && matches!(k.key.to_lowercase().as_str(), "f4" | "space")
 }
 
-pub fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
+/// What a key-down in a terminal is: the app command `keymap` gives it, else
+/// a chord for the shell, else text for the IME / WM_CHAR path. A key that
+/// maps to no command stays the terminal's.
+pub fn map_key(k: &KeyIn, keymap: &Keymap, ctx: &KeyCtx) -> KeyAction {
     if ctx.composing || k.win {
         return KeyAction::Ignore;
     }
     if is_window_system_key(k) {
         return KeyAction::Ignore;
     }
-    let key = k.key.to_lowercase();
-    if let Some(cmd) = app_binding(&key, k.ctrl, k.alt, k.shift, ctx) {
+    if k.ctrl && k.alt {
+        return KeyAction::Text; // AltGr: never a shortcut (`keymap::accept`)
+    }
+    if let Some(cmd) = keymap.command(k, ctx) {
         return KeyAction::App(cmd);
     }
-    if k.ctrl && k.alt {
-        return KeyAction::Text; // AltGr
-    }
+    let key = k.key.to_lowercase();
     let space_mod = key == "space" && (k.ctrl || k.alt);
     if is_named(&key) || space_mod || k.ctrl || k.alt {
         let mut s = String::new();

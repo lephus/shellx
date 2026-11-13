@@ -2,6 +2,435 @@
 //! README's table; `shortcuts.bindings` in the settings file rebinds or
 //! unbinds an action (Settings › Keyboard Shortcuts writes it).
 
+use crate::keys::{AppCommand, Dir, KeyCtx, KeyIn, is_window_system_key};
+use crate::strings::{Lang, Str, shortcut_conflict, t};
+use std::collections::BTreeMap;
+
+/// A key with its modifiers. Written "ctrl+shift+n": lower case, modifiers in
+/// ctrl, alt, shift order. The Windows key is never part of one (`accept`).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Chord {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    /// The GPUI key name in lower case: "n", "tab", "left", "f5", "=", ",".
+    pub key: String,
+}
+
+impl Chord {
+    /// Reads "ctrl+shift+n" in any case and modifier order (the key "+" is
+    /// written "ctrl++"). `None` for an unknown or repeated modifier, a
+    /// missing key or a space.
+    pub fn parse(text: &str) -> Option<Chord> {
+        let text = text.to_lowercase();
+        let (mods, key) = if text == "+" {
+            ("", "+")
+        } else if let Some(mods) = text.strip_suffix("++") {
+            (mods, "+")
+        } else {
+            text.rsplit_once('+').unwrap_or(("", &text))
+        };
+        if key.is_empty()
+            || key.chars().any(char::is_whitespace)
+            || ["ctrl", "alt", "shift"].contains(&key)
+        {
+            return None;
+        }
+        let mut chord = Chord {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            key: key.to_string(),
+        };
+        if !mods.is_empty() {
+            for m in mods.split('+') {
+                let on = match m {
+                    "ctrl" => &mut chord.ctrl,
+                    "alt" => &mut chord.alt,
+                    "shift" => &mut chord.shift,
+                    _ => return None,
+                };
+                if std::mem::replace(on, true) {
+                    return None;
+                }
+            }
+        }
+        Some(chord.normalised())
+    }
+
+    /// The written form, the one `parse` reads and `shortcuts.bindings` stores.
+    pub fn text(&self) -> String {
+        self.joined(["ctrl+", "alt+", "shift+"], &self.key)
+    }
+
+    /// The form shown to people: "Ctrl+Shift+N", "Alt+←", "Ctrl+,".
+    pub fn label(&self) -> String {
+        self.joined(["Ctrl+", "Alt+", "Shift+"], &key_label(&self.key))
+    }
+
+    /// The chord a key-down is.
+    pub fn of(k: &KeyIn) -> Chord {
+        Chord {
+            ctrl: k.ctrl,
+            alt: k.alt,
+            shift: k.shift,
+            key: k.key.to_lowercase(),
+        }
+        .normalised()
+    }
+
+    /// GPUI-Windows reports Alt+Shift+= as "+" and Alt+Shift+- as "_", with
+    /// shift consumed: each shape is the one chord "alt+shift+=" / "alt+shift+-".
+    fn normalised(mut self) -> Chord {
+        if self.alt {
+            let key = match self.key.as_str() {
+                "+" => "=",
+                "_" => "-",
+                _ => return self,
+            };
+            self.key = key.to_string();
+            self.shift = true;
+        }
+        self
+    }
+
+    fn joined(&self, names: [&str; 3], key: &str) -> String {
+        let mut s = String::new();
+        for (on, name) in [self.ctrl, self.alt, self.shift].into_iter().zip(names) {
+            if on {
+                s.push_str(name);
+            }
+        }
+        s.push_str(key);
+        s
+    }
+}
+
+/// Arrows as arrows, Esc short, any other key name capitalised ("F5", "Tab").
+fn key_label(key: &str) -> String {
+    let named = match key {
+        "left" => "←",
+        "right" => "→",
+        "up" => "↑",
+        "down" => "↓",
+        "pageup" => "PageUp",
+        "pagedown" => "PageDown",
+        "escape" => "Esc",
+        _ => {
+            let mut chars = key.chars();
+            return chars
+                .next()
+                .map(|first| first.to_uppercase().chain(chars).collect())
+                .unwrap_or_default();
+        }
+    };
+    named.to_string()
+}
+
+/// A command with a row in Settings › Keyboard Shortcuts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Action {
+    OpenSettings,
+    ToggleSidebar,
+    NewWorkspace,
+    NewTerminal,
+    CloseTab,
+    NextWorkspace,
+    PrevWorkspace,
+    SplitRight,
+    SplitDown,
+    FocusLeft,
+    FocusRight,
+    FocusUp,
+    FocusDown,
+    FocusBack,
+    FocusForward,
+    Copy,
+    Paste,
+}
+
+impl Action {
+    /// The list order.
+    pub const ALL: &'static [Action] = &[
+        Action::OpenSettings,
+        Action::ToggleSidebar,
+        Action::NewWorkspace,
+        Action::NewTerminal,
+        Action::CloseTab,
+        Action::NextWorkspace,
+        Action::PrevWorkspace,
+        Action::SplitRight,
+        Action::SplitDown,
+        Action::FocusLeft,
+        Action::FocusRight,
+        Action::FocusUp,
+        Action::FocusDown,
+        Action::FocusBack,
+        Action::FocusForward,
+        Action::Copy,
+        Action::Paste,
+    ];
+
+    /// The key in `shortcuts.bindings`: the Mac's action id.
+    pub fn id(self) -> &'static str {
+        match self {
+            Action::OpenSettings => "openSettings",
+            Action::ToggleSidebar => "toggleSidebar",
+            Action::NewWorkspace => "newTab",
+            Action::NewTerminal => "newSurface",
+            Action::CloseTab => "closeTab",
+            Action::NextWorkspace => "nextSidebarTab",
+            Action::PrevWorkspace => "prevSidebarTab",
+            Action::SplitRight => "splitRight",
+            Action::SplitDown => "splitDown",
+            Action::FocusLeft => "focusLeft",
+            Action::FocusRight => "focusRight",
+            Action::FocusUp => "focusUp",
+            Action::FocusDown => "focusDown",
+            Action::FocusBack => "focusHistoryBack",
+            Action::FocusForward => "focusHistoryForward",
+            Action::Copy => "copy",
+            Action::Paste => "paste",
+        }
+    }
+
+    /// The row's title: the Mac's.
+    pub fn title(self) -> Str {
+        match self {
+            Action::OpenSettings => Str::SettingsActionOpenSettings,
+            Action::ToggleSidebar => Str::SettingsActionToggleSidebar,
+            Action::NewWorkspace => Str::SettingsActionNewWorkspace,
+            Action::NewTerminal => Str::SettingsActionNewSurface,
+            Action::CloseTab => Str::SettingsActionCloseTab,
+            Action::NextWorkspace => Str::SettingsActionNextWorkspace,
+            Action::PrevWorkspace => Str::SettingsActionPreviousWorkspace,
+            Action::SplitRight => Str::SettingsActionSplitRight,
+            Action::SplitDown => Str::SettingsActionSplitDown,
+            Action::FocusLeft => Str::SettingsActionFocusPaneLeft,
+            Action::FocusRight => Str::SettingsActionFocusPaneRight,
+            Action::FocusUp => Str::SettingsActionFocusPaneUp,
+            Action::FocusDown => Str::SettingsActionFocusPaneDown,
+            Action::FocusBack => Str::SettingsActionFocusBack,
+            Action::FocusForward => Str::SettingsActionFocusForward,
+            Action::Copy => Str::SettingsActionCopy,
+            Action::Paste => Str::SettingsActionPaste,
+        }
+    }
+
+    /// The chord in `windows/README.md`'s table; Back and Forward have none.
+    pub fn default_chord(self) -> Option<Chord> {
+        let text = match self {
+            Action::OpenSettings => "ctrl+,",
+            Action::ToggleSidebar => "ctrl+shift+b",
+            Action::NewWorkspace => "ctrl+shift+n",
+            Action::NewTerminal => "ctrl+shift+t",
+            Action::CloseTab => "ctrl+shift+w",
+            Action::NextWorkspace => "ctrl+tab",
+            Action::PrevWorkspace => "ctrl+shift+tab",
+            Action::SplitRight => "alt+shift+=",
+            Action::SplitDown => "alt+shift+-",
+            Action::FocusLeft => "alt+left",
+            Action::FocusRight => "alt+right",
+            Action::FocusUp => "alt+up",
+            Action::FocusDown => "alt+down",
+            Action::FocusBack | Action::FocusForward => return None,
+            Action::Copy => "ctrl+shift+c",
+            Action::Paste => "ctrl+shift+v",
+        };
+        Chord::parse(text)
+    }
+
+    pub fn command(self) -> AppCommand {
+        match self {
+            Action::OpenSettings => AppCommand::OpenSettings,
+            Action::ToggleSidebar => AppCommand::ToggleSidebar,
+            Action::NewWorkspace => AppCommand::NewWorkspace,
+            Action::NewTerminal => AppCommand::NewTerminal,
+            Action::CloseTab => AppCommand::ClosePane,
+            Action::NextWorkspace => AppCommand::NextTab,
+            Action::PrevWorkspace => AppCommand::PrevTab,
+            Action::SplitRight => AppCommand::SplitRight,
+            Action::SplitDown => AppCommand::SplitDown,
+            Action::FocusLeft => AppCommand::FocusPane(Dir::Left),
+            Action::FocusRight => AppCommand::FocusPane(Dir::Right),
+            Action::FocusUp => AppCommand::FocusPane(Dir::Up),
+            Action::FocusDown => AppCommand::FocusPane(Dir::Down),
+            Action::FocusBack => AppCommand::FocusBack,
+            Action::FocusForward => AppCommand::FocusForward,
+            Action::Copy => AppCommand::Copy,
+            Action::Paste => AppCommand::Paste,
+        }
+    }
+}
+
+/// Why a chord cannot be a shortcut.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refused {
+    /// A plain key: it is typing.
+    NeedsModifier,
+    /// Alt+F4 and Alt+Space: Windows' own.
+    SystemKey,
+    /// Held with the Windows key.
+    WindowsKey,
+    /// Ctrl with Alt: AltGr, how some keyboards type characters.
+    AltGr,
+}
+
+/// Whether `chord` (pressed with the Windows key when `win`) may be a
+/// shortcut: it needs Ctrl or Alt, or is one of F1 to F12.
+pub fn accept(chord: &Chord, win: bool) -> Result<(), Refused> {
+    let key = KeyIn {
+        key: &chord.key,
+        ctrl: chord.ctrl,
+        alt: chord.alt,
+        shift: chord.shift,
+        win: false,
+    };
+    let function_key = chord
+        .key
+        .strip_prefix('f')
+        .and_then(|n| n.parse::<u8>().ok())
+        .is_some_and(|n| (1..=12).contains(&n));
+    if win {
+        Err(Refused::WindowsKey)
+    } else if chord.ctrl && chord.alt {
+        Err(Refused::AltGr)
+    } else if is_window_system_key(&key) {
+        Err(Refused::SystemKey)
+    } else if chord.ctrl || chord.alt || function_key {
+        Ok(())
+    } else {
+        Err(Refused::NeedsModifier)
+    }
+}
+
+/// Ctrl plus a letter: the shell has a use for it (Ctrl+N, Ctrl+T), and once
+/// it is a shortcut the shell no longer gets it.
+pub fn takes_from_the_shell(chord: &Chord) -> bool {
+    chord.ctrl
+        && !chord.alt
+        && !chord.shift
+        && chord.key.len() == 1
+        && chord.key.as_bytes()[0].is_ascii_lowercase()
+}
+
+/// The README's second chords: they have no row and yield to any binding of
+/// the same chord.
+fn alias(chord: &Chord, ctx: &KeyCtx) -> Option<AppCommand> {
+    match (chord.ctrl, chord.alt, chord.shift, chord.key.as_str()) {
+        (true, false, false, "c") if ctx.has_selection => Some(AppCommand::Copy),
+        (false, false, true, "insert") => Some(AppCommand::Paste),
+        (true, false, false, "pagedown") => Some(AppCommand::NextTab),
+        (true, false, false, "pageup") => Some(AppCommand::PrevTab),
+        _ => None,
+    }
+}
+
+/// An action and the chord it has now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Bound {
+    action: Action,
+    chord: Option<Chord>,
+    /// `chord` is the action's default chord.
+    default: bool,
+}
+
+/// The chord of every action: the defaults, with the user's bindings over them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Keymap {
+    /// One per action, in list order.
+    bound: Vec<Bound>,
+}
+
+impl Keymap {
+    /// `bindings` is `Settings::bindings` (`shortcuts.bindings`): action id
+    /// to chord text, `None` for unbound. Unknown ids and unparsable chords
+    /// are ignored, and so is a chord `accept` refuses: a hand-edited file
+    /// cannot turn a typing key into a shortcut.
+    pub fn from_bindings(bindings: &BTreeMap<String, Option<String>>) -> Keymap {
+        let bound = Action::ALL
+            .iter()
+            .map(|&action| {
+                let default = action.default_chord();
+                let chord = match bindings.get(action.id()) {
+                    None => default.clone(),
+                    Some(None) => None,
+                    Some(Some(text)) => Chord::parse(text)
+                        .filter(|c| accept(c, false).is_ok())
+                        .or_else(|| default.clone()),
+                };
+                Bound {
+                    action,
+                    default: chord == default,
+                    chord,
+                }
+            })
+            .collect();
+        Keymap { bound }
+    }
+
+    fn bound(&self, action: Action) -> &Bound {
+        self.bound
+            .iter()
+            .find(|b| b.action == action)
+            .expect("every action has an entry")
+    }
+
+    pub fn chord(&self, action: Action) -> Option<&Chord> {
+        self.bound(action).chord.as_ref()
+    }
+
+    pub fn is_default(&self, action: Action) -> bool {
+        self.bound(action).default
+    }
+
+    /// The action that has `chord` now; an alias has none. When a
+    /// hand-edited file gives one chord to two actions, the one the user
+    /// rebound wins over the one that has it by default.
+    pub fn holder(&self, chord: &Chord) -> Option<Action> {
+        let holds = |b: &&Bound| b.chord.as_ref() == Some(chord);
+        self.bound
+            .iter()
+            .filter(|b| !b.default)
+            .find(holds)
+            .or_else(|| self.bound.iter().find(holds))
+            .map(|b| b.action)
+    }
+
+    /// The app command `k` runs: its action's, else a fixed alias (Ctrl+C
+    /// copies while a selection exists, Shift+Insert pastes, Ctrl+PageDown /
+    /// Ctrl+PageUp are next and previous workspace). The IME, the Windows
+    /// key and AltGr are `keys::map_key`'s to rule out first.
+    pub fn command(&self, k: &KeyIn, ctx: &KeyCtx) -> Option<AppCommand> {
+        let chord = Chord::of(k);
+        match self.holder(&chord) {
+            Some(action) => Some(action.command()),
+            None => alias(&chord, ctx),
+        }
+    }
+
+    /// The `shortcuts.bindings` entry to store: `None` removes the entry (back to default).
+    pub fn entry(action: Action, chord: Option<&Chord>) -> Option<Option<String>> {
+        (chord != action.default_chord().as_ref()).then(|| chord.map(Chord::text))
+    }
+}
+
+/// The sentence shown under a row whose recorded chord was refused.
+pub fn refusal(lang: Lang, refused: Refused) -> &'static str {
+    let sentence = match refused {
+        Refused::NeedsModifier => Str::SettingsShortcutNeedsModifier,
+        Refused::SystemKey => Str::SettingsShortcutReservedByWindows,
+        Refused::WindowsKey => Str::SettingsShortcutWindowsKey,
+        Refused::AltGr => Str::SettingsShortcutCtrlAlt,
+    };
+    t(lang, sentence)
+}
+
+/// The conflict banner: "<holder's title> already uses this shortcut."
+pub fn conflict(lang: Lang, holder: Action) -> String {
+    shortcut_conflict(lang, t(lang, holder.title()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
