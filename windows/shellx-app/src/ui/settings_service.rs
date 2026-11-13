@@ -3,8 +3,8 @@
 //! the observers; the file gets it 300 ms after the last change to that key, on the
 //! background executor, key by key (`settings_store`). `startup::orderly_quit` writes what
 //! still waits. A failed write is one log line naming the error's kind (no path, no value);
-//! the change then lives in memory until ShellX quits. Nothing here panics or blocks the UI
-//! on the file. The theme settings (and, for Appearance System, the main window's appearance)
+//! the value then keeps waiting and is tried again by the next change to that key, by a
+//! Reset All and by the quit flush. Nothing here panics or blocks the UI on the file. The theme settings (and, for Appearance System, the main window's appearance)
 //! choose the active theme (`theme::set_active`); a change to them redraws every window.
 //!
 //! The service also holds the keymap built from `shortcuts.bindings`, rebuilt when they change
@@ -162,8 +162,7 @@ impl SettingsService {
     }
 
     /// Every key back to its default, removed from the file in one write, at once. Keys this
-    /// version does not know, and `shell`, stay.
-    #[allow(dead_code)] // first called by Reset All Settings (F2)
+    /// version does not know, and `shell` (the shell choice is reset by its owner), stay.
     pub fn reset_all(&mut self, cx: &mut Context<Self>) {
         self.settings = Settings::default();
         self.follow(Key::Bindings);
@@ -172,9 +171,7 @@ impl SettingsService {
         self.timers.clear();
         self.apply_theme(cx);
         self.apply_language(cx);
-        for key in Key::ALL {
-            self.writes.wait(key.path(), None);
-        }
+        self.writes.remove_every_key();
         let writes = self.writes.clone();
         cx.background_spawn(async move { writes.flush() }).detach();
         cx.notify();
@@ -305,23 +302,41 @@ impl PendingWrites {
         lock(&self.waiting).insert(path, value);
     }
 
-    /// Writes the value waiting at `path`, if one still waits.
+    /// Every key this version knows waits to be removed from the file (Reset All Settings).
+    fn remove_every_key(&self) {
+        for key in Key::ALL {
+            self.wait(key.path(), None);
+        }
+    }
+
+    /// Writes the value waiting at `path`, if one still waits. A write that fails (a virus
+    /// scanner can hold the file for a moment) leaves the value waiting, for the next change
+    /// to that key, a Reset All or the quit flush.
     fn write(&self, path: &'static str) {
         let _writing = lock(&self.writing);
         let Some(value) = lock(&self.waiting).remove(path) else {
             return;
         };
-        log_failure(self.store.write(path, value));
+        if log_failure(self.store.write(path, value.clone())) {
+            // a newer value for the key, set during the write, stays
+            lock(&self.waiting).entry(path).or_insert(value);
+        }
     }
 
-    /// Writes every waiting value in one write (on quit, and for Reset All).
+    /// Writes every waiting value in one write (on quit, and for Reset All). If the write
+    /// fails every value keeps waiting, except where a newer one came in meanwhile.
     fn flush(&self) {
         let _writing = lock(&self.writing);
         let waiting = std::mem::take(&mut *lock(&self.waiting));
         if waiting.is_empty() {
             return;
         }
-        log_failure(self.store.write_many(waiting.into_iter().collect()));
+        if log_failure(self.store.write_many(waiting.clone().into_iter().collect())) {
+            let mut now = lock(&self.waiting);
+            for (path, value) in waiting {
+                now.entry(path).or_insert(value);
+            }
+        }
     }
 }
 
@@ -330,13 +345,16 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 /// One line with the error's kind only: its text could name the folder (the Windows user).
-fn log_failure(result: io::Result<()>) {
-    if let Err(error) = result {
-        log::warn!(
-            "shellx: settings.json could not be written ({:?}); the change lasts until ShellX quits",
-            error.kind()
-        );
-    }
+/// True when the write failed.
+fn log_failure(result: io::Result<()>) -> bool {
+    let Err(error) = result else {
+        return false;
+    };
+    log::warn!(
+        "shellx: settings.json could not be written ({:?}); the change is tried again when the setting changes again and when ShellX quits",
+        error.kind()
+    );
+    true
 }
 
 #[cfg(test)]
@@ -414,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_write_is_dropped_without_a_panic() {
+    fn a_failed_write_does_not_panic() {
         // the folder cannot be made (a file has its name): the value lives in memory only
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("native");
@@ -424,6 +442,52 @@ mod tests {
         writes.write("app.language");
         writes.wait("app.language", Some(json!("en")));
         writes.flush();
-        assert!(writes.waiting.lock().unwrap().is_empty());
+        // the value is not lost: it waits for the next change to the key or the quit flush
+        assert_eq!(lock(&writes.waiting).len(), 1);
+    }
+
+    #[test]
+    fn reset_all_leaves_only_unknown_keys_in_the_file() {
+        // `shell` is not part of this: Reset All sets it back through `Shells::set_choice`,
+        // which writes `{"kind":"auto"}` and replans the shells.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let store = SettingsStore::new(path.clone());
+        let changes = Key::ALL
+            .iter()
+            .map(|key| (key.path(), Some(json!("x"))))
+            .chain([("future.setting", Some(json!(1)))])
+            .collect();
+        store.write_many(changes).unwrap();
+        let writes = PendingWrites::new(store);
+        writes.remove_every_key();
+        writes.flush();
+        assert_eq!(json_at(&path), json!({"future": {"setting": 1}}));
+    }
+
+    #[test]
+    fn a_failed_write_stays_pending_and_is_tried_again() {
+        // the folder cannot be made (a file has its name): the write fails
+        let dir = tempfile::tempdir().unwrap();
+        let blocker = dir.path().join("native");
+        std::fs::write(&blocker, "").unwrap();
+        let path = blocker.join("settings.json");
+        let writes = PendingWrites::new(SettingsStore::new(path.clone()));
+        writes.wait("app.language", Some(json!("vi")));
+        writes.wait("terminalConfig.font-size", Some(json!(15)));
+        writes.write("app.language");
+        writes.flush();
+        assert_eq!(lock(&writes.waiting).len(), 2);
+        // a newer value for a key replaces the failed one
+        writes.wait("app.language", Some(json!("en")));
+        writes.flush();
+        // the scanner lets go: the quit flush writes what still waits
+        std::fs::remove_file(&blocker).unwrap();
+        writes.flush();
+        assert_eq!(
+            json_at(&path),
+            json!({"app": {"language": "en"}, "terminalConfig": {"font-size": 15}})
+        );
+        assert!(lock(&writes.waiting).is_empty());
     }
 }

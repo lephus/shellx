@@ -831,12 +831,15 @@ static ROWS: &[Row] = &[
         )
     },
     // Reset.
-    custom(
-        "resetAll",
-        Section::Reset,
-        Str::SettingsResetAllSettings,
-        "reset all settings factory reset restore defaults clear preferences dat lai tat ca cai dat mac dinh",
-    ),
+    Row {
+        wired: true,
+        ..custom(
+            "resetAll",
+            Section::Reset,
+            Str::SettingsResetAllSettings,
+            "reset all settings factory reset restore defaults clear preferences dat lai tat ca cai dat mac dinh",
+        )
+    },
     // Updates and About (the existing panels).
     Row {
         wired: true,
@@ -1380,6 +1383,12 @@ mod tests {
     }
 
     #[test]
+    fn every_catalogued_row_is_wired() {
+        let unwired: Vec<&str> = all_rows().filter(|r| !r.wired).map(|r| r.id).collect();
+        assert!(unwired.is_empty(), "rows nothing draws yet: {unwired:?}");
+    }
+
+    #[test]
     fn only_the_migrated_rows_start_wired() {
         let wired: Vec<&str> = all_rows().filter(|r| r.wired).map(|r| r.id).collect();
         assert_eq!(
@@ -1441,6 +1450,7 @@ mod tests {
                 "sidebar.showBranchDirectory",
                 "resetShortcuts",
                 "shortcutList",
+                "resetAll",
                 "updates",
                 "about"
             ]

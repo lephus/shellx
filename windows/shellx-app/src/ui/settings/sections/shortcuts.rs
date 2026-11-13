@@ -147,7 +147,7 @@ impl ShortcutList {
         }
     }
 
-    fn close_notice(&mut self, cx: &mut Context<Self>) {
+    pub(in crate::ui::settings) fn close_notice(&mut self, cx: &mut Context<Self>) {
         if self.notice.take().is_some() {
             cx.notify();
         }
