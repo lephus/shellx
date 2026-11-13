@@ -106,6 +106,8 @@ pub struct SettingsView {
     highlight: Option<(&'static str, Instant)>,
     /// The hit of the last click, drawn selected in the hit list.
     clicked_hit: Option<Hit>,
+    /// The trimmed query of the last draw, to see when the hit list changes.
+    last_query: String,
     /// The Shell and Display cards of Settings › Terminal.
     terminal: TerminalCards,
     /// The search bar and action rows of Settings › Keyboard Shortcuts.
@@ -142,7 +144,16 @@ impl SettingsView {
             cx.observe(&SettingsService::entity(cx), |_, _, cx| cx.notify()),
             cx.subscribe(&search, |this, _, event, cx| this.field_event(*event, cx)),
             // Typing changes the hit list; it never changes the section.
-            cx.observe(&search, |_, _, cx| cx.notify()),
+            cx.observe(&search, |this, search, cx| {
+                let query = search.read(cx).text().trim().to_string();
+                if query != this.last_query {
+                    // Another list: no hit of it is the clicked one, and it starts at the top.
+                    this.last_query = query;
+                    this.clicked_hit = None;
+                    this.sidebar_scroll.set_offset(point(px(0.0), px(0.0)));
+                }
+                cx.notify();
+            }),
         ]);
         let listed = listed_sections();
         let first = listed
@@ -170,6 +181,7 @@ impl SettingsView {
             pending_tries: 0,
             highlight: None,
             clicked_hit: None,
+            last_query: String::new(),
             terminal,
             shortcuts,
             themes,
