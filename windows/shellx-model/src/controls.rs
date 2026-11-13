@@ -446,6 +446,22 @@ mod tests {
         assert_eq!(popover_key(&plain("left")), None);
     }
 
+    #[test]
+    fn a_card_grid_moves_by_the_arrows_and_stops_at_its_ends() {
+        assert_eq!(grid_key(&plain("left"), 4), Some(-1));
+        assert_eq!(grid_key(&plain("right"), 4), Some(1));
+        assert_eq!(grid_key(&plain("up"), 4), Some(-4));
+        assert_eq!(grid_key(&plain("down"), 4), Some(4));
+        assert_eq!(grid_key(&plain("down"), 0), Some(1));
+        assert_eq!(grid_key(&plain("a"), 4), None);
+        assert_eq!(grid_key(&plain("tab"), 4), None);
+        assert_eq!(grid_key(&plain("space"), 4), None);
+        let shifted = KeyIn { shift: true, ..plain("left") };
+        assert_eq!(grid_key(&shifted, 4), None);
+        assert_eq!(moved_highlight(2, grid_key(&plain("up"), 4).unwrap(), 10), 0);
+        assert_eq!(moved_highlight(9, grid_key(&plain("down"), 4).unwrap(), 10), 9);
+    }
+
     /// A stopped key-down yields no WM_CHAR on Windows: no control may take typed text,
     /// Tab (focus moves on) or a shortcut.
     #[test]
