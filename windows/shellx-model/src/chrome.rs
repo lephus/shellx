@@ -1,11 +1,34 @@
 //! The app's chrome colours derived from the terminal theme and the accent (spec §5.5).
+//!
+//! The ShellX theme gives exactly the `palette` constants. Any other theme takes the same steps
+//! ShellX's chrome takes between its background and its text, measured from those constants, and
+//! every text colour is pushed until it reads on the surface it is drawn on.
 
-use crate::palette::Rgba;
+use crate::palette::{self, Rgba};
 use crate::settings::{Accent, SidebarBackground};
-use crate::theme_file::TermTheme;
+use crate::theme_file::{TermTheme, is_dark};
+
+const WHITE: Rgba = Rgba::rgb(0xffffff);
+const BLACK: Rgba = Rgba::rgb(0x000000);
+
+/// WCAG AA for text, and for the muted text the spec allows at 3:1 (spec §5.5).
+const TEXT_MIN: f32 = 4.5;
+const MUTED_MIN: f32 = 3.0;
+
+/// The sidebar following another theme: a dark one lifted 2% towards white, a light one pressed
+/// 3% towards black (Mac: `WindowChromeSidebarTintDefaults.themeTint`, CmuxAppKitSupportUI).
+const SIDEBAR_LIFT: f32 = 0.02;
+const SIDEBAR_PRESS: f32 = 0.03;
+
+/// Text on a sidebar whose readable side is not the window's (a custom colour): the strengths of
+/// the system label colours the Mac draws on such a sidebar, `labelColor` and
+/// `secondaryLabelColor` (Mac: `ShellXSidebarText`, ShellXBrand).
+const LABEL: f32 = 0.85;
+const SECONDARY_LABEL: f32 = 0.5;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Chrome {
+    /// The theme is dark (`theme_file::is_dark`).
     pub dark: bool,
     pub bg: Rgba,
     pub panel: Rgba,
@@ -19,14 +42,17 @@ pub struct Chrome {
     pub primary_soft: Rgba,
     pub primary_line: Rgba,
     pub primary_text: Rgba,
+    /// Fills and dots: the fixed status hues on every theme.
     pub running: Rgba,
     pub done: Rgba,
     pub error: Rgba,
+    /// The same hues as text, adjusted for contrast on `bg`.
     pub running_text: Rgba,
     pub done_text: Rgba,
     pub error_text: Rgba,
     pub selection_title: Rgba,
     pub indicator_unfocused: Rgba,
+    /// Session row fills, on `sidebar_bg`.
     pub session_selected: Rgba,
     pub session_hover: Rgba,
     pub sidebar_bg: Rgba,
@@ -34,33 +60,295 @@ pub struct Chrome {
     pub sidebar_muted: Rgba,
 }
 
-pub fn contrast(_a: Rgba, _b: Rgba) -> f32 {
-    todo!()
+/// WCAG 2 contrast ratio of two opaque colours, 1.0 to 21.0 (alpha is ignored).
+pub fn contrast(a: Rgba, b: Rgba) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
 }
 
-pub fn ensure_contrast(_fg: Rgba, _bg: Rgba, _min: f32) -> Rgba {
-    todo!()
+/// Moves `fg` away from `bg` (towards white on dark, black on light) until the ratio is at least `min`.
+///
+/// `fg` comes back unchanged when it already reads. Otherwise it moves towards the end (white or
+/// black) on its own side of `bg`, the smallest change; when that end cannot reach `min` it crosses
+/// over `bg` towards the other end. When neither end reaches `min`, the result is the end that
+/// contrasts more with `bg`. Each search halves a range of 255 steps, so it always ends.
+pub fn ensure_contrast(fg: Rgba, bg: Rgba, min: f32) -> Rgba {
+    if contrast(fg, bg) >= min {
+        return fg;
+    }
+    let near = end_beyond(fg, bg);
+    let far = if near == WHITE { BLACK } else { WHITE };
+    for end in [near, far] {
+        if contrast(end, bg) >= min {
+            return first_readable(fg, end, bg, min);
+        }
+    }
+    best_end(bg).with_alpha(fg.a)
 }
 
-pub fn accent_color(_accent: &Accent, _system: Option<Rgba>) -> Rgba {
-    todo!()
+/// The accent setting as a colour: ShellX Blue, the Windows accent (ShellX Blue when it cannot be
+/// read), or the user's own.
+pub fn accent_color(accent: &Accent, system: Option<Rgba>) -> Rgba {
+    match accent {
+        Accent::ShellxBlue => palette::PRIMARY,
+        Accent::System => system.unwrap_or(palette::PRIMARY),
+        Accent::Custom(color) => *color,
+    }
 }
 
-pub fn accent_from_dwm(_abgr: u32) -> Rgba {
-    todo!()
+/// The DWM `AccentColor` registry value, laid out 0xAABBGGRR; the alpha byte is ignored.
+pub fn accent_from_dwm(abgr: u32) -> Rgba {
+    Rgba {
+        r: abgr as u8,
+        g: (abgr >> 8) as u8,
+        b: (abgr >> 16) as u8,
+        a: 1.0,
+    }
 }
 
+/// The chrome for `theme`, `accent` and the sidebar background setting (`sidebar_color` is the
+/// Custom colour).
 pub fn chrome(
-    _theme: &TermTheme,
-    _accent: Rgba,
-    _sidebar: SidebarBackground,
-    _sidebar_color: Rgba,
+    theme: &TermTheme,
+    accent: Rgba,
+    sidebar: SidebarBackground,
+    sidebar_color: Rgba,
 ) -> Chrome {
-    todo!()
+    let s = if theme.background == palette::BG && theme.foreground == palette::TEXT {
+        Surfaces::SHELLX
+    } else {
+        Surfaces::derive(theme.background, theme.foreground)
+    };
+    let sidebar_bg = sidebar_background(theme, sidebar, sidebar_color);
+    let (sidebar_text, sidebar_muted) = sidebar_text(&s, sidebar_bg);
+    let (session_selected, session_hover) = session_fills(sidebar_bg, sidebar_text);
+    Chrome {
+        dark: is_dark(theme),
+        bg: s.bg,
+        panel: s.panel,
+        raise: s.raise,
+        line: s.line,
+        border: s.border,
+        text: s.text,
+        text_hi: s.text_hi,
+        muted: s.muted,
+        primary: accent,
+        primary_soft: accent.with_alpha(palette::PRIMARY_SOFT.a),
+        primary_line: accent.with_alpha(palette::PRIMARY_LINE.a),
+        primary_text: primary_text(accent, s.bg),
+        running: palette::RUNNING,
+        done: palette::DONE,
+        error: palette::ERROR,
+        running_text: ensure_contrast(palette::RUNNING, s.bg, TEXT_MIN),
+        done_text: ensure_contrast(palette::DONE, s.bg, TEXT_MIN),
+        error_text: ensure_contrast(palette::ERROR, s.bg, TEXT_MIN),
+        selection_title: s.selection_title,
+        indicator_unfocused: s.indicator_unfocused,
+        session_selected,
+        session_hover,
+        sidebar_bg,
+        sidebar_text,
+        sidebar_muted,
+    }
 }
 
-fn luminance(_c: Rgba) -> f32 {
-    todo!()
+/// The window's surfaces and text, which depend on the theme alone.
+struct Surfaces {
+    bg: Rgba,
+    panel: Rgba,
+    raise: Rgba,
+    line: Rgba,
+    border: Rgba,
+    text: Rgba,
+    text_hi: Rgba,
+    muted: Rgba,
+    selection_title: Rgba,
+    indicator_unfocused: Rgba,
+}
+
+impl Surfaces {
+    const SHELLX: Surfaces = Surfaces {
+        bg: palette::BG,
+        panel: palette::PANEL,
+        raise: palette::RAISE,
+        line: palette::LINE,
+        border: palette::BORDER,
+        text: palette::TEXT,
+        text_hi: palette::TEXT_HI,
+        muted: palette::MUTED,
+        selection_title: palette::SELECTION_TITLE,
+        indicator_unfocused: palette::INDICATOR_UNFOCUSED,
+    };
+
+    /// Each surface sits where its ShellX constant sits on the way from `BG` to `TEXT`, here from
+    /// `bg` to the readable text; the brighter texts sit where `TEXT_HI` and `SELECTION_TITLE` sit
+    /// on the way on to white (to black on a light theme).
+    fn derive(bg: Rgba, fg: Rgba) -> Surfaces {
+        let text = ensure_contrast(fg, bg, TEXT_MIN);
+        let at = |stop: Rgba| mix(bg, text, step(palette::BG, stop, palette::TEXT));
+        let beyond = end_beyond(text, bg);
+        let text_hi = mix(text, beyond, step(palette::TEXT, palette::TEXT_HI, WHITE));
+        Surfaces {
+            bg,
+            panel: at(palette::PANEL),
+            raise: at(palette::RAISE),
+            line: at(palette::LINE),
+            border: at(palette::BORDER),
+            text,
+            text_hi,
+            muted: ensure_contrast(at(palette::MUTED), bg, MUTED_MIN),
+            selection_title: mix(
+                text_hi,
+                beyond,
+                step(palette::TEXT_HI, palette::SELECTION_TITLE, WHITE),
+            ),
+            indicator_unfocused: at(palette::INDICATOR_UNFOCUSED),
+        }
+    }
+}
+
+/// Follow Theme: ShellX keeps `PANEL`, recognised by its background as the Mac does; another
+/// theme is lifted or pressed one small step. Match Terminal: the theme's background.
+fn sidebar_background(theme: &TermTheme, sidebar: SidebarBackground, custom: Rgba) -> Rgba {
+    match sidebar {
+        SidebarBackground::FollowTheme if theme.background == palette::BG => palette::PANEL,
+        SidebarBackground::FollowTheme if is_dark(theme) => {
+            mix(theme.background, WHITE, SIDEBAR_LIFT)
+        }
+        SidebarBackground::FollowTheme => mix(theme.background, BLACK, SIDEBAR_PRESS),
+        SidebarBackground::MatchTerminal => theme.background,
+        SidebarBackground::Custom => custom,
+    }
+}
+
+/// Names and labels on the sidebar. A sidebar that reads with the same end as the window keeps
+/// the window's `text_hi` and `muted` (ShellX's sidebar draws names in `TEXT_HI`); one that does
+/// not takes label colours made from its own readable end.
+fn sidebar_text(s: &Surfaces, sidebar_bg: Rgba) -> (Rgba, Rgba) {
+    let end = best_end(sidebar_bg);
+    let (text, muted) = if end == best_end(s.bg) {
+        (s.text_hi, s.muted)
+    } else {
+        (
+            mix(sidebar_bg, end, LABEL),
+            mix(sidebar_bg, end, SECONDARY_LABEL),
+        )
+    };
+    (
+        ensure_contrast(text, sidebar_bg, TEXT_MIN),
+        ensure_contrast(muted, sidebar_bg, MUTED_MIN),
+    )
+}
+
+/// The selected and hovered session rows: ShellX's own fills on ShellX's sidebar, otherwise the
+/// same steps from the sidebar towards its text.
+fn session_fills(sidebar_bg: Rgba, sidebar_text: Rgba) -> (Rgba, Rgba) {
+    if sidebar_bg == palette::PANEL && sidebar_text == palette::TEXT_HI {
+        return (palette::SESSION_SELECTED, palette::SESSION_HOVER);
+    }
+    let at = |stop: Rgba| {
+        mix(
+            sidebar_bg,
+            sidebar_text,
+            step(palette::PANEL, stop, palette::TEXT_HI),
+        )
+    };
+    (at(palette::SESSION_SELECTED), at(palette::SESSION_HOVER))
+}
+
+/// The accent as text: lifted the step `PRIMARY_TEXT` takes from `PRIMARY` (ShellX Blue lifts to
+/// `PRIMARY_TEXT` itself), away from `bg`, then pushed until it reads.
+fn primary_text(accent: Rgba, bg: Rgba) -> Rgba {
+    let beyond = end_beyond(accent, bg);
+    let lifted = if accent == palette::PRIMARY && beyond == WHITE {
+        palette::PRIMARY_TEXT
+    } else {
+        mix(
+            accent,
+            beyond,
+            step(palette::PRIMARY, palette::PRIMARY_TEXT, WHITE),
+        )
+    };
+    ensure_contrast(lifted, bg, TEXT_MIN)
+}
+
+/// Relative luminance, sRGB linearised as the Mac does (`WindowChromeColorResolver`,
+/// CmuxAppKitSupportUI).
+fn luminance(c: Rgba) -> f32 {
+    let linear = |v: u8| {
+        let s = f32::from(v) / 255.0;
+        if s <= 0.03928 {
+            s / 12.92
+        } else {
+            ((s + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b)
+}
+
+/// White or black, whichever contrasts more with `bg` (Mac: `readableColorScheme`).
+fn best_end(bg: Rgba) -> Rgba {
+    if contrast(WHITE, bg) >= contrast(BLACK, bg) {
+        WHITE
+    } else {
+        BLACK
+    }
+}
+
+/// The end that lies beyond `c` as seen from `bg`: white when `c` is lighter, black when darker,
+/// and the end that contrasts more when the two are equally light.
+fn end_beyond(c: Rgba, bg: Rgba) -> Rgba {
+    let (lc, lb) = (luminance(c), luminance(bg));
+    if lc > lb {
+        WHITE
+    } else if lc < lb {
+        BLACK
+    } else {
+        best_end(bg)
+    }
+}
+
+/// The colour nearest `fg` on the way to `end` that reaches `min` on `bg`. `fg` does not reach
+/// it and `end` does. Every channel moves one way, so luminance only grows (or only shrinks)
+/// along the way: once past `bg` the ratio only grows, and before that it stays below `fg`'s.
+fn first_readable(fg: Rgba, end: Rgba, bg: Rgba, min: f32) -> Rgba {
+    let at = |k: u32| mix(fg, end, k as f32 / 255.0);
+    let (mut fails, mut reads) = (0u32, 255u32);
+    while reads - fails > 1 {
+        let k = (fails + reads) / 2;
+        if contrast(at(k), bg) >= min {
+            reads = k;
+        } else {
+            fails = k;
+        }
+    }
+    at(reads)
+}
+
+/// `from` moved the fraction `t` of the way to `to`, each channel rounded; `from`'s alpha.
+fn mix(from: Rgba, to: Rgba, t: f32) -> Rgba {
+    let channel = |a: u8, b: u8| {
+        (f32::from(a) + (f32::from(b) - f32::from(a)) * t)
+            .round()
+            .clamp(0.0, 255.0) as u8
+    };
+    Rgba {
+        r: channel(from.r, to.r),
+        g: channel(from.g, to.g),
+        b: channel(from.b, to.b),
+        a: from.a,
+    }
+}
+
+/// How far `at` sits on the way from `from` to `to`: the channel differences summed over the
+/// channel ranges summed. Used to read ShellX's own steps off the palette constants.
+fn step(from: Rgba, at: Rgba, to: Rgba) -> f32 {
+    let span = |a: Rgba, b: Rgba| {
+        (f32::from(b.r) - f32::from(a.r))
+            + (f32::from(b.g) - f32::from(a.g))
+            + (f32::from(b.b) - f32::from(a.b))
+    };
+    span(from, at) / span(from, to)
 }
 
 #[cfg(test)]
@@ -91,13 +379,23 @@ mod tests {
     fn readable_pairs(c: &Chrome) -> [(&'static str, Rgba, Rgba, f32); 8] {
         [
             ("text on bg", c.text, c.bg, 4.5),
-            ("sidebar_text on sidebar_bg", c.sidebar_text, c.sidebar_bg, 4.5),
+            (
+                "sidebar_text on sidebar_bg",
+                c.sidebar_text,
+                c.sidebar_bg,
+                4.5,
+            ),
             ("primary_text on bg", c.primary_text, c.bg, 4.5),
             ("running_text on bg", c.running_text, c.bg, 4.5),
             ("done_text on bg", c.done_text, c.bg, 4.5),
             ("error_text on bg", c.error_text, c.bg, 4.5),
             ("muted on bg", c.muted, c.bg, 3.0),
-            ("sidebar_muted on sidebar_bg", c.sidebar_muted, c.sidebar_bg, 3.0),
+            (
+                "sidebar_muted on sidebar_bg",
+                c.sidebar_muted,
+                c.sidebar_bg,
+                3.0,
+            ),
         ]
     }
 
