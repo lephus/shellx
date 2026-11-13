@@ -16,7 +16,7 @@ use gpui::{
 };
 use serde_json::Value;
 use shellx_model::controls::{
-    NumberEsc, digits, number_entry, number_escape, number_pending, number_text, unit_suffix,
+    NumberEsc, digits, number_escape, number_pending, number_text, unit_suffix,
 };
 use shellx_model::palette::Rgba;
 use shellx_model::settings::{Key, Settings, choice_value, colour_value, flag_value, number_value};
@@ -416,7 +416,11 @@ fn commit_number(id: &'static str, view: &mut SettingsView, cx: &mut Context<Set
         return;
     };
     let field = field.clone();
-    if let Some(value) = number_entry(field.read(cx).text(), min, max) {
+    // Only a value that differs from the stored one is written: a blur after Esc or after a
+    // close-commit rewrites nothing.
+    if let Some(stored) = current(cx).number(key)
+        && let Some(value) = number_pending(field.read(cx).text(), stored, min, max)
+    {
         write(key, number_value(key, value), cx);
     }
     let shown = current(cx).number(key).map(number_text).unwrap_or_default();

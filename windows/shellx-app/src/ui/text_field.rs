@@ -22,7 +22,8 @@ use gpui::{
     Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, GlobalElementId,
     InspectorElementId, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, PaintQuad, Pixels, Point, ShapedLine, SharedString, Style, Subscription, TextRun,
-    UTF16Selection, UnderlineStyle, Window, div, fill, point, prelude::*, px, relative, size,
+    UTF16Selection, UnderlineStyle, Window, WindowId, div, fill, point, prelude::*, px, relative,
+    size,
 };
 use shellx_model::text_edit::TextEdit;
 
@@ -54,9 +55,10 @@ pub struct TextField {
     /// Horizontal scroll of the shaped line (keeps the cursor visible).
     scroll_x: Pixels,
     is_selecting: bool,
-    /// Emits `Blur` when the field loses the keyboard; made by the first draw, which is the
-    /// first time a window is at hand.
-    _blur: Option<Subscription>,
+    /// Emits `Blur` when the field loses the keyboard, with the window it was made for. Drawn
+    /// in another window (Settings opened again in a new one), the field replaces it, so there
+    /// is one subscription at a time, and a frame in the same window makes none.
+    _blur: Option<(WindowId, Subscription)>,
 }
 
 impl TextField {
@@ -605,13 +607,14 @@ impl Element for TextElement {
 
 impl Render for TextField {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self._blur.is_none() {
+        let window_id = window.window_handle().window_id();
+        if self._blur.as_ref().is_none_or(|(id, _)| *id != window_id) {
             let field = cx.entity().downgrade();
-            self._blur = Some(
-                window.on_focus_out(&self.focus_handle, cx, move |_, _, cx| {
-                    field.update(cx, |_, cx| cx.emit(TextFieldEvent::Blur)).ok();
-                }),
-            );
+            let subscription = window.on_focus_out(&self.focus_handle, cx, move |_, _, cx| {
+                field.update(cx, |_, cx| cx.emit(TextFieldEvent::Blur)).ok();
+            });
+            // The old one is dropped here, which removes its listener.
+            self._blur = Some((window_id, subscription));
         }
         let focused = self.focus_handle.is_focused(window);
         let border = if self.invalid {
