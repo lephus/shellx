@@ -12,8 +12,8 @@ const WHITE: Rgba = Rgba::rgb(0xffffff);
 const BLACK: Rgba = Rgba::rgb(0x000000);
 
 /// WCAG AA for text, and for the muted text the spec allows at 3:1 (spec §5.5).
-const TEXT_MIN: f32 = 4.5;
-const MUTED_MIN: f32 = 3.0;
+pub(crate) const TEXT_MIN: f32 = 4.5;
+pub(crate) const MUTED_MIN: f32 = 3.0;
 
 /// The sidebar following another theme: a dark one lifted 2% towards white, a light one pressed
 /// 3% towards black (Mac: `WindowChromeSidebarTintDefaults.themeTint`, CmuxAppKitSupportUI).

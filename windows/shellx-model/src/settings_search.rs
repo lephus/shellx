@@ -153,7 +153,7 @@ fn place(hay: &str, needle: &str) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings_catalog::row;
+    use crate::settings_catalog::{row, rows};
 
     /// Searches every row as if its feature were done, so ranking can be tested before then.
     fn everything(query: &str, lang: Lang) -> Vec<Hit> {
@@ -290,14 +290,35 @@ mod tests {
 
     #[test]
     fn unwired_rows_are_not_found() {
-        assert!(!everything("unselected fill", Lang::En).is_empty());
-        assert!(search("unselected fill", Lang::En).is_empty());
-        // A section without a wired row is not offered either.
-        assert!(
-            search("workspace colors", Lang::En)
-                .iter()
-                .all(|h| h.section != Section::WorkspaceColors)
-        );
+        // The first row whose feature is not done: found when everything is searched, never by
+        // the real search. (Which row that is changes as tasks land; with none left there is
+        // nothing to hide.)
+        let unwired = crate::settings_catalog::groups()
+            .iter()
+            .flat_map(|(_, sections)| sections.iter())
+            .flat_map(|section| rows(*section))
+            .find(|row| !row.wired);
+        if let Some(row) = unwired {
+            let title = crate::strings::t(Lang::En, row.title);
+            assert!(
+                row_ids(&everything(title, Lang::En)).contains(&row.id),
+                "{}",
+                row.id
+            );
+            assert!(
+                !row_ids(&search(title, Lang::En)).contains(&row.id),
+                "{}",
+                row.id
+            );
+            // A section without a wired row is not offered either.
+            if !rows(row.section).any(|r| r.wired) {
+                assert!(
+                    search(title, Lang::En)
+                        .iter()
+                        .all(|h| h.section != row.section)
+                );
+            }
+        }
         assert_eq!(
             search("display", Lang::En),
             [

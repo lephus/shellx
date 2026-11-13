@@ -21,15 +21,16 @@
 //! that machine's tabs are listed under it.
 
 use gpui::{
-    ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, MouseDownEvent, Pixels,
-    Resource, SharedString, Stateful, div, img, prelude::*, px, svg, transparent_black,
+    AnyElement, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement,
+    MouseButton, MouseDownEvent, Pixels, Point, Resource, SharedString, Stateful, Window, div, img,
+    prelude::*, px, svg, transparent_black,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::GooglePurpose;
 use shellx_model::keymap::Action;
 use shellx_model::palette::{Pill, Status};
 use shellx_model::settings::Settings;
-use shellx_model::settings_catalog::Section;
+use shellx_model::settings_catalog::{Section, row};
 use shellx_model::sidebar::{
     MachineGroup, MachineIcon, RowAction, SidebarSizes, card_lines, chars_that_fit, shorten_path,
     sidebar_sizes,
@@ -37,6 +38,10 @@ use shellx_model::sidebar::{
 use shellx_model::strings::{Lang, Str, pairing_code_display, t};
 use shellx_model::tabs::TabId;
 use shellx_model::update::{UpdateStatus, download_url, pill_text};
+use shellx_model::workspace_colors::{
+    ColorMenu, RAIL_INSET_Y, RAIL_LEFT, RAIL_RADIUS, RAIL_WIDTH, border_width, color_menu,
+    menu_origin, workspace_color,
+};
 
 use super::account::AccountService;
 use super::assets::Icon;
@@ -67,6 +72,8 @@ pub struct SessionRow {
     pub path: Option<String>,
     /// The git branch of a local pane's directory.
     pub branch: Option<String>,
+    /// The palette name of the workspace's own colour (`None`: the default Purple).
+    pub color: Option<String>,
 }
 
 /// A machine in the machines-header "+" list (a Mac that may be asked, no link yet).
@@ -498,10 +505,10 @@ fn row_action(
     }
 }
 
-/// One workspace, like the Mac's card: a purple rail on the left edge, the
-/// title, then (when there are any) the git branch and the directory. The
-/// selected card has a fill and a 1 px edge; the edge is there (clear) on
-/// the others so selecting never moves the text.
+/// One workspace, like the Mac's card: its colour as a rail on the left edge (Left Rail) or as
+/// the card's fill (Solid Fill), the title, then (when there are any) the git branch and the
+/// directory. The selected card has its outline; the others have it clear, so selecting never
+/// moves the text. A right-click opens the colour menu (`card_color_menu`).
 fn workspace_card(
     ix: usize,
     row: &SessionRow,
@@ -512,11 +519,10 @@ fn workspace_card(
 ) -> Stateful<Div> {
     let selected = row.selected;
     let tab = row.tab;
-    let title_color = if selected {
-        theme::sidebar_selection_title()
-    } else {
-        theme::sidebar_text()
-    };
+    let colour = workspace_color(settings, row.color.as_deref());
+    let style = theme::card_style(settings, colour, selected);
+    let (title_color, muted_color) = theme::card_text(style.fill, selected);
+    let outline = border_width(settings);
     let lines = card_lines(settings, row.branch.as_deref(), row.path.as_deref());
     let title_line = div()
         .flex()
@@ -544,7 +550,7 @@ fn workspace_card(
         .py(px(6.0))
         .child(title_line)
         .when_some(lines.branch, |el, branch| {
-            el.child(card_line(format!("\u{2387} {branch}"), sz))
+            el.child(card_line(format!("\u{2387} {branch}"), sz, muted_color))
         })
         .when_some(lines.directory, |el, path| {
             let path = if settings.truncate_path_from_start {
@@ -552,7 +558,7 @@ fn workspace_card(
             } else {
                 path
             };
-            el.child(card_line(path, sz))
+            el.child(card_line(path, sz, muted_color))
         });
     div()
         .id(("sidebar-session", ix))
@@ -562,45 +568,125 @@ fn workspace_card(
         .mx(px(8.0))
         .my(px(2.0))
         .rounded(px(6.0))
-        .border_1()
+        .border(px(outline))
         .border_color(transparent_black())
         .cursor_pointer()
-        .when(selected, |el| {
-            el.bg(theme::session_selected())
-                .border_color(theme::sidebar_border())
-        })
+        .when_some(style.fill, |el, fill| el.bg(theme::hsla(fill)))
+        .when_some(style.border, |el, edge| el.border_color(theme::hsla(edge)))
         .when(!selected, |el| {
             el.hover(|style| style.bg(theme::session_hover()))
         })
         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
             this.select_tab(tab, window, cx);
         }))
-        .child(
-            div()
-                .absolute()
-                .left_0()
-                .top_0()
-                .bottom_0()
-                .w(px(3.0))
-                .rounded_tl(px(6.0))
-                .rounded_bl(px(6.0))
-                .bg(theme::rail_purple()),
+        .on_mouse_down(
+            MouseButton::Right,
+            cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                this.open_card_menu(tab, event.position, cx);
+            }),
         )
+        .when_some(style.rail, |el, rail| {
+            // The rail sits in from the card's outer edge (the Mac measures from there; an
+            // absolute child is placed inside the outline).
+            el.child(
+                div()
+                    .absolute()
+                    .left(px(RAIL_LEFT - outline))
+                    .top(px(RAIL_INSET_Y - outline))
+                    .bottom(px(RAIL_INSET_Y - outline))
+                    .w(px(RAIL_WIDTH))
+                    .rounded(px(RAIL_RADIUS))
+                    .bg(theme::hsla(rail)),
+            )
+        })
         .child(content)
 }
+
+/// The colour menu of the workspace `tab`, opened by a right-click at `at`: a heading, "Clear
+/// Color" when the workspace has `own` colour, then the palette with its swatches and a check on
+/// `own`. It is placed inside the window; a window too short for it scrolls the list.
+pub fn card_color_menu(
+    tab: TabId,
+    at: Point<Pixels>,
+    own: Option<String>,
+    lang: Lang,
+    window: &Window,
+    cx: &mut Context<RootView>,
+) -> AnyElement {
+    let root = cx.entity().downgrade();
+    let ColorMenu { clear, entries } = color_menu(current(cx), own.as_deref());
+    let set = |name: Option<&'static str>| -> Box<dyn Fn(&mut Window, &mut gpui::App)> {
+        let root = root.clone();
+        Box::new(move |_, cx| {
+            root.update(cx, |this, cx| {
+                this.set_workspace_color(tab, name.map(str::to_string), cx)
+            })
+            .ok();
+        })
+    };
+    let mut items = vec![MenuItem {
+        label: t(lang, Str::SettingsWorkspaceColor).into(),
+        disabled: true,
+        ..Default::default()
+    }];
+    if clear {
+        items.push(MenuItem {
+            label: t(lang, Str::SettingsClearColor).into(),
+            on_click: set(None),
+            ..Default::default()
+        });
+    }
+    for entry in entries {
+        let title = row(&format!("palette{}", entry.name)).map_or(entry.name.into(), |row| {
+            SharedString::from(t(lang, row.title))
+        });
+        items.push(MenuItem {
+            label: title,
+            on_click: set(Some(entry.name)),
+            swatch: Some(entry.color),
+            checked: entry.checked,
+            ..Default::default()
+        });
+    }
+    // The menu is about one row (text line + padding) per item, plus its own padding; the
+    // anchor keeps whatever this estimate misses inside the window.
+    let row_height = f32::from(theme::UI_SIZE) * 1.4 + 10.0;
+    let size = (menu::MIN_W + 2.0, items.len() as f32 * row_height + 10.0);
+    let view = window.viewport_size();
+    let window_size = (f32::from(view.width), f32::from(view.height));
+    let (x, y) = menu_origin(
+        (f32::from(at.x), f32::from(at.y)),
+        size,
+        window_size,
+        MARGIN,
+    );
+    let max_height = px((window_size.1 - 2.0 * MARGIN).max(row_height));
+    menu::popover_at(
+        items,
+        gpui::point(px(x), px(y)),
+        max_height,
+        move |_, cx| {
+            root.update(cx, |this, cx| this.close_card_menu(cx)).ok();
+        },
+    )
+    .into_any_element()
+}
+
+/// The room a menu keeps to the window's edge, in px.
+const MARGIN: f32 = 8.0;
 
 /// A secondary line of a card: the small size, muted, cut off at the card's edge.
 /// The text sits in a row as a `flex_1` child, like the title: as a plain
 /// child of the column GPUI measures it at width 0 first and keeps that
 /// (the line would show only "…").
-fn card_line(text: String, sz: SidebarSizes) -> Div {
+fn card_line(text: String, sz: SidebarSizes, color: gpui::Hsla) -> Div {
     div().flex().child(
         div()
             .flex_1()
             .min_w_0()
             .truncate()
             .text_size(px(sz.small))
-            .text_color(theme::sidebar_muted())
+            .text_color(color)
             .child(text),
     )
 }
@@ -715,6 +801,7 @@ fn help_menu(
         label: t(lang, label).into(),
         shortcut: None,
         on_click: Box::new(move |_, cx| open_https(cx, url)),
+        ..Default::default()
     };
     let items = vec![
         MenuItem {
@@ -729,6 +816,7 @@ fn help_menu(
                         .ok();
                 }
             }),
+            ..Default::default()
         },
         MenuItem {
             label: t(lang, Str::CheckForUpdates).into(),
@@ -746,6 +834,7 @@ fn help_menu(
                     .ok();
                 }
             }),
+            ..Default::default()
         },
         MenuItem {
             label: t(lang, Str::CreateDiagnosticsReport).into(),
@@ -756,6 +845,7 @@ fn help_menu(
                     log::warn!("the diagnostics report did not start: {error}");
                 }
             }),
+            ..Default::default()
         },
         link(Str::Docs, DOCS_URL),
         link(Str::GitHub, GITHUB_URL),

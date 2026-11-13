@@ -61,7 +61,8 @@ use std::time::Instant;
 
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton,
-    MouseDownEvent, Render, ScrollHandle, Subscription, Window, div, prelude::*, relative,
+    MouseDownEvent, Pixels, Point, Render, ScrollHandle, Subscription, Window, div, prelude::*,
+    relative,
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
@@ -135,6 +136,9 @@ pub struct RootView {
     new_menu_open: bool,
     /// The sidebar footer "?" button's menu is showing.
     help_open: bool,
+    /// The colour menu of a workspace card (a right-click): the workspace, and the point of the
+    /// window it opened at.
+    card_menu: Option<(TabId, Point<Pixels>)>,
     /// Each region's tab strip scroll, and the terminal it last showed.
     tab_strips: HashMap<SlotId, (ScrollHandle, PaneId)>,
     /// Which Macs are offered "Request access" (design §4.5): only those the relay says can host,
@@ -244,6 +248,7 @@ impl RootView {
             navigating: false,
             new_menu_open: false,
             help_open: false,
+            card_menu: None,
             tab_strips: HashMap::new(),
             offer_rule: offer_rule_from_env(std::env::var("SHELLX_OFFER_ALL_MACS").ok().as_deref()),
             _subscriptions: subscriptions,
@@ -730,18 +735,58 @@ impl RootView {
         }
     }
 
+    /// The workspace card's colour menu opens at `at`, replacing any dropdown showing. A
+    /// right-click does not select the workspace (the Mac's does not).
+    pub(super) fn open_card_menu(&mut self, tab: TabId, at: Point<Pixels>, cx: &mut Context<Self>) {
+        self.close_menus(cx);
+        self.card_menu = Some((tab, at));
+        cx.notify();
+    }
+
+    /// A press outside the card menu, or a click on one of its rows.
+    pub(super) fn close_card_menu(&mut self, cx: &mut Context<Self>) {
+        if self.card_menu.take().is_some() {
+            cx.notify();
+        }
+    }
+
+    /// Gives a workspace the palette colour `name` (`None`: none of its own, so the default
+    /// Purple). Nothing is redrawn when the colour is the one it has.
+    pub fn set_workspace_color(
+        &mut self,
+        tab: TabId,
+        name: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        let unchanged = self
+            .tabs
+            .tabs()
+            .iter()
+            .find(|t| t.id == tab)
+            .is_none_or(|t| t.color == name);
+        if !unchanged && self.tabs.set_color(tab, name) {
+            cx.notify();
+        }
+    }
+
     /// Whether a dropdown is showing: the title bar "+ ▾" menu, the help
-    /// menu or the machines "+" list.
+    /// menu, the machines "+" list or a workspace card's colour menu.
     fn dropdown_open(&self, cx: &App) -> bool {
-        self.new_menu_open || self.help_open || self.pairing.read(cx).picker_open()
+        dropdown_showing(
+            self.new_menu_open,
+            self.help_open,
+            self.pairing.read(cx).picker_open(),
+            self.card_menu.is_some(),
+        )
     }
 
     /// Closes every dropdown (the "+ ▾" menu, the help menu, the machines
-    /// "+" list): a panel opens, a command or shortcut runs, the sidebar
-    /// toggles, the forced update shows, or a plain Esc (R14).
+    /// "+" list, a card's colour menu): a panel opens, a command or shortcut
+    /// runs, the sidebar toggles, the forced update shows, or a plain Esc (R14).
     fn close_menus(&mut self, cx: &mut Context<Self>) {
         self.close_new_menu(cx);
         self.close_help_menu(cx);
+        self.close_card_menu(cx);
         self.pairing.update(cx, |panel, cx| panel.close_picker(cx));
     }
 
@@ -1175,6 +1220,12 @@ impl Render for RootView {
                     status: Status::Idle,
                     path,
                     branch,
+                    color: self
+                        .tabs
+                        .tabs()
+                        .iter()
+                        .find(|t| t.id == tab)
+                        .and_then(|t| t.color.clone()),
                 });
             }
             Some(sidebar::render(
@@ -1190,6 +1241,17 @@ impl Render for RootView {
         } else {
             None
         };
+        let card_menu = self.card_menu.map(|(tab, at)| {
+            let own = self
+                .tabs
+                .tabs()
+                .iter()
+                .find(|t| t.id == tab)
+                .and_then(|t| t.color.clone());
+            (tab, at, own)
+        });
+        let card_menu = card_menu
+            .map(|(tab, at, own)| sidebar::card_color_menu(tab, at, own, lang, window, cx));
         let overlay = self.required(cx).map(|(min, url)| {
             update_banner::required_overlay(lang, &min, url, &self.overlay_focus)
         });
@@ -1255,6 +1317,7 @@ impl Render for RootView {
                     .child(main),
             )
             .children(settings)
+            .children(card_menu)
             .children(sign_in)
             .children(overlay)
     }
@@ -1263,7 +1326,7 @@ impl Render for RootView {
 /// Whether a dropdown is showing: the title bar "+ ▾" menu, the help menu, the machines "+" list
 /// or the workspace card's colour menu.
 fn dropdown_showing(new_menu: bool, help: bool, picker: bool, card_menu: bool) -> bool {
-    todo!("{new_menu} {help} {picker} {card_menu}")
+    new_menu || help || picker || card_menu
 }
 
 #[cfg(test)]

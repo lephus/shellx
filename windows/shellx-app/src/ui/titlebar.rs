@@ -276,6 +276,7 @@ fn new_workspace_menu(lang: Lang, cx: &mut Context<RootView>) -> impl IntoElemen
                     root.update(cx, |this, cx| this.new_tab(window, cx)).ok();
                 }
             }),
+            ..Default::default()
         },
         MenuItem {
             label: t(lang, Str::NewTerminalTab).into(),
@@ -287,6 +288,7 @@ fn new_workspace_menu(lang: Lang, cx: &mut Context<RootView>) -> impl IntoElemen
                         .ok();
                 }
             }),
+            ..Default::default()
         },
     ];
     menu::popover(items, move |_, cx| {

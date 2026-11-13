@@ -4,9 +4,9 @@
 //! `drawsActiveBorder`, `sidebarWorkspaceRowExplicitRailNSColor`) and
 //! `Packages/Shared/ShellXBrand/.../ShellXSelectionTint.swift`. Pure: C2 wires the cards.
 
-use crate::chrome::{Chrome, is_dark_surface, mix};
+use crate::chrome::{Chrome, MUTED_MIN, TEXT_MIN, ensure_contrast, is_dark_surface, mix};
 use crate::palette::Rgba;
-use crate::settings::{IndicatorStyle, Settings};
+use crate::settings::{IndicatorStyle, Key, Settings};
 
 /// Mac: `WorkspaceTabColorSettings.originalPRPalette`, lines 21-37.
 pub const BUILT_IN: [(&str, u32); 16] = [
@@ -110,8 +110,7 @@ pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: b
     let rail_style = settings.indicator_style == IndicatorStyle::LeftRail;
     // `sidebarUsesSubtleSelection` (SidebarAppearanceSupport.swift:434-442): a chosen selection
     // colour is an explicit request for a solid fill.
-    let subtle =
-        settings.subtle_selection && rail_style && settings.selection_color.is_none();
+    let subtle = settings.subtle_selection && rail_style && settings.selection_color.is_none();
     let none = CardStyle {
         rail: None,
         fill: None,
@@ -125,7 +124,11 @@ pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: b
             return CardStyle { rail, ..none };
         }
         if subtle {
-            let alpha = if dark { SUBTLE_FILL_DARK } else { SUBTLE_FILL_LIGHT };
+            let alpha = if dark {
+                SUBTLE_FILL_DARK
+            } else {
+                SUBTLE_FILL_LIGHT
+            };
             return CardStyle {
                 rail,
                 fill: Some(accent.with_alpha(alpha)),
@@ -199,7 +202,11 @@ fn brightened(c: Rgba) -> Rgba {
     } else {
         (sat + (1.0 - sat) * SATURATION_BOOST).min(1.0)
     };
-    let (p, q, t) = (v * (1.0 - s), v * (1.0 - s * hue.fract()), v * (1.0 - s * (1.0 - hue.fract())));
+    let (p, q, t) = (
+        v * (1.0 - s),
+        v * (1.0 - s * hue.fract()),
+        v * (1.0 - s * (1.0 - hue.fract())),
+    );
     let (r, g, b) = match hue.floor() as u32 {
         0 => (v, t, p),
         1 => (q, v, p),
@@ -232,7 +239,10 @@ const ACTIVE_BORDER_WIDTH: f32 = 1.5;
 /// The width of every card's outline under `settings` (clear when it has no colour, so a
 /// selection never moves the text).
 pub fn border_width(settings: &Settings) -> f32 {
-    todo!("{settings:?}")
+    match settings.indicator_style {
+        IndicatorStyle::LeftRail => EDGE_WIDTH,
+        IndicatorStyle::SolidFill => ACTIVE_BORDER_WIDTH,
+    }
 }
 
 /// One line of the card menu: a palette entry.
@@ -255,27 +265,67 @@ pub struct ColorMenu {
 /// The menu of a workspace whose own colour is `current` (`None`: it shows the default Purple
 /// without having chosen it, so there is nothing to clear and no check).
 pub fn color_menu(settings: &Settings, current: Option<&str>) -> ColorMenu {
-    todo!("{settings:?} {current:?}")
+    ColorMenu {
+        clear: current.is_some(),
+        entries: palette(settings)
+            .into_iter()
+            .map(|entry| MenuEntry {
+                name: entry.name,
+                color: entry.color,
+                checked: current == Some(entry.name),
+            })
+            .collect(),
+    }
 }
 
 /// The top-left corner of a menu of `size` asked at `at`, kept `margin` inside a window of
 /// `window` (all `(width, height)` or `(x, y)` in px). A menu too big for the window starts at
 /// the margin.
-pub fn menu_origin(at: (f32, f32), size: (f32, f32), window: (f32, f32), margin: f32) -> (f32, f32) {
-    todo!("{at:?} {size:?} {window:?} {margin}")
+pub fn menu_origin(
+    at: (f32, f32),
+    size: (f32, f32),
+    window: (f32, f32),
+    margin: f32,
+) -> (f32, f32) {
+    let place = |at: f32, size: f32, window: f32| at.min(window - margin - size).max(margin);
+    (place(at.0, size.0, window.0), place(at.1, size.1, window.1))
 }
 
 /// The title and the secondary text of a card with `fill` (its colour, over the sidebar), made
 /// to read on it: the chrome's own text colours when nothing is filled, else pushed until they
 /// reach the contrast the sidebar's labels have.
 pub fn card_text(chrome: &Chrome, fill: Option<Rgba>, selected: bool) -> (Rgba, Rgba) {
-    todo!("{chrome:?} {fill:?} {selected}")
+    let title = if selected {
+        chrome.sidebar_selection_title
+    } else {
+        chrome.sidebar_text
+    };
+    let muted = chrome.sidebar_muted;
+    let Some(fill) = fill else {
+        return (title, muted);
+    };
+    let surface = mix(chrome.sidebar_bg, fill, fill.a).with_alpha(1.0);
+    (
+        ensure_contrast(title, surface, TEXT_MIN),
+        ensure_contrast(muted, surface, MUTED_MIN),
+    )
 }
 
 /// The JSON of `Key::Palette` once `name` is `colour`; a colour equal to the built-in one is
 /// dropped, and the last drop gives the empty object (the default).
 pub fn palette_edit(settings: &Settings, name: &str, colour: Rgba) -> serde_json::Value {
-    todo!("{settings:?} {name} {colour:?}")
+    let mut edited = settings.clone();
+    let is_base = BUILT_IN
+        .iter()
+        .any(|&(n, hex)| n == name && Rgba::rgb(hex) == colour);
+    if is_base {
+        edited.palette.remove(name);
+    } else {
+        edited.palette.insert(name.to_string(), colour);
+    }
+    edited
+        .to_value(Key::Palette)
+        .unwrap_or_else(|| serde_json::json!({}))
 }
 
 #[cfg(test)]
@@ -293,12 +343,22 @@ mod tests {
 
     /// ShellX theme, accent #60a5fa, the dark sidebar (#100b1d).
     fn dark() -> Chrome {
-        chrome(&shellx(), rgb(ACCENT), SidebarBackground::FollowTheme, rgb(0x100b1d))
+        chrome(
+            &shellx(),
+            rgb(ACCENT),
+            SidebarBackground::FollowTheme,
+            rgb(0x100b1d),
+        )
     }
 
     /// The same theme with a white Custom sidebar: a light surface on a dark theme.
     fn light_sidebar() -> Chrome {
-        chrome(&shellx(), rgb(ACCENT), SidebarBackground::Custom, rgb(0xffffff))
+        chrome(
+            &shellx(),
+            rgb(ACCENT),
+            SidebarBackground::Custom,
+            rgb(0xffffff),
+        )
     }
 
     fn settings(style: IndicatorStyle, subtle: bool) -> Settings {
@@ -318,7 +378,14 @@ mod tests {
         let p = palette(&Settings::default());
         let got: Vec<(&str, u32)> = p
             .iter()
-            .map(|e| (e.name, (u32::from(e.color.r) << 16) | (u32::from(e.color.g) << 8) | u32::from(e.color.b)))
+            .map(|e| {
+                (
+                    e.name,
+                    (u32::from(e.color.r) << 16)
+                        | (u32::from(e.color.g) << 8)
+                        | u32::from(e.color.b),
+                )
+            })
             .collect();
         assert_eq!(
             got,
@@ -383,7 +450,10 @@ mod tests {
         // Brighten Colors in Dark Mode off does not touch the rail: the Mac forces it bright.
         let mut off = s.clone();
         off.brighten_in_dark = false;
-        assert_eq!(card_style(&off, &dark(), purple(&off), false).rail, card.rail);
+        assert_eq!(
+            card_style(&off, &dark(), purple(&off), false).rail,
+            card.rail
+        );
         // The selected card keeps its rail.
         assert_eq!(card_style(&s, &dark(), purple(&s), true).rail, card.rail);
     }
@@ -437,9 +507,15 @@ mod tests {
         assert_eq!(card.border, Some(rgb(0xe6e2f2).with_alpha(0.5)));
         // A value outside 0..1 is clamped, NaN falls back to 0.7.
         s.unselected_fill_opacity = 1.7;
-        assert_eq!(card_style(&s, &dark(), purple(&s), false).fill.unwrap().a, 1.0);
+        assert_eq!(
+            card_style(&s, &dark(), purple(&s), false).fill.unwrap().a,
+            1.0
+        );
         s.unselected_fill_opacity = f32::NAN;
-        assert_eq!(card_style(&s, &dark(), purple(&s), false).fill.unwrap().a, 0.7);
+        assert_eq!(
+            card_style(&s, &dark(), purple(&s), false).fill.unwrap().a,
+            0.7
+        );
     }
 
     #[test]
@@ -456,7 +532,10 @@ mod tests {
         // With subtle off as well.
         s.subtle_selection = false;
         s.indicator_style = IndicatorStyle::LeftRail;
-        assert_eq!(card_style(&s, &dark(), purple(&s), true).fill, Some(rgb(0xaabbcc)));
+        assert_eq!(
+            card_style(&s, &dark(), purple(&s), true).fill,
+            Some(rgb(0xaabbcc))
+        );
     }
 
     #[test]
@@ -490,7 +569,12 @@ mod tests {
         assert_eq!(m.entries.len(), 16);
         assert_eq!(m.entries[0].name, "Red");
         assert_eq!(m.entries[0].color, rgb(0xC0392B));
-        let checked: Vec<_> = m.entries.iter().filter(|e| e.checked).map(|e| e.name).collect();
+        let checked: Vec<_> = m
+            .entries
+            .iter()
+            .filter(|e| e.checked)
+            .map(|e| e.name)
+            .collect();
         assert_eq!(checked, ["Green"]);
         // No colour of its own: nothing to clear and nothing checked, though it draws Purple.
         let none = color_menu(&s, None);
@@ -509,21 +593,39 @@ mod tests {
     fn a_menu_asked_near_an_edge_stays_inside_the_window() {
         let window = (800.0, 600.0);
         let size = (220.0, 300.0);
-        assert_eq!(menu_origin((100.0, 100.0), size, window, 8.0), (100.0, 100.0));
+        assert_eq!(
+            menu_origin((100.0, 100.0), size, window, 8.0),
+            (100.0, 100.0)
+        );
         // Right edge, bottom edge, both.
-        assert_eq!(menu_origin((700.0, 100.0), size, window, 8.0), (572.0, 100.0));
-        assert_eq!(menu_origin((100.0, 500.0), size, window, 8.0), (100.0, 292.0));
-        assert_eq!(menu_origin((790.0, 590.0), size, window, 8.0), (572.0, 292.0));
+        assert_eq!(
+            menu_origin((700.0, 100.0), size, window, 8.0),
+            (572.0, 100.0)
+        );
+        assert_eq!(
+            menu_origin((100.0, 500.0), size, window, 8.0),
+            (100.0, 292.0)
+        );
+        assert_eq!(
+            menu_origin((790.0, 590.0), size, window, 8.0),
+            (572.0, 292.0)
+        );
         // Outside the top-left, and too big for the window: the margin.
         assert_eq!(menu_origin((-5.0, 2.0), size, window, 8.0), (8.0, 8.0));
-        assert_eq!(menu_origin((100.0, 100.0), (220.0, 900.0), window, 8.0), (100.0, 8.0));
+        assert_eq!(
+            menu_origin((100.0, 100.0), (220.0, 900.0), window, 8.0),
+            (100.0, 8.0)
+        );
     }
 
     #[test]
     fn card_text_reads_on_every_colour_and_is_left_alone_without_one() {
         for sidebar in [dark(), light_sidebar()] {
             let (title, muted) = card_text(&sidebar, None, false);
-            assert_eq!((title, muted), (sidebar.sidebar_text, sidebar.sidebar_muted));
+            assert_eq!(
+                (title, muted),
+                (sidebar.sidebar_text, sidebar.sidebar_muted)
+            );
             let (title, _) = card_text(&sidebar, None, true);
             assert_eq!(title, sidebar.sidebar_selection_title);
             let s = Settings::default();
@@ -560,7 +662,9 @@ mod tests {
     }
 
     fn settings_fill(c: &Chrome) -> Rgba {
-        card_style(&Settings::default(), c, rgb(0x6A1B9A), true).fill.unwrap()
+        card_style(&Settings::default(), c, rgb(0x6A1B9A), true)
+            .fill
+            .unwrap()
     }
 
     #[test]
@@ -577,6 +681,9 @@ mod tests {
             serde_json::json!({"Red": "#112233", "Blue": "#010203"})
         );
         // Back to the built-in colour: the entry goes, and the last one leaves the default.
-        assert_eq!(palette_edit(&two, "Red", rgb(0xC0392B)), serde_json::json!({}));
+        assert_eq!(
+            palette_edit(&two, "Red", rgb(0xC0392B)),
+            serde_json::json!({})
+        );
     }
 }
