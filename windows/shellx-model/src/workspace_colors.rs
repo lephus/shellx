@@ -110,8 +110,7 @@ pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: b
     let rail_style = settings.indicator_style == IndicatorStyle::LeftRail;
     // `sidebarUsesSubtleSelection` (SidebarAppearanceSupport.swift:434-442): a chosen selection
     // colour is an explicit request for a solid fill.
-    let subtle =
-        settings.subtle_selection && rail_style && settings.selection_color.is_none();
+    let subtle = settings.subtle_selection && rail_style && settings.selection_color.is_none();
     let none = CardStyle {
         rail: None,
         fill: None,
@@ -125,7 +124,11 @@ pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: b
             return CardStyle { rail, ..none };
         }
         if subtle {
-            let alpha = if dark { SUBTLE_FILL_DARK } else { SUBTLE_FILL_LIGHT };
+            let alpha = if dark {
+                SUBTLE_FILL_DARK
+            } else {
+                SUBTLE_FILL_LIGHT
+            };
             return CardStyle {
                 rail,
                 fill: Some(accent.with_alpha(alpha)),
@@ -199,7 +202,11 @@ fn brightened(c: Rgba) -> Rgba {
     } else {
         (sat + (1.0 - sat) * SATURATION_BOOST).min(1.0)
     };
-    let (p, q, t) = (v * (1.0 - s), v * (1.0 - s * hue.fract()), v * (1.0 - s * (1.0 - hue.fract())));
+    let (p, q, t) = (
+        v * (1.0 - s),
+        v * (1.0 - s * hue.fract()),
+        v * (1.0 - s * (1.0 - hue.fract())),
+    );
     let (r, g, b) = match hue.floor() as u32 {
         0 => (v, t, p),
         1 => (q, v, p),
@@ -232,12 +239,22 @@ mod tests {
 
     /// ShellX theme, accent #60a5fa, the dark sidebar (#100b1d).
     fn dark() -> Chrome {
-        chrome(&shellx(), rgb(ACCENT), SidebarBackground::FollowTheme, rgb(0x100b1d))
+        chrome(
+            &shellx(),
+            rgb(ACCENT),
+            SidebarBackground::FollowTheme,
+            rgb(0x100b1d),
+        )
     }
 
     /// The same theme with a white Custom sidebar: a light surface on a dark theme.
     fn light_sidebar() -> Chrome {
-        chrome(&shellx(), rgb(ACCENT), SidebarBackground::Custom, rgb(0xffffff))
+        chrome(
+            &shellx(),
+            rgb(ACCENT),
+            SidebarBackground::Custom,
+            rgb(0xffffff),
+        )
     }
 
     fn settings(style: IndicatorStyle, subtle: bool) -> Settings {
@@ -257,7 +274,14 @@ mod tests {
         let p = palette(&Settings::default());
         let got: Vec<(&str, u32)> = p
             .iter()
-            .map(|e| (e.name, (u32::from(e.color.r) << 16) | (u32::from(e.color.g) << 8) | u32::from(e.color.b)))
+            .map(|e| {
+                (
+                    e.name,
+                    (u32::from(e.color.r) << 16)
+                        | (u32::from(e.color.g) << 8)
+                        | u32::from(e.color.b),
+                )
+            })
             .collect();
         assert_eq!(
             got,
@@ -322,7 +346,10 @@ mod tests {
         // Brighten Colors in Dark Mode off does not touch the rail: the Mac forces it bright.
         let mut off = s.clone();
         off.brighten_in_dark = false;
-        assert_eq!(card_style(&off, &dark(), purple(&off), false).rail, card.rail);
+        assert_eq!(
+            card_style(&off, &dark(), purple(&off), false).rail,
+            card.rail
+        );
         // The selected card keeps its rail.
         assert_eq!(card_style(&s, &dark(), purple(&s), true).rail, card.rail);
     }
@@ -376,9 +403,15 @@ mod tests {
         assert_eq!(card.border, Some(rgb(0xe6e2f2).with_alpha(0.5)));
         // A value outside 0..1 is clamped, NaN falls back to 0.7.
         s.unselected_fill_opacity = 1.7;
-        assert_eq!(card_style(&s, &dark(), purple(&s), false).fill.unwrap().a, 1.0);
+        assert_eq!(
+            card_style(&s, &dark(), purple(&s), false).fill.unwrap().a,
+            1.0
+        );
         s.unselected_fill_opacity = f32::NAN;
-        assert_eq!(card_style(&s, &dark(), purple(&s), false).fill.unwrap().a, 0.7);
+        assert_eq!(
+            card_style(&s, &dark(), purple(&s), false).fill.unwrap().a,
+            0.7
+        );
     }
 
     #[test]
@@ -395,7 +428,10 @@ mod tests {
         // With subtle off as well.
         s.subtle_selection = false;
         s.indicator_style = IndicatorStyle::LeftRail;
-        assert_eq!(card_style(&s, &dark(), purple(&s), true).fill, Some(rgb(0xaabbcc)));
+        assert_eq!(
+            card_style(&s, &dark(), purple(&s), true).fill,
+            Some(rgb(0xaabbcc))
+        );
     }
 
     #[test]

@@ -883,7 +883,10 @@ mod tests {
             .nth(1)
             .and_then(|rest| rest.split('=').next())
             .unwrap();
-        assert!(name.len() >= 12 && name.starts_with("SHELLX_PROBE_"), "{line}");
+        assert!(
+            name.len() >= 12 && name.starts_with("SHELLX_PROBE_"),
+            "{line}"
+        );
         assert!(line.contains(&format!("%{name}%")), "{line}");
         assert!(!line.contains("%x%") && !line.contains("%X%"), "{line}");
     }

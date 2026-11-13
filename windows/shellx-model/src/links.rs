@@ -56,7 +56,11 @@ impl Links {
 
     /// Insert, or replace the link for the same machine.
     pub fn upsert(&mut self, link: RemoteLink) {
-        match self.links.iter_mut().find(|l| l.machine_id == link.machine_id) {
+        match self
+            .links
+            .iter_mut()
+            .find(|l| l.machine_id == link.machine_id)
+        {
             Some(slot) => *slot = link,
             None => self.links.push(link),
         }
@@ -132,7 +136,9 @@ mod tests {
         assert_eq!(l.access_for("m1", &pending), Access::Granted);
         assert_eq!(
             l.access_for("m2", &pending),
-            Access::Pending { code: "123456".into() }
+            Access::Pending {
+                code: "123456".into()
+            }
         );
         assert_eq!(l.access_for("m3", &pending), Access::None);
     }

@@ -95,6 +95,27 @@ fn search_rows(query: &str, lang: Lang, include: impl Fn(&Row) -> bool) -> Vec<H
     hits
 }
 
+/// The text of a hit list item: its title, and for a row the title of its section as a caption.
+pub fn hit_label(hit: &Hit, lang: Lang) -> (String, Option<String>) {
+    let _ = (hit, lang);
+    (String::new(), None)
+}
+
+/// How far to scroll (down from the top, 0 or more) to put a row in the vertical centre of the
+/// pane: the row's top in the content, its height, the pane's height and the most the content
+/// scrolls. A row that does not fit the pane shows its top.
+pub fn centred_scroll(row_top: f32, row_height: f32, viewport: f32, max: f32) -> f32 {
+    let _ = (row_top, row_height, viewport, max);
+    -1.0
+}
+
+/// How much of the highlight of a row found by search shows, 1.0 to 0.0, `elapsed_ms` after the
+/// click: full for 2 s, then it fades out in 400 ms.
+pub fn highlight_alpha(elapsed_ms: u64) -> f32 {
+    let _ = elapsed_ms;
+    -1.0
+}
+
 struct Query<'a> {
     whole: String,
     words: Vec<&'a str>,
@@ -328,6 +349,107 @@ mod tests {
                 .iter()
                 .all(|h| h.row.is_none_or(|id| row(id).unwrap().wired))
         );
+    }
+
+    #[test]
+    fn a_hit_list_item_names_its_section() {
+        let section = Hit {
+            section: Section::Terminal,
+            row: None,
+            rank: 0,
+        };
+        assert_eq!(
+            hit_label(&section, Lang::En),
+            ("Terminal".to_string(), None)
+        );
+        let size = Hit {
+            section: Section::Terminal,
+            row: Some("terminalConfig.font-size"),
+            rank: 0,
+        };
+        assert_eq!(
+            hit_label(&size, Lang::En),
+            ("Font Size".to_string(), Some("Terminal".to_string()))
+        );
+        let vi = hit_label(&size, Lang::Vi);
+        assert_eq!(
+            vi.0,
+            t(Lang::Vi, row("terminalConfig.font-size").unwrap().title)
+        );
+        assert_eq!(
+            vi.1.as_deref(),
+            Some(t(Lang::Vi, section_title(Section::Terminal)))
+        );
+    }
+
+    #[test]
+    fn a_section_that_is_one_row_of_its_own_title_gives_one_hit() {
+        for lang in [Lang::En, Lang::Vi] {
+            for &(_, sections) in groups() {
+                for &section in sections {
+                    let title = t(lang, section_title(section));
+                    let hits = everything(title, lang);
+                    // The same title twice in one section is the section and its own row.
+                    let mut seen: Vec<(String, &str)> = Vec::new();
+                    for h in &hits {
+                        let key = (hit_label(h, lang).0, h.section.id());
+                        assert!(!seen.contains(&key), "{title}: {key:?} twice");
+                        seen.push(key);
+                    }
+                }
+            }
+        }
+        let updates = search("updates", Lang::En);
+        assert_eq!(
+            updates
+                .iter()
+                .filter(|h| h.section == Section::Updates)
+                .count(),
+            1
+        );
+        assert_eq!(updates[0].row, None);
+    }
+
+    #[test]
+    fn a_word_naming_a_section_lists_the_section_before_its_rows() {
+        let terminal = search("terminal", Lang::En);
+        assert_eq!(
+            terminal[0],
+            Hit {
+                section: Section::Terminal,
+                row: None,
+                rank: 0
+            }
+        );
+        assert!(
+            terminal
+                .iter()
+                .filter(|h| h.section == Section::Terminal)
+                .count()
+                > 1
+        );
+    }
+
+    #[test]
+    fn a_row_is_scrolled_to_the_centre_of_the_pane() {
+        // 600 high pane, a 40 high row at 1000 of 3000 content (max scroll 2400).
+        assert_eq!(centred_scroll(1000.0, 40.0, 600.0, 2400.0), 720.0);
+        // Near the top and the bottom the scroll is clamped to the content.
+        assert_eq!(centred_scroll(100.0, 40.0, 600.0, 2400.0), 0.0);
+        assert_eq!(centred_scroll(2900.0, 40.0, 600.0, 2400.0), 2400.0);
+        // A row taller than the pane shows its top; no scroll when nothing scrolls.
+        assert_eq!(centred_scroll(1000.0, 800.0, 600.0, 2400.0), 1000.0);
+        assert_eq!(centred_scroll(1000.0, 40.0, 600.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn the_highlight_holds_two_seconds_then_fades_out() {
+        assert_eq!(highlight_alpha(0), 1.0);
+        assert_eq!(highlight_alpha(1999), 1.0);
+        assert_eq!(highlight_alpha(2000), 1.0);
+        assert!((highlight_alpha(2200) - 0.5).abs() < 1e-5);
+        assert_eq!(highlight_alpha(2400), 0.0);
+        assert_eq!(highlight_alpha(60_000), 0.0);
     }
 
     #[test]
