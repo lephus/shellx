@@ -106,11 +106,13 @@ pub enum PaneClick {
 
 /// Right and middle clicks as in the Windows console. A click on an unfocused pane only
 /// focuses it. On the focused pane the right button copies the selection, or pastes when
-/// there is none; the middle button does nothing.
+/// there is none; the middle button pastes while `middle_pastes` (Settings › Terminal ›
+/// Middle-Click Paste) is on, and does nothing otherwise.
 pub fn secondary_click(
     button: SecondaryButton,
     pane_focused: bool,
     has_selection: bool,
+    middle_pastes: bool,
 ) -> PaneClick {
     if !pane_focused {
         return PaneClick::FocusOnly;
@@ -120,6 +122,13 @@ pub fn secondary_click(
         SecondaryButton::Right => PaneClick::Paste,
         SecondaryButton::Middle => PaneClick::Nothing,
     }
+}
+
+/// A wheel or touchpad distance in lines, times the Scroll Speed setting. Applied before the
+/// fractional accumulator, so 0.25x of 4 lines collects to exactly one line.
+pub fn scaled_scroll(lines: f64, speed: f32) -> f64 {
+    let _ = (lines, speed);
+    unimplemented!()
 }
 
 #[cfg(test)]
@@ -275,26 +284,61 @@ mod tests {
     fn secondary_clicks_follow_the_windows_console() {
         for button in [SecondaryButton::Right, SecondaryButton::Middle] {
             for has_selection in [false, true] {
-                assert_eq!(
-                    secondary_click(button, false, has_selection),
-                    PaneClick::FocusOnly,
-                    "{button:?} {has_selection}"
-                );
+                for middle in [false, true] {
+                    assert_eq!(
+                        secondary_click(button, false, has_selection, middle),
+                        PaneClick::FocusOnly,
+                        "{button:?} {has_selection} {middle}"
+                    );
+                }
             }
         }
         assert_eq!(
-            secondary_click(SecondaryButton::Right, true, true),
+            secondary_click(SecondaryButton::Right, true, true, false),
             PaneClick::CopySelection
         );
         assert_eq!(
-            secondary_click(SecondaryButton::Right, true, false),
+            secondary_click(SecondaryButton::Right, true, false, false),
             PaneClick::Paste
         );
+        // the right button ignores the middle-click setting
+        assert_eq!(
+            secondary_click(SecondaryButton::Right, true, false, true),
+            PaneClick::Paste
+        );
+    }
+
+    #[test]
+    fn middle_click_pastes_only_when_on_and_the_pane_has_focus() {
         for has_selection in [false, true] {
             assert_eq!(
-                secondary_click(SecondaryButton::Middle, true, has_selection),
+                secondary_click(SecondaryButton::Middle, true, has_selection, true),
+                PaneClick::Paste
+            );
+            assert_eq!(
+                secondary_click(SecondaryButton::Middle, true, has_selection, false),
                 PaneClick::Nothing
             );
+            // the first click on an unfocused pane only focuses it
+            assert_eq!(
+                secondary_click(SecondaryButton::Middle, false, has_selection, true),
+                PaneClick::FocusOnly
+            );
         }
+    }
+
+    #[test]
+    fn scroll_speed_scales_before_accumulating() {
+        let mut a = ScrollAccumulator::default();
+        assert_eq!(a.add(scaled_scroll(4.0, 0.25)), 1);
+        let mut a = ScrollAccumulator::default();
+        assert_eq!(a.add(scaled_scroll(3.0, 2.0)), 6);
+        // 0.25x of a 3-line notch collects over several notches instead of rounding to 0
+        let mut a = ScrollAccumulator::default();
+        let got: Vec<i32> = (0..4).map(|_| a.add(scaled_scroll(3.0, 0.25))).collect();
+        assert_eq!(got, [0, 1, 1, 1]);
+        // direction and the neutral speed are kept; odd input stays odd for the accumulator
+        assert_eq!(scaled_scroll(-3.0, 1.0), -3.0);
+        assert!(scaled_scroll(f64::NAN, 2.0).is_nan());
     }
 }

@@ -861,7 +861,7 @@ impl TermView {
         cx: &mut Context<Self>,
     ) {
         let focused = self.focus_handle.is_focused(window);
-        match secondary_click(button, focused, self.has_selection()) {
+        match secondary_click(button, focused, self.has_selection(), false) {
             PaneClick::FocusOnly => window.focus(&self.focus_handle),
             PaneClick::Paste => self.paste_clipboard(cx),
             PaneClick::CopySelection => self.copy_selection(cx),
