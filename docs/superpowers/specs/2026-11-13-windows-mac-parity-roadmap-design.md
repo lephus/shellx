@@ -237,8 +237,10 @@ Chưa hiện, về ở Phần 1b: Global Font Magnification, nhóm "Warn Before�
 | Cỡ chữ sidebar | tên workspace 12 | 12,5, các chữ khác theo cùng tỉ lệ |
 | Chuột giữa trong terminal | chỉ chuyển tiêu điểm | dán |
 | Back/Forward | đi qua workspace và vùng chia | chỉ đi qua workspace |
+| Vạch màu của workspace | vạch `#6a1b9a` cao hết thẻ, sát mép trái | vạch Purple làm sáng như Mac (`#7f1dba`), rộng 3, cách mép 3 và 5, bo tròn đầu |
+| Thư mục của workspace mới | thư mục nhà | thư mục của terminal đang chọn (Inherit Workspace Working Directory bật); về thư mục nhà khi không biết thư mục đó hoặc thư mục đã mất |
 
-Không đổi: bộ màu khung app (trùng `ShellXPalette` của Mac), phông JetBrains Mono, vạch tím của workspace mới, vị trí workspace mới, cỡ chữ thanh tab, và việc hỏi trước khi dán nhiều dòng.
+Không đổi: bộ màu khung app (trùng `ShellXPalette` của Mac), phông JetBrains Mono, vị trí workspace mới, cỡ chữ thanh tab, và việc hỏi trước khi dán nhiều dòng.
 
 ### 5.5 Theme và màu
 

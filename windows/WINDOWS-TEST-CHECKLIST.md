@@ -156,8 +156,8 @@ Làm trên bản cài thử có Cài đặt mới. Cài đặt giờ là **cửa
   - Đạt: terminal đang mở đổi màu ngay, khung app cũng đổi theo; "Hoàn nguyên" (Revert) hiện ra.
 - [ ] **S5. Cỡ chữ và kiểu con trỏ.** Terminal: đổi Cỡ chữ (nút − và +), rồi Kiểu con trỏ.
   - Đạt: terminal đang mở đổi cỡ chữ và hình con trỏ ngay, vẫn đúng lưới, không méo chữ.
-- [ ] **S6. Đổi phím tắt.** Phím tắt: bấm ô phím của "Phiên mới" (New Workspace), nhấn tổ hợp mới (ví dụ `Ctrl+Alt+N`), đóng Cài đặt, nhấn tổ hợp đó.
-  - Đạt: ô ghi hiện tổ hợp mới; tổ hợp mới mở phiên mới, `Ctrl+Shift+N` cũ không còn mở nữa.
+- [ ] **S6. Đổi phím tắt.** Phím tắt: bấm ô phím của "Phiên mới" (New Workspace), nhấn `Ctrl+Alt+N`, rồi bấm lại ô đó và nhấn `Ctrl+Shift+K`; đóng Cài đặt, nhấn `Ctrl+Shift+K`.
+  - Đạt: `Ctrl+Alt+N` bị từ chối với dòng giải thích màu đỏ (Ctrl+Alt là AltGr, dùng để gõ chữ), ô vẫn giữ phím cũ; `Ctrl+Shift+K` được ghi, mở phiên mới, và `Ctrl+Shift+N` cũ không còn mở nữa.
 - [ ] **S7. Trùng phím.** Ghi cho một hành động một tổ hợp mà hành động khác đang giữ (ví dụ `Ctrl+Shift+B`).
   - Đạt: hiện **dải đỏ** báo trùng, phím không bị gán; phím cũ của cả hai hành động còn nguyên.
 - [ ] **S8. Màu phiên.** Bấm chuột phải vào thẻ phiên trong thanh bên, chọn một màu.
