@@ -5,6 +5,10 @@
 //! still waits. A failed write is one log line naming the error's kind (no path, no value);
 //! the change then lives in memory until ShellX quits. Nothing here panics or blocks the UI
 //! on the file.
+//!
+//! The service also holds the keymap built from `shortcuts.bindings`, rebuilt when they change
+//! (never per key press or per frame): the panes and the main window read every key with it,
+//! and every tooltip or menu line that shows a shortcut reads `shortcut_label`.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -13,6 +17,7 @@ use std::time::Duration;
 
 use gpui::{App, AppContext as _, Context, Entity, Global, Task};
 use serde_json::Value;
+use shellx_model::keymap::{Action, Chord, Keymap};
 use shellx_model::settings::{Key, Settings};
 
 use crate::settings_store::SettingsStore;
@@ -24,6 +29,8 @@ const WRITE_DELAY: Duration = Duration::from_millis(300);
 
 pub struct SettingsService {
     settings: Settings,
+    /// `settings.bindings` over the default shortcuts (`follow`).
+    keymap: Keymap,
     writes: Arc<PendingWrites>,
     /// The timer of each key that waits for its write; a new change to the key drops
     /// (cancels) it and starts another.
@@ -45,12 +52,17 @@ impl SettingsService {
             let writes = writes.clone();
             move || writes.flush()
         });
-        let service = cx.new(|_| SettingsService {
+        let service = cx.new(|_| SettingsService::new(settings, writes));
+        cx.set_global(SharedSettings(service));
+    }
+
+    fn new(settings: Settings, writes: Arc<PendingWrites>) -> SettingsService {
+        SettingsService {
+            keymap: Keymap::from_bindings(&settings.bindings),
             settings,
             writes,
             timers: HashMap::new(),
-        });
-        cx.set_global(SharedSettings(service));
+        }
     }
 
     pub fn entity(cx: &App) -> Entity<SettingsService> {
@@ -59,6 +71,10 @@ impl SettingsService {
 
     pub fn settings(&self) -> &Settings {
         &self.settings
+    }
+
+    pub fn keymap(&self) -> &Keymap {
+        &self.keymap
     }
 
     /// Applies `value` (clamped; one of the wrong type changes nothing), notifies the
@@ -81,6 +97,7 @@ impl SettingsService {
     #[allow(dead_code)] // first called by Reset All Settings (F2)
     pub fn reset_all(&mut self, cx: &mut Context<Self>) {
         self.settings = Settings::default();
+        self.follow(Key::Bindings);
         self.timers.clear();
         for key in Key::ALL {
             self.writes.wait(key.path(), None);
@@ -91,6 +108,7 @@ impl SettingsService {
     }
 
     fn changed(&mut self, key: Key, cx: &mut Context<Self>) {
+        self.follow(key);
         self.writes.wait(key.path(), self.settings.to_value(key));
         let writes = self.writes.clone();
         let delay = cx.background_executor().timer(WRITE_DELAY);
@@ -101,11 +119,34 @@ impl SettingsService {
         self.timers.insert(key, timer);
         cx.notify();
     }
+
+    /// The keymap follows a change to `key`: rebuilt when it is the bindings.
+    fn follow(&mut self, key: Key) {
+        if key == Key::Bindings {
+            self.keymap = Keymap::from_bindings(&self.settings.bindings);
+        }
+    }
 }
 
 /// The current settings, for any view: `current(cx).font_size`.
 pub fn current(cx: &App) -> &Settings {
     cx.global::<SharedSettings>().0.read(cx).settings()
+}
+
+/// The current keymap, which every key press reads: a global lookup and an entity read;
+/// nothing is built or locked.
+pub fn current_keymap(cx: &App) -> &Keymap {
+    cx.global::<SharedSettings>().0.read(cx).keymap()
+}
+
+/// The shortcut a tooltip or menu line shows for `action`: its current chord ("Ctrl+Shift+N"),
+/// or `None` when it is unbound, and then the line shows no shortcut at all.
+pub fn shortcut_label(action: Action, cx: &App) -> Option<String> {
+    label(current_keymap(cx), action)
+}
+
+fn label(keymap: &Keymap, action: Action) -> Option<String> {
+    keymap.chord(action).map(Chord::label)
 }
 
 /// The values that wait for their write, shared by the service's timers and `orderly_quit`.

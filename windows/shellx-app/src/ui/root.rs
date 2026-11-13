@@ -85,8 +85,9 @@ use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
 use super::settings::{self, SettingsHost, SettingsViewEvent};
+use super::settings_service::{SettingsService, current_keymap};
 use super::sidebar::{self, Picker, PickerEntry, SessionRow};
-use super::term_view::{TermEvent, TermView, default_keymap};
+use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
 use super::update_banner;
@@ -175,6 +176,8 @@ impl RootView {
                 cx.notify();
             }),
             cx.observe(&pairing, |_, _, cx| cx.notify()),
+            // The title bar's tooltip and the menus show the current shortcuts.
+            cx.observe(&SettingsService::entity(cx), |_, _, cx| cx.notify()),
             cx.subscribe_in(
                 &pairing,
                 window,
@@ -1014,7 +1017,7 @@ impl RootView {
             has_selection: focused.is_some_and(TermView::has_selection),
             composing: focused.is_some_and(TermView::composing),
         };
-        (map_key(&key, default_keymap(), &ctx), plain_escape)
+        (map_key(&key, current_keymap(cx), &ctx), plain_escape)
     }
 
     fn focused_view<'a>(&self, cx: &'a App) -> Option<&'a TermView> {

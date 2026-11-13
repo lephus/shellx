@@ -15,11 +15,13 @@ use gpui::{
     ClickEvent, Context, Div, FontWeight, MouseDownEvent, Pixels, SharedString, Stateful, Window,
     WindowControlArea, div, prelude::*, px, svg,
 };
+use shellx_model::keymap::Action;
 use shellx_model::strings::{Lang, Str, t};
 
 use super::assets::Icon;
 use super::menu::{self, MenuItem};
 use super::root::RootView;
+use super::settings_service::shortcut_label;
 use super::theme;
 use super::tooltip::Tooltip;
 
@@ -104,6 +106,7 @@ pub fn render(root: &RootView, lang: Lang, window: &Window, cx: &mut Context<Roo
                 px(24.0),
                 t(lang, Str::Settings),
             )
+            // Never through the keymap: the gear opens Settings with its shortcut unbound.
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 this.open_settings(window, cx);
             })),
@@ -198,7 +201,11 @@ fn icon_button(
 /// "+" (a new workspace) and its chevron (a menu: New Workspace, New Tab
 /// (Terminal)), side by side like the Mac's split button.
 fn new_workspace_button(menu_open: bool, lang: Lang, cx: &mut Context<RootView>) -> Div {
-    let plus_tip = format!("{} (Ctrl+Shift+N)", t(lang, Str::NewWorkspace));
+    let name = t(lang, Str::NewWorkspace);
+    let plus_tip = match shortcut_label(Action::NewWorkspace, cx) {
+        Some(keys) => format!("{name} ({keys})"),
+        None => name.to_string(),
+    };
     let plus = icon_button("titlebar-new", Icon::AddPlus, BUTTON, plus_tip)
         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.new_tab(window, cx)));
     let chevron = div()
@@ -262,7 +269,7 @@ fn new_workspace_menu(lang: Lang, cx: &mut Context<RootView>) -> impl IntoElemen
     let items = vec![
         MenuItem {
             label: t(lang, Str::NewWorkspace).into(),
-            shortcut: Some("Ctrl+Shift+N"),
+            shortcut: shortcut_label(Action::NewWorkspace, cx).map(Into::into),
             on_click: Box::new({
                 let root = root.clone();
                 move |window, cx| {
@@ -272,7 +279,7 @@ fn new_workspace_menu(lang: Lang, cx: &mut Context<RootView>) -> impl IntoElemen
         },
         MenuItem {
             label: t(lang, Str::NewTerminalTab).into(),
-            shortcut: Some("Ctrl+Shift+T"),
+            shortcut: shortcut_label(Action::NewTerminal, cx).map(Into::into),
             on_click: Box::new({
                 let root = root.clone();
                 move |window, cx| {

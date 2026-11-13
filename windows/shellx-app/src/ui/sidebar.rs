@@ -26,6 +26,7 @@ use gpui::{
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::GooglePurpose;
+use shellx_model::keymap::Action;
 use shellx_model::palette::{
     PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
 };
@@ -40,6 +41,7 @@ use super::assets::Icon;
 use super::button::{Kind, button};
 use super::menu::{self, MenuItem};
 use super::root::RootView;
+use super::settings_service::shortcut_label;
 use super::theme;
 use super::tooltip::Tooltip;
 use super::update_banner::open_https;
@@ -680,10 +682,11 @@ fn help_menu(
     let items = vec![
         MenuItem {
             label: t(lang, Str::SettingsEllipsis).into(),
-            shortcut: Some("Ctrl+,"),
+            shortcut: shortcut_label(Action::OpenSettings, cx).map(Into::into),
             on_click: Box::new({
                 let root = root.clone();
-                // Opens Settings, never closes it (Ctrl+, toggles).
+                // Opens Settings, never closes it (its shortcut toggles), and never goes
+                // through the keymap: it works with the shortcut unbound.
                 move |window, cx| {
                     root.update(cx, |this, cx| this.show_settings(None, window, cx))
                         .ok();

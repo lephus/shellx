@@ -29,8 +29,9 @@ type Action = dyn Fn(&mut Window, &mut App);
 
 pub(super) struct MenuItem {
     pub label: SharedString,
-    /// Shown on the right, e.g. "Ctrl+Shift+N".
-    pub shortcut: Option<&'static str>,
+    /// Shown on the right, e.g. "Ctrl+Shift+N": the action's current chord
+    /// (`settings_service::shortcut_label`).
+    pub shortcut: Option<SharedString>,
     pub on_click: Box<Action>,
 }
 
