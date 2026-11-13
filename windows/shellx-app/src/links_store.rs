@@ -130,8 +130,9 @@ impl LinksStore {
     }
 }
 
-/// Renames `path` to `<name>.bad-<unix>` (`-<n>` added if that exists).
-fn quarantine(path: &Path) -> io::Result<PathBuf> {
+/// Renames `path` to `<name>.bad-<unix>` (`-<n>` added if that exists). `settings_store`
+/// sets a bad `settings.json` aside with it too.
+pub(crate) fn quarantine(path: &Path) -> io::Result<PathBuf> {
     let unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());

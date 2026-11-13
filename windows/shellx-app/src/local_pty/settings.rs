@@ -10,7 +10,6 @@
 //! (CreateProcess says when a file is missing).
 
 use std::io;
-use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
 
@@ -20,12 +19,10 @@ use shellx_model::shell::{
 };
 
 use super::{PanePlan, ShellCmd, dev_bash};
+use crate::settings_store::SettingsStore;
 
 /// How long the first pane waits for the first lookup (Ruling 16).
 const FIRST_WAIT: Duration = Duration::from_secs(2);
-
-/// A larger `settings.json` is not read: Automatic.
-const SETTINGS_MAX_BYTES: u64 = 64 * 1024;
 
 type Exists = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
@@ -38,72 +35,39 @@ pub enum ShellHost {
     MacDev,
 }
 
-/// `settings.json` in the app's native folder: `{"shell": <ShellChoice>}` (Ruling 3). Keys
-/// this version does not know are kept when it rewrites the file.
+/// The `shell` key of `settings.json`: `{"shell": <ShellChoice>}` (Ruling 3), read and
+/// written through `SettingsStore`, which keeps every other key of the file.
 pub struct SettingsFile {
-    /// `None`: there is no folder to keep it in (`LOCALAPPDATA` unset).
-    path: Option<PathBuf>,
+    store: SettingsStore,
 }
 
 impl SettingsFile {
-    pub fn new(path: PathBuf) -> Self {
-        SettingsFile { path: Some(path) }
+    #[cfg(test)]
+    pub fn new(path: std::path::PathBuf) -> Self {
+        SettingsFile {
+            store: SettingsStore::new(path),
+        }
     }
 
-    fn unavailable() -> Self {
-        SettingsFile { path: None }
+    fn at_native_dir() -> Self {
+        SettingsFile {
+            store: SettingsStore::at_native_dir(),
+        }
     }
 
     /// The stored choice. A missing or unreadable file, or a value this version does not
     /// know, means Auto.
     pub fn load(&self) -> ShellChoice {
-        self.read_object()
-            .and_then(|mut object| object.remove("shell"))
+        self.store
+            .read_raw("shell")
             .and_then(|value| serde_json::from_value(value).ok())
             .unwrap_or_default()
     }
 
-    /// Stores `choice`, keeping the file's other keys: written to a temporary file next to
-    /// it, then renamed over it. Creates the folder when it is missing.
+    /// Stores `choice`, keeping the file's other keys (`SettingsStore::write`).
     pub fn save(&self, choice: &ShellChoice) -> io::Result<()> {
-        let path = self
-            .path
-            .as_ref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "LOCALAPPDATA is not set"))?;
-        let mut object = self.read_object().unwrap_or_default();
-        object.insert(
-            "shell".to_string(),
-            serde_json::to_value(choice).map_err(io::Error::other)?,
-        );
-        let text = serde_json::to_string_pretty(&serde_json::Value::Object(object))
-            .map_err(io::Error::other)?;
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        let tmp = path.with_extension(format!("json.{}.tmp", std::process::id()));
-        let written = std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, path));
-        if written.is_err() {
-            let _ = std::fs::remove_file(&tmp);
-        }
-        written
-    }
-
-    /// The file's JSON object. The first `shells()` call reads it on the UI thread, so a file
-    /// over `SETTINGS_MAX_BYTES` counts as unreadable and is not read through (review M7).
-    fn read_object(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
-        use std::io::Read as _;
-        let file = std::fs::File::open(self.path.as_ref()?).ok()?;
-        let mut text = String::new();
-        file.take(SETTINGS_MAX_BYTES + 1)
-            .read_to_string(&mut text)
-            .ok()?;
-        if text.len() as u64 > SETTINGS_MAX_BYTES {
-            return None;
-        }
-        match serde_json::from_str(&text).ok()? {
-            serde_json::Value::Object(object) => Some(object),
-            _ => None,
-        }
+        let value = serde_json::to_value(choice).map_err(io::Error::other)?;
+        self.store.write("shell", Some(value))
     }
 }
 
@@ -613,10 +577,7 @@ impl Shells {
 pub fn shells() -> &'static Shells {
     static SHELLS: OnceLock<Shells> = OnceLock::new();
     SHELLS.get_or_init(|| {
-        let file = match crate::paths::native_dir() {
-            Ok(dir) => SettingsFile::new(dir.join("settings.json")),
-            Err(_) => SettingsFile::unavailable(),
-        };
+        let file = SettingsFile::at_native_dir();
         let host = if cfg!(windows) {
             ShellHost::Windows
         } else {
@@ -779,7 +740,8 @@ mod tests {
                 shell: ShellKind::GitBash
             }
         );
-        let others = serde_json::json!({"app": {"language": "vi"}, "terminalConfig": {"font-size": 15}});
+        let others =
+            serde_json::json!({"app": {"language": "vi"}, "terminalConfig": {"font-size": 15}});
         for (choice, shape) in [
             (ShellChoice::Auto, serde_json::json!({"kind": "auto"})),
             (

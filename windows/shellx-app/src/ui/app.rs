@@ -16,6 +16,7 @@ use shellx_model::strings::Lang;
 
 use super::assets::Assets;
 use super::root::RootView;
+use super::settings_service::SettingsService;
 use crate::core_service::{ConfiguredCore, MachineFacts};
 use crate::crash::{self, CrashTest};
 use crate::fonts;
@@ -87,6 +88,7 @@ pub fn run() {
             ),
             core: Arc::new(ConfiguredCore::this_pc(MachineFacts::this_pc())),
         });
+        SettingsService::init(cx);
 
         let background = dev_background();
         let window_bounds = first_window_bounds(cx);

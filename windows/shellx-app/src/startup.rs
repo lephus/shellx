@@ -345,8 +345,21 @@ pub fn first_frame_drawn() {
     }
 }
 
-/// The last window closed, or a crash test is about to crash (Ruling 31).
+/// What `orderly_quit` runs first: the settings that still wait for their write
+/// (`SettingsService::init` sets it).
+static FLUSH_ON_QUIT: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
+
+/// Sets what `orderly_quit` runs first; once per process.
+pub fn flush_on_quit(flush: impl Fn() + Send + Sync + 'static) {
+    let _ = FLUSH_ON_QUIT.set(Box::new(flush));
+}
+
+/// The last window closed, or a crash test is about to crash (Ruling 31): the waiting
+/// settings are written, then this start's marker goes.
 pub fn orderly_quit() {
+    if let Some(flush) = FLUSH_ON_QUIT.get() {
+        flush();
+    }
     if let Some(state) = START.get() {
         orderly_quit_in(state);
     }
