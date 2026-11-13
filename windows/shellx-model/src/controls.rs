@@ -405,4 +405,59 @@ mod tests {
         assert_eq!(unit_suffix(Unit::Times), "×");
         assert_eq!(unit_suffix(Unit::Percent), "%");
     }
+
+    /// The Settings view's own keys: a plain Esc asks its host to close it, Tab and Shift+Tab
+    /// move the focus (GPUI binds no Tab). Nothing else, so a letter or a digit always
+    /// reaches the field that has the keyboard, and a chord stays the window's or Windows'.
+    #[test]
+    fn the_settings_view_uses_only_esc_tab_and_shift_tab() {
+        assert_eq!(view_key(&plain("escape")), Some(ViewKey::Close));
+        assert_eq!(view_key(&plain("tab")), Some(ViewKey::Next));
+        assert_eq!(
+            view_key(&KeyIn {
+                shift: true,
+                ..plain("tab")
+            }),
+            Some(ViewKey::Prev)
+        );
+        let letters = ('a'..='z').map(|c| c.to_string());
+        let digits = ('0'..='9').map(|c| c.to_string());
+        let others = [
+            "space",
+            "enter",
+            "backspace",
+            "delete",
+            "left",
+            "right",
+            "up",
+            "down",
+            "home",
+            "end",
+            "f2",
+        ]
+        .map(str::to_string);
+        for key in letters.chain(digits).chain(others) {
+            assert_eq!(view_key(&plain(&key)), None, "{key}");
+            for chord in chords(&key) {
+                assert_eq!(view_key(&chord), None, "{key} chord");
+            }
+        }
+        for key in ["escape", "tab"] {
+            let k = plain(key);
+            for chord in [
+                KeyIn { ctrl: true, ..k },
+                KeyIn { alt: true, ..k },
+                KeyIn { win: true, ..k },
+            ] {
+                assert_eq!(view_key(&chord), None, "{key} chord");
+            }
+        }
+        assert_eq!(
+            view_key(&KeyIn {
+                shift: true,
+                ..plain("escape")
+            }),
+            None
+        );
+    }
 }
