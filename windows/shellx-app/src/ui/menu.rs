@@ -104,10 +104,8 @@ fn menu(
                 .py(px(5.0))
                 .rounded(px(4.0))
                 .cursor_pointer()
-                .when(highlighted == Some(ix), |row| {
-                    row.bg(theme::hsla(theme::SESSION_HOVER))
-                })
-                .hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
+                .when(highlighted == Some(ix), |row| row.bg(theme::panel_hover()))
+                .hover(|style| style.bg(theme::panel_hover()))
                 .on_click(move |_: &ClickEvent, window, cx| {
                     on_click(window, cx);
                     on_close(window, cx);

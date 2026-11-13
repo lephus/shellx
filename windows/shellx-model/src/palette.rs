@@ -1,4 +1,6 @@
 //! ShellX palette (spec §7.4). Soft colors only: no gradients, glows or colored shadows.
+//! The chrome constants are the ShellX theme's chrome; `chrome::chrome` derives every other
+//! theme's from them. The terminal's colours come from the theme file (`theme_file::shellx`).
 
 use crate::strings::Str;
 
@@ -51,6 +53,10 @@ pub const SELECTION_TITLE: Rgba = Rgba::rgb(0xf1f5ff);
 pub const INDICATOR_UNFOCUSED: Rgba = Rgba::rgb(0x5b5478);
 /// The purple of a new workspace's rail.
 pub const RAIL_PURPLE: Rgba = Rgba::rgb(0x6a1b9a);
+/// Fill of the selected sidebar session row (mockup `.sess.cur`).
+pub const SESSION_SELECTED: Rgba = Rgba::rgb(0x1a1430);
+/// Fill of a sidebar session row under the pointer (mockup `.sess:hover`).
+pub const SESSION_HOVER: Rgba = Rgba::rgb(0x161026);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -104,31 +110,6 @@ pub const SECONDARY_BUTTON: ButtonStyle = ButtonStyle {
     text: TEXT,
 };
 
-pub const TERM_BG: Rgba = BG;
-pub const TERM_FG: Rgba = TEXT;
-pub const TERM_CURSOR: Rgba = PRIMARY;
-pub const TERM_SELECTION: Rgba = PRIMARY.with_alpha(0.30);
-
-/// Terminal ANSI 16, soft and tuned to the background.
-pub const ANSI: [Rgba; 16] = [
-    Rgba::rgb(0x1b1530),
-    Rgba::rgb(0xe88a8a),
-    Rgba::rgb(0x6fd49a),
-    Rgba::rgb(0xe8c468),
-    Rgba::rgb(0x60a5fa),
-    Rgba::rgb(0xc4a1f5),
-    Rgba::rgb(0x7fd3e6),
-    Rgba::rgb(0xcdc7e0),
-    Rgba::rgb(0x4a4166),
-    Rgba::rgb(0xf2a7a7),
-    Rgba::rgb(0x93e3b5),
-    Rgba::rgb(0xf2d78f),
-    Rgba::rgb(0x93c5fd),
-    Rgba::rgb(0xd8c0fa),
-    Rgba::rgb(0xa6e4f0),
-    Rgba::rgb(0xe6e2f2),
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,6 +133,8 @@ mod tests {
             (SELECTION_TITLE, "#f1f5ff"),
             (INDICATOR_UNFOCUSED, "#5b5478"),
             (RAIL_PURPLE, "#6a1b9a"),
+            (SESSION_SELECTED, "#1a1430"),
+            (SESSION_HOVER, "#161026"),
         ];
         for (c, h) in cases {
             assert_eq!(c.hex(), h);
@@ -190,29 +173,12 @@ mod tests {
     }
 
     #[test]
-    fn buttons_and_terminal_defaults() {
+    fn buttons() {
         assert_eq!(PRIMARY_BUTTON.bg, PRIMARY_SOFT);
         assert_eq!(PRIMARY_BUTTON.border, PRIMARY_LINE);
         assert_eq!(PRIMARY_BUTTON.text, PRIMARY_TEXT);
         assert_eq!(SECONDARY_BUTTON.bg, RAISE);
         assert_eq!(SECONDARY_BUTTON.border, BORDER);
         assert_eq!(SECONDARY_BUTTON.text, TEXT);
-        assert_eq!((TERM_BG, TERM_FG, TERM_CURSOR), (BG, TEXT, PRIMARY));
-        assert_eq!(TERM_SELECTION, PRIMARY.with_alpha(0.30));
-    }
-
-    #[test]
-    fn ansi_palette() {
-        assert_eq!(ANSI.len(), 16);
-        assert_eq!(ANSI[4], PRIMARY);
-        let hexes: Vec<String> = ANSI.iter().map(Rgba::hex).collect();
-        assert_eq!(
-            hexes,
-            [
-                "#1b1530", "#e88a8a", "#6fd49a", "#e8c468", "#60a5fa", "#c4a1f5", "#7fd3e6",
-                "#cdc7e0", "#4a4166", "#f2a7a7", "#93e3b5", "#f2d78f", "#93c5fd", "#d8c0fa",
-                "#a6e4f0", "#e6e2f2"
-            ]
-        );
     }
 }

@@ -33,10 +33,10 @@ use crate::shell_info::SHELL_STRINGS;
 use crate::term_core::{PtyLink, TermCore, rgb};
 use crate::workspace::{PaneHost, model_panes, spawn_local_pane_with, spawn_reason};
 use shellx_model::diagnose::{Check, probe_script};
-use shellx_model::palette::TERM_BG;
 use shellx_model::selection::to_crlf;
 use shellx_model::shell::ShellProbe;
 use shellx_model::strings::{Lang, t};
+use shellx_model::theme_file;
 
 const TIMEOUT: Duration = Duration::from_secs(45);
 /// A dropped pane's shell must be gone within this.
@@ -404,8 +404,8 @@ pub fn run() -> Result<()> {
 
     // 0. Palette and embedded fonts.
     ensure!(
-        session.frame()?.default_colors.0 == rgb(TERM_BG),
-        "default background is not TERM_BG"
+        session.frame()?.default_colors.0 == rgb(theme_file::shellx().background),
+        "default background is not the ShellX theme's"
     );
     let embedded = fonts::embedded();
     ensure!(

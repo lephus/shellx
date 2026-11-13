@@ -34,7 +34,6 @@ use shellx_model::email_sign_in::{
     DialogFocus, DialogKey, SignInScreen, auto_submit, code_digits, dialog_key, email_looks_valid,
     email_text_refused, keep_keyboard, sign_in_screen, tab_order, tab_target, take_keyboard,
 };
-use shellx_model::palette;
 use shellx_model::strings::{
     Lang, Str, email_error, google_error, resend_code_in, sent_code_to, t,
 };
@@ -650,7 +649,7 @@ impl SignInDialog {
     ) -> Div {
         let handle = self.handle_of(control, cx);
         let ring = if handle.is_focused(window) {
-            theme::hsla(palette::PRIMARY_LINE)
+            theme::primary_line()
         } else {
             transparent_black()
         };
@@ -689,7 +688,7 @@ impl SignInDialog {
     fn error_line(text: String) -> Div {
         div()
             .text_size(theme::SMALL_SIZE)
-            .text_color(theme::hsla(palette::ERROR))
+            .text_color(theme::error_text())
             .child(text)
     }
 

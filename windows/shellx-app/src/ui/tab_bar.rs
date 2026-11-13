@@ -13,7 +13,6 @@ use gpui::{
     px, svg,
 };
 use shellx_model::layout::{Axis, PaneId, SlotId};
-use shellx_model::palette;
 use shellx_model::strings::{Lang, Str, t};
 use shellx_model::tabs::Stack;
 
@@ -84,23 +83,23 @@ fn tab(
 ) -> Stateful<Div> {
     let current = selected && focused_slot;
     let (title_color, weight) = if current {
-        (theme::hsla(palette::SELECTION_TITLE), FontWeight::SEMIBOLD)
+        (theme::selection_title(), FontWeight::SEMIBOLD)
     } else if selected {
         (theme::text(), FontWeight::NORMAL)
     } else {
         (theme::muted(), FontWeight::NORMAL)
     };
     let fill: Option<Hsla> = if current {
-        Some(theme::hsla(palette::PRIMARY_SOFT))
+        Some(theme::primary_soft())
     } else if selected {
         Some(theme::raise())
     } else {
         None
     };
     let bar = if current {
-        theme::hsla(palette::PRIMARY)
+        theme::primary()
     } else {
-        theme::hsla(palette::INDICATOR_UNFOCUSED)
+        theme::indicator_unfocused()
     };
     div()
         .id(("tab", pane.0))
@@ -117,7 +116,7 @@ fn tab(
         .cursor_pointer()
         .when_some(fill, |el, fill| el.bg(fill))
         .when(!selected, |el| {
-            el.hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
+            el.hover(|style| style.bg(theme::panel_hover()))
         })
         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
             this.focus_pane(pane, window, cx);

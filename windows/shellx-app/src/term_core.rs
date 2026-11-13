@@ -7,9 +7,10 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
 use ghostty_vt::{Callbacks, KeyEncoder, RenderFrame, RenderState, Rgb, Terminal};
-use shellx_model::palette::{ANSI, Rgba, TERM_BG, TERM_CURSOR, TERM_FG};
+use shellx_model::palette::Rgba;
 use shellx_model::paste::encode_paste;
 use shellx_model::selection::Viewport;
+use shellx_model::theme_file::TermTheme;
 
 pub const SCROLLBACK_BYTES: usize = 10 * 1024 * 1024;
 
@@ -27,6 +28,15 @@ pub fn rgb(c: Rgba) -> Rgb {
         g: c.g,
         b: c.b,
     }
+}
+
+/// The theme a new terminal starts with: the window's active one (`ui::theme`); ShellX in a
+/// build without the window.
+fn starting_theme() -> TermTheme {
+    #[cfg(any(windows, target_os = "macos"))]
+    return crate::ui::theme::active().term;
+    #[cfg(not(any(windows, target_os = "macos")))]
+    shellx_model::theme_file::shellx()
 }
 
 pub struct TermCore {
@@ -67,28 +77,20 @@ impl TermCore {
             },
             ..Default::default()
         };
-        let mut terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)
+        let terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)
             .context("failed to create libghostty-vt terminal")?;
-        terminal.set_default_colors(
-            Some(rgb(TERM_FG)),
-            Some(rgb(TERM_BG)),
-            Some(rgb(TERM_CURSOR)),
-        );
-        let mut overrides: [Option<Rgb>; 256] = [None; 256];
-        for (slot, color) in overrides.iter_mut().zip(ANSI.iter()) {
-            *slot = Some(rgb(*color));
-        }
-        terminal.set_default_palette(&overrides);
         let render = RenderState::new().context("failed to create render state")?;
         let encoder = KeyEncoder::new().context("failed to create key encoder")?;
-        Ok(TermCore {
+        let mut core = TermCore {
             terminal,
             render,
             encoder,
             link,
             cols,
             rows,
-        })
+        };
+        core.set_theme(&starting_theme());
+        Ok(core)
     }
 
     pub fn size(&self) -> (u16, u16) {
@@ -241,6 +243,22 @@ impl TermCore {
         self.terminal.cursor_position()
     }
 
+    /// Default foreground, background and cursor, and the 16 palette slots, from `theme`; at any
+    /// time, so a live terminal recolours on its next frame. Slots 16-255 keep Ghostty's, and a
+    /// slot the program set itself (OSC 4) stays in effect.
+    pub fn set_theme(&mut self, theme: &TermTheme) {
+        self.terminal.set_default_colors(
+            Some(rgb(theme.foreground)),
+            Some(rgb(theme.background)),
+            Some(rgb(theme.cursor)),
+        );
+        let mut overrides: [Option<Rgb>; 256] = [None; 256];
+        for (slot, color) in overrides.iter_mut().zip(theme.ansi.iter()) {
+            *slot = Some(rgb(*color));
+        }
+        self.terminal.set_default_palette(&overrides);
+    }
+
     #[allow(dead_code)] // used by later tasks (selection copy, pane close)
     pub fn link_closed(&self) -> bool {
         self.link.is_closed()
@@ -250,7 +268,7 @@ impl TermCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shellx_model::palette::PRIMARY;
+    use shellx_model::theme_file;
     use std::sync::Mutex;
 
     #[derive(Default)]
@@ -282,12 +300,55 @@ mod tests {
     }
 
     #[test]
-    fn palette_applied() {
+    fn a_new_terminal_starts_with_the_active_theme() {
+        // No test changes the process-wide theme, so it is the default: ShellX.
+        let shellx = theme_file::shellx();
         let (mut t, _) = core();
         let frame = t.frame().unwrap();
-        assert_eq!(frame.default_colors, (rgb(TERM_BG), rgb(TERM_FG)));
-        assert_eq!(t.render.palette_color(4), rgb(PRIMARY));
-        assert_eq!(t.render.palette_color(0), rgb(ANSI[0]));
+        assert_eq!(
+            frame.default_colors,
+            (rgb(shellx.background), rgb(shellx.foreground))
+        );
+        assert_eq!(frame.cursor_color, Some(rgb(shellx.cursor)));
+        for slot in 0..16u8 {
+            assert_eq!(
+                t.render.palette_color(slot),
+                rgb(shellx.ansi[usize::from(slot)]),
+                "slot {slot}"
+            );
+        }
+    }
+
+    #[test]
+    fn set_theme_recolours_a_live_terminal() {
+        let dracula = theme_file::ThemeSet::new(vec![]).get("Dracula").unwrap();
+        let (mut t, _) = core();
+        t.feed(b"\x1b[31mred\x1b[0m plain");
+        let before = t.frame().unwrap();
+        assert_eq!(
+            before.styled_rows()[0][0].resolved_fg,
+            Some(rgb(theme_file::shellx().ansi[1]))
+        );
+        t.set_theme(&dracula);
+        let frame = t.frame().unwrap();
+        assert_eq!(
+            frame.default_colors,
+            (rgb(dracula.background), rgb(dracula.foreground))
+        );
+        assert_eq!(frame.cursor_color, Some(rgb(dracula.cursor)));
+        assert_eq!(
+            frame.styled_rows()[0][0].resolved_fg,
+            Some(rgb(dracula.ansi[1]))
+        );
+        for slot in 0..16u8 {
+            assert_eq!(
+                t.render.palette_color(slot),
+                rgb(dracula.ansi[usize::from(slot)]),
+                "slot {slot}"
+            );
+        }
+        // The text stays; only its colours change.
+        assert_eq!(t.text_lines().unwrap()[0].trim_end(), "red plain");
     }
 
     #[test]

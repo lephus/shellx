@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod account_view;
+pub mod chrome;
 pub mod controls;
 pub mod core_api;
 pub mod crash_report;
@@ -31,6 +32,7 @@ pub mod start_guard;
 pub mod strings;
 pub mod tabs;
 pub mod text_edit;
+pub mod theme_file;
 pub mod update;
 
 pub use keys::Dir;

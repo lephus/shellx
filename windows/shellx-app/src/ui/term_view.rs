@@ -66,7 +66,6 @@ use shellx_model::mouse::{
     PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, cap_to_screen,
     secondary_click, wheel_action,
 };
-use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
 use shellx_model::paste::{ConfirmKey, PendingPaste, confirm_key, needs_paste_confirmation};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
@@ -287,6 +286,9 @@ pub(super) struct TermView {
     cell_width: Pixels,
     line_height: Pixels,
     title: String,
+    /// `theme::generation` when the terminal last took the active theme's colours (`u64::MAX`:
+    /// never).
+    theme_generation: u64,
 }
 
 impl TermView {
@@ -322,6 +324,8 @@ impl TermView {
             cell_width: px(8.0),
             line_height: px(18.0),
             title: BASE_TITLE.to_string(),
+            // None yet: the first frame sets them, whenever the core was made.
+            theme_generation: u64::MAX,
         }
     }
 
@@ -998,12 +1002,12 @@ impl Focusable for TermView {
 /// the layer around it.
 fn status_pill(pill: &Overlay, lang: Lang) -> Div {
     let dot = match pill.tone {
-        Tone::Running => theme::hsla(RUNNING),
+        Tone::Running => theme::running(),
         Tone::Muted => theme::muted(),
-        Tone::Error => theme::hsla(ERROR),
+        Tone::Error => theme::error(),
     };
     let title_color = match pill.tone {
-        Tone::Error => theme::hsla(ERROR),
+        Tone::Error => theme::error_text(),
         _ => theme::text_hi(),
     };
     let card = div()
@@ -1069,7 +1073,7 @@ fn start_message(lang: Lang, why: String, tried: Vec<String>, cx: &mut Context<T
         .p(px(16.0))
         .font(theme::ui_font())
         .text_size(theme::UI_SIZE)
-        .child(div().text_color(theme::hsla(ERROR)).child(why))
+        .child(div().text_color(theme::error_text()).child(why))
         .children(tried.into_iter().map(|line| {
             div()
                 .text_size(theme::SMALL_SIZE)
@@ -1204,8 +1208,8 @@ impl Render for TermView {
         let root = div()
             .relative()
             .size_full()
-            .bg(theme::hsla(TERM_BG))
-            .text_color(theme::hsla(TERM_FG))
+            .bg(theme::term_bg())
+            .text_color(theme::term_fg())
             .p(px(PADDING))
             .cursor_text()
             .track_focus(&self.focus_handle)
@@ -1540,6 +1544,12 @@ impl Element for TermElement {
                 let Some(session) = view.backend.core() else {
                     return (None, None, None, None, focused, None);
                 };
+                // The theme was replaced since this terminal took its colours.
+                let generation = theme::generation();
+                if view.theme_generation != generation {
+                    session.set_theme(&theme::active().term);
+                    view.theme_generation = generation;
+                }
                 let size_before = session.vt_cols_rows();
                 // Remote: the link records the grid and tells the Mac.
                 let _ = session.resize(cols, rows, cell_w_px, cell_h_px);
@@ -1573,6 +1583,16 @@ impl Element for TermElement {
             return out;
         };
         let (frame_cols, frame_rows) = frame.size;
+        let term = theme::active().term;
+        // Selected cells: the theme's selection background under them, its foreground for
+        // their text.
+        let spans = selection.map_or_else(Vec::new, |sel| sel.spans(frame_cols));
+        let in_selection = |row: usize, col: usize| {
+            spans.iter().any(|&(r, start, end)| {
+                usize::from(r) == row && (usize::from(start)..usize::from(end)).contains(&col)
+            })
+        };
+        let selection_fg = theme::hsla(term.selection_fg);
 
         let (default_bg, default_fg) = frame.default_colors;
         let cell_origin = |col: usize, row: usize| {
@@ -1653,7 +1673,13 @@ impl Element for TermElement {
                 if a11y_title && is_cursor_row {
                     cursor_line_text.push_str(text);
                 }
-                let style = cell_style(cell, default_fg, default_bg);
+                let mut style = cell_style(cell, default_fg, default_bg);
+                if in_selection(row, col) {
+                    style.fg = Hsla {
+                        a: style.fg.a,
+                        ..selection_fg
+                    };
+                }
                 let breaks = acc
                     .as_ref()
                     .is_none_or(|a| a.style != style || a.wide || wide);
@@ -1675,9 +1701,9 @@ impl Element for TermElement {
             cell_lines.push(cell_line);
         }
 
-        // Selection: TERM_SELECTION over the selected cells, under the text.
+        // Selection: the theme's selection background over the selected cells, under the text.
         if let Some(sel) = selection {
-            let color = theme::hsla(TERM_SELECTION);
+            let color = theme::hsla(term.selection_bg);
             for (row, start, end) in sel.spans(frame_cols) {
                 if row >= frame_rows || end <= start {
                     continue;
@@ -1701,7 +1727,7 @@ impl Element for TermElement {
         };
         if let Some(caret) = caret_cell {
             let origin = cell_origin(usize::from(caret.col), usize::from(caret.row));
-            let color = hsla(frame.cursor_color.unwrap_or(rgb(TERM_CURSOR)));
+            let color = hsla(frame.cursor_color.unwrap_or(rgb(term.cursor)));
             let mut cursor_origin = origin;
             if let Some(text) = marked.as_ref() {
                 let run = TextRun {

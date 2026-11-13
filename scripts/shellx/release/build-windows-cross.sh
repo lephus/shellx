@@ -281,7 +281,7 @@ vssh "set -euo pipefail
   echo image $image ready"
 
 # 2. Sources: the three trees the windows workspace needs, plus the pinned ghostty.
-git archive --format=tar.gz -o "$tmp/src.tgz" HEAD windows cmux-tui shellx-core
+git archive --format=tar.gz -o "$tmp/src.tgz" HEAD windows cmux-tui shellx-core Resources/ghostty/themes
 vssh "cat > ~/$remote/src.tgz" < "$tmp/src.tgz"
 vssh "set -euo pipefail
   cd ~/$remote
@@ -289,7 +289,7 @@ vssh "set -euo pipefail
   # A run killed before its exit trap can leave root-owned files behind.
   docker run --rm --name shellx-winbuild-run -v \$PWD/src:/src -v \$PWD/out:/out $image chown -R \$(id -u):\$(id -g) /src /out
   cd src
-  rm -rf windows cmux-tui shellx-core
+  rm -rf windows cmux-tui shellx-core Resources
   # Fresh modification times: git archive stamps the commit time, which can make the kept
   # cargo cache skip a changed file.
   tar -xmzf ../src.tgz

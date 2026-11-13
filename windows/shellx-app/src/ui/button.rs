@@ -3,7 +3,6 @@
 //! PRIMARY_TEXT label, semibold. Secondary: RAISE fill, BORDER, TEXT.
 
 use gpui::{Div, ElementId, FontWeight, SharedString, Stateful, div, prelude::*, px};
-use shellx_model::palette;
 
 use super::theme;
 
@@ -22,9 +21,9 @@ pub fn button(
 ) -> Stateful<Div> {
     let (bg, border, fg) = match kind {
         Kind::Primary => (
-            theme::hsla(palette::PRIMARY_SOFT),
-            theme::hsla(palette::PRIMARY_LINE),
-            theme::hsla(palette::PRIMARY_TEXT),
+            theme::primary_soft(),
+            theme::primary_line(),
+            theme::primary_text(),
         ),
         Kind::Secondary => (theme::raise(), theme::border(), theme::text()),
     };
@@ -48,7 +47,7 @@ pub fn button(
         .when(disabled, |el| el.opacity(0.5))
         .when(!disabled, |el| {
             el.cursor_pointer()
-                .hover(|style| style.border_color(theme::hsla(palette::PRIMARY_LINE)))
+                .hover(|style| style.border_color(theme::primary_line()))
         })
         .child(label)
 }
