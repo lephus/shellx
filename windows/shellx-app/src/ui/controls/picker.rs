@@ -67,6 +67,14 @@ impl Picker {
         }
     }
 
+    /// Shows the options with these labels (a new language); the values stay.
+    pub fn set_labels(&mut self, options: Vec<(SharedString, SharedString)>, cx: &mut Context<Self>) {
+        if self.options != options {
+            self.options = options;
+            cx.notify();
+        }
+    }
+
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         if self.disabled != disabled {
             self.disabled = disabled;

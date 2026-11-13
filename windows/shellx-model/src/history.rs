@@ -57,6 +57,13 @@ impl FocusHistory {
     }
 }
 
+/// Whether a move of focus is recorded: any move when `includes_panes`, else
+/// only one into another workspace (a move between the panes of one workspace
+/// is not a step).
+pub fn records(includes_panes: bool, same_workspace: bool) -> bool {
+    includes_panes || !same_workspace
+}
+
 fn push_capped(stack: &mut Vec<PaneId>, pane: PaneId) {
     stack.push(pane);
     if stack.len() > CAP {
@@ -187,5 +194,15 @@ mod tests {
         assert_eq!(h.back(p(2), &all), Some(p(1)));
         assert_eq!(h.forward(p(1), &all), Some(p(2)));
         assert_eq!(h.forward(p(2), &all), Some(p(3)));
+    }
+
+    #[test]
+    fn focus_history_skips_moves_inside_a_workspace_by_default() {
+        // Off: only a move to another workspace is recorded.
+        assert!(!records(false, true));
+        assert!(records(false, false));
+        // On: every move is.
+        assert!(records(true, true));
+        assert!(records(true, false));
     }
 }

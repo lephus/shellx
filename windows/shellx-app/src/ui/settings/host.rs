@@ -213,6 +213,8 @@ fn placement(
 /// The Settings window's root: its caption above the view.
 pub struct SettingsWindow {
     view: Entity<SettingsView>,
+    /// The language the window's title (taskbar, Alt+Tab) is in.
+    titled: Lang,
     _focus_lost: Subscription,
 }
 
@@ -235,6 +237,7 @@ impl SettingsWindow {
         });
         SettingsWindow {
             view,
+            titled: cx.global::<Services>().lang,
             _focus_lost: focus_lost,
         }
     }
@@ -248,8 +251,13 @@ impl SettingsWindow {
 }
 
 impl Render for SettingsWindow {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
+        // A new Language setting renames the window at once.
+        if self.titled != lang {
+            self.titled = lang;
+            window.set_window_title(t(lang, Str::Settings));
+        }
         div()
             .size_full()
             .flex()

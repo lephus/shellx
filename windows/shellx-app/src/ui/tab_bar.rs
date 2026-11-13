@@ -104,6 +104,8 @@ fn tab(
     } else {
         theme::indicator_unfocused()
     };
+    // Hide Tab Close Button removes only the box: Ctrl+Shift+W still closes the terminal.
+    let hide_close_box = super::settings_service::current(cx).hide_tab_close_button;
     div()
         .id(("tab", pane.0))
         .relative()
@@ -141,7 +143,7 @@ fn tab(
                 .text_color(title_color)
                 .child(title),
         )
-        .child(close_box(pane, lang, cx))
+        .children((!hide_close_box).then(|| close_box(pane, lang, cx)))
         .when(selected, |el| {
             el.child(
                 div()

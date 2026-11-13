@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, VecDeque};
 
 use crate::keys::Dir;
 use crate::layout::{Axis, Close, Layout, PaneId, Rect, SlotId};
+use crate::settings::Placement;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PaneTarget {
@@ -139,15 +140,22 @@ impl Tabs {
 
     /// Appended after the active tab and made active.
     pub fn new_tab(&mut self, target: PaneTarget) -> (TabId, PaneId) {
+        self.new_tab_at(target, Placement::AfterCurrent)
+    }
+
+    /// A new tab made active: first (`Top`), right after the active tab
+    /// (`AfterCurrent`) or last (`End`).
+    pub fn new_tab_at(&mut self, target: PaneTarget, placement: Placement) -> (TabId, PaneId) {
         let pane = self.alloc_pane();
         let slot = self.alloc_slot();
         let id = TabId(self.next_tab);
         self.next_tab += 1;
         self.targets.insert(pane, target);
-        let at = if self.tabs.is_empty() {
-            0
-        } else {
-            self.active + 1
+        let at = match placement {
+            _ if self.tabs.is_empty() => 0,
+            Placement::Top => 0,
+            Placement::AfterCurrent => self.active + 1,
+            Placement::End => self.tabs.len(),
         };
         self.tabs.insert(
             at,
@@ -259,6 +267,47 @@ impl Tabs {
             }
             Close::NotFound => CloseOutcome::NotFound,
         }
+    }
+
+    /// `split_focused`, with every region of the split's run along `axis`
+    /// made the same size when `equalize`.
+    pub fn split_focused_with(&mut self, axis: Axis, target: PaneTarget, equalize: bool) -> PaneId {
+        let pane = self.alloc_pane();
+        let slot = self.alloc_slot();
+        let tab = &mut self.tabs[self.active];
+        let ok = tab
+            .layout
+            .split_with(tab.focused_slot(), axis, slot, equalize);
+        debug_assert!(ok, "the focused slot is always in its layout");
+        tab.stacks.insert(slot, Stack::one(pane));
+        tab.focused = pane;
+        self.targets.insert(pane, target);
+        pane
+    }
+
+    /// `close_pane`; with `keep_workspace_open` the only terminal of a
+    /// workspace is replaced by a fresh local one in the same workspace
+    /// (`Respawned` with its id) instead of closing the workspace. The last
+    /// workspace is refilled either way.
+    pub fn close_pane_with(&mut self, pane: PaneId, keep_workspace_open: bool) -> CloseOutcome {
+        if keep_workspace_open
+            && let Some(i) = self.tabs.iter().position(|t| t.contains(pane))
+            && self.tabs[i].panes() == [pane]
+        {
+            let fresh = self.alloc_pane();
+            let tab = &mut self.tabs[i];
+            let slot = tab.slot_of(pane).expect("the tab contains the pane");
+            tab.stacks.insert(slot, Stack::one(fresh));
+            tab.focused = fresh;
+            let id = tab.id;
+            self.targets.remove(&pane);
+            self.targets.insert(fresh, PaneTarget::Local);
+            return CloseOutcome::Respawned {
+                tab: id,
+                pane: fresh,
+            };
+        }
+        self.close_pane(pane)
     }
 
     /// Focuses `pane`: activates its tab and selects it in its stack.
@@ -879,5 +928,78 @@ mod tests {
         let (_, c) = t.new_tab(PaneTarget::Local);
         assert_eq!(t.active().panes(), vec![c]);
         assert!(t.contains(b2));
+    }
+
+    fn ids(t: &Tabs) -> Vec<TabId> {
+        t.tabs().iter().map(|tab| tab.id).collect()
+    }
+
+    #[test]
+    fn a_new_workspace_lands_at_top_after_current_or_end() {
+        use crate::settings::Placement;
+        let (mut t, _) = Tabs::new();
+        let (b, _) = t.new_tab(PaneTarget::Local);
+        let (c, _) = t.new_tab(PaneTarget::Local);
+        let a = ids(&t)[0];
+        assert_eq!(ids(&t), [a, b, c]);
+        // Active is the first one: After current goes between a and b.
+        assert!(t.select(a));
+        let (d, _) = t.new_tab_at(PaneTarget::Local, Placement::AfterCurrent);
+        assert_eq!(ids(&t), [a, d, b, c]);
+        assert_eq!(t.active().id, d);
+        // Top goes before everything, End after everything, each made active.
+        let (e, _) = t.new_tab_at(PaneTarget::Local, Placement::Top);
+        assert_eq!(ids(&t), [e, a, d, b, c]);
+        assert_eq!(t.active().id, e);
+        assert!(t.select(b));
+        let (f, _) = t.new_tab_at(PaneTarget::Local, Placement::End);
+        assert_eq!(ids(&t), [e, a, d, b, c, f]);
+        assert_eq!(t.active().id, f);
+    }
+
+    #[test]
+    fn closing_the_last_terminal_keeps_the_workspace_when_asked() {
+        let (mut t, first) = Tabs::new();
+        let (second, only) = t.new_tab(PaneTarget::Local);
+        let before = ids(&t);
+        let out = t.close_pane_with(only, true);
+        let CloseOutcome::Respawned { tab, pane } = out else {
+            panic!("{out:?}")
+        };
+        assert_eq!(tab, second);
+        assert_ne!(pane, only);
+        assert_eq!(ids(&t), before, "the workspace stays where it was");
+        assert_eq!(t.active().id, second);
+        assert_eq!(t.active().panes(), vec![pane]);
+        assert_eq!(t.active().focused, pane);
+        assert!(!t.contains(only));
+        assert_eq!(t.target(pane), Some(&PaneTarget::Local));
+        // Without the setting the workspace closes, as before.
+        let out = t.close_pane_with(pane, false);
+        assert!(matches!(out, CloseOutcome::TabClosed { closed, .. } if closed == second));
+        assert!(t.contains(first));
+    }
+
+    #[test]
+    fn keeping_the_workspace_leaves_a_split_workspace_alone() {
+        let (mut t, first) = Tabs::new();
+        let second = t.split_focused(Axis::Row, PaneTarget::Local);
+        let out = t.close_pane_with(second, true);
+        assert!(matches!(out, CloseOutcome::PaneClosed { focus, .. } if focus == first));
+    }
+
+    #[test]
+    fn the_last_workspace_is_always_refilled() {
+        let (mut t, only) = Tabs::new();
+        for keep in [true, false] {
+            let pane = t.active().focused;
+            let out = t.close_pane_with(pane, keep);
+            let CloseOutcome::Respawned { pane: fresh, .. } = out else {
+                panic!("{out:?}")
+            };
+            assert_eq!(t.tabs().len(), 1, "keep {keep}");
+            assert_eq!(t.active().panes(), vec![fresh], "keep {keep}");
+            assert_ne!(fresh, only);
+        }
     }
 }

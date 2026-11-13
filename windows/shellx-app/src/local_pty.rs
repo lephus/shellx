@@ -3,6 +3,7 @@
 //! one to try instead: `settings` and `PanePlan`.
 
 use std::io::{Read, Write};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -46,6 +47,7 @@ impl LocalPty {
         env: &[(&str, &str)],
         cols: u16,
         rows: u16,
+        dir: Option<&Path>,
     ) -> Result<(Arc<LocalPty>, Box<dyn Read + Send>)> {
         let size = PtySize {
             rows,
@@ -61,7 +63,11 @@ impl LocalPty {
         for (key, value) in env {
             command.env(*key, *value);
         }
-        if let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) {
+        if let Some(dir) = dir {
+            command.cwd(dir.to_path_buf());
+        } else if let Some(home) =
+            std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))
+        {
             command.cwd(std::path::PathBuf::from(home));
         }
         let spawned = pair
@@ -206,6 +212,17 @@ impl ShellCmd {
         cols: u16,
         rows: u16,
     ) -> Result<(Arc<LocalPty>, Box<dyn Read + Send>)> {
+        self.spawn_in(extra_args, cols, rows, None)
+    }
+
+    /// `spawn` in `dir` (the user's home when `None`).
+    pub fn spawn_in(
+        &self,
+        extra_args: &[&str],
+        cols: u16,
+        rows: u16,
+        dir: Option<&Path>,
+    ) -> Result<(Arc<LocalPty>, Box<dyn Read + Send>)> {
         let args = self.args_with(extra_args);
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
         let env: Vec<(&str, &str)> = self
@@ -213,7 +230,7 @@ impl ShellCmd {
             .iter()
             .map(|(key, value)| (key.as_str(), value.as_str()))
             .collect();
-        LocalPty::spawn(&self.program, &args, &env, cols, rows)
+        LocalPty::spawn(&self.program, &args, &env, cols, rows, dir)
     }
 }
 

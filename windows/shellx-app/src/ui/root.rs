@@ -56,6 +56,7 @@
 
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -65,7 +66,7 @@ use gpui::{
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::CoreCall;
-use shellx_model::history::FocusHistory;
+use shellx_model::history::{self, FocusHistory};
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId, SlotId};
 use shellx_model::links::RemoteLink as LinkRecord;
@@ -85,14 +86,14 @@ use super::login::{SignInDialog, SignInEvent};
 use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
 use super::settings::{self, SettingsHost, SettingsViewEvent};
-use super::settings_service::{SettingsService, current_keymap};
+use super::settings_service::{SettingsService, current, current_keymap};
 use super::sidebar::{self, Picker, PickerEntry, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
 use super::update_banner;
 use crate::core_service::MachineFacts;
-use crate::cwd::{BranchCache, cwd_from_osc7, row_lines};
+use crate::cwd::{BranchCache, cwd_from_osc7, inherited_start_dir, row_lines};
 use crate::remote_link::{PaneEvent, PaneSink};
 use crate::remote_session::RemoteSession;
 use crate::remote_tabs::{AccountWatch, RemoteTabs, open_want, split_target, start_app_session};
@@ -131,6 +132,9 @@ pub struct RootView {
     last_focus: PaneId,
     /// Set while Back / Forward moves the focus, so the step is not recorded.
     navigating: bool,
+    /// Where the shell of a new local pane starts (a workspace that inherits the focused
+    /// terminal's directory), until `reconcile` hands it to the pane's view.
+    start_dirs: HashMap<PaneId, PathBuf>,
     /// The title bar "+" chevron's menu is showing.
     new_menu_open: bool,
     /// The sidebar footer "?" button's menu is showing.
@@ -242,6 +246,7 @@ impl RootView {
             history: FocusHistory::new(),
             last_focus,
             navigating: false,
+            start_dirs: HashMap::new(),
             new_menu_open: false,
             help_open: false,
             tab_strips: HashMap::new(),
@@ -367,6 +372,7 @@ impl RootView {
         let machines = self.machines(cx);
         let remotes = &mut self.remotes;
         let respawn = &self.respawn;
+        let start_dirs = &mut self.start_dirs;
         let changed = self.host.reconcile(&self.tabs, |pane, target| {
             let view = match target {
                 // The shell kept exiting as it started: no new shell until
@@ -374,7 +380,10 @@ impl RootView {
                 PaneTarget::Local if respawn.is_held(pane) => {
                     cx.new(|cx| TermView::new_held(window, cx))
                 }
-                PaneTarget::Local => cx.new(|cx| TermView::new(window, cx)),
+                PaneTarget::Local => {
+                    let dir = start_dirs.remove(&pane);
+                    cx.new(|cx| TermView::new(dir, window, cx))
+                }
                 PaneTarget::Remote {
                     machine_id,
                     terminal_id,
@@ -420,7 +429,7 @@ impl RootView {
         }
         drop(changed);
         self.focus_terminal(window, cx);
-        self.note_focus();
+        self.note_focus(cx);
         cx.notify();
     }
 
@@ -488,7 +497,8 @@ impl RootView {
     /// Respawned: the last pane of the last tab closed and a fresh local tab
     /// replaced it (the window never quits or goes empty because of that).
     fn close_pane(&mut self, pane: PaneId, window: &mut Window, cx: &mut Context<Self>) {
-        let outcome = self.tabs.close_pane(pane);
+        let keep = current(cx).keep_workspace_open;
+        let outcome = self.tabs.close_pane_with(pane, keep);
         let now = self.now_ms();
         self.respawn.on_close(&outcome, now);
         match outcome {
@@ -566,17 +576,25 @@ impl RootView {
     /// and `focus_pane`): keyboard focus follows, and the move is recorded.
     fn after_focus_change(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.focus_terminal(window, cx);
-        self.note_focus();
+        self.note_focus(cx);
         cx.notify();
     }
 
     /// Records the move from the last recorded terminal to the focused one.
     /// Not while Back / Forward moves it, and not from a terminal that has
     /// closed since (closing is not a step to go back over).
-    fn note_focus(&mut self) {
+    fn note_focus(&mut self, cx: &App) {
+        let includes_panes = current(cx).focus_history_includes_panes;
         let now = self.tabs.active().focused;
         if !self.navigating && self.tabs.contains(self.last_focus) {
-            self.history.record(self.last_focus, now);
+            let same_workspace = self
+                .tabs
+                .tabs()
+                .iter()
+                .any(|tab| tab.contains(self.last_focus) && tab.contains(now));
+            if history::records(includes_panes, same_workspace) {
+                self.history.record(self.last_focus, now);
+            }
         }
         self.last_focus = now;
     }
@@ -630,8 +648,30 @@ impl RootView {
             self.focus_terminal(window, cx);
             return;
         }
-        self.tabs.new_tab(PaneTarget::Local);
+        let settings = current(cx);
+        let placement = settings.new_workspace_placement;
+        let inherit = settings.inherit_working_directory;
+        let dir = inherit.then(|| self.focused_start_dir(cx)).flatten();
+        let (_, pane) = self.tabs.new_tab_at(PaneTarget::Local, placement);
+        if let Some(dir) = dir {
+            self.start_dirs.insert(pane, dir);
+        }
         self.reconcile(window, cx);
+    }
+
+    /// The folder a new local workspace can start in: the focused terminal's last reported
+    /// one (`cwd::inherited_start_dir`).
+    fn focused_start_dir(&self, cx: &App) -> Option<PathBuf> {
+        let focused = self.tabs.active().focused;
+        let url = self
+            .host
+            .get(focused)
+            .and_then(|live| live.view.read(cx).cwd());
+        inherited_start_dir(
+            url.as_deref(),
+            self.pane_machine(focused).is_some(),
+            &|dir| dir.is_dir(),
+        )
     }
 
     /// Ctrl+Shift+T and the "+" menu's "New Tab (Terminal)": a new terminal
@@ -785,9 +825,10 @@ impl RootView {
 
     /// Splits `slot`: a new region next to it holding a new terminal.
     pub fn split(&mut self, slot: SlotId, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
+        let equalize = current(cx).equalize_splits;
         self.add_terminal(
             slot,
-            |tabs, target| tabs.split_focused(axis, target),
+            move |tabs, target| tabs.split_focused_with(axis, target, equalize),
             window,
             cx,
         );

@@ -1,6 +1,7 @@
 //! UI strings: they follow the Windows display language (Vietnamese on a
 //! Vietnamese Windows, English otherwise); `SHELLX_LANG=en|vi` overrides it.
 
+use crate::settings::LanguageChoice;
 use crate::shell::{CustomShellError, ShellError, is_absolute};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,6 +29,29 @@ impl Lang {
         match ui_lang_id {
             Some(id) if id & 0x3ff == 0x2a => Lang::Vi,
             _ => Lang::En,
+        }
+    }
+
+    /// Whether `SHELLX_LANG` decides the language (a value starting with `en` or `vi`).
+    pub fn env_decides(env: Option<&str>) -> bool {
+        env.is_some_and(|v| {
+            let v = v.trim().to_ascii_lowercase();
+            v.starts_with("vi") || v.starts_with("en")
+        })
+    }
+
+    /// `from_system` with the stored choice between the environment and Windows:
+    /// `SHELLX_LANG` wins, then English or Vietnamese when chosen, else Windows.
+    pub fn from_choice(choice: LanguageChoice, env: Option<&str>, ui_lang_id: Option<u16>) -> Lang {
+        let chosen = match choice {
+            LanguageChoice::System => return Lang::from_system(env, ui_lang_id),
+            LanguageChoice::En => Lang::En,
+            LanguageChoice::Vi => Lang::Vi,
+        };
+        if Lang::env_decides(env) {
+            Lang::from_system(env, ui_lang_id)
+        } else {
+            chosen
         }
     }
 
@@ -2920,5 +2944,52 @@ mod tests {
             assert_eq!(t(Lang::Vi, key), vi, "{key:?}");
             assert_eq!(t(Lang::En, key), en, "{key:?}");
         }
+    }
+
+    #[test]
+    fn the_language_choice_loses_to_the_environment_and_beats_windows() {
+        use crate::settings::LanguageChoice;
+        let vi_windows = Some(0x042A);
+        let en_windows = Some(0x0409);
+        // The environment wins over everything.
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::Vi, Some("en"), vi_windows),
+            Lang::En
+        );
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::En, Some("vi"), en_windows),
+            Lang::Vi
+        );
+        // The choice beats Windows.
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::En, None, vi_windows),
+            Lang::En
+        );
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::Vi, None, en_windows),
+            Lang::Vi
+        );
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::Vi, Some("fr"), en_windows),
+            Lang::Vi
+        );
+        // System follows Windows, as before.
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::System, None, vi_windows),
+            Lang::Vi
+        );
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::System, None, en_windows),
+            Lang::En
+        );
+        assert_eq!(
+            Lang::from_choice(LanguageChoice::System, Some("en"), vi_windows),
+            Lang::En
+        );
+        // Only an en/vi value counts as the environment deciding.
+        assert!(Lang::env_decides(Some("EN-us")));
+        assert!(!Lang::env_decides(Some("fr")));
+        assert!(!Lang::env_decides(Some("")));
+        assert!(!Lang::env_decides(None));
     }
 }

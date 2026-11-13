@@ -265,65 +265,86 @@ static ROWS: &[Row] = &[
         )
     },
     // App.
-    setting(
-        Key::Language,
-        Section::App,
-        Str::Language,
-        None,
-        Control::Picker(&[
-            (Str::SettingsSystem, "system"),
-            (Str::SettingsLanguageEnglish, "en"),
-            (Str::SettingsLanguageVietnamese, "vi"),
-        ]),
-        "language locale localization translation english vietnamese restart ngon ngu tieng viet tieng anh",
-    ),
-    setting(
-        Key::NewWorkspacePlacement,
-        Section::App,
-        Str::SettingsNewWorkspacePlacement,
-        Some(Str::SettingsNewWorkspacePlacementSubtitle),
-        Control::Picker(&[
-            (Str::SettingsPlacementTop, "top"),
-            (Str::SettingsPlacementAfterCurrent, "afterCurrent"),
-            (Str::SettingsPlacementEnd, "end"),
-        ]),
-        "new workspace placement insert position order top after current end bottom vi tri phien moi tren cuoi",
-    ),
-    toggle(
-        Key::InheritWorkingDirectory,
-        Section::App,
-        Str::SettingsInheritWorkingDirectory,
-        Str::SettingsInheritWorkingDirectorySubtitle,
-        "inherit workspace working directory cwd folder current new workspace ke thua thu muc lam viec phien moi",
-    ),
-    toggle(
-        Key::KeepWorkspaceOpen,
-        Section::App,
-        Str::SettingsKeepWorkspaceOpen,
-        Str::SettingsKeepWorkspaceOpenSubtitle,
-        "keep workspace open close last surface pane tab terminal giu phien mo dong tab cuoi",
-    ),
-    toggle(
-        Key::FocusHistoryIncludesPanes,
-        Section::App,
-        Str::SettingsFocusHistoryIncludesPanes,
-        Str::SettingsFocusHistoryIncludesPanesSubtitle,
-        "focus history back forward panes tabs workspaces navigation lich su tieu diem quay lai tien toi khung",
-    ),
-    toggle(
-        Key::EqualizeSplits,
-        Section::App,
-        Str::SettingsEqualizeSplits,
-        Str::SettingsEqualizeSplitsSubtitle,
-        "equalize balance distribute even equal split pane size new split can bang chia khung",
-    ),
-    toggle(
-        Key::HideTabCloseButton,
-        Section::App,
-        Str::SettingsHideTabCloseButton,
-        Str::SettingsHideTabCloseButtonSubtitle,
-        "hide tab close button x tabs an nut dong tab",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::Language,
+            Section::App,
+            Str::Language,
+            None,
+            Control::Picker(&[
+                (Str::SettingsSystem, "system"),
+                (Str::SettingsLanguageEnglish, "en"),
+                (Str::SettingsLanguageVietnamese, "vi"),
+            ]),
+            "language locale localization translation english vietnamese restart ngon ngu tieng viet tieng anh",
+        )
+    },
+    Row {
+        wired: true,
+        ..setting(
+            Key::NewWorkspacePlacement,
+            Section::App,
+            Str::SettingsNewWorkspacePlacement,
+            Some(Str::SettingsNewWorkspacePlacementSubtitle),
+            Control::Picker(&[
+                (Str::SettingsPlacementTop, "top"),
+                (Str::SettingsPlacementAfterCurrent, "afterCurrent"),
+                (Str::SettingsPlacementEnd, "end"),
+            ]),
+            "new workspace placement insert position order top after current end bottom vi tri phien moi tren cuoi",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::InheritWorkingDirectory,
+            Section::App,
+            Str::SettingsInheritWorkingDirectory,
+            Str::SettingsInheritWorkingDirectorySubtitle,
+            "inherit workspace working directory cwd folder current new workspace ke thua thu muc lam viec phien moi",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::KeepWorkspaceOpen,
+            Section::App,
+            Str::SettingsKeepWorkspaceOpen,
+            Str::SettingsKeepWorkspaceOpenSubtitle,
+            "keep workspace open close last surface pane tab terminal giu phien mo dong tab cuoi",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::FocusHistoryIncludesPanes,
+            Section::App,
+            Str::SettingsFocusHistoryIncludesPanes,
+            Str::SettingsFocusHistoryIncludesPanesSubtitle,
+            "focus history back forward panes tabs workspaces navigation lich su tieu diem quay lai tien toi khung",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::EqualizeSplits,
+            Section::App,
+            Str::SettingsEqualizeSplits,
+            Str::SettingsEqualizeSplitsSubtitle,
+            "equalize balance distribute even equal split pane size new split can bang chia khung",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::HideTabCloseButton,
+            Section::App,
+            Str::SettingsHideTabCloseButton,
+            Str::SettingsHideTabCloseButtonSubtitle,
+            "hide tab close button x tabs an nut dong tab",
+        )
+    },
     // Themes.
     Row {
         wired: true,
@@ -1352,6 +1373,13 @@ mod tests {
             wired,
             [
                 "account",
+                "app.language",
+                "app.newWorkspacePlacement",
+                "app.workspaceInheritWorkingDirectory",
+                "app.keepWorkspaceOpenWhenClosingLastSurface",
+                "app.focusHistoryIncludesPanesAndTabs",
+                "app.equalizeSplitsOnCreate",
+                "app.hideTabCloseButton",
                 "app.appearance",
                 "app.accentColor",
                 "terminalTheme",

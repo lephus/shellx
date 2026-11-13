@@ -43,6 +43,7 @@
 //! per pane drains its `PaneEvent`s (sent by the session's threads).
 
 use std::ops::Range;
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -91,7 +92,7 @@ use crate::remote_session::{RemotePane, RemoteSession, SessionStatus};
 use crate::remote_tabs::{OpenError, Overlay, Tone, coalesce, failed_overlay, overlay};
 use crate::shell_info::{BASE_TITLE, ScreenReaderProbe, a11y_title_env, window_title};
 use crate::term_core::{PtyLink, TermCore, rgb};
-use crate::workspace::spawn_local_pane_with;
+use crate::workspace::spawn_local_pane_in;
 
 /// What a pane tells RootView.
 pub(super) enum TermEvent {
@@ -287,6 +288,9 @@ pub(super) struct TermView {
     theme_generation: u64,
     /// `settings_service::font_revision` when `font` was last built.
     font_revision: u64,
+    /// Where a local shell starts (a new workspace that inherits a directory); the user's home
+    /// when `None`. Retry starts there again.
+    start_dir: Option<PathBuf>,
 }
 
 impl TermView {
@@ -325,13 +329,15 @@ impl TermView {
             // None yet: the first frame sets them, whenever the core was made.
             theme_generation: u64::MAX,
             font_revision: font_revision(cx),
+            start_dir: None,
         }
     }
 
     /// A local pane on ConPTY: the shell `shells()` plans for a new pane
     /// (Auto, the stored choice or `SHELLX_SHELL`), or its one fallback.
-    pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub(super) fn new(dir: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView::blank(window, cx);
+        view.start_dir = dir;
         view.start_local(shells().pane_start(), cx);
         // Development only (Ruling 24): every new pane asks about a 3-line paste.
         #[cfg(target_os = "macos")]
@@ -357,7 +363,7 @@ impl TermView {
                 return;
             }
         };
-        let started = match spawn_local_pane_with(&start.plan, 80, 24, &[]) {
+        let started = match spawn_local_pane_in(&start.plan, 80, 24, &[], self.start_dir.as_deref()) {
             Ok(started) => started,
             Err(failure) => {
                 self.failure = Some(StartProblem::Spawn(failure.lines()));

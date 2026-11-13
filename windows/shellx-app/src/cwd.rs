@@ -116,6 +116,22 @@ pub fn row_lines(
     }
 }
 
+/// Where a new local workspace starts when it inherits the working directory: the folder the
+/// focused pane's shell last reported (`osc7`). A pane that shows a Mac (`remote`) has a path
+/// on another machine, and a folder that is gone (`is_dir` says so) is no start: both give
+/// `None`, and the workspace starts where it always did.
+pub fn inherited_start_dir(
+    osc7: Option<&str>,
+    remote: bool,
+    is_dir: &dyn Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    if remote {
+        return None;
+    }
+    let dir = PathBuf::from(cwd_from_osc7(osc7?)?);
+    is_dir(&dir).then_some(dir)
+}
+
 /// The branch checked out in the repository that contains `cwd`: the name
 /// for `ref: refs/heads/NAME`, the first 7 characters of a detached HEAD,
 /// `None` outside a repository.
@@ -423,5 +439,24 @@ mod tests {
                 "{path}"
             );
         }
+    }
+
+    #[test]
+    fn a_new_workspace_inherits_the_focused_local_directory_that_exists() {
+        let exists = |path: &Path| path == Path::new("C:\\Users\\me\\code");
+        let url = Some("file://PC/C:/Users/me/code");
+        assert_eq!(
+            inherited_start_dir(url, false, &exists),
+            Some(PathBuf::from("C:\\Users\\me\\code"))
+        );
+        // A Mac pane's path is on another machine.
+        assert_eq!(inherited_start_dir(url, true, &exists), None);
+        // The folder is gone, or the shell has reported nothing, or not a path.
+        assert_eq!(
+            inherited_start_dir(Some("file://PC/C:/gone"), false, &exists),
+            None
+        );
+        assert_eq!(inherited_start_dir(None, false, &exists), None);
+        assert_eq!(inherited_start_dir(Some("nonsense"), false, &exists), None);
     }
 }
