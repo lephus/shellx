@@ -140,6 +140,56 @@ Nếu hỏng (ShellX báo không mở được cửa sổ ở mọi lần mở):
 
 ---
 
+## Phần 3: Cài đặt (cửa sổ Settings mới)
+
+Làm trên bản cài thử có Cài đặt mới. Cài đặt giờ là **cửa sổ riêng** (980×680) kèm ô tìm kiếm; nội dung giống Mac. Nếu một bước hỏng ở cửa sổ riêng, đặt `SHELLX_SETTINGS_HOST=panel` (trong cmd: `set SHELLX_SETTINGS_HOST=panel`, rồi `start "" "%LOCALAPPDATA%\Programs\ShellX Native\shellx-desktop.exe"`) và làm lại bước đó: Cài đặt khi đó vẽ trong cửa sổ chính, cùng nội dung. Bước nào hỏng thì chạy "ShellX – Chẩn đoán" và ghi bước mấy, ở chế độ nào (cửa sổ riêng hay tấm phủ).
+
+### 3.1. Mười hai bước
+
+- [ ] **S1. Mở.** Nhấn `Ctrl+,`, đóng bằng `Esc`, rồi bấm biểu tượng bánh răng ở thanh tiêu đề.
+  - Đạt: cả hai cách mở cửa sổ "Cài đặt" với cột trái (ô tìm kiếm, các nhóm) và mục Tài khoản lần đầu; mở lần hai khi đang mở chỉ đưa cửa sổ đó lên trước, không mở thêm.
+- [ ] **S2. Tìm kiếm tiếng Việt.** Bấm ô tìm kiếm, bật Unikey (Telex) gõ `phím`; rồi tắt Unikey, bật bàn phím Vietnamese Telex của Windows và gõ lại.
+  - Đạt: ra đúng `phím`, mỗi ký tự một lần; danh sách kết quả hiện "Phím tắt" và các dòng liên quan; gõ `phim` (không dấu) cũng ra kết quả.
+- [ ] **S3. Sáng / tối.** Giao diện màu (Themes) › Giao diện: chọn Sáng, rồi Tối.
+  - Đạt: cả cửa sổ chính, cửa sổ Cài đặt và terminal đổi ngay sang sáng (chữ đọc được), rồi về tối; không cần khởi động lại.
+- [ ] **S4. Theme khác.** Mở sẵn một terminal có chữ, trong Giao diện màu chọn một theme tối khác (ví dụ Dracula).
+  - Đạt: terminal đang mở đổi màu ngay, khung app cũng đổi theo; "Hoàn nguyên" (Revert) hiện ra.
+- [ ] **S5. Cỡ chữ và kiểu con trỏ.** Terminal: đổi Cỡ chữ (nút − và +), rồi Kiểu con trỏ.
+  - Đạt: terminal đang mở đổi cỡ chữ và hình con trỏ ngay, vẫn đúng lưới, không méo chữ.
+- [ ] **S6. Đổi phím tắt.** Phím tắt: bấm ô phím của "Phiên mới" (New Workspace), nhấn tổ hợp mới (ví dụ `Ctrl+Alt+N`), đóng Cài đặt, nhấn tổ hợp đó.
+  - Đạt: ô ghi hiện tổ hợp mới; tổ hợp mới mở phiên mới, `Ctrl+Shift+N` cũ không còn mở nữa.
+- [ ] **S7. Trùng phím.** Ghi cho một hành động một tổ hợp mà hành động khác đang giữ (ví dụ `Ctrl+Shift+B`).
+  - Đạt: hiện **dải đỏ** báo trùng, phím không bị gán; phím cũ của cả hai hành động còn nguyên.
+- [ ] **S8. Màu phiên.** Bấm chuột phải vào thẻ phiên trong thanh bên, chọn một màu.
+  - Đạt: thẻ đổi màu theo kiểu đã chọn (vạch trái hoặc tô); menu chuột phải không bị cắt ở mép cửa sổ.
+- [ ] **S9. Nền thanh bên.** Thanh bên: Nền thanh bên chọn "Màu riêng" (Custom Color), nhập một màu.
+  - Đạt: nền thanh bên đổi ngay, chữ trên thanh bên vẫn đọc được (thử cả màu trắng và màu rất tối).
+- [ ] **S10. Đặt lại.** Đặt lại: bấm "Đặt lại tất cả cài đặt".
+  - Đạt: mọi thứ về mặc định (giao diện, theme, cỡ chữ, nền thanh bên, phím tắt); vẫn đăng nhập, vẫn thấy các Mac đã ghép; không có hộp xác nhận.
+- [ ] **S11. Nhớ cài đặt.** Đổi một cài đặt (ví dụ Cỡ chữ), thoát hẳn ShellX, mở lại.
+  - Đạt: cài đặt đã đổi còn nguyên; cửa sổ Cài đặt mở lại ở đúng vị trí, cỡ và mục lần trước.
+- [ ] **S12. Đường lùi tấm phủ.** Nếu bất kỳ bước nào ở trên hỏng trong cửa sổ riêng: đặt `SHELLX_SETTINGS_HOST=panel` và làm lại S1 và S2.
+  - Đạt: Cài đặt vẽ trong cửa sổ chính, mở bằng `Ctrl+,` và bánh răng, gõ tiếng Việt vào ô tìm kiếm đúng. Nếu bước này đạt mà cửa sổ riêng hỏng, ghi rõ để biết lỗi nằm ở cửa sổ riêng.
+
+### 3.2. Kiểm thêm (từ các lần review)
+
+- [ ] **X1. Ghi nhanh.** Đổi một cài đặt rồi tắt ShellX trong vòng nửa giây: thay đổi vẫn được giữ (ghi sau 300 ms và khi thoát).
+- [ ] **X2. Bàn phím trong Cài đặt.** `Tab` / `Shift+Tab` di chuyển tiêu điểm; `Space` / `Enter` bật tắt và mở menu; `Esc` đóng menu đang mở mà không đóng Cài đặt; kéo thanh trượt rồi thả chuột ngoài cửa sổ thì việc kéo kết thúc.
+- [ ] **X3. Nhãn phím tắt.** Đổi "Phiên mới", rồi rê chuột vào nút "+" và mở các menu: nhãn hiện phím mới ngay. Tổ hợp có `+` hay `=` (ví dụ `Ctrl+Shift+=`) hiện là "Ctrl++".
+- [ ] **X4. Ô ghi phím.** Ô ghi ngừng nghe khi nhấn `Alt+Tab`, bấm chỗ khác, hoặc đổi mục; `Alt+F4` vẫn đóng cửa sổ khi ô đang nghe.
+- [ ] **X5. Theme khác mặc định.** Với Dracula, rồi một theme sáng: bảng ghép cặp, hộp đăng nhập, các menu, thanh bên "trắng tùy chỉnh" và cửa sổ Cài đặt đều đọc được.
+- [ ] **X6. Theme.** Tìm không có kết quả hiện "Không có theme nào khớp với tìm kiếm của bạn."; Màu nhấn "Tùy chỉnh" hiện ô màu; "Hoàn nguyên" hiện sau khi chọn và trả lại cặp theme cũ; phím mũi tên di chuyển vòng chọn trong thư viện.
+- [ ] **X7. Terminal áp dụng ngay.** Phông, cỡ, con trỏ, lề đổi trên terminal đang mở ngay; danh sách Phông cuộn được và theo phím mũi tên; ở Giới hạn cuộn (Scrollback), `Esc` trả lại giá trị đã lưu, bấm ra ngoài thì lưu, kể cả sau khi đóng và mở lại Cài đặt.
+- [ ] **X8. Con trỏ do chương trình.** Chạy `printf '\e[5 q'` (con trỏ thanh) rồi `printf '\e[0 q'`: con trỏ về đúng Kiểu con trỏ trong Cài đặt. (Trong PowerShell dùng ``Write-Host -NoNewline "`e[5 q"`` và ``"`e[0 q"``.)
+- [ ] **X9. Hộp đăng nhập.** `Tab` đi theo thứ tự email → nút → … (kể cả sau khi cửa sổ mất rồi lấy lại tiêu điểm).
+- [ ] **X10. Hành vi terminal.** Tốc độ cuộn 0,25 và 3,0 đổi quãng cuộn của con lăn; "Sao chép khi chọn" chỉ chép khi nhả chuột; chuột giữa dán vào khung đang chọn và chỉ chuyển tiêu điểm khi khung chưa chọn; dán nhiều dòng chỉ hỏi khi "Xác nhận dán không an toàn" đang bật.
+- [ ] **X11. Thanh bên.** Đường dẫn dài bị cắt đúng đầu đã chọn, không tràn (độ rộng Segoe UI), ở cỡ chữ 10 và 20.
+- [ ] **X12. Ứng dụng.** Phiên mới bắt đầu ở thư mục của terminal đang chọn; đổi Ngôn ngữ thì mọi cửa sổ đang mở đổi ngay; "Ẩn nút đóng tab" chỉ ẩn dấu ×; "Cân bằng các khung khi tạo" cho ba khung bằng nhau.
+- [ ] **X13. Màu phiên.** Rê chuột vào thẻ Tô đặc màu xanh lá: chữ vẫn đọc được; bấm chuột phải thẻ gần góc dưới phải: menu nằm gọn trong cửa sổ.
+- [ ] **X14. Tìm kiếm.** Gõ `phím` bằng Unikey (Telex) và bằng bàn phím Vietnamese của Windows; bấm một kết quả: mục mở ra, dòng cuộn về giữa và nhấp sáng 2 giây.
+
+---
+
 ## Kiểm sau
 
 Các mục của danh sách cũ ([G1-G3-CHECKLIST.md](G1-G3-CHECKLIST.md), 45 mục) mà 10 bước và Phần 2 chưa bao gồm. Chưa cần làm trong vòng này; làm khi có bản phát hành thật. Khi làm, nhớ rằng hộp đăng nhập giờ là **email và mã 6 số** (không còn mật khẩu).

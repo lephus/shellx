@@ -2,7 +2,7 @@
 
 A native Windows terminal for ShellX: GPUI window (Direct3D 11 + DirectWrite), libghostty-vt
 grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.7.1
-(unsigned). Dark theme only; the UI language follows the Windows display language
+(unsigned). Light, Dark or follow Windows (Settings › Themes); the UI language follows the Windows display language
 (Vietnamese on a Vietnamese Windows, English otherwise; `SHELLX_LANG` overrides it, see
 [Command line](#command-line)).
 
@@ -84,11 +84,13 @@ exits non-zero if no window appeared. The first release build takes about 5 minu
 - `SHELLX_DEV_PREVIEW=paste|settings|settings:<section>` (development only) puts a pending 3-line
   paste in each new pane (`paste`), or opens Settings at start (`settings`), on a given section with
   `settings:<section>` (`account`, `app`, `themes`, `terminal`, `workspaceColors`, `sidebar`,
-  `keyboardShortcuts`, `reset`, `updates`, `about`; a section with no working row yet is not
-  shown), so the multi-line paste bar and the Settings sections can be drawn without a person
-  clicking. Settings opens in its own window, which `dev/mac-shot.sh` captures (it is in front).
+  `keyboardShortcuts`, `reset`, `updates`, `about`), so the multi-line paste bar and the Settings
+  sections can be drawn without a person clicking. `settings:search:<query>` types the query into
+  the search field and `settings:search:<query>:click` also clicks the first hit. Settings opens in
+  its own window, which `dev/mac-shot.sh` captures (it is in front).
 - `SHELLX_SETTINGS_HOST=panel` (every build) draws Settings over the main window instead of in a
-  window of its own, as ShellX also does by itself when that window cannot open.
+  window of its own, as ShellX also does by itself when that window cannot open. The content and
+  layout are the same; on a PC, use it when the Settings window does not take keys or Vietnamese typing.
 - `SHELLX_DEV_SIGN_IN=start|google|code|invalid|switch|expired` (Mac development build only)
   opens the sign-in dialog on that screen for screenshots, with a made-up address and no network
   call: `start` as this build has it (no Google: a Mac build has no Google client), `google` the
@@ -145,6 +147,13 @@ All state is under `%LOCALAPPDATA%\ShellX\native\`:
 - `remote\` : remote client identity and `links.json` (paired Macs)
 - `logs\` : `shellx.log` (rotated at 1 MB, 3 files kept), crash files and diagnostics reports, see
   [Support](#support)
+- `settings.json` : every setting, in the Mac's key names (`app.appearance`, `terminalConfig.*`,
+  `sidebarAppearance.*`, `shortcuts.bindings`, …). Written 300 ms after a change and when ShellX quits; keys
+  ShellX does not know are kept
+- `ui-state.json` : the Settings window's position, size and last section
+- `themes\` : your own terminal themes, one file per theme in the Ghostty format (`key = value` lines;
+  the file name is the theme name; `.conf` files work too). Files over 64 KB are skipped and at most 500 files
+  are read; a theme here wins over a bundled one with the same name
 - `render.json` : the remembered display mode (`{"mode":"compatible"}` once the compatible mode has
   rescued a start); `starting.json` is a short-lived "ShellX is starting" marker that is removed once the
   first frame is drawn
@@ -155,7 +164,9 @@ Uninstalling ShellX removes the program; the `native\` state is kept.
 
 ## Keyboard shortcuts
 
-Terminal keys follow Windows Terminal; plain `Ctrl+C` / `Ctrl+V` go to the shell (and so
+Terminal keys follow Windows Terminal. The table is the default set; every shortcut can be changed in
+Settings › Keyboard Shortcuts (click the key, press the new chord; a chord another action holds is
+refused with a red banner), and Reset All Settings brings the defaults back. Plain `Ctrl+C` / `Ctrl+V` go to the shell (and so
 does every other plain `Ctrl+letter`, for example `Ctrl+N` and `Ctrl+T`).
 
 A workspace is a card in the sidebar; a terminal tab is a tab in the tab bar of one split
@@ -179,13 +190,13 @@ region of a workspace.
 | `Alt+F4`, `Alt+Space` | Not app shortcuts: Windows keeps them (close the window; the window's system menu), also while a terminal or the forced-update overlay has the keyboard |
 
 The same actions are on screen: the title bar has the sidebar toggle, the "+ ▾" new-workspace
-menu, Back / Forward (focus history across workspaces and regions) and the settings gear (there is
+menu, Back / Forward (focus history across workspaces) and the settings gear (there is
 no search box and no bell: they come back when they work); each region has a tab bar
 with a close box per tab and the New terminal / Split right / Split down buttons; the
 sidebar footer has the `?` help menu (Settings…, Check for Updates, Create diagnostics report, Docs, GitHub), the
 version and, when a newer version exists, the "Update Available" pill.
 
-While any panel is open (settings, pairing, sign-in, forced-update overlay), app shortcuts are
+While any panel is open (pairing, sign-in, forced-update overlay), app shortcuts are
 swallowed and `Esc` closes the topmost panel (not the forced-update overlay); the terminal gets
 the keyboard back when the last panel closes. A panel never opens by itself over a terminal you are
 typing in: when the server ends the session, the sidebar footer shows "Phiên đăng nhập đã hết hạn."
@@ -197,7 +208,7 @@ or a shortcut runs, and on `Esc`, which then does not reach the shell.
 ### Mouse and paste
 
 - **Right-click** pastes the clipboard; with a selection it copies the selection instead (like the
-  Windows console). Middle-click only focuses.
+  Windows console). Middle-click pastes too (Settings › Terminal › Middle-Click Paste).
 - A first click (left, right or middle) on a pane that does not have the keyboard only moves the keyboard
   to that pane; it pastes and selects nothing. Click again to paste.
 - Clicking while a dropdown menu is open closes the menu and does nothing else.
@@ -209,24 +220,56 @@ or a shortcut runs, and on `Esc`, which then does not reach the shell.
 - Touchpad scrolling accumulates fractions of a line, so a slow swipe moves a little. In a full-screen
   program (`less`, `vim`) that has not asked for the mouse, the wheel sends the arrow keys.
 
-Source of truth: `shellx-model/src/keys.rs`. Keys are ignored while an IME is composing
+Source of truth: the defaults are in `shellx-model/src/keymap.rs`; your changes are in `settings.json`
+(`shortcuts.bindings`). `shellx-model/src/keys.rs` only maps a key press to terminal bytes. Keys are ignored while an IME is composing
 and while the Windows key is held. `Ctrl+Alt` combinations are treated as AltGr text.
 
 ## Settings
 
-`Ctrl+,` opens Settings. The sections that matter for support:
+`Ctrl+,` or the gear in the title bar opens Settings in a window of its own (content 980×680, at least
+820×540), so the terminal behind it changes while you adjust it. Opening it again brings the open window
+forward; `Esc` closes it when no menu or shortcut recorder is open. Window position, size and last section
+are remembered. If that window cannot open, or `SHELLX_SETTINGS_HOST=panel` is set, Settings is drawn
+over the main window instead, with the same content. The left column has a search field (it ignores
+Vietnamese accents) and the sections; the right side shows one section.
 
+| Group | Sections |
+|---|---|
+| General | Account, App, Themes |
+| Terminal | Terminal |
+| Workspace | Workspace Colors |
+| Sidebar & Dock | Sidebar |
+| Keyboard & Advanced | Keyboard Shortcuts, Reset |
+| ShellX (Windows only) | Updates, About |
+
+The Mac sections ShellX for Windows does not have yet (Agents, Browser, Remote and Devices, …) are not
+shown; a row is drawn only when it works.
+
+- **Account**: signed-in state, "Đăng nhập…" / "Đăng nhập lại" and sign-out (also available when the
+  account state shows an error).
+- **App**: language (changes every open window at once) and the Mac "App" rows that work on Windows.
+- **Themes**: Appearance (System, Light, Dark), Accent, and the theme gallery for dark and for light (464
+  bundled Ghostty themes plus your own in `themes\`), with search and Revert. A change shows in the open
+  terminals and the window chrome at once.
 - **Terminal**: the shell new tabs start. "Tự động" / "Automatic" (the default) is PowerShell 7 when it is
   installed, otherwise Windows PowerShell, otherwise Command Prompt; the list also offers the other shells
   ShellX found (Git Bash, WSL) and a custom command line (a program and arguments, for example
   `wsl.exe -d Ubuntu`; the box says at once when the program cannot be found, and a path with spaces needs
   double quotes). The choice applies to terminals opened after it; open tabs are not touched. While
   `SHELLX_SHELL` is set, Settings says so and uses that value instead. The lookup runs in the
-  background, so the list may show only Automatic and Custom for a moment after start.
+  background, so the list may show only Automatic and Custom for a moment after start. The same section
+  has the font, size, cursor, padding, scrollback, scrolling and paste options; they apply to open
+  terminals at once. Defaults follow the Mac (font size 13, padding 2, scrollback 50 MB, middle click
+  pastes); Confirm Unsafe Pastes stays on.
 - **Display** (under Terminal): "Chế độ hiển thị thường" / "Standard display mode" or "Chế độ hiển thị
   tương thích" / "Compatible display mode", see [Display and the compatible mode](#display-and-the-compatible-mode).
-- **Account**: signed-in state, "Đăng nhập…" / "Đăng nhập lại" and sign-out (also available when the
-  account state shows an error).
+- **Workspace Colors**: the style and colour list for workspace cards; right-click a card to pick its colour.
+- **Sidebar**: font size, what a card shows, where long paths are cut, and Sidebar Background (Follow
+  Theme, Custom Color, …).
+- **Keyboard Shortcuts**: every action with its current key; click it to record a new one.
+- **Reset**: Reset All Settings writes the defaults back to `settings.json` (keys ShellX does not know
+  stay). It does not touch the sign-in, `links.json` (paired Macs), `render.json` or `ui-state.json`.
+  There is no confirmation.
 - **About**: `ShellX 1.7.1`, or `ShellX 1.7.1 (<label> <commit>)` on a test installer.
 
 The help menu (`?` in the sidebar footer) lists Cài đặt…, Kiểm tra cập nhật, Tạo báo cáo chẩn đoán
@@ -425,6 +468,7 @@ SHELLX_BUILD_LABEL=test scripts/shellx/release/build-windows-cross.sh <output fo
   library recovers the relay link by itself the pane still shows as connected and the
   typed bytes are sent once the link is back (a buffered command may run late). Only after
   that does the pane show "đang kết nối lại…" and refuse input.
+- A second running ShellX picks up changed settings at its next start.
 
 ## Coexistence with the Flutter ShellX
 
