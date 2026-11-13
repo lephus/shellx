@@ -496,6 +496,8 @@ mod tests {
                 sidebar_primary_text: palette::PRIMARY_TEXT,
                 // The machines header's "+" turns TEXT under the pointer.
                 sidebar_icon_hover: palette::TEXT,
+                sidebar_line: palette::LINE,
+                sidebar_border: palette::BORDER,
             }
         );
     }
@@ -741,5 +743,32 @@ mod tests {
         assert_eq!(accent_from_dwm(0xff_d7_78_00), Rgba::rgb(0x0078d7));
         // The alpha byte is ignored.
         assert_eq!(accent_from_dwm(0x00_33_22_11), Rgba::rgb(0x112233));
+    }
+
+    #[test]
+    fn a_custom_sidebar_keeps_its_borders_visible() {
+        let mut failures = Vec::new();
+        let colours = [rgb(0xffffff), rgb(0x000000), rgb(0x203040), rgb(0x100b1d)];
+        for (name, text) in bundled() {
+            let theme = parse(name, text);
+            for custom in colours {
+                let c = chrome(&theme, palette::PRIMARY, SidebarBackground::Custom, custom);
+                for (what, border) in [("line", c.sidebar_line), ("border", c.sidebar_border)] {
+                    let ratio = contrast(border, c.sidebar_bg);
+                    if ratio < 1.5 {
+                        failures.push(format!("{name} {custom:?} {what} {ratio:.2}"));
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
+
+    #[test]
+    fn a_sidebar_that_follows_the_theme_keeps_the_windows_borders() {
+        for sidebar in [SidebarBackground::FollowTheme, SidebarBackground::MatchTerminal] {
+            let c = chrome(&named("Dracula"), palette::PRIMARY, sidebar, rgb(0xffffff));
+            assert_eq!((c.sidebar_line, c.sidebar_border), (c.line, c.border));
+        }
     }
 }

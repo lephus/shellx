@@ -675,4 +675,104 @@ mod tests {
         }
         assert!(item(r#","can_host":true"#).can_host);
     }
+
+    #[test]
+    fn the_default_size_is_12_5_and_others_scale() {
+        let d = sidebar_sizes(12.5);
+        assert_eq!(
+            d,
+            SidebarSizes {
+                brand: 14.0,
+                card_title: 12.5,
+                header: 10.5,
+                small: 11.0,
+                pill: 10.0
+            }
+        );
+        let big = sidebar_sizes(25.0);
+        assert_eq!(big.brand, 28.0);
+        assert_eq!(big.card_title, 25.0);
+        assert_eq!(big.header, 21.0);
+        assert_eq!(big.small, 22.0);
+        assert_eq!(big.pill, 20.0);
+    }
+
+    fn settings_with(hide: bool, branch_dir: bool, wrap: bool) -> crate::settings::Settings {
+        crate::settings::Settings {
+            hide_sidebar_details: hide,
+            show_branch_directory: branch_dir,
+            wrap_workspace_titles: wrap,
+            ..crate::settings::Settings::default()
+        }
+    }
+
+    #[test]
+    fn the_default_card_shows_branch_and_directory() {
+        let lines = card_lines(&settings_with(false, true, false), Some("main"), Some("~\\p"));
+        assert_eq!(
+            lines,
+            CardLines {
+                title_wraps: false,
+                branch: Some("main".into()),
+                directory: Some("~\\p".into())
+            }
+        );
+    }
+
+    #[test]
+    fn hide_all_details_drops_branch_and_directory() {
+        let lines = card_lines(&settings_with(true, true, false), Some("main"), Some("~\\p"));
+        assert_eq!((lines.branch, lines.directory), (None, None));
+    }
+
+    #[test]
+    fn show_branch_directory_off_drops_both() {
+        let lines = card_lines(&settings_with(false, false, false), Some("main"), Some("~\\p"));
+        assert_eq!((lines.branch, lines.directory), (None, None));
+    }
+
+    #[test]
+    fn wrap_still_applies_while_the_details_are_hidden() {
+        let lines = card_lines(&settings_with(true, true, true), None, None);
+        assert!(lines.title_wraps);
+        assert!(!card_lines(&settings_with(true, true, false), None, None).title_wraps);
+    }
+
+    #[test]
+    fn a_long_path_is_cut_at_the_chosen_end() {
+        let path = "~\\projects\\shellx\\windows\\src\\ui"; // 32 characters
+        assert_eq!(path.chars().count(), 32);
+        let from_start = shorten_path(path, 20, true);
+        assert_eq!(from_start, "\u{2026}\\windows\\src\\ui");
+        assert!(from_start.chars().count() <= 20);
+        let from_end = shorten_path(path, 20, false);
+        assert_eq!(from_end, "~\\projects\\shellx\\w\u{2026}");
+        assert_eq!(from_end.chars().count(), 20);
+    }
+
+    #[test]
+    fn a_short_path_is_unchanged() {
+        assert_eq!(shorten_path("~\\proj", 20, true), "~\\proj");
+        assert_eq!(shorten_path("~\\proj", 7, false), "~\\proj");
+    }
+
+    #[test]
+    fn a_last_segment_longer_than_the_room_is_cut_inside_it() {
+        assert_eq!(shorten_path("C:\\abcdefghijklmnop", 8, true), "\u{2026}jklmnop");
+    }
+
+    #[test]
+    fn paths_count_characters_and_slashes_do_not_panic() {
+        let vi = "~\\Tài liệu\\Đồ án\\Hệ điều hành";
+        let cut = shorten_path(vi, 12, true);
+        assert!(cut.chars().count() <= 12);
+        assert!(cut.starts_with('\u{2026}'));
+        let cut = shorten_path(vi, 12, false);
+        assert_eq!(cut.chars().count(), 12);
+        assert!(cut.ends_with('\u{2026}'));
+        assert_eq!(shorten_path("~/a/bb/ccc/dddd", 9, true), "\u{2026}/ccc/dddd");
+        assert_eq!(shorten_path("abc", 0, true), "");
+        assert_eq!(shorten_path("abcdef", 1, false), "\u{2026}");
+        assert_eq!(shorten_path("a\\b\\", 3, true), "\u{2026}b\\");
+    }
 }
