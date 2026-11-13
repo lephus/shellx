@@ -18,6 +18,7 @@ use shellx_model::tabs::Stack;
 
 use super::assets::Icon;
 use super::root::RootView;
+use super::settings_service::current as current_settings;
 use super::theme;
 use super::tooltip::Tooltip;
 use crate::workspace::TAB_BAR_H;
@@ -82,6 +83,8 @@ fn tab(
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
     let current = selected && focused_slot;
+    // Settings › Terminal › Tab Bar Font Size; the bar's height stays.
+    let title_size = current_settings(cx).tab_bar_font_size;
     let (title_color, weight) = if current {
         (theme::selection_title(), FontWeight::SEMIBOLD)
     } else if selected {
@@ -133,7 +136,7 @@ fn tab(
                 .min_w_0()
                 .max_w(px(TITLE_MAX_W))
                 .truncate()
-                .text_size(theme::SMALL_SIZE)
+                .text_size(px(title_size))
                 .font_weight(weight)
                 .text_color(title_color)
                 .child(title),

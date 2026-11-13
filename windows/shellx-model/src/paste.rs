@@ -51,6 +51,13 @@ pub fn needs_paste_confirmation(text: &str, bracketed: bool) -> bool {
     }
 }
 
+/// Whether pasting `text` must wait for a confirmation: Confirm Unsafe Pastes is on and the
+/// text is several command lines for a pane that is not in bracketed-paste mode
+/// ([`needs_paste_confirmation`]). With the setting off nothing asks.
+pub fn asks_first(text: &str, bracketed: bool, confirm_unsafe: bool) -> bool {
+    confirm_unsafe && needs_paste_confirmation(text, bracketed)
+}
+
 /// How many command lines `text` holds, as the confirmation counts them: segments split at
 /// `\r\n`, `\n` or `\r`, less one empty segment at the end (a final newline ends the last
 /// line, it does not start a new one).
@@ -111,6 +118,25 @@ pub fn confirm_key(k: &KeyIn) -> ConfirmKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_multi_line_paste_asks_only_while_the_setting_is_on() {
+        assert!(asks_first("echo 1\necho 2\n", false, true));
+        assert!(!asks_first("echo 1\necho 2\n", false, false));
+    }
+
+    #[test]
+    fn a_single_line_never_asks() {
+        for on in [false, true] {
+            assert!(!asks_first("ls -la", false, on));
+            assert!(!asks_first("ls -la\n", false, on));
+        }
+    }
+
+    #[test]
+    fn a_bracketed_pane_never_asks_even_when_on() {
+        assert!(!asks_first("echo 1\necho 2\n", true, true));
+    }
 
     fn count(hay: &[u8], needle: &[u8]) -> usize {
         hay.windows(needle.len()).filter(|w| *w == needle).count()

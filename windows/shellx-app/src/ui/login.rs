@@ -505,7 +505,9 @@ impl SignInDialog {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.open {
+        // A field that lost the keyboard says so after the focus has moved: it must not take
+        // the tracking back.
+        if !self.open || event == TextFieldEvent::Blur {
             return;
         }
         self.focused = field;
@@ -517,6 +519,7 @@ impl SignInDialog {
             TextFieldEvent::Cancel => self.close(cx),
             TextFieldEvent::Next => self.move_focus(false, window, cx),
             TextFieldEvent::Prev => self.move_focus(true, window, cx),
+            TextFieldEvent::Blur => {}
         }
     }
 

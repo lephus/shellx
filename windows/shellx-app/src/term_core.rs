@@ -4,15 +4,33 @@
 //! shared. No UI here, so `--smoke` and the window drive the same code.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context as _, Result};
 use ghostty_vt::{Callbacks, KeyEncoder, RenderFrame, RenderState, Rgb, Terminal};
 use shellx_model::palette::Rgba;
 use shellx_model::paste::encode_paste;
 use shellx_model::selection::Viewport;
+use shellx_model::settings::Settings;
 use shellx_model::theme_file::TermTheme;
 
-pub const SCROLLBACK_BYTES: usize = 10 * 1024 * 1024;
+/// The scrollback of terminals made from now on, in bytes (`UNSET`: the setting's default; 0 is a
+/// real limit: no scrollback).
+/// Settings › Terminal › Scrollback Limit sets it (`set_scrollback_bytes`); a terminal already
+/// open keeps the limit it was made with.
+const UNSET: usize = usize::MAX;
+static SCROLLBACK_BYTES: AtomicUsize = AtomicUsize::new(UNSET);
+
+pub fn set_scrollback_bytes(bytes: usize) {
+    SCROLLBACK_BYTES.store(bytes, Ordering::Relaxed);
+}
+
+fn scrollback_bytes() -> usize {
+    match SCROLLBACK_BYTES.load(Ordering::Relaxed) {
+        UNSET => shellx_model::settings::scrollback_bytes(Settings::default().scrollback_mb),
+        set => set,
+    }
+}
 
 /// The byte link under a terminal pane. `&self` everywhere so libghostty's
 /// `on_pty_write` callback (DSR/DA replies) can hold an `Arc<dyn PtyLink>`.
@@ -77,7 +95,7 @@ impl TermCore {
             },
             ..Default::default()
         };
-        let terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)
+        let terminal = Terminal::new(cols, rows, scrollback_bytes(), callbacks)
             .context("failed to create libghostty-vt terminal")?;
         let render = RenderState::new().context("failed to create render state")?;
         let encoder = KeyEncoder::new().context("failed to create key encoder")?;
@@ -235,6 +253,11 @@ impl TermCore {
 
     pub fn scroll_to_bottom(&mut self) {
         self.terminal.scroll_to_bottom();
+    }
+
+    /// The program set the cursor shape itself (DECSCUSR) and has not reset it.
+    pub fn cursor_overridden(&self) -> bool {
+        self.terminal.cursor_overridden()
     }
 
     /// Cursor (col, row) in the active screen, also while the cursor is
@@ -477,5 +500,16 @@ mod tests {
         t.feed(b"\x1b[6n");
         let all: Vec<u8> = writes(&link).concat();
         assert!(all.starts_with(b"\x1b[") && all.ends_with(b"R"), "{all:?}");
+    }
+
+    #[test]
+    fn a_zero_scrollback_limit_is_kept_and_the_core_accepts_it() {
+        set_scrollback_bytes(0);
+        assert_eq!(scrollback_bytes(), 0);
+        // Ghostty reads 0 as "no scrollback": the terminal is made and takes output.
+        let (mut term, _link) = core();
+        term.feed(b"one\r\ntwo\r\n");
+        assert!(term.frame().is_ok());
+        set_scrollback_bytes(shellx_model::settings::scrollback_bytes(50));
     }
 }

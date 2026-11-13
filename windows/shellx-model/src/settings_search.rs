@@ -290,8 +290,8 @@ mod tests {
 
     #[test]
     fn unwired_rows_are_not_found() {
-        assert!(!everything("font size", Lang::En).is_empty());
-        assert!(search("font size", Lang::En).is_empty());
+        assert!(!everything("workspace color indicator", Lang::En).is_empty());
+        assert!(search("workspace color indicator", Lang::En).is_empty());
         // A section without a wired row is not offered either.
         assert!(
             search("workspace colors", Lang::En)

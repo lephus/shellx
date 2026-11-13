@@ -115,6 +115,7 @@ impl SettingsHost {
     /// Closes Settings, its window or its panel. The caller gives the keyboard back.
     pub fn close(&mut self, cx: &mut Context<RootView>) {
         if self.panel_open {
+            self.view.update(cx, |view, cx| view.commit_edits(cx));
             self.panel_open = false;
             cx.notify();
         }
@@ -218,7 +219,9 @@ pub struct SettingsWindow {
 impl SettingsWindow {
     fn new(view: Entity<SettingsView>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // The close button and Alt+F4 close it without `close`: the frame is kept here.
-        window.on_window_should_close(cx, |window, _| {
+        let closing = view.clone();
+        window.on_window_should_close(cx, move |window, cx| {
+            closing.update(cx, |view, cx| view.commit_edits(cx));
             remember_frame(window);
             true
         });
@@ -237,7 +240,8 @@ impl SettingsWindow {
     }
 
     /// Esc, Settings closed from the main window, or the app quitting.
-    fn close(&mut self, window: &mut Window, _: &mut Context<Self>) {
+    fn close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.view.update(cx, |view, cx| view.commit_edits(cx));
         remember_frame(window);
         window.remove_window();
     }

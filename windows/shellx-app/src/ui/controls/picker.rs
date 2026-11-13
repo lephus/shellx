@@ -6,7 +6,7 @@
 
 use gpui::{
     ClickEvent, Context, EventEmitter, FocusHandle, Focusable, KeyDownEvent, MouseDownEvent,
-    SharedString, Window, div, prelude::*, px, svg,
+    ScrollHandle, SharedString, Window, div, point, prelude::*, px, svg,
 };
 use shellx_model::controls::{self, PopoverKey};
 
@@ -29,6 +29,8 @@ pub struct Picker {
     disabled: bool,
     /// The highlighted row while the list is open.
     open: Option<usize>,
+    /// The list's scroll position: a long list (the Font picker) scrolls to the highlight.
+    scroll: ScrollHandle,
 }
 
 impl EventEmitter<PickerEvent> for Picker {}
@@ -52,6 +54,7 @@ impl Picker {
             value: value.into(),
             disabled: false,
             open: None,
+            scroll: ScrollHandle::new(),
         }
     }
 
@@ -84,7 +87,10 @@ impl Picker {
 
     fn open_list(&mut self, cx: &mut Context<Self>) {
         if !self.disabled && !self.options.is_empty() {
-            self.open = Some(self.selected_index().unwrap_or(0));
+            let at = self.selected_index().unwrap_or(0);
+            self.open = Some(at);
+            self.scroll.set_offset(point(px(0.0), px(0.0)));
+            self.scroll.scroll_to_item(at);
             cx.notify();
         }
     }
@@ -123,6 +129,7 @@ impl Picker {
                     cx.stop_propagation();
                     let moved = controls::moved_highlight(highlighted, delta, self.options.len());
                     self.open = Some(moved);
+                    self.scroll.scroll_to_item(moved);
                     cx.notify();
                 }
                 Some(PopoverKey::Pick) => {
@@ -156,7 +163,7 @@ impl Picker {
                 }
             })
             .collect();
-        menu::popover_highlighted(items, highlighted, move |_, cx| {
+        menu::popover_highlighted(items, highlighted, &self.scroll, move |_, cx| {
             picker.update(cx, |this, cx| this.close(cx)).ok();
         })
     }

@@ -335,9 +335,24 @@ pub fn word_at(line: &str, col: u16) -> (u16, u16) {
     (clamp(s), clamp(e))
 }
 
+/// Whether letting go of the mouse button copies the selection: Copy on Selection is on and
+/// something is selected. Only a release asks, so a selection that merely moves with the
+/// scrollback is never copied again.
+pub fn copies_on_release(copy_on_select: bool, selection_visible: bool) -> bool {
+    copy_on_select && selection_visible
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn releasing_a_selection_copies_only_when_on() {
+        assert!(copies_on_release(true, true));
+        assert!(!copies_on_release(true, false));
+        assert!(!copies_on_release(false, true));
+        assert!(!copies_on_release(false, false));
+    }
 
     fn c(row: u16, col: u16) -> Cell {
         Cell { row, col }

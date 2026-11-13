@@ -144,6 +144,7 @@ impl ColorWell {
                 self.close(window, cx);
                 window.focus_next();
             }
+            TextFieldEvent::Blur => {}
         }
     }
 

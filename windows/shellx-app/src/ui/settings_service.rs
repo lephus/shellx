@@ -19,13 +19,14 @@ use std::time::Duration;
 use gpui::{App, AppContext as _, Context, Entity, Global, Task, Window, WindowAppearance};
 use serde_json::Value;
 use shellx_model::keymap::{Action, Chord, Keymap};
-use shellx_model::settings::{Accent, Key, Settings};
+use shellx_model::settings::{Accent, Key, Settings, scrollback_bytes};
 use shellx_model::theme_file::{ThemeSet, is_dark_mode};
 
 use super::theme::{self, Active};
 use crate::os_info;
 use crate::settings_store::SettingsStore;
 use crate::startup;
+use crate::term_core;
 use crate::user_themes;
 
 /// How long a key waits after its last change before it is written: a slider being dragged
@@ -54,6 +55,9 @@ pub struct SettingsService {
     themes: ThemeSet,
     /// The main window's appearance is dark: what Appearance System follows.
     system_dark: bool,
+    /// Counts the changes to the terminal font family: a terminal rebuilds its `Font` when it
+    /// sees another number (`font_revision`).
+    font_revision: u64,
 }
 
 struct SharedSettings(Entity<SettingsService>);
@@ -71,11 +75,11 @@ impl SettingsService {
             let writes = writes.clone();
             move || writes.flush()
         });
-        let mut service =
-            SettingsService::new(settings, writes, is_dark(cx.window_appearance()));
+        let mut service = SettingsService::new(settings, writes, is_dark(cx.window_appearance()));
         // A stored user theme name resolves from the first frame.
         service.themes = ThemeSet::new(user_themes::read());
         theme::set_active(service.resolve_theme());
+        term_core::set_scrollback_bytes(scrollback_bytes(service.settings.scrollback_mb));
         let service = cx.new(|_| service);
         cx.set_global(SharedSettings(service));
     }
@@ -88,6 +92,7 @@ impl SettingsService {
             timers: HashMap::new(),
             themes: ThemeSet::new(Vec::new()),
             system_dark,
+            font_revision: 0,
         }
     }
 
@@ -160,6 +165,8 @@ impl SettingsService {
     pub fn reset_all(&mut self, cx: &mut Context<Self>) {
         self.settings = Settings::default();
         self.follow(Key::Bindings);
+        self.follow(Key::FontFamily);
+        self.follow(Key::ScrollbackMb);
         self.timers.clear();
         self.apply_theme(cx);
         for key in Key::ALL {
@@ -186,10 +193,17 @@ impl SettingsService {
         cx.notify();
     }
 
-    /// The keymap follows a change to `key`: rebuilt when it is the bindings.
+    /// What depends on `key` follows its change: the keymap (bindings), the font revision, the
+    /// scrollback of new terminals.
     fn follow(&mut self, key: Key) {
-        if key == Key::Bindings {
-            self.keymap = Keymap::from_bindings(&self.settings.bindings);
+        match key {
+            Key::Bindings => self.keymap = Keymap::from_bindings(&self.settings.bindings),
+            Key::FontFamily => self.font_revision += 1,
+            // Terminals opened from now on keep this much.
+            Key::ScrollbackMb => {
+                term_core::set_scrollback_bytes(scrollback_bytes(self.settings.scrollback_mb));
+            }
+            _ => {}
         }
     }
 
@@ -228,6 +242,12 @@ fn is_dark(appearance: WindowAppearance) -> bool {
 /// The current settings, for any view: `current(cx).font_size`.
 pub fn current(cx: &App) -> &Settings {
     cx.global::<SharedSettings>().0.read(cx).settings()
+}
+
+/// Counts the changes to the terminal font family, so a terminal draws with a rebuilt font
+/// only after one.
+pub fn font_revision(cx: &App) -> u64 {
+    cx.global::<SharedSettings>().0.read(cx).font_revision
 }
 
 /// The current keymap, which every key press reads: a global lookup and an entity read;

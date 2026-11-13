@@ -12,11 +12,12 @@
 //! value from the settings, so a change made elsewhere (Reset, another window) shows at once.
 
 use gpui::{
-    AnyElement, App, Context, Div, Entity, Focusable, SharedString, Subscription, Window, div,
-    prelude::*, px,
+    AnyElement, App, Context, Div, Entity, SharedString, Subscription, div, prelude::*, px,
 };
 use serde_json::Value;
-use shellx_model::controls::{digits, number_entry, number_text, unit_suffix};
+use shellx_model::controls::{
+    NumberEsc, digits, number_escape, number_pending, number_text, unit_suffix,
+};
 use shellx_model::palette::Rgba;
 use shellx_model::settings::{Key, Settings, choice_value, colour_value, flag_value, number_value};
 use shellx_model::settings_catalog::{Control, Row, Section, Unit, row, rows, section_title};
@@ -43,7 +44,8 @@ pub(super) enum RowControl {
     Stepper(Entity<Stepper>),
     Number {
         field: Entity<TextField>,
-        /// The field had the keyboard at the last draw: leaving it commits its text.
+        /// The field holds text the user typed that is not the stored value yet: a draw leaves
+        /// it alone until it is committed (Enter, blur, close) or taken back (Esc).
         editing: bool,
     },
     Color(Entity<ColorWell>),
@@ -236,28 +238,6 @@ pub(super) fn section_card(
         .children(rows_card(&ids, view, cx))
 }
 
-/// Commits the number field the keyboard has just left (called at each draw, which follows
-/// every focus change).
-pub(super) fn commit_left_numbers(
-    view: &mut SettingsView,
-    window: &Window,
-    cx: &mut Context<SettingsView>,
-) {
-    let mut left = Vec::new();
-    for (id, entry) in &mut view.controls {
-        if let RowControl::Number { field, editing } = &mut entry.control {
-            let focused = field.focus_handle(cx).is_focused(window);
-            if *editing && !focused {
-                left.push(*id);
-            }
-            *editing = focused;
-        }
-    }
-    for id in left {
-        commit_number(id, view, cx);
-    }
-}
-
 /// Writes a row's value; `None` (a value the key cannot take) changes nothing.
 fn write(key: Key, value: Option<Value>, cx: &mut App) {
     if let Some(value) = value {
@@ -377,7 +357,7 @@ fn number_field(
     let id = row.id;
     let subscriptions = vec![
         // Only digits stay in the field.
-        cx.observe(&field, |_, field, cx| {
+        cx.observe(&field, move |view, field, cx| {
             let typed = field.read(cx);
             if typed.composing() {
                 return;
@@ -386,14 +366,27 @@ fn number_field(
             if kept != typed.text() {
                 field.update(cx, |field, cx| field.set_text(&kept, cx));
             }
-        }),
-        cx.subscribe(&field, move |view, _, event: &TextFieldEvent, cx| {
-            if *event == TextFieldEvent::Submit {
-                commit_number(id, view, cx);
-            } else {
-                view.field_event(*event, cx);
+            // Text that is not the stored value is an edit a draw must not overwrite.
+            let stored = number_row(id, view, cx).map(|(_, stored, ..)| number_text(stored));
+            let differs = stored.is_some_and(|stored| stored != kept);
+            if let Some(RowEntry {
+                control: RowControl::Number { editing, .. },
+                ..
+            }) = view.controls.get_mut(id)
+            {
+                *editing = differs;
             }
         }),
+        cx.subscribe(
+            &field,
+            move |view, _, event: &TextFieldEvent, cx| match event {
+                // Enter, or the keyboard leaving the field, commits it (clamped).
+                TextFieldEvent::Submit | TextFieldEvent::Blur => commit_number(id, view, cx),
+                // Esc takes an edit back; with none it is the window's.
+                TextFieldEvent::Cancel if restore_number(id, view, cx) => {}
+                _ => view.field_event(*event, cx),
+            },
+        ),
     ];
     view.controls.insert(
         row.id,
@@ -423,11 +416,73 @@ fn commit_number(id: &'static str, view: &mut SettingsView, cx: &mut Context<Set
         return;
     };
     let field = field.clone();
-    if let Some(value) = number_entry(field.read(cx).text(), min, max) {
+    // Only a value that differs from the stored one is written: a blur after Esc or after a
+    // close-commit rewrites nothing.
+    if let Some(stored) = current(cx).number(key)
+        && let Some(value) = number_pending(field.read(cx).text(), stored, min, max)
+    {
         write(key, number_value(key, value), cx);
     }
     let shown = current(cx).number(key).map(number_text).unwrap_or_default();
     field.update(cx, |field, cx| field.set_text(&shown, cx));
+}
+
+/// The stored value of a number row, as its field shows it, and its range.
+fn number_row(
+    id: &'static str,
+    view: &SettingsView,
+    cx: &App,
+) -> Option<(Entity<TextField>, f32, f32, f32)> {
+    let row = row(id)?;
+    let (Some(key), Control::Number { min, max, .. }) = (row.key, row.control) else {
+        return None;
+    };
+    let RowEntry {
+        control: RowControl::Number { field, .. },
+        ..
+    } = view.controls.get(id)?
+    else {
+        return None;
+    };
+    Some((field.clone(), current(cx).number(key)?, min, max))
+}
+
+/// Esc in a number field with an edit in it: the stored value comes back. `false` when there
+/// is no edit (Esc then closes Settings).
+fn restore_number(
+    id: &'static str,
+    view: &mut SettingsView,
+    cx: &mut Context<SettingsView>,
+) -> bool {
+    let Some((field, stored, ..)) = number_row(id, view, cx) else {
+        return false;
+    };
+    if number_escape(field.read(cx).text(), stored) == NumberEsc::Close {
+        return false;
+    }
+    field.update(cx, |field, cx| field.set_text(&number_text(stored), cx));
+    true
+}
+
+/// Settings is closing: a number field holding an edit commits it (clamped).
+pub(super) fn commit_pending_numbers(view: &mut SettingsView, cx: &mut Context<SettingsView>) {
+    let ids: Vec<&'static str> = view
+        .controls
+        .iter()
+        .filter(|(_, entry)| matches!(entry.control, RowControl::Number { .. }))
+        .map(|(id, _)| *id)
+        .collect();
+    for id in ids {
+        let Some((field, stored, min, max)) = number_row(id, view, cx) else {
+            continue;
+        };
+        let key = row(id).and_then(|row| row.key);
+        if let (Some(key), Some(value)) =
+            (key, number_pending(field.read(cx).text(), stored, min, max))
+        {
+            write(key, number_value(key, value), cx);
+        }
+    }
 }
 
 fn number_control(field: Entity<TextField>, unit: Unit) -> Div {
