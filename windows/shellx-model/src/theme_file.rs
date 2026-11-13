@@ -46,7 +46,8 @@ fn parse_with(name: &str, text: &str, fallback: Option<&TermTheme>) -> TermTheme
     let (mut background, mut foreground) = (None, None);
     let (mut cursor, mut cursor_text) = (None, None);
     let (mut selection_bg, mut selection_fg) = (None, None);
-    for line in text.lines() {
+    // Windows editors write a UTF-8 BOM, which must not hide the first key.
+    for line in text.trim_start_matches('\u{feff}').lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
@@ -145,6 +146,12 @@ impl ThemeSet {
             .map(|(n, t)| parse(n, t))
     }
 
+    /// Every theme once, parsed, in the set's order. Parses the whole set: keep the result
+    /// instead of calling it per frame.
+    pub fn themes(&self) -> Vec<TermTheme> {
+        self.entries.iter().map(|(n, t)| parse(n, t)).collect()
+    }
+
     fn side(&self, query: &str, dark: bool) -> Vec<&str> {
         let query = fold(query.trim());
         self.entries
@@ -163,6 +170,58 @@ impl ThemeSet {
     pub fn light(&self, query: &str) -> Vec<&str> {
         self.side(query, false)
     }
+}
+
+/// A user theme file over this many bytes is not read.
+pub const USER_THEME_MAX_BYTES: u64 = 64 * 1024;
+/// At most this many user theme files are read.
+pub const USER_THEME_MAX_FILES: usize = 500;
+
+/// Which of the user's theme files (name, size in bytes) are read, as indices into `files`:
+/// a name that starts with a dot and a file over `USER_THEME_MAX_BYTES` are skipped, the rest
+/// are taken in case-insensitive name order, the first `USER_THEME_MAX_FILES` of them.
+pub fn user_theme_files(files: &[(String, u64)]) -> Vec<usize> {
+    let mut picked: Vec<usize> = (0..files.len())
+        .filter(|&i| {
+            let (name, size) = &files[i];
+            !name.is_empty() && !name.starts_with('.') && *size <= USER_THEME_MAX_BYTES
+        })
+        .collect();
+    picked.sort_by(|&a, &b| {
+        let (a, b) = (&files[a].0, &files[b].0);
+        a.to_lowercase()
+            .cmp(&b.to_lowercase())
+            .then_with(|| a.cmp(b))
+    });
+    picked.truncate(USER_THEME_MAX_FILES);
+    picked
+}
+
+/// The gallery's columns: as many as fit 128 wide with 10 between them, each as wide as the
+/// width allows up to 220 (the Mac's adaptive grid). Returns the column count and a card's width.
+pub fn gallery_grid(width: f32) -> (usize, f32) {
+    const MIN: f32 = 128.0;
+    const MAX: f32 = 220.0;
+    const GAP: f32 = 10.0;
+    let width = if width.is_finite() { width.max(0.0) } else { 0.0 };
+    let columns = (((width + GAP) / (MIN + GAP)).floor() as usize).max(1);
+    let each = (width - GAP * (columns - 1) as f32) / columns as f32;
+    (columns, each.clamp(MIN, MAX))
+}
+
+/// The gallery's two sides in the order they are listed: the side in use first (`true` is
+/// the dark side).
+pub fn sides_first(dark_mode: bool) -> [bool; 2] {
+    [dark_mode, !dark_mode]
+}
+
+/// The indices of the folded names (`settings_search::fold`) that contain the folded query;
+/// an empty query matches all.
+pub fn matching(folded_names: &[String], query: &str) -> Vec<usize> {
+    let query = fold(query.trim());
+    (0..folded_names.len())
+        .filter(|&i| folded_names[i].contains(&query))
+        .collect()
 }
 
 /// The theme in use: the pair's side for `dark`; an empty or unknown name takes that side's

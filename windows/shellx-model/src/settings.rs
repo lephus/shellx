@@ -642,6 +642,21 @@ pub fn choice_value(key: Key, choice: &str) -> Option<Value> {
         .then_some(value)
 }
 
+/// The JSON of the accent: "cmux", "system" or "#rrggbb".
+pub fn accent_value(accent: Accent) -> Value {
+    match accent {
+        Accent::ShellxBlue => Value::String("cmux".into()),
+        Accent::System => Value::String("system".into()),
+        Accent::Custom(colour) => hex_value(colour),
+    }
+}
+
+/// The JSON of a side of the terminal theme pair set to the theme `name`; `None` for any
+/// other key.
+pub fn theme_value(key: Key, name: &str) -> Option<Value> {
+    matches!(key, Key::ThemeLight | Key::ThemeDark).then(|| Value::String(name.to_string()))
+}
+
 /// The JSON for a colour row set to `colour`.
 pub fn colour_value(key: Key, colour: Rgba) -> Option<Value> {
     matches!(key, Key::SelectionColor | Key::SidebarColor).then(|| hex_value(colour))
