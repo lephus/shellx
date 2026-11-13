@@ -22,6 +22,7 @@ mod sections {
     pub(super) mod account;
     pub(super) mod shortcuts;
     pub(super) mod terminal_cards;
+    pub(super) mod themes;
     pub(super) mod updates;
 }
 
@@ -44,6 +45,7 @@ pub use host::SettingsHost;
 use self::rows::RowEntry;
 use self::sections::shortcuts::ShortcutList;
 use self::sections::terminal_cards::TerminalCards;
+use self::sections::themes::ThemeGallery;
 use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
@@ -94,6 +96,8 @@ pub struct SettingsView {
     terminal: TerminalCards,
     /// The search bar and action rows of Settings › Keyboard Shortcuts.
     shortcuts: Entity<ShortcutList>,
+    /// The state of Settings › Themes.
+    themes: Entity<ThemeGallery>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -113,6 +117,9 @@ impl SettingsView {
         let (terminal, mut subscriptions) = TerminalCards::new(cx);
         let (shortcuts, shortcut_subscriptions) = sections::shortcuts::new(cx);
         subscriptions.extend(shortcut_subscriptions);
+        let detail_scroll = ScrollHandle::new();
+        let (themes, theme_subscriptions) = sections::themes::new(detail_scroll.clone(), cx);
+        subscriptions.extend(theme_subscriptions);
         subscriptions.extend([
             cx.observe(&account, |_, _, cx| cx.notify()),
             // A setting changed here or in the other window: the rows show it.
@@ -137,13 +144,14 @@ impl SettingsView {
             drawn_section: None,
             search,
             sidebar_scroll: ScrollHandle::new(),
-            detail_scroll: ScrollHandle::new(),
+            detail_scroll,
             window: None,
             controls: HashMap::new(),
             anchors: HashMap::new(),
             pending_row: None,
             terminal,
             shortcuts,
+            themes,
             _subscriptions: subscriptions,
         }
     }
@@ -156,6 +164,9 @@ impl SettingsView {
         }
         if self.section != section {
             self.section = section;
+            if section == Section::Themes {
+                sections::themes::opened(self, cx);
+            }
             let mut state = ui_state::load();
             state.settings_section = Some(section.id().to_string());
             ui_state::save(&state);
@@ -184,6 +195,9 @@ impl SettingsView {
         self.window = Some(window);
         sections::account::opened(self, cx);
         sections::terminal_cards::opened(self, cx);
+        if self.section == Section::Themes {
+            sections::themes::opened(self, cx);
+        }
         cx.notify();
     }
 
@@ -245,6 +259,7 @@ impl SettingsView {
         match self.section {
             Section::Account => sections::account::render(self, cx),
             Section::Terminal => sections::terminal_cards::render(self, cx),
+            Section::Themes => sections::themes::render(self, cx),
             Section::KeyboardShortcuts => sections::shortcuts::render(self, cx),
             Section::Updates => sections::updates::render(self, cx),
             Section::About => sections::about::render(self, cx),

@@ -210,6 +210,22 @@ pub fn popover_key(k: &KeyIn) -> Option<PopoverKey> {
     }
 }
 
+/// The arrows of a card grid `columns` wide (one tab stop for the whole grid): the number of
+/// cards the cursor moves, Left and Right one, Up and Down a row.
+pub fn grid_key(k: &KeyIn, columns: usize) -> Option<i32> {
+    if !no_modifier(k) {
+        return None;
+    }
+    let row = i32::try_from(columns.max(1)).unwrap_or(i32::MAX);
+    match k.key {
+        "left" => Some(-1),
+        "right" => Some(1),
+        "up" => Some(-row),
+        "down" => Some(row),
+        _ => None,
+    }
+}
+
 /// The highlighted row of a list of `len` rows after moving `delta` rows: it stops at the ends.
 pub fn moved_highlight(current: usize, delta: i32, len: usize) -> usize {
     let last = len.saturating_sub(1);
@@ -456,10 +472,19 @@ mod tests {
         assert_eq!(grid_key(&plain("a"), 4), None);
         assert_eq!(grid_key(&plain("tab"), 4), None);
         assert_eq!(grid_key(&plain("space"), 4), None);
-        let shifted = KeyIn { shift: true, ..plain("left") };
+        let shifted = KeyIn {
+            shift: true,
+            ..plain("left")
+        };
         assert_eq!(grid_key(&shifted, 4), None);
-        assert_eq!(moved_highlight(2, grid_key(&plain("up"), 4).unwrap(), 10), 0);
-        assert_eq!(moved_highlight(9, grid_key(&plain("down"), 4).unwrap(), 10), 9);
+        assert_eq!(
+            moved_highlight(2, grid_key(&plain("up"), 4).unwrap(), 10),
+            0
+        );
+        assert_eq!(
+            moved_highlight(9, grid_key(&plain("down"), 4).unwrap(), 10),
+            9
+        );
     }
 
     /// A stopped key-down yields no WM_CHAR on Windows: no control may take typed text,

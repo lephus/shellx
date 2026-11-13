@@ -325,39 +325,51 @@ static ROWS: &[Row] = &[
         "hide tab close button x tabs an nut dong tab",
     ),
     // Themes.
-    setting(
-        Key::Appearance,
-        Section::Themes,
-        Str::SettingsAppearance,
-        Some(Str::SettingsAppearanceSubtitle),
-        Control::Segmented(&[
-            (Str::SettingsSystem, "system"),
-            (Str::SettingsLight, "light"),
-            (Str::SettingsDark, "dark"),
-        ]),
-        "appearance theme color scheme light mode dark mode system mode giao dien sang toi he thong",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::Appearance,
+            Section::Themes,
+            Str::SettingsAppearance,
+            Some(Str::SettingsAppearanceSubtitle),
+            Control::Segmented(&[
+                (Str::SettingsSystem, "system"),
+                (Str::SettingsLight, "light"),
+                (Str::SettingsDark, "dark"),
+            ]),
+            "appearance theme color scheme light mode dark mode system mode giao dien sang toi he thong",
+        )
+    },
     // A picker plus a colour well for Custom, whose JSON value is the colour itself.
-    setting(
-        Key::Accent,
-        Section::Themes,
-        Str::SettingsAccentColor,
-        Some(Str::SettingsAccentColorSubtitle),
-        Control::Custom,
-        "accent color highlight tint blue system accent windows accent shellx blue mau nhan xanh",
-    ),
-    custom(
-        "terminalTheme",
-        Section::Themes,
-        Str::SettingsTerminalTheme,
-        "terminal theme ghostty themes color scheme palette colors light dark pair revert catppuccin gruvbox nord dracula solarized tokyonight rose pine github giao dien mau theme sang toi",
-    ),
-    custom(
-        "themeGallery",
-        Section::Themes,
-        Str::SettingsSearchAllThemes,
-        "theme gallery preview cards dark themes light themes thu vien theme tim",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::Accent,
+            Section::Themes,
+            Str::SettingsAccentColor,
+            Some(Str::SettingsAccentColorSubtitle),
+            Control::Custom,
+            "accent color highlight tint blue system accent windows accent shellx blue mau nhan xanh",
+        )
+    },
+    Row {
+        wired: true,
+        ..custom(
+            "terminalTheme",
+            Section::Themes,
+            Str::SettingsTerminalTheme,
+            "terminal theme ghostty themes color scheme palette colors light dark pair revert catppuccin gruvbox nord dracula solarized tokyonight rose pine github giao dien mau theme sang toi",
+        )
+    },
+    Row {
+        wired: true,
+        ..custom(
+            "themeGallery",
+            Section::Themes,
+            Str::SettingsSearchAllThemes,
+            "theme gallery preview cards dark themes light themes thu vien theme tim",
+        )
+    },
     // Terminal: the two existing cards, then the Mac's rows.
     Row {
         wired: true,
@@ -1292,6 +1304,10 @@ mod tests {
             wired,
             [
                 "account",
+                "app.appearance",
+                "app.accentColor",
+                "terminalTheme",
+                "themeGallery",
                 "shell",
                 "display",
                 "resetShortcuts",

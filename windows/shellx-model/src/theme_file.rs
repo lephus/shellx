@@ -203,7 +203,11 @@ pub fn gallery_grid(width: f32) -> (usize, f32) {
     const MIN: f32 = 128.0;
     const MAX: f32 = 220.0;
     const GAP: f32 = 10.0;
-    let width = if width.is_finite() { width.max(0.0) } else { 0.0 };
+    let width = if width.is_finite() {
+        width.max(0.0)
+    } else {
+        0.0
+    };
     let columns = (((width + GAP) / (MIN + GAP)).floor() as usize).max(1);
     let each = (width - GAP * (columns - 1) as f32) / columns as f32;
     (columns, each.clamp(MIN, MAX))
@@ -336,7 +340,10 @@ mod tests {
     }
     #[test]
     fn a_bom_does_not_hide_the_first_key() {
-        let t = parse("Bom", "\u{feff}background = #123456\nforeground = #abcdef\n");
+        let t = parse(
+            "Bom",
+            "\u{feff}background = #123456\nforeground = #abcdef\n",
+        );
         assert_eq!(t.background, rgb(0x123456));
         assert_eq!(t.foreground, rgb(0xabcdef));
     }
