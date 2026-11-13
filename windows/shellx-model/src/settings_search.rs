@@ -294,9 +294,9 @@ mod tests {
         assert!(search("font size", Lang::En).is_empty());
         // A section without a wired row is not offered either.
         assert!(
-            search("themes", Lang::En)
+            search("workspace colors", Lang::En)
                 .iter()
-                .all(|h| h.section != Section::Themes)
+                .all(|h| h.section != Section::WorkspaceColors)
         );
         assert_eq!(
             search("display", Lang::En),

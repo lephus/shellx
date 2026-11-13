@@ -20,12 +20,13 @@ use gpui::{App, AppContext as _, Context, Entity, Global, Task, Window, WindowAp
 use serde_json::Value;
 use shellx_model::keymap::{Action, Chord, Keymap};
 use shellx_model::settings::{Accent, Key, Settings};
-use shellx_model::theme_file::ThemeSet;
+use shellx_model::theme_file::{ThemeSet, is_dark_mode};
 
 use super::theme::{self, Active};
 use crate::os_info;
 use crate::settings_store::SettingsStore;
 use crate::startup;
+use crate::user_themes;
 
 /// How long a key waits after its last change before it is written: a slider being dragged
 /// writes once, when it stops.
@@ -70,7 +71,10 @@ impl SettingsService {
             let writes = writes.clone();
             move || writes.flush()
         });
-        let service = SettingsService::new(settings, writes, is_dark(cx.window_appearance()));
+        let mut service =
+            SettingsService::new(settings, writes, is_dark(cx.window_appearance()));
+        // A stored user theme name resolves from the first frame.
+        service.themes = ThemeSet::new(user_themes::read());
         theme::set_active(service.resolve_theme());
         let service = cx.new(|_| service);
         cx.set_global(SharedSettings(service));
@@ -111,6 +115,24 @@ impl SettingsService {
 
     pub fn settings(&self) -> &Settings {
         &self.settings
+    }
+
+    /// The bundled themes and the user's: what the pair's names are looked up in.
+    pub fn themes(&self) -> &ThemeSet {
+        &self.themes
+    }
+
+    /// The window is dark now: Appearance Dark, or System with a dark window.
+    pub fn is_dark_mode(&self) -> bool {
+        is_dark_mode(self.settings.appearance, self.system_dark)
+    }
+
+    /// The user's theme files were read again: the set is rebuilt and the active theme
+    /// resolved again (a stored name may now find its file).
+    pub fn set_user_themes(&mut self, user: Vec<(String, String)>, cx: &mut Context<Self>) {
+        self.themes = ThemeSet::new(user);
+        self.apply_theme(cx);
+        cx.notify();
     }
 
     pub fn keymap(&self) -> &Keymap {

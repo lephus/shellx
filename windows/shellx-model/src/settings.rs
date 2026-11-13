@@ -506,9 +506,7 @@ impl Settings {
                     .filter_map(|(k, c)| Some((k.clone(), parse_hex(c.as_str()?)?)))
                     .collect()
             }
-            Key::SidebarBackground => {
-                self.sidebar_background = from_name(SIDEBAR_BACKGROUNDS, v)?
-            }
+            Key::SidebarBackground => self.sidebar_background = from_name(SIDEBAR_BACKGROUNDS, v)?,
             Key::SidebarColor => self.sidebar_color = parse_hex(v.as_str()?)?,
             Key::SidebarFontSize => self.sidebar_font_size = snapped(v, 10.0, 20.0, 0.5)?,
             Key::HideSidebarDetails => self.hide_sidebar_details = v.as_bool()?,
@@ -642,6 +640,21 @@ pub fn choice_value(key: Key, choice: &str) -> Option<Value> {
         .then_some(value)
 }
 
+/// The JSON of the accent: "cmux", "system" or "#rrggbb".
+pub fn accent_value(accent: Accent) -> Value {
+    match accent {
+        Accent::ShellxBlue => Value::String("cmux".into()),
+        Accent::System => Value::String("system".into()),
+        Accent::Custom(colour) => hex_value(colour),
+    }
+}
+
+/// The JSON of a side of the terminal theme pair set to the theme `name`; `None` for any
+/// other key.
+pub fn theme_value(key: Key, name: &str) -> Option<Value> {
+    matches!(key, Key::ThemeLight | Key::ThemeDark).then(|| Value::String(name.to_string()))
+}
+
 /// The JSON for a colour row set to `colour`.
 pub fn colour_value(key: Key, colour: Rgba) -> Option<Value> {
     matches!(key, Key::SelectionColor | Key::SidebarColor).then(|| hex_value(colour))
@@ -694,7 +707,7 @@ fn put_parts(map: &mut Map<String, Value>, parts: &[&str], value: Option<Value>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Map, Value};
+    use serde_json::{Map, Value, json};
     use std::collections::HashSet;
 
     fn obj(v: Value) -> Map<String, Value> {
@@ -1001,5 +1014,24 @@ mod tests {
             let s = applied(key, colour_value(key, colour));
             assert_eq!(s.colour(key), Some(colour), "{key:?}");
         }
+    }
+
+    #[test]
+    fn accent_and_theme_names_are_written_by_typed_helpers() {
+        assert_eq!(accent_value(Accent::ShellxBlue), json!("cmux"));
+        assert_eq!(accent_value(Accent::System), json!("system"));
+        assert_eq!(
+            accent_value(Accent::Custom(Rgba::rgb(0xff8800))),
+            json!("#ff8800")
+        );
+        assert_eq!(
+            theme_value(Key::ThemeDark, "Dracula"),
+            Some(json!("Dracula"))
+        );
+        assert_eq!(theme_value(Key::ThemeLight, "Nord"), Some(json!("Nord")));
+        assert_eq!(theme_value(Key::Appearance, "Nord"), None);
+        let mut s = Settings::default();
+        assert!(s.set_from_value(Key::Accent, &accent_value(Accent::System)));
+        assert_eq!(s.accent, Accent::System);
     }
 }

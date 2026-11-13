@@ -46,7 +46,8 @@ fn parse_with(name: &str, text: &str, fallback: Option<&TermTheme>) -> TermTheme
     let (mut background, mut foreground) = (None, None);
     let (mut cursor, mut cursor_text) = (None, None);
     let (mut selection_bg, mut selection_fg) = (None, None);
-    for line in text.lines() {
+    // Windows editors write a UTF-8 BOM, which must not hide the first key.
+    for line in text.trim_start_matches('\u{feff}').lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
@@ -145,6 +146,12 @@ impl ThemeSet {
             .map(|(n, t)| parse(n, t))
     }
 
+    /// Every theme once, parsed, in the set's order. Parses the whole set: keep the result
+    /// instead of calling it per frame.
+    pub fn themes(&self) -> Vec<TermTheme> {
+        self.entries.iter().map(|(n, t)| parse(n, t)).collect()
+    }
+
     fn side(&self, query: &str, dark: bool) -> Vec<&str> {
         let query = fold(query.trim());
         self.entries
@@ -162,6 +169,91 @@ impl ThemeSet {
 
     pub fn light(&self, query: &str) -> Vec<&str> {
         self.side(query, false)
+    }
+}
+
+/// A user theme file over this many bytes is not read.
+pub const USER_THEME_MAX_BYTES: u64 = 64 * 1024;
+/// At most this many user theme files are read.
+pub const USER_THEME_MAX_FILES: usize = 500;
+
+/// Which of the user's theme files (name, size in bytes) are read, as indices into `files`:
+/// a name that starts with a dot and a file over `USER_THEME_MAX_BYTES` are skipped, the rest
+/// are taken in case-insensitive name order, the first `USER_THEME_MAX_FILES` of them.
+pub fn user_theme_files(files: &[(String, u64)]) -> Vec<usize> {
+    let mut picked: Vec<usize> = (0..files.len())
+        .filter(|&i| {
+            let (name, size) = &files[i];
+            !name.is_empty() && !name.starts_with('.') && *size <= USER_THEME_MAX_BYTES
+        })
+        .collect();
+    picked.sort_by(|&a, &b| {
+        let (a, b) = (&files[a].0, &files[b].0);
+        a.to_lowercase()
+            .cmp(&b.to_lowercase())
+            .then_with(|| a.cmp(b))
+    });
+    picked.truncate(USER_THEME_MAX_FILES);
+    picked
+}
+
+/// The gallery's columns: as many as fit 128 wide with 10 between them, each as wide as the
+/// width allows up to 220 (the Mac's adaptive grid). Returns the column count and a card's width.
+pub fn gallery_grid(width: f32) -> (usize, f32) {
+    const MIN: f32 = 128.0;
+    const MAX: f32 = 220.0;
+    const GAP: f32 = 10.0;
+    let width = if width.is_finite() {
+        width.max(0.0)
+    } else {
+        0.0
+    };
+    let columns = (((width + GAP) / (MIN + GAP)).floor() as usize).max(1);
+    let each = (width - GAP * (columns - 1) as f32) / columns as f32;
+    (columns, each.clamp(MIN, MAX))
+}
+
+/// The gallery's two sides in the order they are listed: the side in use first (`true` is
+/// the dark side).
+pub fn sides_first(dark_mode: bool) -> [bool; 2] {
+    [dark_mode, !dark_mode]
+}
+
+/// The indices of the folded names (`settings_search::fold`) that contain the folded query;
+/// an empty query matches all.
+pub fn matching(folded_names: &[String], query: &str) -> Vec<usize> {
+    let query = fold(query.trim());
+    (0..folded_names.len())
+        .filter(|&i| folded_names[i].contains(&query))
+        .collect()
+}
+
+/// Whether a gallery card named `card` is the theme the pair's side stores as `stored`: the
+/// same case rule as the lookup (`ThemeSet::get`).
+pub fn is_current_theme(card: &str, stored: &str) -> bool {
+    card.to_lowercase() == stored.to_lowercase()
+}
+
+/// The grid's top edge (window coordinates) moved by more than half a row since the frame
+/// was built: the rows built are for the old place, so another frame is needed.
+pub fn top_moved(old: f32, new: f32, row: f32) -> bool {
+    (new - old).abs() > row / 2.0
+}
+
+/// Which of the grid's items (top and height, in grid coordinates) to build: those that meet
+/// the viewport (`view` = top and bottom in window coordinates) or lie within `margin` of it,
+/// for a grid whose top edge is at `grid_top`. A span of indices; empty when none does.
+pub fn visible_span(
+    items: &[(f32, f32)],
+    view: (f32, f32),
+    grid_top: f32,
+    margin: f32,
+) -> std::ops::Range<usize> {
+    let (low, high) = (view.0 - grid_top - margin, view.1 - grid_top + margin);
+    let meets = |&(y, h): &(f32, f32)| y + h >= low && y <= high;
+    match (items.iter().position(meets), items.iter().rposition(meets)) {
+        (Some(first), Some(last)) => first..last + 1,
+        _ => 0..0,
     }
 }
 
@@ -274,5 +366,112 @@ mod tests {
         assert_eq!(active(&set, &s, false).name, "Catppuccin Latte");
         s.theme_dark = "dracula".into();
         assert_eq!(active(&set, &s, true).name, "Dracula");
+    }
+    #[test]
+    fn a_bom_does_not_hide_the_first_key() {
+        let t = parse(
+            "Bom",
+            "\u{feff}background = #123456\nforeground = #abcdef\n",
+        );
+        assert_eq!(t.background, rgb(0x123456));
+        assert_eq!(t.foreground, rgb(0xabcdef));
+    }
+
+    #[test]
+    fn user_theme_files_are_sorted_and_capped() {
+        let files: Vec<(String, u64)> = vec![
+            ("Zeta".into(), 10),
+            ("alpha".into(), 10),
+            ("Huge".into(), USER_THEME_MAX_BYTES + 1),
+            ("Edge".into(), USER_THEME_MAX_BYTES),
+            (".hidden".into(), 10),
+            ("Beta".into(), 0),
+        ];
+        let picked: Vec<&str> = user_theme_files(&files)
+            .into_iter()
+            .map(|i| files[i].0.as_str())
+            .collect();
+        assert_eq!(picked, ["alpha", "Beta", "Edge", "Zeta"]);
+        let many: Vec<(String, u64)> = (0..USER_THEME_MAX_FILES + 40)
+            .map(|n| (format!("t{n:04}"), 1))
+            .collect();
+        let picked = user_theme_files(&many);
+        assert_eq!(picked.len(), USER_THEME_MAX_FILES);
+        assert_eq!(many[picked[0]].0, "t0000");
+        assert!(user_theme_files(&[]).is_empty());
+    }
+
+    #[test]
+    fn every_theme_is_listed_once_with_its_side() {
+        let set = ThemeSet::new(vec![]);
+        let all = set.themes();
+        assert_eq!(all.len(), 464);
+        assert_eq!(all.iter().filter(|t| is_dark(t)).count(), 386);
+        assert_eq!(all[0].name, bundled()[0].0);
+    }
+
+    #[test]
+    fn the_gallery_grid_is_adaptive_between_128_and_220() {
+        assert_eq!(gallery_grid(100.0), (1, 128.0));
+        assert_eq!(gallery_grid(300.0), (2, 145.0));
+        assert_eq!(gallery_grid(138.0), (1, 138.0));
+        assert_eq!(gallery_grid(137.0).0, 1);
+        assert_eq!(gallery_grid(500.0), (3, 160.0));
+        let (columns, width) = gallery_grid(1000.0);
+        assert_eq!(columns, 7);
+        assert!((width - 940.0 / 7.0).abs() < 0.01);
+        // One column never gets wider than 220.
+        assert_eq!(gallery_grid(260.0), (1, 220.0));
+        assert_eq!(gallery_grid(0.0), (1, 128.0));
+    }
+
+    #[test]
+    fn the_side_in_use_is_listed_first() {
+        assert_eq!(sides_first(true), [true, false]);
+        assert_eq!(sides_first(false), [false, true]);
+    }
+
+    #[test]
+    fn the_gallery_search_folds_case_and_accents() {
+        let names: Vec<String> = ["Catppuccin Latte", "Dracula", "Rosé Pine"]
+            .iter()
+            .map(|n| crate::settings_search::fold(n))
+            .collect();
+        assert_eq!(matching(&names, ""), [0, 1, 2]);
+        assert_eq!(matching(&names, "  DRAC "), [1]);
+        assert_eq!(matching(&names, "rose"), [2]);
+        assert!(matching(&names, "zzz").is_empty());
+    }
+    #[test]
+    fn a_card_is_current_when_its_name_is_the_stored_one_in_the_lookup_case_rule() {
+        assert!(is_current_theme("Catppuccin Latte", "catppuccin latte"));
+        assert!(is_current_theme("Dracula", "Dracula"));
+        assert!(!is_current_theme("Dracula", "Nord"));
+        assert!(!is_current_theme("Dracula", ""));
+        // The two sides are told apart by the caller: a dark card against the light name is no match.
+        let (dark, light) = ("ShellX", "Catppuccin Latte");
+        assert!(is_current_theme("ShellX", dark));
+        assert!(!is_current_theme("ShellX", light));
+    }
+
+    #[test]
+    fn a_moved_grid_top_asks_for_another_frame_only_past_half_a_row() {
+        assert!(!top_moved(500.0, 500.0, 64.0));
+        assert!(!top_moved(500.0, 520.0, 64.0));
+        assert!(top_moved(500.0, 540.0, 64.0));
+        assert!(top_moved(500.0, 100.0, 64.0));
+    }
+
+    #[test]
+    fn only_the_rows_that_meet_the_viewport_and_a_margin_are_built() {
+        // (top, height) of 10 rows of 64.
+        let rows: Vec<(f32, f32)> = (0..10).map(|n| (n as f32 * 64.0, 64.0)).collect();
+        // Grid starts at 500 in the window; the viewport is 80..400: above the grid.
+        assert_eq!(visible_span(&rows, (80.0, 400.0), 500.0, 64.0), 0..0);
+        // Grid top at 100, viewport 80..400: rows 0..=4 (y 0..320), plus a margin row.
+        assert_eq!(visible_span(&rows, (80.0, 400.0), 100.0, 64.0), 0..6);
+        // Scrolled far down: grid top at -300, viewport 80..400 -> y 380..700.
+        assert_eq!(visible_span(&rows, (80.0, 400.0), -300.0, 64.0), 4..10);
+        assert_eq!(visible_span(&[], (0.0, 10.0), 0.0, 64.0), 0..0);
     }
 }
