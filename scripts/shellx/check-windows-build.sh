@@ -101,11 +101,22 @@ docker_cpus="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"
 [[ "$docker_cpus" =~ ^[1-9][0-9]*$ ]] || docker_cpus=8
 cpus=$((docker_cpus < 8 ? docker_cpus : 8))
 jobs=$((cpus < 6 ? cpus : 6))
+# zig 0.16 cannot read a resolv.conf with a comment line ("ResolvConfParseFailed" when the
+# ghostty build fetches its dependencies), and Docker Desktop's starts with one: the container
+# gets the same file without its comments.
+dns_dir="$(mktemp -d "${TMPDIR:-/tmp}/shellx-wincheck-dns.XXXXXX")"
+tmp_dirs+=("$dns_dir")
+docker run --rm --entrypoint cat "$image" /etc/resolv.conf | grep -v '^[[:space:]]*[#;]' \
+  >"$dns_dir/resolv.conf" || true
+dns_mount=()
+if grep -q '^[[:space:]]*nameserver' "$dns_dir/resolv.conf"; then
+  dns_mount=(-v "$dns_dir/resolv.conf":/etc/resolv.conf:ro)
+fi
 docker volume create shellx-wincheck-cache >/dev/null
 status=0
 docker run --rm --init --name shellx-wincheck-run --memory 6g --cpus "$cpus" -e CARGO_BUILD_JOBS="$jobs" \
   -e CMUX_TUI_BUILD_COMMIT="$commit" -e SHELLX_WINCHECK_PROFILE="$profile" \
-  -v shellx-wincheck-cache:/cache -v "$src":/src \
+  -v shellx-wincheck-cache:/cache -v "$src":/src ${dns_mount[@]+"${dns_mount[@]}"} \
   "$image" bash /opt/winbuild/check-in-container.sh || status=$?
 profile_note=""
 [[ $profile == dev ]] || profile_note=", $profile profile"
