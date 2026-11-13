@@ -25,11 +25,6 @@ pub const CAPTION_FALLBACK: &str = "Segoe MDL2 Assets";
 pub const UI_SIZE: Pixels = px(13.0);
 pub const SMALL_SIZE: Pixels = px(11.0);
 pub const PILL_SIZE: Pixels = px(10.0);
-/// Sidebar like the Mac's: brand name, machine and workspace titles, the
-/// machines header.
-pub const BRAND_SIZE: Pixels = px(14.0);
-pub const CARD_TITLE_SIZE: Pixels = px(12.0);
-pub const HEADER_SIZE: Pixels = px(10.5);
 pub const CAPTION_GLYPH_SIZE: Pixels = px(10.0);
 
 /// The theme in use: the window's chrome and the terminals' colours.
@@ -201,6 +196,13 @@ pub fn sidebar_text() -> Hsla {
 }
 pub fn sidebar_muted() -> Hsla {
     hsla(chrome().sidebar_muted)
+}
+/// The sidebar's edge and footer line, and the selected card's border.
+pub fn sidebar_line() -> Hsla {
+    hsla(chrome().sidebar_line)
+}
+pub fn sidebar_border() -> Hsla {
+    hsla(chrome().sidebar_border)
 }
 /// The selected workspace card's fill and title.
 pub fn session_selected() -> Hsla {

@@ -290,8 +290,8 @@ mod tests {
 
     #[test]
     fn unwired_rows_are_not_found() {
-        assert!(!everything("workspace color indicator", Lang::En).is_empty());
-        assert!(search("workspace color indicator", Lang::En).is_empty());
+        assert!(!everything("unselected fill", Lang::En).is_empty());
+        assert!(search("unselected fill", Lang::En).is_empty());
         // A section without a wired row is not offered either.
         assert!(
             search("workspace colors", Lang::En)
@@ -300,11 +300,19 @@ mod tests {
         );
         assert_eq!(
             search("display", Lang::En),
-            [Hit {
-                section: Section::Terminal,
-                row: Some("display"),
-                rank: 0
-            }]
+            [
+                Hit {
+                    section: Section::Terminal,
+                    row: Some("display"),
+                    rank: 0
+                },
+                // Its subtitle says "Display git branches and working directories."
+                Hit {
+                    section: Section::Sidebar,
+                    row: Some("sidebar.showBranchDirectory"),
+                    rank: 5
+                }
+            ]
         );
         let updates = search("cập nhật", Lang::Vi);
         assert_eq!(
