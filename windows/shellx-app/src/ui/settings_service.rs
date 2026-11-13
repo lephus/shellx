@@ -305,6 +305,10 @@ impl PendingWrites {
         lock(&self.waiting).insert(path, value);
     }
 
+    /// Every key this version knows waits to be removed from the file (Reset All Settings).
+    #[allow(dead_code)] // stub: the test below is red
+    fn remove_every_key(&self) {}
+
     /// Writes the value waiting at `path`, if one still waits.
     fn write(&self, path: &'static str) {
         let _writing = lock(&self.writing);
@@ -414,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_write_is_dropped_without_a_panic() {
+    fn a_failed_write_does_not_panic() {
         // the folder cannot be made (a file has its name): the value lives in memory only
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("native");
@@ -424,6 +428,50 @@ mod tests {
         writes.write("app.language");
         writes.wait("app.language", Some(json!("en")));
         writes.flush();
-        assert!(writes.waiting.lock().unwrap().is_empty());
+        // the value is not lost: it waits for the next write or the quit flush
+        assert_eq!(lock(&writes.waiting).len(), 1);
+    }
+
+    #[test]
+    fn reset_all_leaves_only_unknown_keys_in_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let store = SettingsStore::new(path.clone());
+        let changes = Key::ALL
+            .iter()
+            .map(|key| (key.path(), Some(json!("x"))))
+            .chain([("future.setting", Some(json!(1)))])
+            .collect();
+        store.write_many(changes).unwrap();
+        let writes = PendingWrites::new(store);
+        writes.remove_every_key();
+        writes.flush();
+        assert_eq!(json_at(&path), json!({"future": {"setting": 1}}));
+    }
+
+    #[test]
+    fn a_failed_write_stays_pending_and_is_tried_again() {
+        // the folder cannot be made (a file has its name): the write fails
+        let dir = tempfile::tempdir().unwrap();
+        let blocker = dir.path().join("native");
+        std::fs::write(&blocker, "").unwrap();
+        let path = blocker.join("settings.json");
+        let writes = PendingWrites::new(SettingsStore::new(path.clone()));
+        writes.wait("app.language", Some(json!("vi")));
+        writes.wait("terminalConfig.font-size", Some(json!(15)));
+        writes.write("app.language");
+        writes.flush();
+        assert_eq!(lock(&writes.waiting).len(), 2);
+        // a newer value for a key replaces the failed one
+        writes.wait("app.language", Some(json!("en")));
+        writes.flush();
+        // the scanner lets go: the quit flush writes what still waits
+        std::fs::remove_file(&blocker).unwrap();
+        writes.flush();
+        assert_eq!(
+            json_at(&path),
+            json!({"app": {"language": "en"}, "terminalConfig": {"font-size": 15}})
+        );
+        assert!(lock(&writes.waiting).is_empty());
     }
 }
