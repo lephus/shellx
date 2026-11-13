@@ -225,8 +225,8 @@ impl Key {
         Key::Bindings,
     ];
 
-    /// The dotted path of the key in `settings.json`.
-    pub fn path(self) -> &'static str {
+    /// The dotted path of the key in `settings.json` (also the id of its Settings row).
+    pub const fn path(self) -> &'static str {
         match self {
             Key::Language => "app.language",
             Key::Appearance => "app.appearance",

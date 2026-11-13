@@ -240,6 +240,191 @@ pub enum Str {
     SessionExpired,
     /// The notice's button (catalog `signin.expired`, second sentence).
     SignInAgain,
+    // The Settings window (`settings_catalog`): English is the Mac's `defaultValue`, Vietnamese
+    // the Mac's Vietnamese where it has the key. Later tasks use these and add none.
+    /// The sidebar search field's placeholder and its empty result.
+    SettingsSearch,
+    SettingsNoResults,
+    /// Group titles (`settings_catalog::group_title`); Terminal and ShellX reuse `Terminal`
+    /// and `AppName`.
+    SettingsGroupGeneral,
+    SettingsGroupWorkspace,
+    SettingsGroupSidebarAndDock,
+    SettingsGroupKeyboardAndAdvanced,
+    /// Section titles; Account, Terminal, Updates and About reuse the existing strings, and
+    /// Reset is `SettingsReset`.
+    SettingsSectionApp,
+    SettingsSectionThemes,
+    SettingsSectionWorkspaceColors,
+    SettingsSectionSidebar,
+    SettingsSectionKeyboardShortcuts,
+    /// Option labels shared by Appearance, Accent Color and Language.
+    SettingsSystem,
+    SettingsLight,
+    SettingsDark,
+    /// The Font picker's first entry and Selection Highlight's label before a colour is chosen.
+    SettingsDefault,
+    /// The Reset section, and every row's "Reset" button.
+    SettingsReset,
+    /// Under Language after a change that needs a new start.
+    SettingsRestartToApply,
+    /// App.
+    SettingsLanguageEnglish,
+    SettingsLanguageVietnamese,
+    /// Under Language while `SHELLX_LANG` decides the language.
+    SettingsLanguageEnvOverride,
+    SettingsNewWorkspacePlacement,
+    SettingsNewWorkspacePlacementSubtitle,
+    SettingsPlacementTop,
+    SettingsPlacementAfterCurrent,
+    SettingsPlacementEnd,
+    SettingsInheritWorkingDirectory,
+    SettingsInheritWorkingDirectorySubtitle,
+    SettingsKeepWorkspaceOpen,
+    SettingsKeepWorkspaceOpenSubtitle,
+    SettingsFocusHistoryIncludesPanes,
+    SettingsFocusHistoryIncludesPanesSubtitle,
+    SettingsEqualizeSplits,
+    SettingsEqualizeSplitsSubtitle,
+    SettingsHideTabCloseButton,
+    SettingsHideTabCloseButtonSubtitle,
+    /// Themes.
+    SettingsAppearance,
+    SettingsAppearanceSubtitle,
+    SettingsAccentColor,
+    SettingsAccentColorSubtitle,
+    SettingsAccentShellxBlue,
+    SettingsAccentCustom,
+    SettingsTerminalTheme,
+    SettingsRevert,
+    /// The gallery's search field (also the gallery row's title in search).
+    SettingsSearchAllThemes,
+    SettingsDarkThemes,
+    SettingsLightThemes,
+    SettingsNoThemesMatch,
+    /// Terminal: the shell card's title (the display card's is `Display`).
+    SettingsShell,
+    SettingsTabBarFontSize,
+    SettingsTabBarFontSizeSubtitle,
+    SettingsScrollSpeed,
+    SettingsScrollSpeedSubtitle,
+    SettingsCopyOnSelect,
+    SettingsCopyOnSelectSubtitle,
+    SettingsConfirmUnsafePaste,
+    SettingsConfirmUnsafePasteSubtitleOn,
+    SettingsConfirmUnsafePasteSubtitleOff,
+    SettingsFont,
+    /// After a stored font family that is not installed.
+    SettingsFontNotInstalled,
+    SettingsFontSize,
+    SettingsCursorStyle,
+    SettingsCursorBlock,
+    SettingsCursorBar,
+    SettingsCursorUnderline,
+    SettingsCursorHollow,
+    SettingsPaddingX,
+    SettingsPaddingY,
+    SettingsScrollbackLimit,
+    SettingsScrollbackLimitSubtitle,
+    SettingsMiddleClickPaste,
+    SettingsMiddleClickPasteSubtitle,
+    /// Workspace Colors.
+    SettingsWorkspaceColorIndicator,
+    SettingsLeftRail,
+    SettingsSolidFill,
+    SettingsSubtleSelection,
+    SettingsSubtleSelectionSubtitle,
+    SettingsBrightenInDark,
+    SettingsBrightenInDarkSubtitle,
+    SettingsUnselectedFillOpacity,
+    SettingsUnselectedFillOpacitySubtitle,
+    SettingsSelectionHighlight,
+    SettingsSelectionHighlightSubtitle,
+    /// The note above the palette rows.
+    SettingsPaletteNote,
+    /// The 16 workspace colours, in palette order.
+    SettingsColorRed,
+    SettingsColorCrimson,
+    SettingsColorOrange,
+    SettingsColorAmber,
+    SettingsColorOlive,
+    SettingsColorGreen,
+    SettingsColorTeal,
+    SettingsColorAqua,
+    SettingsColorBlue,
+    SettingsColorNavy,
+    SettingsColorIndigo,
+    SettingsColorPurple,
+    SettingsColorMagenta,
+    SettingsColorRose,
+    SettingsColorBrown,
+    SettingsColorCharcoal,
+    SettingsResetPalette,
+    SettingsResetPaletteSubtitle,
+    /// The workspace card's right-click menu.
+    SettingsWorkspaceColor,
+    SettingsClearColor,
+    /// Sidebar.
+    SettingsSidebarBackground,
+    SettingsSidebarBackgroundSubtitle,
+    SettingsFollowTheme,
+    SettingsMatchTerminal,
+    SettingsCustomColor,
+    SettingsSidebarColor,
+    SettingsSidebarColorSubtitle,
+    SettingsSidebarFontSize,
+    SettingsSidebarFontSizeSubtitle,
+    SettingsHideAllSidebarDetails,
+    SettingsHideAllSidebarDetailsSubtitle,
+    SettingsWrapWorkspaceTitles,
+    SettingsWrapWorkspaceTitlesSubtitle,
+    SettingsTruncatePathFromStart,
+    SettingsTruncatePathFromStartSubtitle,
+    SettingsShowBranchDirectory,
+    SettingsShowBranchDirectorySubtitle,
+    /// Keyboard Shortcuts: the action titles (the Mac's `ShortcutAction` names).
+    SettingsActionOpenSettings,
+    SettingsActionToggleSidebar,
+    SettingsActionNewWorkspace,
+    SettingsActionNewSurface,
+    SettingsActionCloseTab,
+    SettingsActionNextWorkspace,
+    SettingsActionPreviousWorkspace,
+    SettingsActionSplitRight,
+    SettingsActionSplitDown,
+    SettingsActionFocusPaneLeft,
+    SettingsActionFocusPaneRight,
+    SettingsActionFocusPaneUp,
+    SettingsActionFocusPaneDown,
+    SettingsActionFocusBack,
+    SettingsActionFocusForward,
+    SettingsActionCopy,
+    SettingsActionPaste,
+    /// The shortcut list's search bar and recorder.
+    SettingsSearchShortcuts,
+    SettingsDetectShortcut,
+    SettingsListening,
+    SettingsPressShortcut,
+    SettingsNoShortcutsMatch,
+    /// Tooltips of a row's X button: before and after a clear.
+    SettingsUnbindShortcut,
+    SettingsRestoreShortcut,
+    SettingsResetDefaultShortcuts,
+    SettingsResetDefaultShortcutsSubtitle,
+    SettingsResetDefaults,
+    /// Under the shortcut list.
+    SettingsShortcutsFooter,
+    /// Why a recorded chord is refused.
+    SettingsShortcutNeedsModifier,
+    SettingsShortcutReservedByWindows,
+    SettingsShortcutWindowsKey,
+    SettingsShortcutCtrlAlt,
+    /// Under a row bound to Ctrl plus a letter.
+    SettingsShortcutLeavesShell,
+    /// The conflict banner's button (its sentence is `shortcut_conflict`).
+    SettingsUndo,
+    /// Reset: the row and its button.
+    SettingsResetAllSettings,
 }
 
 impl Str {
@@ -397,6 +582,161 @@ impl Str {
         Str::EmailCodeMethod,
         Str::SessionExpired,
         Str::SignInAgain,
+        Str::SettingsSearch,
+        Str::SettingsNoResults,
+        Str::SettingsGroupGeneral,
+        Str::SettingsGroupWorkspace,
+        Str::SettingsGroupSidebarAndDock,
+        Str::SettingsGroupKeyboardAndAdvanced,
+        Str::SettingsSectionApp,
+        Str::SettingsSectionThemes,
+        Str::SettingsSectionWorkspaceColors,
+        Str::SettingsSectionSidebar,
+        Str::SettingsSectionKeyboardShortcuts,
+        Str::SettingsSystem,
+        Str::SettingsLight,
+        Str::SettingsDark,
+        Str::SettingsDefault,
+        Str::SettingsReset,
+        Str::SettingsRestartToApply,
+        Str::SettingsLanguageEnglish,
+        Str::SettingsLanguageVietnamese,
+        Str::SettingsLanguageEnvOverride,
+        Str::SettingsNewWorkspacePlacement,
+        Str::SettingsNewWorkspacePlacementSubtitle,
+        Str::SettingsPlacementTop,
+        Str::SettingsPlacementAfterCurrent,
+        Str::SettingsPlacementEnd,
+        Str::SettingsInheritWorkingDirectory,
+        Str::SettingsInheritWorkingDirectorySubtitle,
+        Str::SettingsKeepWorkspaceOpen,
+        Str::SettingsKeepWorkspaceOpenSubtitle,
+        Str::SettingsFocusHistoryIncludesPanes,
+        Str::SettingsFocusHistoryIncludesPanesSubtitle,
+        Str::SettingsEqualizeSplits,
+        Str::SettingsEqualizeSplitsSubtitle,
+        Str::SettingsHideTabCloseButton,
+        Str::SettingsHideTabCloseButtonSubtitle,
+        Str::SettingsAppearance,
+        Str::SettingsAppearanceSubtitle,
+        Str::SettingsAccentColor,
+        Str::SettingsAccentColorSubtitle,
+        Str::SettingsAccentShellxBlue,
+        Str::SettingsAccentCustom,
+        Str::SettingsTerminalTheme,
+        Str::SettingsRevert,
+        Str::SettingsSearchAllThemes,
+        Str::SettingsDarkThemes,
+        Str::SettingsLightThemes,
+        Str::SettingsNoThemesMatch,
+        Str::SettingsShell,
+        Str::SettingsTabBarFontSize,
+        Str::SettingsTabBarFontSizeSubtitle,
+        Str::SettingsScrollSpeed,
+        Str::SettingsScrollSpeedSubtitle,
+        Str::SettingsCopyOnSelect,
+        Str::SettingsCopyOnSelectSubtitle,
+        Str::SettingsConfirmUnsafePaste,
+        Str::SettingsConfirmUnsafePasteSubtitleOn,
+        Str::SettingsConfirmUnsafePasteSubtitleOff,
+        Str::SettingsFont,
+        Str::SettingsFontNotInstalled,
+        Str::SettingsFontSize,
+        Str::SettingsCursorStyle,
+        Str::SettingsCursorBlock,
+        Str::SettingsCursorBar,
+        Str::SettingsCursorUnderline,
+        Str::SettingsCursorHollow,
+        Str::SettingsPaddingX,
+        Str::SettingsPaddingY,
+        Str::SettingsScrollbackLimit,
+        Str::SettingsScrollbackLimitSubtitle,
+        Str::SettingsMiddleClickPaste,
+        Str::SettingsMiddleClickPasteSubtitle,
+        Str::SettingsWorkspaceColorIndicator,
+        Str::SettingsLeftRail,
+        Str::SettingsSolidFill,
+        Str::SettingsSubtleSelection,
+        Str::SettingsSubtleSelectionSubtitle,
+        Str::SettingsBrightenInDark,
+        Str::SettingsBrightenInDarkSubtitle,
+        Str::SettingsUnselectedFillOpacity,
+        Str::SettingsUnselectedFillOpacitySubtitle,
+        Str::SettingsSelectionHighlight,
+        Str::SettingsSelectionHighlightSubtitle,
+        Str::SettingsPaletteNote,
+        Str::SettingsColorRed,
+        Str::SettingsColorCrimson,
+        Str::SettingsColorOrange,
+        Str::SettingsColorAmber,
+        Str::SettingsColorOlive,
+        Str::SettingsColorGreen,
+        Str::SettingsColorTeal,
+        Str::SettingsColorAqua,
+        Str::SettingsColorBlue,
+        Str::SettingsColorNavy,
+        Str::SettingsColorIndigo,
+        Str::SettingsColorPurple,
+        Str::SettingsColorMagenta,
+        Str::SettingsColorRose,
+        Str::SettingsColorBrown,
+        Str::SettingsColorCharcoal,
+        Str::SettingsResetPalette,
+        Str::SettingsResetPaletteSubtitle,
+        Str::SettingsWorkspaceColor,
+        Str::SettingsClearColor,
+        Str::SettingsSidebarBackground,
+        Str::SettingsSidebarBackgroundSubtitle,
+        Str::SettingsFollowTheme,
+        Str::SettingsMatchTerminal,
+        Str::SettingsCustomColor,
+        Str::SettingsSidebarColor,
+        Str::SettingsSidebarColorSubtitle,
+        Str::SettingsSidebarFontSize,
+        Str::SettingsSidebarFontSizeSubtitle,
+        Str::SettingsHideAllSidebarDetails,
+        Str::SettingsHideAllSidebarDetailsSubtitle,
+        Str::SettingsWrapWorkspaceTitles,
+        Str::SettingsWrapWorkspaceTitlesSubtitle,
+        Str::SettingsTruncatePathFromStart,
+        Str::SettingsTruncatePathFromStartSubtitle,
+        Str::SettingsShowBranchDirectory,
+        Str::SettingsShowBranchDirectorySubtitle,
+        Str::SettingsActionOpenSettings,
+        Str::SettingsActionToggleSidebar,
+        Str::SettingsActionNewWorkspace,
+        Str::SettingsActionNewSurface,
+        Str::SettingsActionCloseTab,
+        Str::SettingsActionNextWorkspace,
+        Str::SettingsActionPreviousWorkspace,
+        Str::SettingsActionSplitRight,
+        Str::SettingsActionSplitDown,
+        Str::SettingsActionFocusPaneLeft,
+        Str::SettingsActionFocusPaneRight,
+        Str::SettingsActionFocusPaneUp,
+        Str::SettingsActionFocusPaneDown,
+        Str::SettingsActionFocusBack,
+        Str::SettingsActionFocusForward,
+        Str::SettingsActionCopy,
+        Str::SettingsActionPaste,
+        Str::SettingsSearchShortcuts,
+        Str::SettingsDetectShortcut,
+        Str::SettingsListening,
+        Str::SettingsPressShortcut,
+        Str::SettingsNoShortcutsMatch,
+        Str::SettingsUnbindShortcut,
+        Str::SettingsRestoreShortcut,
+        Str::SettingsResetDefaultShortcuts,
+        Str::SettingsResetDefaultShortcutsSubtitle,
+        Str::SettingsResetDefaults,
+        Str::SettingsShortcutsFooter,
+        Str::SettingsShortcutNeedsModifier,
+        Str::SettingsShortcutReservedByWindows,
+        Str::SettingsShortcutWindowsKey,
+        Str::SettingsShortcutCtrlAlt,
+        Str::SettingsShortcutLeavesShell,
+        Str::SettingsUndo,
+        Str::SettingsResetAllSettings,
     ];
 }
 
@@ -585,6 +925,221 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::EmailCodeMethod => "Mã qua email",
             Str::SessionExpired => "Phiên đăng nhập đã hết hạn.",
             Str::SignInAgain => "Đăng nhập lại",
+            Str::SettingsSearch => "Tìm kiếm",
+            Str::SettingsNoResults => "Không có kết quả",
+            Str::SettingsGroupGeneral => "Chung",
+            Str::SettingsGroupWorkspace => "Phiên",
+            Str::SettingsGroupSidebarAndDock => "Thanh bên & Dock",
+            Str::SettingsGroupKeyboardAndAdvanced => "Bàn phím & Nâng cao",
+            Str::SettingsSectionApp => "Ứng dụng",
+            Str::SettingsSectionThemes => "Giao diện màu",
+            Str::SettingsSectionWorkspaceColors => "Màu phiên",
+            Str::SettingsSectionSidebar => "Thanh bên",
+            Str::SettingsSectionKeyboardShortcuts => "Phím tắt",
+            Str::SettingsSystem => "Hệ thống",
+            Str::SettingsLight => "Sáng",
+            Str::SettingsDark => "Tối",
+            Str::SettingsDefault => "Mặc định",
+            Str::SettingsReset => "Đặt lại",
+            Str::SettingsRestartToApply => "Khởi động lại ShellX để áp dụng",
+            Str::SettingsLanguageEnglish => "English",
+            Str::SettingsLanguageVietnamese => "Tiếng Việt",
+            Str::SettingsLanguageEnvOverride => {
+                "SHELLX_LANG đang được đặt nên ShellX dùng giá trị đó thay cho lựa chọn này."
+            }
+            Str::SettingsNewWorkspacePlacement => "Vị trí phiên mới",
+            Str::SettingsNewWorkspacePlacementSubtitle => {
+                "Chọn vị trí phiên mới xuất hiện trong thanh bên."
+            }
+            Str::SettingsPlacementTop => "Trên",
+            Str::SettingsPlacementAfterCurrent => "Sau mục hiện tại",
+            Str::SettingsPlacementEnd => "Cuối",
+            Str::SettingsInheritWorkingDirectory => "Kế thừa thư mục làm việc của phiên",
+            Str::SettingsInheritWorkingDirectorySubtitle => {
+                "Phiên mới bắt đầu trong thư mục làm việc của phiên hiện tại."
+            }
+            Str::SettingsKeepWorkspaceOpen => "Giữ phiên mở khi đóng tab cuối cùng",
+            Str::SettingsKeepWorkspaceOpenSubtitle => {
+                "Đóng tab cuối cùng trong một phiên vẫn giữ phiên đó mở."
+            }
+            Str::SettingsFocusHistoryIncludesPanes => "Đưa khung và tab vào lịch sử tiêu điểm",
+            Str::SettingsFocusHistoryIncludesPanesSubtitle => {
+                "Dùng Quay lại và Tiến tới cũng đưa bạn về các khung và tab trước đó."
+            }
+            Str::SettingsEqualizeSplits => "Cân bằng các khung khi tạo",
+            Str::SettingsEqualizeSplitsSubtitle => {
+                "Chia khung sẽ làm các khung theo hướng đó có kích thước bằng nhau."
+            }
+            Str::SettingsHideTabCloseButton => "Ẩn nút đóng tab",
+            Str::SettingsHideTabCloseButtonSubtitle => "Bỏ nút đóng khỏi các tab.",
+            Str::SettingsAppearance => "Giao diện",
+            Str::SettingsAppearanceSubtitle => {
+                "Chuyển ShellX và terminal giữa sáng và tối. Hệ thống theo Windows."
+            }
+            Str::SettingsAccentColor => "Màu nhấn",
+            Str::SettingsAccentColorSubtitle => {
+                "Màu của phiên đang chọn, viền tiêu điểm và các điểm nhấn khác của ShellX. Hệ thống sẽ theo màu nhấn của Windows."
+            }
+            Str::SettingsAccentShellxBlue => "Xanh ShellX",
+            Str::SettingsAccentCustom => "Tùy chỉnh",
+            Str::SettingsTerminalTheme => "Theme terminal",
+            Str::SettingsRevert => "Hoàn nguyên",
+            Str::SettingsSearchAllThemes => "Tìm tất cả theme",
+            Str::SettingsDarkThemes => "Theme tối",
+            Str::SettingsLightThemes => "Theme sáng",
+            Str::SettingsNoThemesMatch => "Không có theme nào khớp với tìm kiếm của bạn.",
+            Str::SettingsShell => "Shell",
+            Str::SettingsTabBarFontSize => "Cỡ chữ thanh tab",
+            Str::SettingsTabBarFontSizeSubtitle => {
+                "Điều khiển cỡ chữ của tiêu đề tab terminal ở đầu mỗi khung."
+            }
+            Str::SettingsScrollSpeed => "Tốc độ cuộn",
+            Str::SettingsScrollSpeedSubtitle => {
+                "Hệ số nhân áp dụng cho con lăn chuột và touchpad trong terminal. Càng cao cuộn càng nhanh."
+            }
+            Str::SettingsCopyOnSelect => "Sao chép khi chọn",
+            Str::SettingsCopyOnSelectSubtitle => {
+                "Chọn văn bản trong terminal sẽ sao chép nó vào bảng nhớ tạm."
+            }
+            Str::SettingsConfirmUnsafePaste => "Xác nhận dán không an toàn",
+            Str::SettingsConfirmUnsafePasteSubtitleOn => {
+                "Dán nhiều dòng sẽ chờ bạn xác nhận, vì mỗi dòng chạy ngay như một lệnh."
+            }
+            Str::SettingsConfirmUnsafePasteSubtitleOff => {
+                "Dán nhiều dòng sẽ được thực hiện mà không hỏi."
+            }
+            Str::SettingsFont => "Phông chữ",
+            Str::SettingsFontNotInstalled => "(chưa cài)",
+            Str::SettingsFontSize => "Cỡ chữ",
+            Str::SettingsCursorStyle => "Kiểu con trỏ",
+            Str::SettingsCursorBlock => "Khối",
+            Str::SettingsCursorBar => "Thanh",
+            Str::SettingsCursorUnderline => "Gạch chân",
+            Str::SettingsCursorHollow => "Rỗng",
+            Str::SettingsPaddingX => "Đệm ngang",
+            Str::SettingsPaddingY => "Đệm dọc",
+            Str::SettingsScrollbackLimit => "Giới hạn scrollback",
+            Str::SettingsScrollbackLimitSubtitle => "Áp dụng cho các terminal mới.",
+            Str::SettingsMiddleClickPaste => "Dán bằng nút giữa chuột",
+            Str::SettingsMiddleClickPasteSubtitle => {
+                "Các ứng dụng dùng chuột vẫn nhận được nhấp chuột giữa."
+            }
+            Str::SettingsWorkspaceColorIndicator => "Chỉ báo màu phiên",
+            Str::SettingsLeftRail => "Vạch bên trái",
+            Str::SettingsSolidFill => "Tô đặc",
+            Str::SettingsSubtleSelection => "Làm nổi bật lựa chọn tinh tế",
+            Str::SettingsSubtleSelectionSubtitle => {
+                "Hiện phiên đang chọn bằng một sắc nhạt kèm viền mỏng thay vì tô đặc. Màu Làm nổi bật lựa chọn tùy chỉnh vẫn dùng tô đặc."
+            }
+            Str::SettingsBrightenInDark => "Làm sáng màu ở chế độ tối",
+            Str::SettingsBrightenInDarkSubtitle => {
+                "Làm sáng màu phiên ở chế độ tối để dễ đọc trên thanh bên tối. Tắt để hiện màu đúng như đã chọn. Áp dụng cho Tô đặc; chỉ báo Vạch bên trái luôn dùng vạch đã làm sáng."
+            }
+            Str::SettingsUnselectedFillOpacity => "Độ mờ đục tô màu mục chưa chọn",
+            Str::SettingsUnselectedFillOpacitySubtitle => {
+                "Mức độ màu của phiên tô các hàng chưa được chọn. Giá trị tối đa hiện đầy đủ màu. Áp dụng cho Tô đặc."
+            }
+            Str::SettingsSelectionHighlight => "Màu làm nổi bật mục chọn",
+            Str::SettingsSelectionHighlightSubtitle => {
+                "Màu nền của phiên đang chọn trong thanh bên."
+            }
+            Str::SettingsPaletteNote => {
+                "Sửa shellx.json để thêm hoặc xóa các màu có tên. \"Choose Custom Color...\" vẫn thêm các mục Custom N cục bộ."
+            }
+            Str::SettingsColorRed => "Đỏ",
+            Str::SettingsColorCrimson => "Đỏ thẫm",
+            Str::SettingsColorOrange => "Cam",
+            Str::SettingsColorAmber => "Hổ phách",
+            Str::SettingsColorOlive => "Ô liu",
+            Str::SettingsColorGreen => "Xanh lá",
+            Str::SettingsColorTeal => "Xanh mòng két",
+            Str::SettingsColorAqua => "Xanh ngọc",
+            Str::SettingsColorBlue => "Xanh dương",
+            Str::SettingsColorNavy => "Xanh hải quân",
+            Str::SettingsColorIndigo => "Chàm",
+            Str::SettingsColorPurple => "Tím",
+            Str::SettingsColorMagenta => "Hồng cánh sen",
+            Str::SettingsColorRose => "Hồng sẫm",
+            Str::SettingsColorBrown => "Nâu",
+            Str::SettingsColorCharcoal => "Xám than",
+            Str::SettingsResetPalette => "Đặt lại bảng màu",
+            Str::SettingsResetPaletteSubtitle => "Khôi phục bảng màu tích hợp.",
+            Str::SettingsWorkspaceColor => "Màu của phiên",
+            Str::SettingsClearColor => "Xóa màu",
+            Str::SettingsSidebarBackground => "Nền thanh bên",
+            Str::SettingsSidebarBackgroundSubtitle => {
+                "Theo giao diện màu của terminal, dùng chính nền của terminal, hoặc chọn một màu riêng."
+            }
+            Str::SettingsFollowTheme => "Theo giao diện màu",
+            Str::SettingsMatchTerminal => "Khớp terminal",
+            Str::SettingsCustomColor => "Màu riêng",
+            Str::SettingsSidebarColor => "Màu thanh bên",
+            Str::SettingsSidebarColorSubtitle => {
+                "Thanh bên giữ màu này dù bạn chọn giao diện màu nào."
+            }
+            Str::SettingsSidebarFontSize => "Cỡ chữ thanh bên",
+            Str::SettingsSidebarFontSizeSubtitle => {
+                "Điều khiển tiêu đề phiên, siêu dữ liệu và huy hiệu ở thanh bên trái."
+            }
+            Str::SettingsHideAllSidebarDetails => "Ẩn mọi chi tiết trên thanh bên",
+            Str::SettingsHideAllSidebarDetailsSubtitle => "Chỉ hiện tiêu đề phiên trong thanh bên.",
+            Str::SettingsWrapWorkspaceTitles => "Xuống dòng tiêu đề phiên trên thanh bên",
+            Str::SettingsWrapWorkspaceTitlesSubtitle => {
+                "Hiện đầy đủ tiêu đề phiên dài trên nhiều dòng."
+            }
+            Str::SettingsTruncatePathFromStart => "Cắt đường dẫn từ đầu",
+            Str::SettingsTruncatePathFromStartSubtitle => {
+                "Rút gọn đường dẫn dài từ phần đầu để giữ phần cuối luôn hiển thị."
+            }
+            Str::SettingsShowBranchDirectory => "Hiện branch + thư mục trên thanh bên",
+            Str::SettingsShowBranchDirectorySubtitle => {
+                "Hiển thị các git branch và thư mục làm việc."
+            }
+            Str::SettingsActionOpenSettings => "Cài đặt…",
+            Str::SettingsActionToggleSidebar => "Bật/tắt thanh bên trái",
+            Str::SettingsActionNewWorkspace => "Phiên mới",
+            Str::SettingsActionNewSurface => "Tab mới",
+            Str::SettingsActionCloseTab => "Đóng tab",
+            Str::SettingsActionNextWorkspace => "Phiên kế tiếp",
+            Str::SettingsActionPreviousWorkspace => "Phiên trước",
+            Str::SettingsActionSplitRight => "Chia sang phải",
+            Str::SettingsActionSplitDown => "Chia xuống dưới",
+            Str::SettingsActionFocusPaneLeft => "Chuyển tới khung bên trái",
+            Str::SettingsActionFocusPaneRight => "Chuyển tới khung bên phải",
+            Str::SettingsActionFocusPaneUp => "Chuyển tới khung bên trên",
+            Str::SettingsActionFocusPaneDown => "Chuyển tới khung bên dưới",
+            Str::SettingsActionFocusBack => "Tiêu điểm trước",
+            Str::SettingsActionFocusForward => "Tiêu điểm sau",
+            Str::SettingsActionCopy => "Sao chép",
+            Str::SettingsActionPaste => "Dán",
+            Str::SettingsSearchShortcuts => "Tìm phím tắt",
+            Str::SettingsDetectShortcut => "Dò phím tắt",
+            Str::SettingsListening => "Đang lắng nghe…",
+            Str::SettingsPressShortcut => "Nhấn phím tắt…",
+            Str::SettingsNoShortcutsMatch => "Không có phím tắt nào khớp",
+            Str::SettingsUnbindShortcut => "Bỏ gán phím tắt",
+            Str::SettingsRestoreShortcut => "Khôi phục phím tắt trước đó",
+            Str::SettingsResetDefaultShortcuts => "Đặt lại phím tắt mặc định",
+            Str::SettingsResetDefaultShortcutsSubtitle => {
+                "Khôi phục giá trị phím tắt tích hợp cho các phím tắt được quản lý trong cài đặt ứng dụng."
+            }
+            Str::SettingsResetDefaults => "Đặt lại mặc định",
+            Str::SettingsShortcutsFooter => {
+                "Nhấp vào giá trị phím tắt để ghi. Dùng X để gỡ gán; sau khi xóa, nút này đổi thành khôi phục."
+            }
+            Str::SettingsShortcutNeedsModifier => {
+                "Phím tắt phải có Ctrl hoặc Alt, hoặc là một phím từ F1 đến F12."
+            }
+            Str::SettingsShortcutReservedByWindows => {
+                "Windows giữ tổ hợp phím này (Alt+F4, Alt+Space)."
+            }
+            Str::SettingsShortcutWindowsKey => "Không dùng được tổ hợp có phím Windows.",
+            Str::SettingsShortcutCtrlAlt => {
+                "Một số bàn phím dùng Ctrl+Alt (AltGr) để gõ ký tự, nên tổ hợp này không làm phím tắt được."
+            }
+            Str::SettingsShortcutLeavesShell => "Phím này sẽ không còn tới shell nữa.",
+            Str::SettingsUndo => "Hoàn tác",
+            Str::SettingsResetAllSettings => "Đặt lại tất cả cài đặt",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -764,6 +1319,223 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::EmailCodeMethod => "Email code",
             Str::SessionExpired => "Your session expired.",
             Str::SignInAgain => "Sign in again",
+            Str::SettingsSearch => "Search",
+            Str::SettingsNoResults => "No Results",
+            Str::SettingsGroupGeneral => "General",
+            Str::SettingsGroupWorkspace => "Workspace",
+            Str::SettingsGroupSidebarAndDock => "Sidebar & Dock",
+            Str::SettingsGroupKeyboardAndAdvanced => "Keyboard & Advanced",
+            Str::SettingsSectionApp => "App",
+            Str::SettingsSectionThemes => "Themes",
+            Str::SettingsSectionWorkspaceColors => "Workspace Colors",
+            Str::SettingsSectionSidebar => "Sidebar",
+            Str::SettingsSectionKeyboardShortcuts => "Keyboard Shortcuts",
+            Str::SettingsSystem => "System",
+            Str::SettingsLight => "Light",
+            Str::SettingsDark => "Dark",
+            Str::SettingsDefault => "Default",
+            Str::SettingsReset => "Reset",
+            Str::SettingsRestartToApply => "Restart ShellX to apply",
+            Str::SettingsLanguageEnglish => "English",
+            Str::SettingsLanguageVietnamese => "Tiếng Việt",
+            Str::SettingsLanguageEnvOverride => {
+                "SHELLX_LANG is set, so ShellX uses it instead of this choice."
+            }
+            Str::SettingsNewWorkspacePlacement => "New Workspace Placement",
+            Str::SettingsNewWorkspacePlacementSubtitle => {
+                "Choose where new workspaces appear in the sidebar."
+            }
+            Str::SettingsPlacementTop => "Top",
+            Str::SettingsPlacementAfterCurrent => "After current",
+            Str::SettingsPlacementEnd => "End",
+            Str::SettingsInheritWorkingDirectory => "Inherit Workspace Working Directory",
+            Str::SettingsInheritWorkingDirectorySubtitle => {
+                "Starts new workspaces in the working directory of the current workspace."
+            }
+            Str::SettingsKeepWorkspaceOpen => "Keep Workspace Open When Closing Last Surface",
+            Str::SettingsKeepWorkspaceOpenSubtitle => {
+                "Closing the last surface in a workspace keeps the workspace open."
+            }
+            Str::SettingsFocusHistoryIncludesPanes => "Include Panes and Tabs in Focus History",
+            Str::SettingsFocusHistoryIncludesPanesSubtitle => {
+                "Using Back and Forward also returns to previous panes and tabs."
+            }
+            Str::SettingsEqualizeSplits => "Equalize Splits on Create",
+            Str::SettingsEqualizeSplitsSubtitle => {
+                "Splitting a pane makes the panes in that direction equal in size."
+            }
+            Str::SettingsHideTabCloseButton => "Hide Tab Close Button",
+            Str::SettingsHideTabCloseButtonSubtitle => "Removes the close button from tabs.",
+            Str::SettingsAppearance => "Appearance",
+            Str::SettingsAppearanceSubtitle => {
+                "Switch ShellX and the terminal between light and dark. System follows Windows."
+            }
+            Str::SettingsAccentColor => "Accent Color",
+            Str::SettingsAccentColorSubtitle => {
+                "Color of the selected workspace, focus rings, and other ShellX highlights. System follows the Windows accent color."
+            }
+            Str::SettingsAccentShellxBlue => "ShellX Blue",
+            Str::SettingsAccentCustom => "Custom",
+            Str::SettingsTerminalTheme => "Terminal Theme",
+            Str::SettingsRevert => "Revert",
+            Str::SettingsSearchAllThemes => "Search all themes",
+            Str::SettingsDarkThemes => "Dark Themes",
+            Str::SettingsLightThemes => "Light Themes",
+            Str::SettingsNoThemesMatch => "No themes match your search.",
+            Str::SettingsShell => "Shell",
+            Str::SettingsTabBarFontSize => "Tab Bar Font Size",
+            Str::SettingsTabBarFontSizeSubtitle => {
+                "Controls the font size of the terminal tab titles at the top of each pane."
+            }
+            Str::SettingsScrollSpeed => "Scroll Speed",
+            Str::SettingsScrollSpeedSubtitle => {
+                "Multiplier applied to terminal scroll wheel and touchpad deltas. Higher scrolls faster."
+            }
+            Str::SettingsCopyOnSelect => "Copy on Selection",
+            Str::SettingsCopyOnSelectSubtitle => {
+                "Selecting text in a terminal copies it to the clipboard."
+            }
+            Str::SettingsConfirmUnsafePaste => "Confirm Unsafe Pastes",
+            Str::SettingsConfirmUnsafePasteSubtitleOn => {
+                "A paste of several lines waits for you to confirm it, since each line runs as a command at once."
+            }
+            Str::SettingsConfirmUnsafePasteSubtitleOff => {
+                "Pastes of several lines go through without asking."
+            }
+            Str::SettingsFont => "Font",
+            Str::SettingsFontNotInstalled => "(not installed)",
+            Str::SettingsFontSize => "Font Size",
+            Str::SettingsCursorStyle => "Cursor Style",
+            Str::SettingsCursorBlock => "Block",
+            Str::SettingsCursorBar => "Bar",
+            Str::SettingsCursorUnderline => "Underline",
+            Str::SettingsCursorHollow => "Hollow",
+            Str::SettingsPaddingX => "Horizontal Padding",
+            Str::SettingsPaddingY => "Vertical Padding",
+            Str::SettingsScrollbackLimit => "Scrollback Limit",
+            Str::SettingsScrollbackLimitSubtitle => "Applies to new terminals.",
+            Str::SettingsMiddleClickPaste => "Middle-Click Paste",
+            Str::SettingsMiddleClickPasteSubtitle => {
+                "Apps that use the mouse still get middle clicks."
+            }
+            Str::SettingsWorkspaceColorIndicator => "Workspace Color Indicator",
+            Str::SettingsLeftRail => "Left Rail",
+            Str::SettingsSolidFill => "Solid Fill",
+            Str::SettingsSubtleSelection => "Subtle Selection Highlight",
+            Str::SettingsSubtleSelectionSubtitle => {
+                "Show the selected workspace as a faint accent tint with a thin edge instead of a solid fill. A custom Selection Highlight color still uses a solid fill."
+            }
+            Str::SettingsBrightenInDark => "Brighten Colors in Dark Mode",
+            Str::SettingsBrightenInDarkSubtitle => {
+                "Lighten workspace colors in dark mode so they stay readable on a dark sidebar. Turn off to show colors exactly as chosen. Applies to Solid Fill; the Left Rail indicator always uses a lightened rail."
+            }
+            Str::SettingsUnselectedFillOpacity => "Unselected Fill Opacity",
+            Str::SettingsUnselectedFillOpacitySubtitle => {
+                "How strongly a workspace color fills rows that are not selected. The maximum shows the full color. Applies to Solid Fill."
+            }
+            Str::SettingsSelectionHighlight => "Selection Highlight",
+            Str::SettingsSelectionHighlightSubtitle => {
+                "Background color of the selected workspace in the sidebar."
+            }
+            Str::SettingsPaletteNote => {
+                "Edit shellx.json to add or remove named colors. \"Choose Custom Color...\" still adds local Custom N entries."
+            }
+            Str::SettingsColorRed => "Red",
+            Str::SettingsColorCrimson => "Crimson",
+            Str::SettingsColorOrange => "Orange",
+            Str::SettingsColorAmber => "Amber",
+            Str::SettingsColorOlive => "Olive",
+            Str::SettingsColorGreen => "Green",
+            Str::SettingsColorTeal => "Teal",
+            Str::SettingsColorAqua => "Aqua",
+            Str::SettingsColorBlue => "Blue",
+            Str::SettingsColorNavy => "Navy",
+            Str::SettingsColorIndigo => "Indigo",
+            Str::SettingsColorPurple => "Purple",
+            Str::SettingsColorMagenta => "Magenta",
+            Str::SettingsColorRose => "Rose",
+            Str::SettingsColorBrown => "Brown",
+            Str::SettingsColorCharcoal => "Charcoal",
+            Str::SettingsResetPalette => "Reset Palette",
+            Str::SettingsResetPaletteSubtitle => "Restore the built-in palette.",
+            Str::SettingsWorkspaceColor => "Workspace Color",
+            Str::SettingsClearColor => "Clear Color",
+            Str::SettingsSidebarBackground => "Sidebar Background",
+            Str::SettingsSidebarBackgroundSubtitle => {
+                "Follow the terminal theme, use the terminal's own background, or pick a color of your own."
+            }
+            Str::SettingsFollowTheme => "Follow Theme",
+            Str::SettingsMatchTerminal => "Match Terminal",
+            Str::SettingsCustomColor => "Custom Color",
+            Str::SettingsSidebarColor => "Sidebar Color",
+            Str::SettingsSidebarColorSubtitle => {
+                "The sidebar keeps this color whichever theme you pick."
+            }
+            Str::SettingsSidebarFontSize => "Sidebar Font Size",
+            Str::SettingsSidebarFontSizeSubtitle => {
+                "Controls workspace titles, metadata, and badges in the left sidebar."
+            }
+            Str::SettingsHideAllSidebarDetails => "Hide All Sidebar Details",
+            Str::SettingsHideAllSidebarDetailsSubtitle => {
+                "Shows only workspace titles in the sidebar."
+            }
+            Str::SettingsWrapWorkspaceTitles => "Wrap Workspace Titles in Sidebar",
+            Str::SettingsWrapWorkspaceTitlesSubtitle => {
+                "Shows long workspace titles in full on multiple lines."
+            }
+            Str::SettingsTruncatePathFromStart => "Truncate Path From Start",
+            Str::SettingsTruncatePathFromStartSubtitle => {
+                "Shortens long paths from the start to keep their end visible."
+            }
+            Str::SettingsShowBranchDirectory => "Show Branch + Directory in Sidebar",
+            Str::SettingsShowBranchDirectorySubtitle => {
+                "Display git branches and working directories."
+            }
+            Str::SettingsActionOpenSettings => "Settings…",
+            Str::SettingsActionToggleSidebar => "Toggle Left Sidebar",
+            Str::SettingsActionNewWorkspace => "New Workspace",
+            Str::SettingsActionNewSurface => "New Surface",
+            Str::SettingsActionCloseTab => "Close Tab",
+            Str::SettingsActionNextWorkspace => "Next Workspace",
+            Str::SettingsActionPreviousWorkspace => "Previous Workspace",
+            Str::SettingsActionSplitRight => "Split Right",
+            Str::SettingsActionSplitDown => "Split Down",
+            Str::SettingsActionFocusPaneLeft => "Focus Pane Left",
+            Str::SettingsActionFocusPaneRight => "Focus Pane Right",
+            Str::SettingsActionFocusPaneUp => "Focus Pane Up",
+            Str::SettingsActionFocusPaneDown => "Focus Pane Down",
+            Str::SettingsActionFocusBack => "Focus Back",
+            Str::SettingsActionFocusForward => "Focus Forward",
+            Str::SettingsActionCopy => "Copy",
+            Str::SettingsActionPaste => "Paste",
+            Str::SettingsSearchShortcuts => "Search shortcuts",
+            Str::SettingsDetectShortcut => "Detect Shortcut",
+            Str::SettingsListening => "Listening…",
+            Str::SettingsPressShortcut => "Press shortcut…",
+            Str::SettingsNoShortcutsMatch => "No shortcuts match",
+            Str::SettingsUnbindShortcut => "Unbind shortcut",
+            Str::SettingsRestoreShortcut => "Restore previous shortcut",
+            Str::SettingsResetDefaultShortcuts => "Reset Default Shortcuts",
+            Str::SettingsResetDefaultShortcutsSubtitle => {
+                "Restore built-in shortcut values for shortcuts managed in app settings."
+            }
+            Str::SettingsResetDefaults => "Reset Defaults",
+            Str::SettingsShortcutsFooter => {
+                "Click a shortcut value to record. Use X to unbind; it changes to restore after a clear."
+            }
+            Str::SettingsShortcutNeedsModifier => {
+                "A shortcut needs Ctrl or Alt, or must be one of F1 to F12."
+            }
+            Str::SettingsShortcutReservedByWindows => {
+                "Windows keeps this keystroke (Alt+F4, Alt+Space)."
+            }
+            Str::SettingsShortcutWindowsKey => "Shortcuts with the Windows key can't be used.",
+            Str::SettingsShortcutCtrlAlt => {
+                "Some keyboards type characters with Ctrl+Alt (AltGr), so it can't be a shortcut."
+            }
+            Str::SettingsShortcutLeavesShell => "This key will no longer reach the shell.",
+            Str::SettingsUndo => "Undo",
+            Str::SettingsResetAllSettings => "Reset All Settings",
         },
     }
 }
@@ -1066,6 +1838,34 @@ pub fn save_link_failed(lang: Lang, message: &str) -> String {
     }
 }
 
+/// Settings › Themes, the Terminal Theme row: "Light: X · Dark: Y", or the one name when both
+/// sides use the same theme (the Mac's `settings.terminal.themeGallery.pair`).
+pub fn theme_pair_summary(lang: Lang, light: &str, dark: &str) -> String {
+    if light == dark {
+        return light.to_string();
+    }
+    match lang {
+        Lang::Vi => format!("Sáng: {light} · Tối: {dark}"),
+        Lang::En => format!("Light: {light} · Dark: {dark}"),
+    }
+}
+
+/// Settings › Workspace Colors, under a palette row: "Base: #C0392B" (the built-in colour).
+pub fn palette_base(lang: Lang, hex: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Gốc: {hex}"),
+        Lang::En => format!("Base: {hex}"),
+    }
+}
+
+/// The shortcut conflict banner: "<the other action's title> already uses this shortcut."
+pub fn shortcut_conflict(lang: Lang, other_action: &str) -> String {
+    match lang {
+        Lang::Vi => format!("{other_action} đang dùng phím tắt này."),
+        Lang::En => format!("{other_action} already uses this shortcut."),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1083,7 +1883,30 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 153);
+        assert_eq!(Str::ALL.len(), 308);
+    }
+
+    #[test]
+    fn settings_sentences_with_a_value() {
+        assert_eq!(
+            theme_pair_summary(Lang::En, "Catppuccin Latte", "ShellX"),
+            "Light: Catppuccin Latte · Dark: ShellX"
+        );
+        assert_eq!(
+            theme_pair_summary(Lang::Vi, "Catppuccin Latte", "ShellX"),
+            "Sáng: Catppuccin Latte · Tối: ShellX"
+        );
+        assert_eq!(theme_pair_summary(Lang::Vi, "Nord", "Nord"), "Nord");
+        assert_eq!(palette_base(Lang::En, "#C0392B"), "Base: #C0392B");
+        assert_eq!(palette_base(Lang::Vi, "#C0392B"), "Gốc: #C0392B");
+        assert_eq!(
+            shortcut_conflict(Lang::En, "Split Right"),
+            "Split Right already uses this shortcut."
+        );
+        assert_eq!(
+            shortcut_conflict(Lang::Vi, "Chia sang phải"),
+            "Chia sang phải đang dùng phím tắt này."
+        );
     }
 
     #[test]
