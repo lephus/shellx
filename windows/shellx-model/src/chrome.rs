@@ -307,6 +307,11 @@ fn luminance(c: Rgba) -> f32 {
     0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b)
 }
 
+/// Whether `bg` reads as a dark surface: white is its readable end (Mac: `readableColorScheme`).
+pub(crate) fn is_dark_surface(bg: Rgba) -> bool {
+    best_end(bg) == WHITE
+}
+
 /// White or black, whichever contrasts more with `bg` (Mac: `readableColorScheme`).
 fn best_end(bg: Rgba) -> Rgba {
     if contrast(WHITE, bg) >= contrast(BLACK, bg) {
@@ -347,7 +352,7 @@ fn first_readable(fg: Rgba, end: Rgba, bg: Rgba, min: f32) -> Rgba {
 }
 
 /// `from` moved the fraction `t` of the way to `to`, each channel rounded; `from`'s alpha.
-fn mix(from: Rgba, to: Rgba, t: f32) -> Rgba {
+pub(crate) fn mix(from: Rgba, to: Rgba, t: f32) -> Rgba {
     let channel = |a: u8, b: u8| {
         (f32::from(a) + (f32::from(b) - f32::from(a)) * t)
             .round()
