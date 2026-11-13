@@ -20,6 +20,7 @@ pub mod paste;
 pub mod redact;
 pub mod remote_state;
 pub mod selection;
+pub mod settings;
 pub mod shell;
 pub mod sidebar;
 pub mod start_guard;
