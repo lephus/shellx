@@ -311,6 +311,12 @@ pub fn card_text(chrome: &Chrome, fill: Option<Rgba>, selected: bool) -> (Rgba, 
     )
 }
 
+/// The title and secondary text of an unselected card while the pointer is on it: the hover
+/// fill replaces the card's own fill, so the text must read on that.
+pub fn hover_card_text(chrome: &Chrome) -> (Rgba, Rgba) {
+    todo!("{chrome:?}")
+}
+
 /// The JSON of `Key::Palette` once `name` is `colour`; a colour equal to the built-in one is
 /// dropped, and the last drop gives the empty object (the default).
 pub fn palette_edit(settings: &Settings, name: &str, colour: Rgba) -> serde_json::Value {
@@ -685,5 +691,37 @@ mod tests {
             palette_edit(&two, "Red", rgb(0xC0392B)),
             serde_json::json!({})
         );
+    }
+
+    #[test]
+    fn card_text_reads_on_the_hover_fill_and_on_selected_solid_fills() {
+        let s = Settings::default();
+        for sidebar in [dark(), light_sidebar()] {
+            let surface = mix(sidebar.sidebar_bg, sidebar.session_hover, sidebar.session_hover.a)
+                .with_alpha(1.0);
+            let (title, muted) = hover_card_text(&sidebar);
+            assert!(crate::chrome::contrast(title, surface) >= 4.5, "hover title");
+            assert!(crate::chrome::contrast(muted, surface) >= 3.0, "hover muted");
+            // The selected card's fill: the accent, or any chosen selection colour.
+            for fill in std::iter::once(sidebar.primary)
+                .chain(BUILT_IN.iter().map(|&(_, hex)| rgb(hex)))
+                .chain([rgb(0xffffff), rgb(0x000000), rgb(0x808080)])
+            {
+                let solid = Settings {
+                    indicator_style: IndicatorStyle::SolidFill,
+                    selection_color: Some(fill),
+                    ..s.clone()
+                };
+                let style = card_style(&solid, &sidebar, rgb(0x6A1B9A), true);
+                let shown = style.fill.unwrap();
+                assert_eq!(shown, fill);
+                let (title, muted) = card_text(&sidebar, style.fill, true);
+                assert!(crate::chrome::contrast(title, shown) >= 4.5, "{fill:?} title");
+                assert!(crate::chrome::contrast(muted, shown) >= 3.0, "{fill:?} muted");
+            }
+            let accent = card_style(&settings(IndicatorStyle::SolidFill, true), &sidebar, rgb(0x6A1B9A), true);
+            let (title, _) = card_text(&sidebar, accent.fill, true);
+            assert!(crate::chrome::contrast(title, sidebar.primary) >= 4.5, "accent title");
+        }
     }
 }
