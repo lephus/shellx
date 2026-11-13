@@ -1027,6 +1027,28 @@ mod tests {
         );
     }
 
+    /// A slider has a Reset button exactly where the Mac's row has one: TerminalSection.swift
+    /// (Tab Bar Font Size, Scroll Speed) and SidebarSection.swift (Sidebar Font Size) have a
+    /// "Reset" button; WorkspaceColorsSection.swift's Unselected Fill Opacity has none.
+    #[test]
+    fn slider_reset_buttons_follow_the_mac() {
+        let sliders: Vec<(&str, bool)> = all_rows()
+            .filter_map(|r| match r.control {
+                Control::Slider { reset, .. } => Some((r.id, reset)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            sliders,
+            [
+                ("terminalConfig.surface-tab-bar-font-size", true),
+                ("terminal.scrollSpeed", true),
+                ("workspaceColors.unselectedFillOpacity", false),
+                ("terminalConfig.sidebar-font-size", true),
+            ]
+        );
+    }
+
     #[test]
     fn controls_carry_the_spec_ranges_and_the_json_spellings() {
         let control = |id: &str| row(id).unwrap().control;
@@ -1036,7 +1058,8 @@ mod tests {
                 min: 8.0,
                 max: 14.0,
                 step: 0.5,
-                unit: Unit::Points
+                unit: Unit::Points,
+                reset: true
             }
         );
         assert_eq!(
@@ -1045,7 +1068,8 @@ mod tests {
                 min: 0.25,
                 max: 3.0,
                 step: 0.05,
-                unit: Unit::Times
+                unit: Unit::Times,
+                reset: true
             }
         );
         assert_eq!(
@@ -1054,7 +1078,8 @@ mod tests {
                 min: 0.0,
                 max: 1.0,
                 step: 0.05,
-                unit: Unit::Percent
+                unit: Unit::Percent,
+                reset: false
             }
         );
         assert_eq!(
@@ -1063,7 +1088,8 @@ mod tests {
                 min: 10.0,
                 max: 20.0,
                 step: 0.5,
-                unit: Unit::Points
+                unit: Unit::Points,
+                reset: true
             }
         );
         assert_eq!(
