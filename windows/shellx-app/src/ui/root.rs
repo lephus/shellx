@@ -1036,6 +1036,11 @@ impl RootView {
         let value = std::env::var("SHELLX_DEV_PREVIEW").ok();
         if let Some(section) = settings::preview(value.as_deref()) {
             self.show_settings(section, window, cx);
+            if let Some((query, click)) = settings::preview_search(value.as_deref()) {
+                self.settings
+                    .view()
+                    .update(cx, |view, cx| view.dev_search(&query, click, cx));
+            }
         }
     }
 
