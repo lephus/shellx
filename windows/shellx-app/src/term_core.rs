@@ -499,4 +499,15 @@ mod tests {
         let all: Vec<u8> = writes(&link).concat();
         assert!(all.starts_with(b"\x1b[") && all.ends_with(b"R"), "{all:?}");
     }
+
+    #[test]
+    fn a_zero_scrollback_limit_is_kept_and_the_core_accepts_it() {
+        set_scrollback_bytes(0);
+        assert_eq!(scrollback_bytes(), 0);
+        // Ghostty reads 0 as "no scrollback": the terminal is made and takes output.
+        let (mut term, _link) = core();
+        term.feed(b"one\r\ntwo\r\n");
+        assert!(term.frame().is_ok());
+        set_scrollback_bytes(shellx_model::settings::scrollback_bytes(50));
+    }
 }
