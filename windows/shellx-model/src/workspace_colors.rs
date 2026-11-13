@@ -217,6 +217,67 @@ fn brightened(c: Rgba) -> Rgba {
     }
 }
 
+/// Widths of the card's coloured parts, in px (points mapped 1:1). The rail is a 3 wide bar, 3 in
+/// from the card's left edge and 5 in from its top and bottom, ends rounded to half its width
+/// (Mac: `SidebarWorkspaceRowCellView.swift:1609-1610`).
+pub const RAIL_WIDTH: f32 = 3.0;
+pub const RAIL_LEFT: f32 = 3.0;
+pub const RAIL_INSET_Y: f32 = 5.0;
+pub const RAIL_RADIUS: f32 = 1.5;
+/// The card's outline: 1 for the selection edge (`SidebarWorkspaceRowCellView.swift:244`), 1.5
+/// for the Solid Fill active border (`:249-254`).
+const EDGE_WIDTH: f32 = 1.0;
+const ACTIVE_BORDER_WIDTH: f32 = 1.5;
+
+/// The width of every card's outline under `settings` (clear when it has no colour, so a
+/// selection never moves the text).
+pub fn border_width(settings: &Settings) -> f32 {
+    todo!("{settings:?}")
+}
+
+/// One line of the card menu: a palette entry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MenuEntry {
+    pub name: &'static str,
+    pub color: Rgba,
+    /// The workspace's own colour.
+    pub checked: bool,
+}
+
+/// The right-click menu of a card, under the heading "Workspace Color".
+#[derive(Clone, Debug, PartialEq)]
+pub struct ColorMenu {
+    /// "Clear Color" is listed: only a colour of the workspace's own can be cleared.
+    pub clear: bool,
+    pub entries: Vec<MenuEntry>,
+}
+
+/// The menu of a workspace whose own colour is `current` (`None`: it shows the default Purple
+/// without having chosen it, so there is nothing to clear and no check).
+pub fn color_menu(settings: &Settings, current: Option<&str>) -> ColorMenu {
+    todo!("{settings:?} {current:?}")
+}
+
+/// The top-left corner of a menu of `size` asked at `at`, kept `margin` inside a window of
+/// `window` (all `(width, height)` or `(x, y)` in px). A menu too big for the window starts at
+/// the margin.
+pub fn menu_origin(at: (f32, f32), size: (f32, f32), window: (f32, f32), margin: f32) -> (f32, f32) {
+    todo!("{at:?} {size:?} {window:?} {margin}")
+}
+
+/// The title and the secondary text of a card with `fill` (its colour, over the sidebar), made
+/// to read on it: the chrome's own text colours when nothing is filled, else pushed until they
+/// reach the contrast the sidebar's labels have.
+pub fn card_text(chrome: &Chrome, fill: Option<Rgba>, selected: bool) -> (Rgba, Rgba) {
+    todo!("{chrome:?} {fill:?} {selected}")
+}
+
+/// The JSON of `Key::Palette` once `name` is `colour`; a colour equal to the built-in one is
+/// dropped, and the last drop gives the empty object (the default).
+pub fn palette_edit(settings: &Settings, name: &str, colour: Rgba) -> serde_json::Value {
+    todo!("{settings:?} {name} {colour:?}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -412,5 +473,110 @@ mod tests {
         s.brighten_in_dark = true;
         let grey = card_style(&s, &dark(), rgb(0x808080), false).fill.unwrap();
         assert_eq!((grey.r, grey.g, grey.b), (194, 194, 194));
+    }
+    #[test]
+    fn the_outline_is_wider_on_a_solid_fill_card() {
+        let rail = settings(IndicatorStyle::LeftRail, true);
+        let solid = settings(IndicatorStyle::SolidFill, true);
+        assert_eq!(border_width(&rail), 1.0);
+        assert_eq!(border_width(&solid), 1.5);
+    }
+
+    #[test]
+    fn the_menu_lists_the_palette_and_checks_the_workspaces_own_colour() {
+        let s = Settings::default();
+        let m = color_menu(&s, Some("Green"));
+        assert!(m.clear);
+        assert_eq!(m.entries.len(), 16);
+        assert_eq!(m.entries[0].name, "Red");
+        assert_eq!(m.entries[0].color, rgb(0xC0392B));
+        let checked: Vec<_> = m.entries.iter().filter(|e| e.checked).map(|e| e.name).collect();
+        assert_eq!(checked, ["Green"]);
+        // No colour of its own: nothing to clear and nothing checked, though it draws Purple.
+        let none = color_menu(&s, None);
+        assert!(!none.clear);
+        assert!(none.entries.iter().all(|e| !e.checked));
+        // An edited palette colour shows in the menu.
+        let mut edited = Settings::default();
+        edited.palette.insert("Red".into(), rgb(0x112233));
+        assert_eq!(color_menu(&edited, None).entries[0].color, rgb(0x112233));
+        // A name the palette does not know is a colour of its own, but checks nothing.
+        let odd = color_menu(&s, Some("Mauve"));
+        assert!(odd.clear && odd.entries.iter().all(|e| !e.checked));
+    }
+
+    #[test]
+    fn a_menu_asked_near_an_edge_stays_inside_the_window() {
+        let window = (800.0, 600.0);
+        let size = (220.0, 300.0);
+        assert_eq!(menu_origin((100.0, 100.0), size, window, 8.0), (100.0, 100.0));
+        // Right edge, bottom edge, both.
+        assert_eq!(menu_origin((700.0, 100.0), size, window, 8.0), (572.0, 100.0));
+        assert_eq!(menu_origin((100.0, 500.0), size, window, 8.0), (100.0, 292.0));
+        assert_eq!(menu_origin((790.0, 590.0), size, window, 8.0), (572.0, 292.0));
+        // Outside the top-left, and too big for the window: the margin.
+        assert_eq!(menu_origin((-5.0, 2.0), size, window, 8.0), (8.0, 8.0));
+        assert_eq!(menu_origin((100.0, 100.0), (220.0, 900.0), window, 8.0), (100.0, 8.0));
+    }
+
+    #[test]
+    fn card_text_reads_on_every_colour_and_is_left_alone_without_one() {
+        for sidebar in [dark(), light_sidebar()] {
+            let (title, muted) = card_text(&sidebar, None, false);
+            assert_eq!((title, muted), (sidebar.sidebar_text, sidebar.sidebar_muted));
+            let (title, _) = card_text(&sidebar, None, true);
+            assert_eq!(title, sidebar.sidebar_selection_title);
+            let s = Settings::default();
+            for (name, _) in BUILT_IN {
+                for opacity in [0.0, 0.3, 0.7, 1.0] {
+                    for fill in [
+                        workspace_color(&s, Some(name)).with_alpha(opacity),
+                        brightened(workspace_color(&s, Some(name))).with_alpha(opacity),
+                    ] {
+                        let surface = mix(sidebar.sidebar_bg, fill, fill.a).with_alpha(1.0);
+                        for selected in [false, true] {
+                            let (title, muted) = card_text(&sidebar, Some(fill), selected);
+                            assert!(
+                                crate::chrome::contrast(title, surface) >= 4.5,
+                                "{name} {opacity} title"
+                            );
+                            assert!(
+                                crate::chrome::contrast(muted, surface) >= 3.0,
+                                "{name} {opacity} muted"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn card_text_that_already_reads_is_not_changed() {
+        let c = dark();
+        // The default selected card (subtle accent tint) keeps the chrome's own title.
+        let fill = settings_fill(&c);
+        assert_eq!(card_text(&c, Some(fill), true).0, c.sidebar_selection_title);
+    }
+
+    fn settings_fill(c: &Chrome) -> Rgba {
+        card_style(&Settings::default(), c, rgb(0x6A1B9A), true).fill.unwrap()
+    }
+
+    #[test]
+    fn editing_a_palette_colour_keeps_the_others_and_drops_a_colour_back_at_its_base() {
+        let s = Settings::default();
+        assert_eq!(
+            palette_edit(&s, "Red", rgb(0x112233)),
+            serde_json::json!({"Red": "#112233"})
+        );
+        let mut two = Settings::default();
+        two.palette.insert("Red".into(), rgb(0x112233));
+        assert_eq!(
+            palette_edit(&two, "Blue", rgb(0x010203)),
+            serde_json::json!({"Red": "#112233", "Blue": "#010203"})
+        );
+        // Back to the built-in colour: the entry goes, and the last one leaves the default.
+        assert_eq!(palette_edit(&two, "Red", rgb(0xC0392B)), serde_json::json!({}));
     }
 }

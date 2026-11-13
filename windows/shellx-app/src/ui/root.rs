@@ -1259,3 +1259,24 @@ impl Render for RootView {
             .children(overlay)
     }
 }
+
+/// Whether a dropdown is showing: the title bar "+ ▾" menu, the help menu, the machines "+" list
+/// or the workspace card's colour menu.
+fn dropdown_showing(new_menu: bool, help: bool, picker: bool, card_menu: bool) -> bool {
+    todo!("{new_menu} {help} {picker} {card_menu}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dropdown_showing;
+
+    #[test]
+    fn the_card_menu_is_a_dropdown() {
+        assert!(!dropdown_showing(false, false, false, false));
+        assert!(dropdown_showing(false, false, false, true));
+        // The others still count on their own.
+        assert!(dropdown_showing(true, false, false, false));
+        assert!(dropdown_showing(false, true, false, false));
+        assert!(dropdown_showing(false, false, true, false));
+    }
+}
