@@ -21,6 +21,8 @@ pub mod redact;
 pub mod remote_state;
 pub mod selection;
 pub mod settings;
+pub mod settings_catalog;
+pub mod settings_search;
 pub mod shell;
 pub mod sidebar;
 pub mod start_guard;
