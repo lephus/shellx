@@ -91,6 +91,15 @@ pub fn is_window_system_key(k: &KeyIn) -> bool {
         && matches!(k.key.to_lowercase().as_str(), "f4" | "space")
 }
 
+/// A key-down that is a modifier alone. GPUI-Windows sends none (a modifier is a
+/// modifiers-changed event), other platforms may.
+pub fn is_modifier_alone(key: &str) -> bool {
+    matches!(
+        key.to_lowercase().as_str(),
+        "shift" | "control" | "ctrl" | "alt" | "platform" | "cmd" | "win" | "function" | "capslock"
+    )
+}
+
 /// What a key-down in a terminal is: the app command `keymap` gives it, else
 /// a chord for the shell, else text for the IME / WM_CHAR path. A key that
 /// maps to no command stays the terminal's.

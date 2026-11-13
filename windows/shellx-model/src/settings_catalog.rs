@@ -719,6 +719,7 @@ static ROWS: &[Row] = &[
     // Keyboard Shortcuts: the Mac puts Reset above the search bar and the action list.
     Row {
         subtitle: Some(Str::SettingsResetDefaultShortcutsSubtitle),
+        wired: true,
         ..custom(
             "resetShortcuts",
             Section::KeyboardShortcuts,
@@ -726,12 +727,15 @@ static ROWS: &[Row] = &[
             "reset default shortcuts restore defaults built in hotkeys keybindings dat lai phim tat mac dinh",
         )
     },
-    custom(
-        "shortcutList",
-        Section::KeyboardShortcuts,
-        Str::SettingsSectionKeyboardShortcuts,
-        "keyboard shortcuts hotkeys keybindings key bindings commands record unbind settings toggle left sidebar new workspace new surface close tab next workspace previous workspace split right split down focus pane left right up down focus back forward copy paste phim tat ghi phim",
-    ),
+    Row {
+        wired: true,
+        ..custom(
+            "shortcutList",
+            Section::KeyboardShortcuts,
+            Str::SettingsSectionKeyboardShortcuts,
+            "keyboard shortcuts hotkeys keybindings key bindings commands record unbind settings toggle left sidebar new workspace new surface close tab next workspace previous workspace split right split down focus pane left right up down focus back forward copy paste phim tat ghi phim",
+        )
+    },
     // Reset.
     custom(
         "resetAll",

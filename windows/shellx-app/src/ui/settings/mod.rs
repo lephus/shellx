@@ -20,6 +20,7 @@ mod rows;
 mod sections {
     pub(super) mod about;
     pub(super) mod account;
+    pub(super) mod shortcuts;
     pub(super) mod terminal_cards;
     pub(super) mod updates;
 }
@@ -41,6 +42,7 @@ use shellx_model::strings::{Lang, Str, t};
 pub use host::SettingsHost;
 
 use self::rows::RowEntry;
+use self::sections::shortcuts::ShortcutList;
 use self::sections::terminal_cards::TerminalCards;
 use super::account::AccountService;
 use super::app::Services;
@@ -90,6 +92,8 @@ pub struct SettingsView {
     pending_row: Option<&'static str>,
     /// The Shell and Display cards of Settings › Terminal.
     terminal: TerminalCards,
+    /// The search bar and action rows of Settings › Keyboard Shortcuts.
+    shortcuts: Entity<ShortcutList>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -107,6 +111,8 @@ impl SettingsView {
         let search =
             cx.new(|cx| TextField::new(false, t(lang, Str::SettingsSearch), cx).tab_stop());
         let (terminal, mut subscriptions) = TerminalCards::new(cx);
+        let (shortcuts, shortcut_subscriptions) = sections::shortcuts::new(cx);
+        subscriptions.extend(shortcut_subscriptions);
         subscriptions.extend([
             cx.observe(&account, |_, _, cx| cx.notify()),
             // A setting changed here or in the other window: the rows show it.
@@ -137,6 +143,7 @@ impl SettingsView {
             anchors: HashMap::new(),
             pending_row: None,
             terminal,
+            shortcuts,
             _subscriptions: subscriptions,
         }
     }
@@ -238,6 +245,7 @@ impl SettingsView {
         match self.section {
             Section::Account => sections::account::render(self, cx),
             Section::Terminal => sections::terminal_cards::render(self, cx),
+            Section::KeyboardShortcuts => sections::shortcuts::render(self, cx),
             Section::Updates => sections::updates::render(self, cx),
             Section::About => sections::about::render(self, cx),
             section => rows::section_card(section, self, cx),

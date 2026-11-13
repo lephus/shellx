@@ -15,7 +15,7 @@
 //! (or the terminal) would never see the letter.
 
 use crate::keymap::Keymap;
-use crate::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
+use crate::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, is_modifier_alone, map_key};
 
 /// A panel, topmost first in drawing order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,10 +178,7 @@ pub enum StoppedPaneKey {
 /// commands (what `keymap` binds), the keys that are not the pane's and auto-repeats
 /// (`repeat`, GPUI's `is_held`).
 pub fn stopped_pane_key(k: &KeyIn, keymap: &Keymap, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
-    let modifier_alone = matches!(
-        k.key.to_lowercase().as_str(),
-        "shift" | "control" | "ctrl" | "alt" | "platform" | "cmd" | "win" | "function" | "capslock"
-    );
+    let modifier_alone = is_modifier_alone(k.key);
     match map_key(k, keymap, ctx) {
         KeyAction::App(command) if !matches!(command, AppCommand::Copy | AppCommand::Paste) => {
             StoppedPaneKey::Command(command)

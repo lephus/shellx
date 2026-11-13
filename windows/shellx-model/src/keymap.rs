@@ -3,6 +3,7 @@
 //! unbinds an action (Settings › Keyboard Shortcuts writes it).
 
 use crate::keys::{AppCommand, Dir, KeyCtx, KeyIn, is_window_system_key};
+use crate::settings_search::fold;
 use crate::strings::{Lang, Str, shortcut_conflict, t};
 use std::collections::BTreeMap;
 
@@ -429,6 +430,87 @@ pub fn refusal(lang: Lang, refused: Refused) -> &'static str {
 /// The conflict banner: "<holder's title> already uses this shortcut."
 pub fn conflict(lang: Lang, holder: Action) -> String {
     shortcut_conflict(lang, t(lang, holder.title()))
+}
+
+/// What the shortcut list is filtered by: the text in its search bar, or the chord "Detect
+/// Shortcut" heard.
+#[derive(Clone, Copy, Debug)]
+pub enum ListFilter<'a> {
+    Text(&'a str),
+    Chord(&'a Chord),
+}
+
+/// The actions the shortcut list shows, in list order: all of them with no filter or blank
+/// text; for text, those whose title in `lang` or the other language holds every word typed,
+/// without case or Vietnamese marks; for a chord, those bound to it now.
+pub fn listed(keymap: &Keymap, filter: Option<ListFilter>, lang: Lang) -> Vec<Action> {
+    let other = match lang {
+        Lang::En => Lang::Vi,
+        Lang::Vi => Lang::En,
+    };
+    let query = match filter {
+        Some(ListFilter::Text(text)) => fold(text),
+        _ => String::new(),
+    };
+    let words: Vec<&str> = query.split_whitespace().collect();
+    Action::ALL
+        .iter()
+        .copied()
+        .filter(|&action| match filter {
+            Some(ListFilter::Chord(chord)) => keymap.chord(action) == Some(chord),
+            _ if words.is_empty() => true,
+            _ => {
+                let titles = [lang, other].map(|l| fold(t(l, action.title())));
+                words
+                    .iter()
+                    .all(|word| titles.iter().any(|title| title.contains(word)))
+            }
+        })
+        .collect()
+}
+
+/// The button beside a row's recorder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClearButton {
+    /// X: unbinds the action.
+    Clear,
+    /// The action is unbound: the arrow puts its default back.
+    Restore,
+    /// Unbound with no default (Back, Forward): nothing to do, drawn disabled.
+    Off,
+}
+
+pub fn clear_button(keymap: &Keymap, action: Action) -> ClearButton {
+    if keymap.chord(action).is_some() {
+        ClearButton::Clear
+    } else if action.default_chord().is_some() {
+        ClearButton::Restore
+    } else {
+        ClearButton::Off
+    }
+}
+
+/// `bindings` (`Settings::bindings`) with `action` bound to `chord`, `None` unbinding it: its
+/// entry is replaced (removed when it would equal the default) and every other entry stays.
+/// When another action holds `chord`, nothing is saved: `Err` names that action.
+pub fn rebound(
+    keymap: &Keymap,
+    bindings: &BTreeMap<String, Option<String>>,
+    action: Action,
+    chord: Option<&Chord>,
+) -> Result<BTreeMap<String, Option<String>>, Action> {
+    if let Some(holder) = chord
+        .and_then(|chord| keymap.holder(chord))
+        .filter(|holder| *holder != action)
+    {
+        return Err(holder);
+    }
+    let mut bindings = bindings.clone();
+    match Keymap::entry(action, chord) {
+        Some(entry) => bindings.insert(action.id().to_string(), entry),
+        None => bindings.remove(action.id()),
+    };
+    Ok(bindings)
 }
 
 #[cfg(test)]
@@ -1017,7 +1099,10 @@ mod tests {
         // Vietnamese typed with or without its marks ("Chia sang phải").
         assert_eq!(text("Chia sang phải", Lang::Vi), [Action::SplitRight]);
         assert_eq!(text("chia phai", Lang::Vi), [Action::SplitRight]);
-        assert_eq!(text("CHIA", Lang::Vi), [Action::SplitRight, Action::SplitDown]);
+        assert_eq!(
+            text("CHIA", Lang::Vi),
+            [Action::SplitRight, Action::SplitDown]
+        );
         assert_eq!(
             text("phai", Lang::Vi),
             [Action::SplitRight, Action::FocusRight]
@@ -1050,7 +1135,13 @@ mod tests {
             by(&km, &Chord::of(&key("+", false, true, false)), Lang::Vi),
             [Action::SplitRight]
         );
-        for nobody in ["ctrl+shift+k", "ctrl+pagedown", "shift+insert", "ctrl+c", "a"] {
+        for nobody in [
+            "ctrl+shift+k",
+            "ctrl+pagedown",
+            "shift+insert",
+            "ctrl+c",
+            "a",
+        ] {
             assert!(by(&km, &chord(nobody), Lang::En).is_empty(), "{nobody}");
         }
         // The current binding: the rebound chord, not the old one; an unbound action never.
@@ -1090,7 +1181,12 @@ mod tests {
         );
         // Its own chord again changes nothing.
         assert_eq!(
-            rebound(&km, &none, Action::NewWorkspace, Some(&chord("ctrl+shift+n"))),
+            rebound(
+                &km,
+                &none,
+                Action::NewWorkspace,
+                Some(&chord("ctrl+shift+n"))
+            ),
             Ok(none.clone())
         );
         // An alias yields to a binding: Shift+Insert can be bound.
@@ -1099,7 +1195,10 @@ mod tests {
             Ok(stored(&[("splitDown", Some("shift+insert"))]))
         );
         // A chord a rebind freed can be taken; the other entries stay.
-        let b = stored(&[("newTab", Some("ctrl+shift+k")), ("futureAction", Some("ctrl+q"))]);
+        let b = stored(&[
+            ("newTab", Some("ctrl+shift+k")),
+            ("futureAction", Some("ctrl+q")),
+        ]);
         let km = Keymap::from_bindings(&b);
         assert_eq!(
             rebound(&km, &b, Action::SplitRight, Some(&chord("ctrl+shift+n"))),
@@ -1148,7 +1247,10 @@ mod tests {
             Err(Action::SplitDown)
         );
         // Back: nothing to unbind or restore until it is bound; unbinding it removes its entry.
-        assert_eq!(clear_button(&defaults(), Action::FocusBack), ClearButton::Off);
+        assert_eq!(
+            clear_button(&defaults(), Action::FocusBack),
+            ClearButton::Off
+        );
         let b = stored(&[("focusHistoryBack", Some("f6"))]);
         let km = Keymap::from_bindings(&b);
         assert_eq!(clear_button(&km, Action::FocusBack), ClearButton::Clear);
