@@ -1,5 +1,6 @@
-//! The Settings control kit (spec §5.3, inventory §D): the card and its rows, the switch, the
-//! segmented control, the picker, the slider, the stepper and the colour well.
+//! The Settings control kit (spec §5.3, inventory §D): the card, its rows and the section
+//! header above it, the switch, the segmented control, the picker, the slider, the stepper
+//! and the colour well.
 //!
 //! A stateless control is a function of the value it shows and calls back when the user
 //! changes it. A control with its own state (an open list, a drag, a typed hex code) is an
@@ -26,7 +27,7 @@ mod slider;
 mod stepper;
 mod toggle;
 
-pub use card::{card, row};
+pub use card::{card, row, section_header};
 pub use color_well::{ColorEvent, ColorWell};
 pub use picker::{Picker, PickerEvent};
 pub use segmented::segmented;
