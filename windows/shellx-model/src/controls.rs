@@ -149,6 +149,27 @@ pub fn moved_highlight(current: usize, delta: i32, len: usize) -> usize {
     (current + i64::from(delta)).clamp(0, last as i64) as usize
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DragMove {
+    /// No drag is on.
+    Ignore,
+    /// The knob follows the pointer.
+    Follow,
+    /// The button came up where the slider did not see it (GPUI-Windows sends no mouse-up
+    /// when the capture is lost): the drag ends, the knob stays.
+    End,
+}
+
+/// What a pointer move does to a slider, given whether it is dragging and whether the left
+/// button is down during the move.
+pub fn slider_drag_move(dragging: bool, left_down: bool) -> DragMove {
+    match (dragging, left_down) {
+        (false, _) => DragMove::Ignore,
+        (true, true) => DragMove::Follow,
+        (true, false) => DragMove::End,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

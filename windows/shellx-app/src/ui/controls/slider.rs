@@ -8,7 +8,7 @@ use gpui::{
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Window, canvas, div,
     prelude::*, px,
 };
-use shellx_model::controls;
+use shellx_model::controls::{self, DragMove};
 use shellx_model::settings_catalog::Unit;
 
 use super::super::theme;
@@ -112,6 +112,17 @@ impl Slider {
         self.change(value, cx);
     }
 
+    /// A pointer move anywhere in the window while a drag is on. A move without the left
+    /// button ends the drag: GPUI-Windows sends no mouse-up when the capture is lost.
+    fn on_drag_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        let left_down = event.pressed_button == Some(MouseButton::Left);
+        match controls::slider_drag_move(self.dragging, left_down) {
+            DragMove::Ignore => {}
+            DragMove::Follow => self.drag_to(event.position.x, cx),
+            DragMove::End => self.dragging = false,
+        }
+    }
+
     fn on_mouse_down(&mut self, event: &MouseDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         if !self.disabled {
             self.dragging = true;
@@ -188,7 +199,7 @@ impl Render for Slider {
                         let moves = slider.clone();
                         window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
                             if phase == DispatchPhase::Bubble && moves.read(cx).dragging {
-                                moves.update(cx, |this, cx| this.drag_to(event.position.x, cx));
+                                moves.update(cx, |this, cx| this.on_drag_move(event, cx));
                             }
                         });
                         window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
