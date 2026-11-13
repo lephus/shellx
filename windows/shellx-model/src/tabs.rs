@@ -436,6 +436,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn set_color_stores_the_palette_name_of_one_tab() {
+        let (mut t, _) = Tabs::new();
+        let id = t.active().id;
+        assert_eq!(t.active().color, None);
+        assert!(t.set_color(id, Some("Teal".into())));
+        assert_eq!(t.active().color.as_deref(), Some("Teal"));
+        assert!(t.set_color(id, None));
+        assert_eq!(t.active().color, None);
+        assert!(!t.set_color(TabId(999), None));
+    }
+
+    #[test]
     fn respawn_storm_stops_after_five_in_ten_seconds() {
         let (mut t, _) = Tabs::new();
         let mut g = RespawnGuard::new();

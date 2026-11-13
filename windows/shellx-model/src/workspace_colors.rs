@@ -1,12 +1,56 @@
-//! The workspace colour palette and how a workspace card is drawn (Mac: `WorkspaceTabColorSettings`,
-//! `sidebarWorkspaceRowBackgroundStyle`, `ShellXSelectionTint`). Pure: C2 wires the cards.
+//! The workspace colour palette and how a workspace card is drawn. The Mac files are
+//! `WorkspaceTabColorSettings.swift` (palette, brighten), `Sidebar/SidebarAppearanceSupport.swift`
+//! (`sidebarWorkspaceRowBackgroundStyle`, `CmuxSelectionFill`, `sidebarUsesSubtleSelection`,
+//! `drawsActiveBorder`, `sidebarWorkspaceRowExplicitRailNSColor`) and
+//! `Packages/Shared/ShellXBrand/.../ShellXSelectionTint.swift`. Pure: C2 wires the cards.
 
-use crate::chrome::Chrome;
+use crate::chrome::{Chrome, is_dark_surface, mix};
 use crate::palette::Rgba;
-use crate::settings::Settings;
+use crate::settings::{IndicatorStyle, Settings};
 
-pub const BUILT_IN: [(&str, u32); 16] = [("", 0); 16];
+/// Mac: `WorkspaceTabColorSettings.originalPRPalette`, lines 21-37.
+pub const BUILT_IN: [(&str, u32); 16] = [
+    ("Red", 0xC0392B),
+    ("Crimson", 0x922B21),
+    ("Orange", 0xA04000),
+    ("Amber", 0x7D6608),
+    ("Olive", 0x4A5C18),
+    ("Green", 0x196F3D),
+    ("Teal", 0x006B6B),
+    ("Aqua", 0x0E6B8C),
+    ("Blue", 0x1565C0),
+    ("Navy", 0x1A5276),
+    ("Indigo", 0x283593),
+    ("Purple", 0x6A1B9A),
+    ("Magenta", 0xAD1457),
+    ("Rose", 0x880E4F),
+    ("Brown", 0x7B3F00),
+    ("Charcoal", 0x3E4B5E),
+];
+
+/// The colour a new workspace starts with (Mac: `newWorkspaceColorHex`, line 73).
 pub const DEFAULT_NAME: &str = "Purple";
+
+/// The rail's alpha (Mac: `SidebarWorkspaceRowCellView.swift:547`).
+const RAIL_ALPHA: f32 = 0.95;
+/// Unselected Solid Fill opacity when the setting is not a number (Mac: `SidebarAppearanceSupport.swift:575`).
+const FALLBACK_UNSELECTED_OPACITY: f32 = 0.7;
+/// Subtle selection fill alpha, emphasized: dark 0.14, light 0.11; edge 0.60
+/// (Mac: `SidebarAppearanceSupport.swift:317-322`).
+const SUBTLE_FILL_DARK: f32 = 0.14;
+const SUBTLE_FILL_LIGHT: f32 = 0.11;
+const SUBTLE_EDGE: f32 = 0.60;
+/// The tint of a non-subtle selection on a dark sidebar: the accent at 22% over the sidebar
+/// (Mac: `ShellXSelectionTint.sidebarFill`, ShellXSelectionTint.swift:42).
+const TINT: f32 = 0.22;
+/// The outline of the selected Solid Fill card: the label colour at 50%
+/// (Mac: `SidebarWorkspaceRowCellView.swift:253-254`; 1.5 pt wide).
+const ACTIVE_BORDER_ALPHA: f32 = 0.5;
+/// Brighten (Mac: `WorkspaceTabColorSettings.brightenedForDarkAppearance`, lines 279-300).
+const BRIGHT_FLOOR: f32 = 0.62;
+const BRIGHT_BOOST: f32 = 0.28;
+const GREY_SATURATION: f32 = 0.08;
+const SATURATION_BOOST: f32 = 0.12;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Entry {
@@ -15,14 +59,38 @@ pub struct Entry {
     pub color: Rgba,
 }
 
-pub fn palette(_settings: &Settings) -> Vec<Entry> {
-    todo!()
+/// The built-ins with the stored overrides applied (Mac: `palette(defaults:)`, built-in part).
+pub fn palette(settings: &Settings) -> Vec<Entry> {
+    BUILT_IN
+        .iter()
+        .map(|&(name, hex)| {
+            let base = Rgba::rgb(hex);
+            Entry {
+                name,
+                base,
+                color: settings.palette.get(name).copied().unwrap_or(base),
+            }
+        })
+        .collect()
 }
 
-pub fn workspace_color(_settings: &Settings, _name: Option<&str>) -> Rgba {
-    todo!()
+/// The colour of a palette name. `None` or an unknown name is the current Purple
+/// (Mac: `newWorkspaceColorHex`, line 73).
+pub fn workspace_color(settings: &Settings, name: Option<&str>) -> Rgba {
+    let by_name = |n: &str| {
+        settings.palette.get(n).copied().or_else(|| {
+            BUILT_IN
+                .iter()
+                .find(|(b, _)| *b == n)
+                .map(|&(_, hex)| Rgba::rgb(hex))
+        })
+    };
+    name.and_then(by_name)
+        .or_else(|| by_name(DEFAULT_NAME))
+        .expect("Purple is built in")
 }
 
+/// What a workspace card draws: the rail on its left edge, its background and its outline.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CardStyle {
     pub rail: Option<Rgba>,
@@ -30,8 +98,121 @@ pub struct CardStyle {
     pub border: Option<Rgba>,
 }
 
-pub fn card_style(_settings: &Settings, _chrome: &Chrome, _color: Rgba, _selected: bool) -> CardStyle {
-    todo!()
+/// The card of a workspace with colour `color`, on the sidebar of `chrome`. The accent is
+/// `chrome.primary`; "dark" is the sidebar's own surface, not the window's. Windows has no
+/// multi-select and no inactive-window dimming, so the selection is always the emphasized one.
+/// Where the Mac uses the system accent for the subtle tint, this uses the app accent.
+pub fn card_style(settings: &Settings, chrome: &Chrome, color: Rgba, selected: bool) -> CardStyle {
+    let dark = is_dark_surface(chrome.sidebar_bg);
+    let accent = chrome.primary;
+    let rail_style = settings.indicator_style == IndicatorStyle::LeftRail;
+    // `sidebarUsesSubtleSelection` (SidebarAppearanceSupport.swift:439): a chosen selection
+    // colour is an explicit request for a solid fill.
+    let subtle =
+        settings.subtle_selection && rail_style && settings.selection_color.is_none();
+    let none = CardStyle {
+        rail: None,
+        fill: None,
+        border: None,
+    };
+
+    if rail_style {
+        // `sidebarWorkspaceRowExplicitRailNSColor`: forceBright, whatever Brighten says.
+        let rail = Some(brightened(color).with_alpha(RAIL_ALPHA));
+        if !selected {
+            return CardStyle { rail, ..none };
+        }
+        if subtle {
+            let alpha = if dark { SUBTLE_FILL_DARK } else { SUBTLE_FILL_LIGHT };
+            return CardStyle {
+                rail,
+                fill: Some(accent.with_alpha(alpha)),
+                border: Some(accent.with_alpha(SUBTLE_EDGE)),
+            };
+        }
+        // `sidebarSelectedWorkspaceBackgroundNSColor` (SidebarAppearanceSupport.swift:342-373):
+        // a chosen colour first, then ShellX's tint on a dark sidebar, otherwise the accent.
+        let fill = match settings.selection_color {
+            Some(c) => c,
+            None if dark => mix(chrome.sidebar_bg, accent, TINT).with_alpha(1.0),
+            None => accent,
+        };
+        return CardStyle {
+            rail,
+            fill: Some(fill),
+            border: None,
+        };
+    }
+
+    // Solid Fill.
+    if selected {
+        return CardStyle {
+            fill: Some(settings.selection_color.unwrap_or(accent)),
+            // `drawsActiveBorder`: solid-fill rows always outline the selected one.
+            border: Some(chrome.sidebar_text.with_alpha(ACTIVE_BORDER_ALPHA)),
+            ..none
+        };
+    }
+    let opacity = settings.unselected_fill_opacity;
+    let opacity = if opacity.is_finite() {
+        opacity.clamp(0.0, 1.0)
+    } else {
+        FALLBACK_UNSELECTED_OPACITY
+    };
+    // `displayNSColor`: brightened on a dark sidebar when Brighten Colors in Dark Mode is on.
+    let shown = if dark && settings.brighten_in_dark {
+        brightened(color)
+    } else {
+        color
+    };
+    CardStyle {
+        fill: Some(shown.with_alpha(opacity)),
+        ..none
+    }
+}
+
+/// Mac: `brightenedForDarkAppearance`. HSB brightness `max(v, 0.62) + (1-v)*0.28`; saturation
+/// `s + (1-s)*0.12` unless the colour is nearly grey; the hue stays.
+fn brightened(c: Rgba) -> Rgba {
+    let (r, g, b) = (
+        f32::from(c.r) / 255.0,
+        f32::from(c.g) / 255.0,
+        f32::from(c.b) / 255.0,
+    );
+    let max = r.max(g).max(b);
+    let delta = max - r.min(g).min(b);
+    let hue = if delta == 0.0 {
+        0.0
+    } else if max == r {
+        (((g - b) / delta) % 6.0 + 6.0) % 6.0
+    } else if max == g {
+        (b - r) / delta + 2.0
+    } else {
+        (r - g) / delta + 4.0
+    };
+    let sat = if max == 0.0 { 0.0 } else { delta / max };
+    let v = (max.max(BRIGHT_FLOOR) + (1.0 - max) * BRIGHT_BOOST).min(1.0);
+    let s = if sat <= GREY_SATURATION {
+        sat
+    } else {
+        (sat + (1.0 - sat) * SATURATION_BOOST).min(1.0)
+    };
+    let (p, q, t) = (v * (1.0 - s), v * (1.0 - s * hue.fract()), v * (1.0 - s * (1.0 - hue.fract())));
+    let (r, g, b) = match hue.floor() as u32 {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        _ => (v, p, q),
+    };
+    let byte = |x: f32| (x * 255.0).round().clamp(0.0, 255.0) as u8;
+    Rgba {
+        r: byte(r),
+        g: byte(g),
+        b: byte(b),
+        a: c.a,
+    }
 }
 
 #[cfg(test)]
