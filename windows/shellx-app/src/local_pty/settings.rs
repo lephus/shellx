@@ -763,6 +763,50 @@ mod tests {
     }
 
     #[test]
+    fn the_shell_choice_keeps_its_1_7_1_shape() {
+        let (_dir, path) = settings_path();
+        // what 1.7.1 wrote, with the keys of the Settings window beside it
+        std::fs::write(
+            &path,
+            "{\n  \"shell\": {\n    \"kind\": \"known\",\n    \"shell\": \"git_bash\"\n  },\n  \
+             \"app\": {\"language\": \"vi\"},\n  \"terminalConfig\": {\"font-size\": 15}\n}",
+        )
+        .unwrap();
+        let file = SettingsFile::new(path.clone());
+        assert_eq!(
+            file.load(),
+            ShellChoice::Known {
+                shell: ShellKind::GitBash
+            }
+        );
+        let others = serde_json::json!({"app": {"language": "vi"}, "terminalConfig": {"font-size": 15}});
+        for (choice, shape) in [
+            (ShellChoice::Auto, serde_json::json!({"kind": "auto"})),
+            (
+                ShellChoice::Known {
+                    shell: ShellKind::Pwsh,
+                },
+                serde_json::json!({"kind": "known", "shell": "pwsh"}),
+            ),
+            (
+                ShellChoice::Custom {
+                    command_line: r#""C:\Program Files\Git\bin\bash.exe" -l"#.into(),
+                },
+                serde_json::json!({
+                    "kind": "custom",
+                    "command_line": r#""C:\Program Files\Git\bin\bash.exe" -l"#
+                }),
+            ),
+        ] {
+            file.save(&choice).unwrap();
+            let mut expected = others.clone();
+            expected["shell"] = shape;
+            assert_eq!(json(&path), expected, "{choice:?}");
+            assert_eq!(file.load(), choice);
+        }
+    }
+
+    #[test]
     fn a_missing_or_unreadable_file_means_auto() {
         let (_dir, path) = settings_path();
         let file = SettingsFile::new(path.clone());

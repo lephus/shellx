@@ -12,6 +12,7 @@ mod pairing;
 mod panes;
 mod root;
 mod settings;
+mod settings_service;
 mod sidebar;
 mod tab_bar;
 mod term_view;

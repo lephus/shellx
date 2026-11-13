@@ -33,6 +33,7 @@ mod paths;
 mod remote_link;
 mod remote_session;
 mod remote_tabs;
+mod settings_store;
 mod shell_info;
 mod smoke;
 mod startup;
