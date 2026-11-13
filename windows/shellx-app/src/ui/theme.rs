@@ -66,6 +66,21 @@ pub fn muted() -> Hsla {
 pub fn done() -> Hsla {
     hsla(palette::DONE)
 }
+pub fn primary() -> Hsla {
+    hsla(palette::PRIMARY)
+}
+pub fn primary_soft() -> Hsla {
+    hsla(palette::PRIMARY_SOFT)
+}
+pub fn primary_line() -> Hsla {
+    hsla(palette::PRIMARY_LINE)
+}
+pub fn primary_text() -> Hsla {
+    hsla(palette::PRIMARY_TEXT)
+}
+pub fn error() -> Hsla {
+    hsla(palette::ERROR)
+}
 /// Close caption button hover: ERROR at 0.9 (solid, no glow).
 pub fn close_hover() -> Hsla {
     hsla(palette::ERROR.with_alpha(0.9))

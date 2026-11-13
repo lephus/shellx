@@ -1,7 +1,157 @@
+//! The rules of the Settings controls (`shellx-app/src/ui/controls/`): where a slider's track
+//! maps to a value, how a stepper moves, how the colour field reads a hex code, how a value is
+//! written beside its control, and which keys each control uses.
+//!
+//! A control stops only the keys these functions name, and only while it has the keyboard:
+//! on Windows a stopped key-down produces no WM_CHAR, so a control never takes a letter, a
+//! digit, Tab or a chord.
+
+use crate::keys::KeyIn;
+use crate::palette::Rgba;
+use crate::settings_catalog::Unit;
+
+/// The value at `fraction` of a slider's track: clamped to the track, snapped to `step`.
+pub fn slider_value(fraction: f32, min: f32, max: f32, step: f32) -> f32 {
+    let fraction = f64::from(unit_interval(fraction));
+    let (min64, max64) = (f64::from(min), f64::from(max));
+    snap(min64 + fraction * (max64 - min64), min, max, step)
+}
+
+/// Where `value` sits on a slider's track, from 0 to 1.
+pub fn slider_fraction(value: f32, min: f32, max: f32) -> f32 {
+    if max <= min {
+        return 0.0;
+    }
+    unit_interval((value - min) / (max - min))
+}
+
+/// Clamped to 0–1, NaN to 0.
+fn unit_interval(fraction: f32) -> f32 {
+    if fraction.is_nan() {
+        0.0
+    } else {
+        fraction.clamp(0.0, 1.0)
+    }
+}
+
+/// `value` moved by `steps` whole steps, snapped and clamped.
+pub fn stepped(value: f32, steps: i32, min: f32, max: f32, step: f32) -> f32 {
+    snap(
+        f64::from(value) + f64::from(steps) * f64::from(step),
+        min,
+        max,
+        step,
+    )
+}
+
+/// Snaps to a multiple of `step` as `settings.rs` reads the value back, drops the float noise
+/// the way `settings.json` writes it (four decimals), then clamps.
+fn snap(x: f64, min: f32, max: f32, step: f32) -> f32 {
+    let step = f64::from(step);
+    let x = if step > 0.0 {
+        (x / step).round() * step
+    } else {
+        x
+    };
+    let x = (x * 1e4).round() / 1e4;
+    // `max().min()` never panics on an empty range, unlike `clamp`.
+    (x as f32).max(min).min(max)
+}
+
+/// "#RRGGBB" or "RRGGBB", any case, spaces around it ignored.
+pub fn parse_hex(text: &str) -> Option<Rgba> {
+    let text = text.trim();
+    let digits = text.strip_prefix('#').unwrap_or(text);
+    if digits.len() != 6 || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    u32::from_str_radix(digits, 16).ok().map(Rgba::rgb)
+}
+
+/// The label beside a slider or stepper, as the Mac writes it: "13 pt", "12.5 pt", "1.00×",
+/// "70%", "50 MB".
+pub fn format_value(value: f32, unit: Unit) -> String {
+    match unit {
+        Unit::Points => format!("{} pt", points(value)),
+        Unit::Times => format!("{value:.2}×"),
+        Unit::Percent => format!("{}%", (f64::from(value) * 100.0).round()),
+        Unit::Megabytes => format!("{} MB", f64::from(value).round()),
+    }
+}
+
+/// At most two decimals and no trailing zero, like the Mac's `formattedFontSize`.
+fn points(value: f32) -> String {
+    let text = format!("{value:.2}");
+    text.trim_end_matches('0').trim_end_matches('.').to_string()
+}
+
+fn no_modifier(k: &KeyIn) -> bool {
+    !(k.ctrl || k.alt || k.shift || k.win)
+}
+
+/// A focused slider: Left and Right move it one step.
+pub fn slider_key(k: &KeyIn) -> Option<i32> {
+    if !no_modifier(k) {
+        return None;
+    }
+    match k.key {
+        "left" => Some(-1),
+        "right" => Some(1),
+        _ => None,
+    }
+}
+
+/// A focused stepper: Up and Down move it one step.
+pub fn stepper_key(k: &KeyIn) -> Option<i32> {
+    if !no_modifier(k) {
+        return None;
+    }
+    match k.key {
+        "down" => Some(-1),
+        "up" => Some(1),
+        _ => None,
+    }
+}
+
+/// Space or Enter: flips a focused toggle, picks a focused segment, opens a closed picker or
+/// colour well.
+pub fn activates(k: &KeyIn) -> bool {
+    no_modifier(k) && matches!(k.key, "space" | "enter")
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PopoverKey {
+    /// Moves the highlight by this many rows.
+    Move(i32),
+    /// Picks the highlighted row.
+    Pick,
+    Close,
+}
+
+/// The keys of an open picker list (the keyboard stays on the picker while it is open).
+pub fn popover_key(k: &KeyIn) -> Option<PopoverKey> {
+    if !no_modifier(k) {
+        return None;
+    }
+    match k.key {
+        "up" => Some(PopoverKey::Move(-1)),
+        "down" => Some(PopoverKey::Move(1)),
+        "space" | "enter" => Some(PopoverKey::Pick),
+        "escape" => Some(PopoverKey::Close),
+        _ => None,
+    }
+}
+
+/// The highlighted row of a list of `len` rows after moving `delta` rows: it stops at the ends.
+pub fn moved_highlight(current: usize, delta: i32, len: usize) -> usize {
+    let last = len.saturating_sub(1);
+    let current = current.min(last) as i64;
+    (current + i64::from(delta)).clamp(0, last as i64) as usize
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys::KeyIn;
 
     fn plain(key: &str) -> KeyIn<'_> {
         KeyIn {
@@ -34,9 +184,7 @@ mod tests {
     /// Every value a catalogue slider can hold, from `min` by `step` to `max`.
     fn grid(min: f32, max: f32, step: f32) -> Vec<f32> {
         let n = ((max - min) / step).round() as i32;
-        (0..=n)
-            .map(|k| stepped(min, k, min, max, step))
-            .collect()
+        (0..=n).map(|k| stepped(min, k, min, max, step)).collect()
     }
 
     #[test]
@@ -161,8 +309,17 @@ mod tests {
     #[test]
     fn no_control_uses_a_letter_a_digit_tab_or_a_chord() {
         let letters = ('a'..='z').chain('0'..='9').map(String::from);
-        let named = ["tab", "backspace", "delete", "home", "end", "pageup", "pagedown", "f2"]
-            .map(String::from);
+        let named = [
+            "tab",
+            "backspace",
+            "delete",
+            "home",
+            "end",
+            "pageup",
+            "pagedown",
+            "f2",
+        ]
+        .map(String::from);
         for key in letters.chain(named) {
             let k = plain(&key);
             assert_eq!(slider_key(&k), None, "{key}");

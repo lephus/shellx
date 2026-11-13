@@ -5,6 +5,7 @@ mod account;
 mod app;
 mod assets;
 mod button;
+mod controls;
 mod google_button;
 mod login;
 mod menu;

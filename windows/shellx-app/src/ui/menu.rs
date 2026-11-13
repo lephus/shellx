@@ -8,7 +8,9 @@
 //! the anchor point, so it opens upward. It is drawn after everything else,
 //! so it covers what is under it. It is not a panel: it holds no focus, so
 //! the keyboard stays where it was. A press outside it, or a click on a row
-//! (after the row's action), calls `on_close`.
+//! (after the row's action), calls `on_close`. `popover_highlighted` also
+//! marks one row, for the owner that moves through the rows with the keys
+//! (a Settings picker).
 
 use std::rc::Rc;
 
@@ -37,7 +39,16 @@ pub(super) fn popover(
     items: Vec<MenuItem>,
     on_close: impl Fn(&mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    menu(items, on_close, Corner::TopLeft, px(4.0))
+    menu(items, None, on_close, Corner::TopLeft, px(4.0))
+}
+
+/// `popover` with row `highlighted` marked as the hovered row is.
+pub(super) fn popover_highlighted(
+    items: Vec<MenuItem>,
+    highlighted: usize,
+    on_close: impl Fn(&mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    menu(items, Some(highlighted), on_close, Corner::TopLeft, px(4.0))
 }
 
 /// Opens up from the anchor point, 4 px above it.
@@ -45,12 +56,13 @@ pub(super) fn popover_above(
     items: Vec<MenuItem>,
     on_close: impl Fn(&mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    menu(items, on_close, Corner::BottomLeft, px(-4.0))
+    menu(items, None, on_close, Corner::BottomLeft, px(-4.0))
 }
 
 /// `corner` of the menu goes `gap` (down is positive) from the anchor point.
 fn menu(
     items: Vec<MenuItem>,
+    highlighted: Option<usize>,
     on_close: impl Fn(&mut Window, &mut App) + 'static,
     corner: Corner,
     gap: Pixels,
@@ -91,6 +103,9 @@ fn menu(
                 .py(px(5.0))
                 .rounded(px(4.0))
                 .cursor_pointer()
+                .when(highlighted == Some(ix), |row| {
+                    row.bg(theme::hsla(theme::SESSION_HOVER))
+                })
                 .hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
                 .on_click(move |_: &ClickEvent, window, cx| {
                     on_click(window, cx);

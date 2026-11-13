@@ -46,6 +46,8 @@ pub struct TextField {
     edit: TextEdit,
     placeholder: SharedString,
     disabled: bool,
+    /// The text cannot be used (the colour well's hex code): the border shows it.
+    invalid: bool,
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
     /// Horizontal scroll of the shaped line (keeps the cursor visible).
@@ -60,6 +62,7 @@ impl TextField {
             edit: TextEdit::new(masked),
             placeholder: placeholder.into(),
             disabled: false,
+            invalid: false,
             last_layout: None,
             last_bounds: None,
             scroll_x: px(0.0),
@@ -88,6 +91,14 @@ impl TextField {
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         if self.disabled != disabled {
             self.disabled = disabled;
+            cx.notify();
+        }
+    }
+
+    /// An invalid field draws its border in the error colour.
+    pub fn set_invalid(&mut self, invalid: bool, cx: &mut Context<Self>) {
+        if self.invalid != invalid {
+            self.invalid = invalid;
             cx.notify();
         }
     }
@@ -583,7 +594,9 @@ impl Element for TextElement {
 impl Render for TextField {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.focus_handle.is_focused(window);
-        let border = if focused {
+        let border = if self.invalid {
+            theme::error()
+        } else if focused {
             theme::hsla(palette::PRIMARY_LINE)
         } else {
             theme::border()
