@@ -101,8 +101,10 @@ pub struct ThemeGallery {
     cursor: usize,
     /// The columns of the last frame (the arrows move a row by it).
     columns: usize,
-    /// The grid's width and top edge (in window coordinates) at its last paint.
-    width: Rc<Cell<f32>>,
+    /// The grid's width, from the pane's width at its last paint (0 until then).
+    width: Option<f32>,
+    /// The grid's top edge (window coordinates) at its last paint. A change shows at the next
+    /// draw: the rows built are a row wider than the viewport either side.
     top: Rc<Cell<f32>>,
     /// The pane's scroll, to keep the ring in view.
     scroll: ScrollHandle,
@@ -131,6 +133,22 @@ pub fn render(view: &mut SettingsView, cx: &mut Context<SettingsView>) -> Div {
     let lang = cx.global::<Services>().lang;
     let wired = |id: &str| row(id).filter(|row| row.wired);
     let gallery = view.themes.clone();
+    // The pane's width at its last paint, less its padding, the card's borders and the
+    // gallery's padding.
+    let pane = f32::from(view.detail_scroll.bounds().size.width);
+    let width = (pane - 2.0 * super::super::PANE_PADDING - 2.0 - 2.0 * GALLERY_PAD)
+        .max(0.0)
+        .round();
+    // Before the first paint the width is not known; a change draws the section again.
+    // (The gallery is drawn after this, in the same frame, so it is not notified: a notify
+    // during the parent's draw leaves its search field without its placeholder.)
+    if gallery.update(cx, |gallery, _| {
+        let changed = gallery.width != Some(width);
+        gallery.width = Some(width);
+        changed
+    }) {
+        view.redraw = true;
+    }
     let appearance = wired("app.appearance").map(|row| {
         let line = appearance_row(row, &gallery, lang, cx);
         view.anchored(row.id, line)
@@ -399,7 +417,7 @@ impl ThemeGallery {
             sides: [Side::default(), Side::default()],
             cursor: 0,
             columns: 1,
-            width: Rc::new(Cell::new(0.0)),
+            width: None,
             top: Rc::new(Cell::new(0.0)),
             scroll,
             preview: (theme::primary_rgba(), theme::primary_rgba()),
@@ -569,13 +587,7 @@ impl ThemeGallery {
     }
 
     fn search_bar(&self) -> Div {
-        div().flex().flex_row().child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .max_w(px(200.0))
-                .child(self.search.clone()),
-        )
+        div().flex_none().w(px(200.0)).child(self.search.clone())
     }
 
     fn heading(dark: bool, lang: Lang) -> Div {
@@ -701,10 +713,7 @@ impl Render for ThemeGallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
         let order = self.order(cx);
-        let width = match self.width.get() {
-            width if width > 0.0 => width,
-            _ => FIRST_WIDTH,
-        };
+        let width = self.width.filter(|w| *w > 0.0).unwrap_or(FIRST_WIDTH);
         let (columns, card_width) = gallery_grid(width);
         self.columns = columns;
         let items = self.items(columns, order);
@@ -767,16 +776,9 @@ impl Render for ThemeGallery {
             }
         }
 
-        let (width_cell, top_cell) = (self.width.clone(), self.top.clone());
+        let top_cell = self.top.clone();
         let measure = canvas(
-            move |bounds, window, _| {
-                let (width, top) = (f32::from(bounds.size.width), f32::from(bounds.origin.y));
-                if (width_cell.get() - width).abs() > 0.5 || (top_cell.get() - top).abs() > 0.5 {
-                    width_cell.set(width);
-                    top_cell.set(top);
-                    window.refresh();
-                }
-            },
+            move |bounds, _, _| top_cell.set(f32::from(bounds.origin.y)),
             |_, _, _, _| {},
         )
         .absolute()
@@ -795,6 +797,7 @@ impl Render for ThemeGallery {
         div()
             .flex()
             .flex_col()
+            .w_full()
             .gap(px(8.0))
             .border_t_1()
             .border_color(theme::line())

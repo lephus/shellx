@@ -98,6 +98,8 @@ pub struct SettingsView {
     shortcuts: Entity<ShortcutList>,
     /// The state of Settings › Themes.
     themes: Entity<ThemeGallery>,
+    /// A section asked for one more frame (it drew from a size that was not known yet).
+    redraw: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -152,6 +154,7 @@ impl SettingsView {
             terminal,
             shortcuts,
             themes,
+            redraw: false,
             _subscriptions: subscriptions,
         }
     }
@@ -382,6 +385,10 @@ impl Render for SettingsView {
         let listed = listed_sections();
         let sidebar = self.sidebar(&listed, lang, cx);
         let content = self.section_content(cx);
+        if std::mem::take(&mut self.redraw) {
+            let view = cx.entity_id();
+            window.on_next_frame(move |_, cx| cx.notify(view));
+        }
         if let Some(anchor) = self.pending_row.take().and_then(|id| self.anchors.get(id)) {
             // It is placed once this frame is laid out; the scroll lands on the next one.
             anchor.scroll_to(window, cx);
