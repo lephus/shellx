@@ -327,7 +327,8 @@ mod tests {
             row: None,
             rank: 4
         }));
-        assert!(phim_tat.iter().any(|h| h.row == Some("shortcutList")));
+        // The list row is titled like its section: one hit, the section.
+        assert!(phim_tat.iter().all(|h| h.row != Some("shortcutList")));
     }
 
     #[test]
