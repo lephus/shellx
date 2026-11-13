@@ -19,7 +19,8 @@
 #
 # Docker: image shellx-wincheck:<hash of the five recipe files>, built on first use; cache
 # volume shellx-wincheck-cache (cargo registry, xwin CRT/SDK, zig, target); one run at a time
-# (container shellx-wincheck-run), at most 8 CPUs, 6 GB of memory, 6 cargo jobs.
+# (container shellx-wincheck-run), the CPUs Docker has up to 8, 6 GB of memory, and 6 cargo jobs
+# (fewer when Docker has fewer CPUs).
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -94,10 +95,15 @@ fi
 git -C "$ghostty_dir" archive --prefix=ghostty/ "$ghostty_sha" | tar -x -m -C "$src"
 echo "Checking $commit for Windows ($profile profile; ghostty $ghostty_sha from $ghostty_dir), image $image"
 
-# 3. Check.
+# 3. Check. Docker refuses --cpus above what it has (Docker Desktop's default on a Mac can be
+# 4): ask for that many, at most 8, and run at most that many cargo jobs, at most 6.
+docker_cpus="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"
+[[ "$docker_cpus" =~ ^[1-9][0-9]*$ ]] || docker_cpus=8
+cpus=$((docker_cpus < 8 ? docker_cpus : 8))
+jobs=$((cpus < 6 ? cpus : 6))
 docker volume create shellx-wincheck-cache >/dev/null
 status=0
-docker run --rm --init --name shellx-wincheck-run --memory 6g --cpus 8 -e CARGO_BUILD_JOBS=6 \
+docker run --rm --init --name shellx-wincheck-run --memory 6g --cpus "$cpus" -e CARGO_BUILD_JOBS="$jobs" \
   -e CMUX_TUI_BUILD_COMMIT="$commit" -e SHELLX_WINCHECK_PROFILE="$profile" \
   -v shellx-wincheck-cache:/cache -v "$src":/src \
   "$image" bash /opt/winbuild/check-in-container.sh || status=$?
