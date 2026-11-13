@@ -105,6 +105,26 @@ pub fn number_text(value: f32) -> String {
     format!("{}", f64::from(value).round())
 }
 
+/// What Esc does in a number field: with an edit in it, the stored value comes back and the
+/// window stays; with none, the key is the window's (it closes).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NumberEsc {
+    Restore,
+    Close,
+}
+
+pub fn number_escape(text: &str, stored: f32) -> NumberEsc {
+    let _ = (text, stored);
+    unimplemented!()
+}
+
+/// The value to write when the window closes with `text` in the field: its clamped number,
+/// only when it differs from the stored one.
+pub fn number_pending(text: &str, stored: f32, min: f32, max: f32) -> Option<f32> {
+    let _ = (text, stored, min, max);
+    unimplemented!()
+}
+
 /// The unit written after a number field.
 pub fn unit_suffix(unit: Unit) -> &'static str {
     match unit {
@@ -802,5 +822,22 @@ mod tests {
                 "{focused} {active}"
             );
         }
+    }
+
+    #[test]
+    fn esc_in_a_number_field_restores_an_edit_and_otherwise_closes() {
+        assert_eq!(number_escape("75", 50.0), NumberEsc::Restore);
+        assert_eq!(number_escape("", 50.0), NumberEsc::Restore);
+        assert_eq!(number_escape("50", 50.0), NumberEsc::Close);
+    }
+
+    #[test]
+    fn closing_with_an_edit_in_a_number_field_commits_it_clamped() {
+        assert_eq!(number_pending("75", 50.0, 0.0, 100_000.0), Some(75.0));
+        assert_eq!(number_pending("999999", 50.0, 0.0, 100_000.0), Some(100_000.0));
+        assert_eq!(number_pending("50", 50.0, 0.0, 100_000.0), None);
+        assert_eq!(number_pending("", 50.0, 0.0, 100_000.0), None);
+        // An edit that clamps to the stored value changes nothing.
+        assert_eq!(number_pending("200000", 100_000.0, 0.0, 100_000.0), None);
     }
 }

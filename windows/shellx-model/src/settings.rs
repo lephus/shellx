@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Number, Value};
 
+use crate::layout::Rect;
 use crate::palette::Rgba;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -647,6 +648,37 @@ pub fn colour_value(key: Key, colour: Rgba) -> Option<Value> {
     matches!(key, Key::SelectionColor | Key::SidebarColor).then(|| hex_value(colour))
 }
 
+/// The terminal's scrollback in bytes for a Scrollback Limit of `mb` megabytes: the Mac's
+/// factor (1 MB = 1,000,000 bytes), the one the file stores.
+pub fn scrollback_bytes(mb: u32) -> usize {
+    let _ = mb;
+    unimplemented!()
+}
+
+/// The cursor shape to draw: the one the program asked for (DECSCUSR) wins; with none, the
+/// Cursor Style setting.
+pub fn cursor_shape(setting: CursorStyle, program: Option<CursorStyle>) -> CursorStyle {
+    let _ = (setting, program);
+    unimplemented!()
+}
+
+/// What to paint for the cursor on `cell`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CursorPaint {
+    Fill(Rect),
+    Outline(Rect),
+}
+
+/// Thickness of the bar and the underline cursor, in logical pixels.
+pub const CURSOR_LINE: f32 = 2.0;
+
+/// The rectangle to paint for `style` on the cell `cell`: block = the cell, bar = a 2 px
+/// column at its left edge, underline = a 2 px row at its bottom, hollow = its outline.
+pub fn cursor_paint(style: CursorStyle, cell: Rect) -> CursorPaint {
+    let _ = (style, cell);
+    unimplemented!()
+}
+
 pub fn get<'a>(root: &'a Map<String, Value>, path: &str) -> Option<&'a Value> {
     let mut parts = path.split('.');
     let mut cur = root.get(parts.next()?)?;
@@ -1001,5 +1033,47 @@ mod tests {
             let s = applied(key, colour_value(key, colour));
             assert_eq!(s.colour(key), Some(colour), "{key:?}");
         }
+    }
+
+    #[test]
+    fn scrollback_megabytes_convert_with_the_macs_factor() {
+        assert_eq!(scrollback_bytes(0), 0);
+        assert_eq!(scrollback_bytes(1), 1_000_000);
+        assert_eq!(scrollback_bytes(50), 50_000_000);
+        assert_eq!(scrollback_bytes(100_000), 100_000_000_000);
+        assert_eq!(
+            Settings::default().raw(Key::ScrollbackMb),
+            json!(scrollback_bytes(50) as u64)
+        );
+    }
+
+    #[test]
+    fn a_program_cursor_shape_wins() {
+        use CursorStyle::*;
+        assert_eq!(cursor_shape(Block, Some(Bar)), Bar);
+        assert_eq!(cursor_shape(Underline, Some(Hollow)), Hollow);
+        assert_eq!(cursor_shape(Bar, None), Bar);
+        assert_eq!(cursor_shape(Hollow, None), Hollow);
+    }
+
+    #[test]
+    fn the_cursor_paints_on_its_cell_by_style() {
+        let cell = Rect { x: 10.0, y: 20.0, w: 8.0, h: 18.0 };
+        assert_eq!(cursor_paint(CursorStyle::Block, cell), CursorPaint::Fill(cell));
+        assert_eq!(
+            cursor_paint(CursorStyle::Bar, cell),
+            CursorPaint::Fill(Rect { x: 10.0, y: 20.0, w: 2.0, h: 18.0 })
+        );
+        assert_eq!(
+            cursor_paint(CursorStyle::Underline, cell),
+            CursorPaint::Fill(Rect { x: 10.0, y: 36.0, w: 8.0, h: 2.0 })
+        );
+        assert_eq!(cursor_paint(CursorStyle::Hollow, cell), CursorPaint::Outline(cell));
+        // A cell narrower than the line is covered whole, never overshot.
+        let thin = Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 };
+        assert_eq!(
+            cursor_paint(CursorStyle::Bar, thin),
+            CursorPaint::Fill(Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 })
+        );
     }
 }
