@@ -275,4 +275,76 @@ mod tests {
         s.theme_dark = "dracula".into();
         assert_eq!(active(&set, &s, true).name, "Dracula");
     }
+    #[test]
+    fn a_bom_does_not_hide_the_first_key() {
+        let t = parse("Bom", "\u{feff}background = #123456\nforeground = #abcdef\n");
+        assert_eq!(t.background, rgb(0x123456));
+        assert_eq!(t.foreground, rgb(0xabcdef));
+    }
+
+    #[test]
+    fn user_theme_files_are_sorted_and_capped() {
+        let files: Vec<(String, u64)> = vec![
+            ("Zeta".into(), 10),
+            ("alpha".into(), 10),
+            ("Huge".into(), USER_THEME_MAX_BYTES + 1),
+            ("Edge".into(), USER_THEME_MAX_BYTES),
+            (".hidden".into(), 10),
+            ("Beta".into(), 0),
+        ];
+        let picked: Vec<&str> = user_theme_files(&files)
+            .into_iter()
+            .map(|i| files[i].0.as_str())
+            .collect();
+        assert_eq!(picked, ["alpha", "Beta", "Edge", "Zeta"]);
+        let many: Vec<(String, u64)> = (0..USER_THEME_MAX_FILES + 40)
+            .map(|n| (format!("t{n:04}"), 1))
+            .collect();
+        let picked = user_theme_files(&many);
+        assert_eq!(picked.len(), USER_THEME_MAX_FILES);
+        assert_eq!(many[picked[0]].0, "t0000");
+        assert!(user_theme_files(&[]).is_empty());
+    }
+
+    #[test]
+    fn every_theme_is_listed_once_with_its_side() {
+        let set = ThemeSet::new(vec![]);
+        let all = set.themes();
+        assert_eq!(all.len(), 464);
+        assert_eq!(all.iter().filter(|t| is_dark(t)).count(), 386);
+        assert_eq!(all[0].name, bundled()[0].0);
+    }
+
+    #[test]
+    fn the_gallery_grid_is_adaptive_between_128_and_220() {
+        assert_eq!(gallery_grid(100.0), (1, 128.0));
+        assert_eq!(gallery_grid(300.0), (2, 145.0));
+        assert_eq!(gallery_grid(138.0), (1, 138.0));
+        assert_eq!(gallery_grid(137.0).0, 1);
+        assert_eq!(gallery_grid(500.0), (3, 160.0));
+        let (columns, width) = gallery_grid(1000.0);
+        assert_eq!(columns, 7);
+        assert!((width - 940.0 / 7.0).abs() < 0.01);
+        // One column never gets wider than 220.
+        assert_eq!(gallery_grid(260.0), (1, 220.0));
+        assert_eq!(gallery_grid(0.0), (1, 128.0));
+    }
+
+    #[test]
+    fn the_side_in_use_is_listed_first() {
+        assert_eq!(sides_first(true), [true, false]);
+        assert_eq!(sides_first(false), [false, true]);
+    }
+
+    #[test]
+    fn the_gallery_search_folds_case_and_accents() {
+        let names: Vec<String> = ["Catppuccin Latte", "Dracula", "Rosé Pine"]
+            .iter()
+            .map(|n| crate::settings_search::fold(n))
+            .collect();
+        assert_eq!(matching(&names, ""), [0, 1, 2]);
+        assert_eq!(matching(&names, "  DRAC "), [1]);
+        assert_eq!(matching(&names, "rose"), [2]);
+        assert!(matching(&names, "zzz").is_empty());
+    }
 }

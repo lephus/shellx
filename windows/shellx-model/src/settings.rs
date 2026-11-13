@@ -1002,4 +1002,20 @@ mod tests {
             assert_eq!(s.colour(key), Some(colour), "{key:?}");
         }
     }
+
+    #[test]
+    fn accent_and_theme_names_are_written_by_typed_helpers() {
+        assert_eq!(accent_value(Accent::ShellxBlue), json!("cmux"));
+        assert_eq!(accent_value(Accent::System), json!("system"));
+        assert_eq!(
+            accent_value(Accent::Custom(Rgba::rgb(0xff8800))),
+            json!("#ff8800")
+        );
+        assert_eq!(theme_value(Key::ThemeDark, "Dracula"), Some(json!("Dracula")));
+        assert_eq!(theme_value(Key::ThemeLight, "Nord"), Some(json!("Nord")));
+        assert_eq!(theme_value(Key::Appearance, "Nord"), None);
+        let mut s = Settings::default();
+        assert!(s.set_from_value(Key::Accent, &accent_value(Accent::System)));
+        assert_eq!(s.accent, Accent::System);
+    }
 }

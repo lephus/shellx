@@ -1924,6 +1924,20 @@ mod tests {
     }
 
     #[test]
+    fn the_pair_summary_names_one_theme_when_both_sides_match() {
+        assert_eq!(theme_pair_summary(Lang::En, "Nord", "Nord"), "Nord");
+        assert_eq!(theme_pair_summary(Lang::Vi, "Nord", "Nord"), "Nord");
+        assert_eq!(
+            theme_pair_summary(Lang::En, "Nord", "Dracula"),
+            "Light: Nord · Dark: Dracula"
+        );
+        assert_eq!(
+            theme_pair_summary(Lang::Vi, "Nord", "Dracula"),
+            "Sáng: Nord · Tối: Dracula"
+        );
+    }
+
+    #[test]
     fn settings_sentences_with_a_value() {
         assert_eq!(
             theme_pair_summary(Lang::En, "Catppuccin Latte", "ShellX"),
