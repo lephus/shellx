@@ -14,7 +14,8 @@
 //! that was handled is not translated, so no WM_CHAR follows and the field
 //! (or the terminal) would never see the letter.
 
-use crate::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
+use crate::keymap::Keymap;
+use crate::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, is_modifier_alone, map_key};
 
 /// A panel, topmost first in drawing order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -174,13 +175,11 @@ pub enum StoppedPaneKey {
 }
 
 /// The key-down rule of a pane without a shell: any fresh key retries, except window
-/// commands, the keys that are not the pane's and auto-repeats (`repeat`, GPUI's `is_held`).
-pub fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
-    let modifier_alone = matches!(
-        k.key.to_lowercase().as_str(),
-        "shift" | "control" | "ctrl" | "alt" | "platform" | "cmd" | "win" | "function" | "capslock"
-    );
-    match map_key(k, ctx) {
+/// commands (what `keymap` binds), the keys that are not the pane's and auto-repeats
+/// (`repeat`, GPUI's `is_held`).
+pub fn stopped_pane_key(k: &KeyIn, keymap: &Keymap, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
+    let modifier_alone = is_modifier_alone(k.key);
+    match map_key(k, keymap, ctx) {
         KeyAction::App(command) if !matches!(command, AppCommand::Copy | AppCommand::Paste) => {
             StoppedPaneKey::Command(command)
         }
@@ -194,6 +193,16 @@ pub fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keymap::Keymap;
+    use std::collections::BTreeMap;
+
+    // The rules of 1.7.1: the tests below run against the default keymap.
+    fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
+        crate::keys::map_key(k, &Keymap::from_bindings(&BTreeMap::new()), ctx)
+    }
+    fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
+        super::stopped_pane_key(k, &Keymap::from_bindings(&BTreeMap::new()), ctx, repeat)
+    }
 
     #[test]
     fn composing_and_text_keys_pass_while_a_panel_is_open() {
@@ -275,7 +284,7 @@ mod tests {
 
     #[test]
     fn alt_f4_reaches_windows_under_every_panel() {
-        use crate::keys::{KeyCtx, KeyIn, map_key};
+        use crate::keys::{KeyCtx, KeyIn};
         let alt_f4 = KeyIn {
             key: "f4",
             ctrl: false,

@@ -79,6 +79,7 @@ use shellx_model::strings::{
 
 use super::app::Services;
 use super::button::{Kind, button};
+use super::settings_service::current_keymap;
 use super::theme;
 use crate::fonts;
 use crate::ime::{self, ImeTarget};
@@ -883,7 +884,7 @@ impl TermView {
         // No shell runs (held, or it could not start): a fresh key retries
         // (`modal::stopped_pane_key`; never its auto-repeat).
         if self.held || self.failure.is_some() {
-            match stopped_pane_key(&key, &ctx, event.is_held) {
+            match stopped_pane_key(&key, current_keymap(cx), &ctx, event.is_held) {
                 StoppedPaneKey::Command(command) => {
                     cx.emit(TermEvent::Command(command));
                     cx.stop_propagation();
@@ -914,7 +915,7 @@ impl TermView {
                 ConfirmKey::CancelAndPass => self.cancel_paste(cx),
             }
         }
-        match map_key(&key, &ctx) {
+        match map_key(&key, current_keymap(cx), &ctx) {
             KeyAction::App(command @ (AppCommand::Copy | AppCommand::Paste)) => {
                 self.clipboard_command(command, cx);
                 cx.stop_propagation();

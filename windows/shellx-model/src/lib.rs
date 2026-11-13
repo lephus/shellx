@@ -10,6 +10,7 @@ pub mod email_sign_in;
 pub mod first_window;
 pub mod google_button;
 pub mod history;
+pub mod keymap;
 pub mod keys;
 pub mod layout;
 pub mod links;
