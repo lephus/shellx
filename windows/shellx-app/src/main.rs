@@ -38,6 +38,8 @@ mod shell_info;
 mod smoke;
 mod startup;
 mod term_core;
+#[cfg(any(windows, target_os = "macos"))]
+mod ui_state;
 mod workspace;
 
 // The window also builds on macOS, for development screenshots only.

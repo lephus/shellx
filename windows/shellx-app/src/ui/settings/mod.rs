@@ -830,3 +830,76 @@ fn shell_row(id: String, label: String, selected: bool) -> Stateful<Div> {
                 .child(label),
         )
 }
+
+mod host;
+
+#[cfg(test)]
+mod tests {
+    use super::{listed_sections, listed_with, preview};
+    use shellx_model::settings_catalog::{Group, Row, Section, groups, rows};
+
+    /// Only the rows with these ids are wired.
+    fn wired(ids: &'static [&'static str]) -> impl Fn(&Row) -> bool {
+        move |row| ids.contains(&row.id)
+    }
+
+    #[test]
+    fn sections_without_a_wired_row_are_not_listed() {
+        assert_eq!(
+            listed_with(wired(&["account", "shell", "display", "updates", "about"])),
+            vec![
+                (Group::General, vec![Section::Account]),
+                (Group::Terminal, vec![Section::Terminal]),
+                (Group::ShellX, vec![Section::Updates, Section::About]),
+            ]
+        );
+        assert_eq!(listed_with(wired(&[])), vec![]);
+        // A section is listed for one wired row, in its group's order.
+        assert_eq!(
+            listed_with(wired(&["app.appearance", "account"])),
+            vec![(Group::General, vec![Section::Account, Section::Themes])]
+        );
+        let everything: Vec<(Group, Vec<Section>)> = groups()
+            .iter()
+            .map(|(group, sections)| (*group, sections.to_vec()))
+            .collect();
+        assert_eq!(listed_with(|_| true), everything);
+        // The sidebar lists exactly the sections the catalogue has a wired row in.
+        let listed: Vec<Section> = listed_sections()
+            .into_iter()
+            .flat_map(|(_, sections)| sections)
+            .collect();
+        for (_, sections) in groups() {
+            for section in *sections {
+                assert_eq!(
+                    listed.contains(section),
+                    rows(*section).any(|row| row.wired),
+                    "{section:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_preview_variable_names_a_section() {
+        assert_eq!(preview(None), None);
+        assert_eq!(preview(Some("")), None);
+        assert_eq!(preview(Some("paste")), None);
+        assert_eq!(preview(Some("settingsx")), None);
+        // `settings` opens Settings on the section it shows anyway.
+        assert_eq!(preview(Some("settings")), Some(None));
+        assert_eq!(preview(Some(" settings ")), Some(None));
+        assert_eq!(preview(Some("settings:")), Some(None));
+        assert_eq!(preview(Some("settings:nope")), Some(None));
+        for (_, sections) in groups() {
+            for section in *sections {
+                let value = format!("settings:{}", section.id());
+                assert_eq!(preview(Some(&value)), Some(Some(*section)), "{value}");
+            }
+        }
+        assert_eq!(
+            preview(Some("settings:keyboardShortcuts")),
+            Some(Some(Section::KeyboardShortcuts))
+        );
+    }
+}

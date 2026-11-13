@@ -378,4 +378,31 @@ mod tests {
         assert_eq!(slider_drag_move(false, true), DragMove::Ignore);
         assert_eq!(slider_drag_move(false, false), DragMove::Ignore);
     }
+
+    /// A number field (Scrollback Limit): it keeps only the digits typed, commits a whole
+    /// number clamped to the row's range, and writes its unit beside it.
+    #[test]
+    fn a_number_field_keeps_digits_and_commits_a_clamped_whole_number() {
+        assert_eq!(digits("1a2 3"), "123");
+        assert_eq!(digits("-5.5"), "55");
+        assert_eq!(digits("１２"), "");
+        assert_eq!(digits(""), "");
+        assert_eq!(number_entry("50", 0.0, 100_000.0), Some(50.0));
+        assert_eq!(number_entry("007", 0.0, 100_000.0), Some(7.0));
+        assert_eq!(number_entry(" 12 ", 0.0, 100_000.0), Some(12.0));
+        assert_eq!(number_entry("200000", 0.0, 100_000.0), Some(100_000.0));
+        assert_eq!(
+            number_entry("99999999999999999999999", 0.0, 100_000.0),
+            Some(100_000.0)
+        );
+        assert_eq!(number_entry("3", 4.0, 96.0), Some(4.0));
+        assert_eq!(number_entry("", 0.0, 100_000.0), None);
+        assert_eq!(number_entry("MB", 0.0, 100_000.0), None);
+        assert_eq!(number_text(50.0), "50");
+        assert_eq!(number_text(100_000.0), "100000");
+        assert_eq!(unit_suffix(Unit::Megabytes), "MB");
+        assert_eq!(unit_suffix(Unit::Points), "pt");
+        assert_eq!(unit_suffix(Unit::Times), "×");
+        assert_eq!(unit_suffix(Unit::Percent), "%");
+    }
 }

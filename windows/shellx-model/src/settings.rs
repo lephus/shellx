@@ -746,4 +746,146 @@ mod tests {
         let paths: HashSet<&str> = Key::ALL.iter().map(|k| k.path()).collect();
         assert_eq!(paths.len(), Key::ALL.len());
     }
+
+    use crate::settings_catalog::{Control, Section, groups, rows};
+
+    /// Every row of the catalogue with its key and control.
+    fn keyed_rows() -> impl Iterator<Item = (Key, Control)> {
+        groups()
+            .iter()
+            .flat_map(|(_, sections)| sections.iter().copied())
+            .flat_map(|section: Section| rows(section))
+            .filter_map(|row| row.key.map(|key| (key, row.control)))
+    }
+
+    /// The value a row writes, read back as the file would give it.
+    fn applied(key: Key, value: Option<Value>) -> Settings {
+        let value = value.unwrap_or_else(|| panic!("{key:?} has no value"));
+        let mut s = Settings::default();
+        assert!(s.set_from_value(key, &value), "{key:?} accepts {value}");
+        s
+    }
+
+    #[test]
+    fn a_switch_shows_its_meaning_and_writes_the_stored_spelling() {
+        // Keep Workspace Open is stored inverted.
+        assert_eq!(flag_value(Key::KeepWorkspaceOpen, true), Some(json!(false)));
+        assert_eq!(flag_value(Key::KeepWorkspaceOpen, false), Some(json!(true)));
+        assert_eq!(
+            Settings::default().flag(Key::KeepWorkspaceOpen),
+            Some(false)
+        );
+        let kept = applied(
+            Key::KeepWorkspaceOpen,
+            flag_value(Key::KeepWorkspaceOpen, true),
+        );
+        assert!(kept.keep_workspace_open);
+        assert_eq!(kept.flag(Key::KeepWorkspaceOpen), Some(true));
+        // Middle-Click Paste is stored as "primary-paste" / "ignore".
+        assert_eq!(
+            flag_value(Key::MiddleClickPaste, true),
+            Some(json!("primary-paste"))
+        );
+        assert_eq!(
+            flag_value(Key::MiddleClickPaste, false),
+            Some(json!("ignore"))
+        );
+        assert_eq!(Settings::default().flag(Key::MiddleClickPaste), Some(true));
+        let ignored = applied(
+            Key::MiddleClickPaste,
+            flag_value(Key::MiddleClickPaste, false),
+        );
+        assert_eq!(ignored.flag(Key::MiddleClickPaste), Some(false));
+        // A plain switch.
+        assert_eq!(flag_value(Key::CopyOnSelect, true), Some(json!(true)));
+        // Not a switch.
+        assert_eq!(Settings::default().flag(Key::FontSize), None);
+        assert_eq!(flag_value(Key::FontSize, true), None);
+        // Every switch row of the catalogue, both ways.
+        for (key, control) in keyed_rows() {
+            if control != Control::Toggle {
+                continue;
+            }
+            for on in [true, false] {
+                let s = applied(key, flag_value(key, on));
+                assert_eq!(s.flag(key), Some(on), "{key:?} {on}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_number_row_shows_megabytes_and_writes_bytes_for_the_scrollback() {
+        assert_eq!(Settings::default().number(Key::ScrollbackMb), Some(50.0));
+        assert_eq!(
+            number_value(Key::ScrollbackMb, 75.0),
+            Some(json!(75_000_000u64))
+        );
+        let s = applied(Key::ScrollbackMb, number_value(Key::ScrollbackMb, 75.0));
+        assert_eq!(s.scrollback_mb, 75);
+        assert_eq!(s.number(Key::ScrollbackMb), Some(75.0));
+        assert_eq!(number_value(Key::FontSize, 15.5), Some(json!(15.5)));
+        assert_eq!(Settings::default().number(Key::PaddingX), Some(2.0));
+        assert_eq!(number_value(Key::FontSize, f32::NAN), None);
+        assert_eq!(Settings::default().number(Key::CopyOnSelect), None);
+        assert_eq!(number_value(Key::CopyOnSelect, 1.0), None);
+        // Every slider, stepper and number row reads back what it wrote.
+        for (key, control) in keyed_rows() {
+            let (min, max) = match control {
+                Control::Slider { min, max, .. }
+                | Control::Stepper { min, max, .. }
+                | Control::Number { min, max, .. } => (min, max),
+                _ => continue,
+            };
+            for shown in [min, max] {
+                let s = applied(key, number_value(key, shown));
+                assert_eq!(s.number(key), Some(shown), "{key:?} {shown}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_choice_row_writes_the_catalogue_spelling() {
+        assert_eq!(Settings::default().choice(Key::CursorStyle), Some("block"));
+        assert_eq!(
+            choice_value(Key::CursorStyle, "block_hollow"),
+            Some(json!("block_hollow"))
+        );
+        assert_eq!(choice_value(Key::CursorStyle, "hollow"), None);
+        assert_eq!(choice_value(Key::CopyOnSelect, "block"), None);
+        assert_eq!(Settings::default().choice(Key::FontSize), None);
+        // Every option of every segmented and picker row.
+        for (key, control) in keyed_rows() {
+            let options = match control {
+                Control::Segmented(options) | Control::Picker(options) => options,
+                _ => continue,
+            };
+            for (_, spelling) in options {
+                let s = applied(key, choice_value(key, spelling));
+                assert_eq!(s.choice(key), Some(*spelling), "{key:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_colour_row_writes_its_hex_code() {
+        assert_eq!(Settings::default().colour(Key::SelectionColor), None);
+        assert_eq!(
+            Settings::default().colour(Key::SidebarColor),
+            Some(Rgba::rgb(0x100B1D))
+        );
+        let colour = Rgba::rgb(0x112233);
+        assert_eq!(
+            colour_value(Key::SelectionColor, colour),
+            Some(json!("#112233"))
+        );
+        assert_eq!(colour_value(Key::FontSize, colour), None);
+        assert_eq!(Settings::default().colour(Key::FontSize), None);
+        for (key, control) in keyed_rows() {
+            if !matches!(control, Control::Color { .. }) {
+                continue;
+            }
+            let s = applied(key, colour_value(key, colour));
+            assert_eq!(s.colour(key), Some(colour), "{key:?}");
+        }
+    }
 }
