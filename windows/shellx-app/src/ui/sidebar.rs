@@ -28,8 +28,12 @@ use shellx_model::account::AccountState;
 use shellx_model::core_api::GooglePurpose;
 use shellx_model::keymap::Action;
 use shellx_model::palette::{Pill, Status};
+use shellx_model::settings::Settings;
 use shellx_model::settings_catalog::Section;
-use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
+use shellx_model::sidebar::{
+    MachineGroup, MachineIcon, RowAction, SidebarSizes, card_lines, chars_that_fit, shorten_path,
+    sidebar_sizes,
+};
 use shellx_model::strings::{Lang, Str, pairing_code_display, t};
 use shellx_model::tabs::TabId;
 use shellx_model::update::{UpdateStatus, download_url, pill_text};
@@ -39,12 +43,15 @@ use super::assets::Icon;
 use super::button::{Kind, button};
 use super::menu::{self, MenuItem};
 use super::root::RootView;
-use super::settings_service::shortcut_label;
+use super::settings_service::{current, shortcut_label};
 use super::theme;
 use super::tooltip::Tooltip;
 use super::update_banner::open_https;
 
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
+
+/// The width a card's text has: the sidebar less the card's margins, edge and padding.
+const CARD_TEXT_WIDTH: f32 = crate::workspace::SIDEBAR_W - 16.0 - 2.0 - 12.0 - 8.0 - 1.0;
 
 /// One workspace card: one per tab, under the machine its panes run on.
 pub struct SessionRow {
@@ -92,6 +99,8 @@ pub fn render(
     cx: &mut Context<RootView>,
 ) -> Div {
     let signed_in = matches!(account.read(cx).state(), AccountState::LoggedIn { .. });
+    let settings = current(cx).clone();
+    let sz = sidebar_sizes(settings.sidebar_font_size);
     // The groups and cards scroll; the brand, the machines header and the
     // footer stay put.
     let mut list = div()
@@ -103,7 +112,7 @@ pub fn render(
         .overflow_y_scroll();
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
-        list = list.child(group_header(ix, group, lang, cx));
+        list = list.child(group_header(ix, group, lang, sz, cx));
         if local && !group.sessions_visible {
             continue;
         }
@@ -111,7 +120,7 @@ pub fn render(
         // offline: their panes show "ngoại tuyến".
         for (ix, row) in sessions.iter().enumerate() {
             if row.machine_id == group.machine_id {
-                list = list.child(workspace_card(ix, row, lang, cx));
+                list = list.child(workspace_card(ix, row, lang, sz, &settings, cx));
             }
         }
     }
@@ -124,11 +133,11 @@ pub fn render(
         .h_full()
         .bg(theme::sidebar_bg())
         .border_r_1()
-        .border_color(theme::line())
-        .child(brand(lang))
-        .child(machines_block(picker, signed_in, lang, cx))
+        .border_color(theme::sidebar_line())
+        .child(brand(lang, sz))
+        .child(machines_block(picker, signed_in, lang, sz, cx))
         .child(list)
-        .children(session_notice(account, lang, cx))
+        .children(session_notice(account, lang, sz, cx))
         .child(footer(account, help_open, lang, cx))
 }
 
@@ -137,6 +146,7 @@ pub fn render(
 fn session_notice(
     account: &Entity<AccountService>,
     lang: Lang,
+    sz: SidebarSizes,
     cx: &mut Context<RootView>,
 ) -> Option<Div> {
     let notice = account.read(cx).sign_in_notice()?;
@@ -149,10 +159,10 @@ fn session_notice(
             .px(px(10.0))
             .py(px(6.0))
             .border_t_1()
-            .border_color(theme::line())
+            .border_color(theme::sidebar_line())
             .child(
                 div()
-                    .text_size(theme::SMALL_SIZE)
+                    .text_size(px(sz.small))
                     .text_color(theme::sidebar_muted())
                     .child(t(lang, notice.line)),
             )
@@ -174,7 +184,7 @@ fn session_notice(
     )
 }
 
-fn brand(lang: Lang) -> Div {
+fn brand(lang: Lang, sz: SidebarSizes) -> Div {
     // The logo keeps its own colors (the one allowed gradient), so it goes
     // through `img` (full-color raster) instead of the tinted `svg`.
     let logo = img(ImageSource::Resource(Resource::Embedded(
@@ -194,7 +204,7 @@ fn brand(lang: Lang) -> Div {
         .child(logo)
         .child(
             div()
-                .text_size(theme::BRAND_SIZE)
+                .text_size(px(sz.brand))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(theme::sidebar_text())
                 .child(t(lang, Str::AppName)),
@@ -209,16 +219,17 @@ fn machines_block(
     picker: Option<&Picker>,
     signed_in: bool,
     lang: Lang,
+    sz: SidebarSizes,
     cx: &mut Context<RootView>,
 ) -> Div {
     let block = div()
         .flex()
         .flex_col()
         .flex_none()
-        .child(machines_header(signed_in, lang, cx));
+        .child(machines_header(signed_in, lang, sz, cx));
     match picker {
         Some(picker) => block
-            .child(machine_picker(picker, lang, cx))
+            .child(machine_picker(picker, lang, sz, cx))
             .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 this.close_machine_picker(window, cx);
             })),
@@ -228,7 +239,12 @@ fn machines_block(
 
 /// `signed_in`: the "+" lists machines; signed out it opens the sign-in
 /// dialog, and its tooltip says so.
-fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> Div {
+fn machines_header(
+    signed_in: bool,
+    lang: Lang,
+    sz: SidebarSizes,
+    cx: &mut Context<RootView>,
+) -> Div {
     let tip = if signed_in {
         Str::AddMachine
     } else {
@@ -244,7 +260,7 @@ fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> D
         .px(px(14.0))
         .pt(px(10.0))
         .pb(px(4.0))
-        .text_size(theme::HEADER_SIZE)
+        .text_size(px(sz.header))
         .font_weight(FontWeight::MEDIUM)
         .text_color(theme::sidebar_muted())
         .child(t(lang, Str::MachinesHeader))
@@ -280,7 +296,12 @@ fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> D
 /// request access on click; offline ones are dimmed (approval needs the
 /// other machine). Under them, the sentences saying why none (or none else)
 /// can be asked, so the list is never empty and silent.
-fn machine_picker(picker: &Picker, lang: Lang, cx: &mut Context<RootView>) -> Div {
+fn machine_picker(
+    picker: &Picker,
+    lang: Lang,
+    sz: SidebarSizes,
+    cx: &mut Context<RootView>,
+) -> Div {
     // Not a panel: no focus handle, so the keyboard stays where it was.
     let mut list = div()
         .flex()
@@ -292,7 +313,7 @@ fn machine_picker(picker: &Picker, lang: Lang, cx: &mut Context<RootView>) -> Di
         .border_1()
         .border_color(theme::border())
         .bg(theme::raise())
-        .text_size(theme::SMALL_SIZE);
+        .text_size(px(sz.small));
     for (ix, entry) in picker.entries.iter().enumerate() {
         let dot = if entry.online {
             theme::done()
@@ -339,7 +360,13 @@ fn machine_picker(picker: &Picker, lang: Lang, cx: &mut Context<RootView>) -> Di
     list
 }
 
-fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<RootView>) -> Div {
+fn group_header(
+    ix: usize,
+    group: &MachineGroup,
+    lang: Lang,
+    sz: SidebarSizes,
+    cx: &mut Context<RootView>,
+) -> Div {
     let icon = match group.icon {
         MachineIcon::Laptop => Icon::Laptop,
         MachineIcon::Desktop => Icon::Desktop,
@@ -372,7 +399,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
                     div()
                         .min_w_0()
                         .truncate()
-                        .text_size(theme::CARD_TITLE_SIZE)
+                        .text_size(px(sz.card_title))
                         .text_color(theme::sidebar_text())
                         .font_weight(FontWeight::SEMIBOLD)
                         .child(group.title.clone()),
@@ -381,7 +408,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
                     row.child(
                         div()
                             .flex_none()
-                            .text_size(theme::SMALL_SIZE)
+                            .text_size(px(sz.small))
                             .text_color(theme::sidebar_muted())
                             .child(format!("· {note}")),
                     )
@@ -401,12 +428,12 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
             header.child(
                 div()
                     .pl(px(24.0))
-                    .text_size(theme::SMALL_SIZE)
+                    .text_size(px(sz.small))
                     .text_color(theme::sidebar_muted())
                     .child(subtitle),
             )
         })
-        .when_some(row_action(ix, group, lang, cx), |header, action| {
+        .when_some(row_action(ix, group, lang, sz, cx), |header, action| {
             header.child(div().flex().pl(px(24.0)).pt(px(4.0)).child(action))
         })
 }
@@ -418,6 +445,7 @@ fn row_action(
     ix: usize,
     group: &MachineGroup,
     lang: Lang,
+    sz: SidebarSizes,
     cx: &mut Context<RootView>,
 ) -> Option<Div> {
     match &group.action {
@@ -431,7 +459,7 @@ fn row_action(
                         Kind::Secondary,
                         false,
                     )
-                    .text_size(theme::SMALL_SIZE)
+                    .text_size(px(sz.small))
                     .on_click(cx.listener(
                         move |this, _: &ClickEvent, window, cx| {
                             this.request_access(id.clone(), name.clone(), window, cx);
@@ -442,7 +470,7 @@ fn row_action(
         }
         RowAction::ShowCode(code) => Some(
             div()
-                .text_size(theme::SMALL_SIZE)
+                .text_size(px(sz.small))
                 .text_color(theme::sidebar_primary_text())
                 .child(pairing_code_display(code)),
         ),
@@ -456,7 +484,7 @@ fn row_action(
                         Kind::Primary,
                         false,
                     )
-                    .text_size(theme::SMALL_SIZE)
+                    .text_size(px(sz.small))
                     .text_color(theme::sidebar_primary_text())
                     .on_click(cx.listener(
                         move |this, _: &ClickEvent, window, cx| {
@@ -478,6 +506,8 @@ fn workspace_card(
     ix: usize,
     row: &SessionRow,
     lang: Lang,
+    sz: SidebarSizes,
+    settings: &Settings,
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
     let selected = row.selected;
@@ -487,6 +517,7 @@ fn workspace_card(
     } else {
         theme::sidebar_text()
     };
+    let lines = card_lines(settings, row.branch.as_deref(), row.path.as_deref());
     let title_line = div()
         .flex()
         .items_center()
@@ -495,14 +526,14 @@ fn workspace_card(
             div()
                 .flex_1()
                 .min_w_0()
-                .truncate()
-                .text_size(theme::CARD_TITLE_SIZE)
+                .when(!lines.title_wraps, |title| title.truncate())
+                .text_size(px(sz.card_title))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(title_color)
                 .child(row.title.clone()),
         )
         .when_some(row.status.pill(), |el, pill| {
-            el.child(pill_label(pill, lang))
+            el.child(pill_label(pill, lang, sz))
         });
     let content = div()
         .flex()
@@ -512,11 +543,16 @@ fn workspace_card(
         .pr(px(8.0))
         .py(px(6.0))
         .child(title_line)
-        .when_some(row.branch.as_ref(), |el, branch| {
-            el.child(card_line(format!("\u{2387} {branch}")))
+        .when_some(lines.branch, |el, branch| {
+            el.child(card_line(format!("\u{2387} {branch}"), sz))
         })
-        .when_some(row.path.as_ref(), |el, path| {
-            el.child(card_line(path.clone()))
+        .when_some(lines.directory, |el, path| {
+            let path = if settings.truncate_path_from_start {
+                shorten_path(&path, chars_that_fit(CARD_TEXT_WIDTH, sz.small), true)
+            } else {
+                path
+            };
+            el.child(card_line(path, sz))
         });
     div()
         .id(("sidebar-session", ix))
@@ -531,7 +567,7 @@ fn workspace_card(
         .cursor_pointer()
         .when(selected, |el| {
             el.bg(theme::session_selected())
-                .border_color(theme::border())
+                .border_color(theme::sidebar_border())
         })
         .when(!selected, |el| {
             el.hover(|style| style.bg(theme::session_hover()))
@@ -553,28 +589,28 @@ fn workspace_card(
         .child(content)
 }
 
-/// A secondary line of a card: 11 px, muted, cut off at the card's edge.
+/// A secondary line of a card: the small size, muted, cut off at the card's edge.
 /// The text sits in a row as a `flex_1` child, like the title: as a plain
 /// child of the column GPUI measures it at width 0 first and keeps that
 /// (the line would show only "…").
-fn card_line(text: String) -> Div {
+fn card_line(text: String, sz: SidebarSizes) -> Div {
     div().flex().child(
         div()
             .flex_1()
             .min_w_0()
             .truncate()
-            .text_size(theme::SMALL_SIZE)
+            .text_size(px(sz.small))
             .text_color(theme::sidebar_muted())
             .child(text),
     )
 }
 
-fn pill_label(pill: Pill, lang: Lang) -> Div {
+fn pill_label(pill: Pill, lang: Lang, sz: SidebarSizes) -> Div {
     div()
         .flex_none()
         .px(px(6.0))
         .rounded(px(8.0))
-        .text_size(theme::PILL_SIZE)
+        .text_size(px(sz.pill))
         .bg(theme::hsla(pill.bg))
         .text_color(theme::hsla(pill.fg))
         .child(t(lang, pill.label))
@@ -606,7 +642,7 @@ fn footer(
         .pr(px(10.0))
         .py(px(6.0))
         .border_t_1()
-        .border_color(theme::line())
+        .border_color(theme::sidebar_line())
         .child(help_button(account, help_open, lang, cx))
         .child(version_label())
         .child(div().flex_1())

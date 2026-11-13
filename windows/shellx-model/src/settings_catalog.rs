@@ -655,19 +655,23 @@ static ROWS: &[Row] = &[
         )
     },
     // Sidebar.
-    setting(
-        Key::SidebarBackground,
-        Section::Sidebar,
-        Str::SettingsSidebarBackground,
-        Some(Str::SettingsSidebarBackgroundSubtitle),
-        Control::Picker(&[
-            (Str::SettingsFollowTheme, "theme"),
-            (Str::SettingsMatchTerminal, "terminal"),
-            (Str::SettingsCustomColor, "custom"),
-        ]),
-        "sidebar background match terminal follow theme custom color tint nen thanh ben theo giao dien mau khop rieng",
-    ),
     Row {
+        wired: true,
+        ..setting(
+            Key::SidebarBackground,
+            Section::Sidebar,
+            Str::SettingsSidebarBackground,
+            Some(Str::SettingsSidebarBackgroundSubtitle),
+            Control::Picker(&[
+                (Str::SettingsFollowTheme, "theme"),
+                (Str::SettingsMatchTerminal, "terminal"),
+                (Str::SettingsCustomColor, "custom"),
+            ]),
+            "sidebar background match terminal follow theme custom color tint nen thanh ben theo giao dien mau khop rieng",
+        )
+    },
+    Row {
+        wired: true,
         visible: custom_sidebar_color,
         ..setting(
             Key::SidebarColor,
@@ -678,37 +682,47 @@ static ROWS: &[Row] = &[
             "sidebar color tint custom background mau thanh ben rieng",
         )
     },
-    setting(
-        Key::SidebarFontSize,
-        Section::Sidebar,
-        Str::SettingsSidebarFontSize,
-        Some(Str::SettingsSidebarFontSizeSubtitle),
-        Control::Slider {
-            min: 10.0,
-            max: 20.0,
-            step: 0.5,
-            unit: Unit::Points,
-            reset: true,
-        },
-        "sidebar font size workspace titles text points pt bigger smaller co chu thanh ben",
-    ),
-    toggle(
-        Key::HideSidebarDetails,
-        Section::Sidebar,
-        Str::SettingsHideAllSidebarDetails,
-        Str::SettingsHideAllSidebarDetailsSubtitle,
-        "hide all sidebar details compact only titles minimal an moi chi tiet thanh ben",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::SidebarFontSize,
+            Section::Sidebar,
+            Str::SettingsSidebarFontSize,
+            Some(Str::SettingsSidebarFontSizeSubtitle),
+            Control::Slider {
+                min: 10.0,
+                max: 20.0,
+                step: 0.5,
+                unit: Unit::Points,
+                reset: true,
+            },
+            "sidebar font size workspace titles text points pt bigger smaller co chu thanh ben",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::HideSidebarDetails,
+            Section::Sidebar,
+            Str::SettingsHideAllSidebarDetails,
+            Str::SettingsHideAllSidebarDetailsSubtitle,
+            "hide all sidebar details compact only titles minimal an moi chi tiet thanh ben",
+        )
+    },
     // Stays enabled while details are hidden, since the titles still show (as the Mac's
     // SidebarSection.swift does).
-    toggle(
-        Key::WrapWorkspaceTitles,
-        Section::Sidebar,
-        Str::SettingsWrapWorkspaceTitles,
-        Str::SettingsWrapWorkspaceTitlesSubtitle,
-        "wrap workspace titles multiline long titles xuong dong tieu de phien",
-    ),
     Row {
+        wired: true,
+        ..toggle(
+            Key::WrapWorkspaceTitles,
+            Section::Sidebar,
+            Str::SettingsWrapWorkspaceTitles,
+            Str::SettingsWrapWorkspaceTitlesSubtitle,
+            "wrap workspace titles multiline long titles xuong dong tieu de phien",
+        )
+    },
+    Row {
+        wired: true,
         enabled: sidebar_details_shown,
         ..toggle(
             Key::TruncatePathFromStart,
@@ -719,6 +733,7 @@ static ROWS: &[Row] = &[
         )
     },
     Row {
+        wired: true,
         enabled: sidebar_details_shown,
         ..toggle(
             Key::ShowBranchDirectory,
@@ -1310,6 +1325,13 @@ mod tests {
                 "themeGallery",
                 "shell",
                 "display",
+                "sidebarAppearance.background",
+                "sidebarAppearance.tintColor",
+                "terminalConfig.sidebar-font-size",
+                "sidebar.hideAllDetails",
+                "sidebar.wrapWorkspaceTitles",
+                "sidebar.truncatePathFromStart",
+                "sidebar.showBranchDirectory",
                 "resetShortcuts",
                 "shortcutList",
                 "updates",

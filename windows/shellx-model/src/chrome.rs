@@ -29,6 +29,9 @@ const SECONDARY_LABEL: f32 = 0.5;
 /// Selected text in a text field: the accent at the strength ShellX 1.7.1 draws it.
 const FIELD_SELECTION_ALPHA: f32 = 0.3;
 
+/// The least contrast a border on a Custom sidebar keeps against it: visible, never glaring.
+const EDGE_MIN: f32 = 1.5;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Chrome {
     /// The theme is dark (`theme_file::is_dark`).
@@ -72,6 +75,9 @@ pub struct Chrome {
     pub sidebar_primary_text: Rgba,
     /// An icon under the pointer on the sidebar (the machines header's "+").
     pub sidebar_icon_hover: Rgba,
+    /// The sidebar's edge and the line above its footer, and the selected card's border.
+    pub sidebar_line: Rgba,
+    pub sidebar_border: Rgba,
 }
 
 /// WCAG 2 contrast ratio of two opaque colours, 1.0 to 21.0 (alpha is ignored).
@@ -140,6 +146,21 @@ pub fn chrome(
     // read on it; otherwise its own label colour stands in for them.
     let same_side = best_end(sidebar_bg) == best_end(s.bg);
     let on_sidebar = |window: Rgba| if same_side { window } else { sidebar_text };
+    let (sidebar_line, sidebar_border) = if sidebar == SidebarBackground::Custom {
+        // The window's borders belong to the window's colours; on a colour of the user's choice
+        // they take the steps ShellX's take, from that colour towards its text, and stay visible.
+        let at = |stop: Rgba| {
+            let edge = mix(
+                sidebar_bg,
+                sidebar_text,
+                step(palette::BG, stop, palette::TEXT),
+            );
+            ensure_contrast(edge, sidebar_bg, EDGE_MIN)
+        };
+        (at(palette::LINE), at(palette::BORDER))
+    } else {
+        (s.line, s.border)
+    };
     Chrome {
         dark: is_dark(theme),
         bg: s.bg,
@@ -176,6 +197,8 @@ pub fn chrome(
         ),
         sidebar_primary_text: primary_text(accent, sidebar_bg),
         sidebar_icon_hover: ensure_contrast(on_sidebar(s.text), sidebar_bg, TEXT_MIN),
+        sidebar_line,
+        sidebar_border,
     }
 }
 
@@ -766,7 +789,10 @@ mod tests {
 
     #[test]
     fn a_sidebar_that_follows_the_theme_keeps_the_windows_borders() {
-        for sidebar in [SidebarBackground::FollowTheme, SidebarBackground::MatchTerminal] {
+        for sidebar in [
+            SidebarBackground::FollowTheme,
+            SidebarBackground::MatchTerminal,
+        ] {
             let c = chrome(&named("Dracula"), palette::PRIMARY, sidebar, rgb(0xffffff));
             assert_eq!((c.sidebar_line, c.sidebar_border), (c.line, c.border));
         }
