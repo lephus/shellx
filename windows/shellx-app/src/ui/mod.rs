@@ -18,7 +18,7 @@ mod sidebar;
 mod tab_bar;
 mod term_view;
 mod text_field;
-mod theme;
+pub(crate) mod theme;
 mod titlebar;
 mod tooltip;
 mod update_banner;

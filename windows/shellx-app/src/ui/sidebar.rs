@@ -26,9 +26,7 @@ use gpui::{
 };
 use shellx_model::account::AccountState;
 use shellx_model::core_api::GooglePurpose;
-use shellx_model::palette::{
-    PRIMARY_LINE, PRIMARY_SOFT, PRIMARY_TEXT, Pill, RAIL_PURPLE, SELECTION_TITLE, Status,
-};
+use shellx_model::palette::{Pill, Status};
 use shellx_model::settings_catalog::Section;
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
 use shellx_model::strings::{Lang, Str, pairing_code_display, t};
@@ -122,7 +120,7 @@ pub fn render(
         .flex_none()
         .w(WIDTH)
         .h_full()
-        .bg(theme::panel())
+        .bg(theme::sidebar_bg())
         .border_r_1()
         .border_color(theme::line())
         .child(brand(lang))
@@ -153,7 +151,7 @@ fn session_notice(
             .child(
                 div()
                     .text_size(theme::SMALL_SIZE)
-                    .text_color(theme::muted())
+                    .text_color(theme::sidebar_muted())
                     .child(t(lang, notice.line)),
             )
             .child(
@@ -196,7 +194,7 @@ fn brand(lang: Lang) -> Div {
             div()
                 .text_size(theme::BRAND_SIZE)
                 .font_weight(FontWeight::SEMIBOLD)
-                .text_color(theme::text_hi())
+                .text_color(theme::sidebar_text())
                 .child(t(lang, Str::AppName)),
         )
 }
@@ -246,7 +244,7 @@ fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> D
         .pb(px(4.0))
         .text_size(theme::HEADER_SIZE)
         .font_weight(FontWeight::MEDIUM)
-        .text_color(theme::muted())
+        .text_color(theme::sidebar_muted())
         .child(t(lang, Str::MachinesHeader))
         .child(
             // Request access to another machine: toggles the "+" list (signed
@@ -268,9 +266,9 @@ fn machines_header(signed_in: bool, lang: Lang, cx: &mut Context<RootView>) -> D
                     svg()
                         .path(Icon::AddPlus.path())
                         .size(px(18.0))
-                        .text_color(theme::muted())
+                        .text_color(theme::sidebar_muted())
                         .group_hover("sidebar-add-machine", |style| {
-                            style.text_color(theme::text())
+                            style.text_color(theme::sidebar_icon_hover())
                         }),
                 ),
         )
@@ -318,7 +316,7 @@ fn machine_picker(picker: &Picker, lang: Lang, cx: &mut Context<RootView>) -> Di
         let row = if entry.online {
             let (id, name) = (entry.machine_id.clone(), entry.name.clone());
             row.cursor_pointer()
-                .hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
+                .hover(|style| style.bg(theme::panel_hover()))
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     this.request_access(id.clone(), name.clone(), window, cx);
                 }))
@@ -347,7 +345,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
     let dot = if group.online {
         theme::done()
     } else {
-        theme::muted()
+        theme::sidebar_muted()
     };
     let title_row = div()
         .flex()
@@ -358,7 +356,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
                 .path(icon.path())
                 .flex_none()
                 .size(px(16.0))
-                .text_color(theme::muted()),
+                .text_color(theme::sidebar_muted()),
         )
         // "Name · this PC": the note sits right after the name.
         .child(
@@ -373,7 +371,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
                         .min_w_0()
                         .truncate()
                         .text_size(theme::CARD_TITLE_SIZE)
-                        .text_color(theme::text_hi())
+                        .text_color(theme::sidebar_text())
                         .font_weight(FontWeight::SEMIBOLD)
                         .child(group.title.clone()),
                 )
@@ -382,7 +380,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
                         div()
                             .flex_none()
                             .text_size(theme::SMALL_SIZE)
-                            .text_color(theme::muted())
+                            .text_color(theme::sidebar_muted())
                             .child(format!("· {note}")),
                     )
                 }),
@@ -402,7 +400,7 @@ fn group_header(ix: usize, group: &MachineGroup, lang: Lang, cx: &mut Context<Ro
                 div()
                     .pl(px(24.0))
                     .text_size(theme::SMALL_SIZE)
-                    .text_color(theme::muted())
+                    .text_color(theme::sidebar_muted())
                     .child(subtitle),
             )
         })
@@ -443,7 +441,7 @@ fn row_action(
         RowAction::ShowCode(code) => Some(
             div()
                 .text_size(theme::SMALL_SIZE)
-                .text_color(theme::hsla(shellx_model::palette::PRIMARY_TEXT))
+                .text_color(theme::sidebar_primary_text())
                 .child(pairing_code_display(code)),
         ),
         RowAction::Open => {
@@ -457,6 +455,7 @@ fn row_action(
                         false,
                     )
                     .text_size(theme::SMALL_SIZE)
+                    .text_color(theme::sidebar_primary_text())
                     .on_click(cx.listener(
                         move |this, _: &ClickEvent, window, cx| {
                             this.open_remote(id.clone(), window, cx);
@@ -482,9 +481,9 @@ fn workspace_card(
     let selected = row.selected;
     let tab = row.tab;
     let title_color = if selected {
-        theme::hsla(SELECTION_TITLE)
+        theme::sidebar_selection_title()
     } else {
-        theme::text_hi()
+        theme::sidebar_text()
     };
     let title_line = div()
         .flex()
@@ -529,11 +528,11 @@ fn workspace_card(
         .border_color(transparent_black())
         .cursor_pointer()
         .when(selected, |el| {
-            el.bg(theme::hsla(theme::SESSION_SELECTED))
+            el.bg(theme::session_selected())
                 .border_color(theme::border())
         })
         .when(!selected, |el| {
-            el.hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
+            el.hover(|style| style.bg(theme::session_hover()))
         })
         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
             this.select_tab(tab, window, cx);
@@ -547,7 +546,7 @@ fn workspace_card(
                 .w(px(3.0))
                 .rounded_tl(px(6.0))
                 .rounded_bl(px(6.0))
-                .bg(theme::hsla(RAIL_PURPLE.with_alpha(0.95))),
+                .bg(theme::rail_purple()),
         )
         .child(content)
 }
@@ -563,7 +562,7 @@ fn card_line(text: String) -> Div {
             .min_w_0()
             .truncate()
             .text_size(theme::SMALL_SIZE)
-            .text_color(theme::muted())
+            .text_color(theme::sidebar_muted())
             .child(text),
     )
 }
@@ -645,8 +644,10 @@ fn help_button(
             svg()
                 .path(Icon::CircleHelp.path())
                 .size(px(14.0))
-                .text_color(theme::muted())
-                .group_hover("sidebar-help", |style| style.text_color(theme::text_hi())),
+                .text_color(theme::sidebar_muted())
+                .group_hover("sidebar-help", |style| {
+                    style.text_color(theme::sidebar_text())
+                }),
         );
     div()
         .relative()
@@ -734,7 +735,7 @@ fn version_label() -> Div {
         .h(px(FOOTER_BUTTON))
         .px(px(5.0))
         .text_size(theme::SMALL_SIZE)
-        .text_color(theme::muted())
+        .text_color(theme::sidebar_muted())
         .child(format!("v{}", shellx_model::VERSION))
 }
 
@@ -752,11 +753,11 @@ fn update_pill(status: &UpdateStatus, lang: Lang) -> Option<Stateful<Div>> {
         .px(px(8.0))
         .rounded_full()
         .border_1()
-        .border_color(theme::hsla(PRIMARY_LINE))
-        .bg(theme::hsla(PRIMARY_SOFT))
+        .border_color(theme::primary_line())
+        .bg(theme::primary_soft())
         .text_size(theme::SMALL_SIZE)
         .font_weight(FontWeight::MEDIUM)
-        .text_color(theme::hsla(PRIMARY_TEXT))
+        .text_color(theme::sidebar_primary_text())
         .whitespace_nowrap()
         .child(text);
     Some(match url {

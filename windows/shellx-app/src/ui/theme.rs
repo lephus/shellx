@@ -1,9 +1,16 @@
-//! Spec §7.4 for GPUI: the `shellx_model::palette` tokens as `gpui::Hsla`,
-//! the UI / wordmark / caption fonts and the text sizes. Solid colors only:
-//! no gradients, glows or colored shadows anywhere in the UI.
+//! Spec §7.4 and §5.5 for GPUI: the active theme's colours as `gpui::Hsla`, the UI / wordmark /
+//! caption fonts and the text sizes. Every colour the window draws comes from here: the chrome
+//! (`shellx_model::chrome`) and the terminal theme of the one process-wide [`Active`], which
+//! `SettingsService` replaces when a theme setting or the window's appearance changes. Solid
+//! colors only: no gradients, glows or colored shadows anywhere in the UI.
+
+use std::sync::{LazyLock, PoisonError, RwLock};
 
 use gpui::{Font, FontFallbacks, FontWeight, Hsla, Pixels, font, px};
+use shellx_model::chrome::{Chrome, accent_color, chrome as derive_chrome};
 use shellx_model::palette::{self, Rgba};
+use shellx_model::settings::Settings;
+use shellx_model::theme_file::{self, TermTheme, ThemeSet, is_dark_mode};
 
 use crate::fonts;
 
@@ -25,9 +32,76 @@ pub const CARD_TITLE_SIZE: Pixels = px(12.0);
 pub const HEADER_SIZE: Pixels = px(10.5);
 pub const CAPTION_GLYPH_SIZE: Pixels = px(10.0);
 
-/// Sidebar session rows (mockup `.sess.cur` / `.sess:hover`).
-pub const SESSION_SELECTED: Rgba = Rgba::rgb(0x1a1430);
-pub const SESSION_HOVER: Rgba = Rgba::rgb(0x161026);
+/// The theme in use: the window's chrome and the terminals' colours.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Active {
+    pub chrome: Chrome,
+    pub term: TermTheme,
+}
+
+impl Active {
+    /// The theme `settings` choose: the light or dark side of the pair (`system_dark` is the
+    /// window's appearance, for Appearance System), the accent (`system_accent` is the Windows
+    /// accent, for Accent System) and the sidebar background.
+    pub fn resolve(
+        settings: &Settings,
+        themes: &ThemeSet,
+        system_dark: bool,
+        system_accent: Option<Rgba>,
+    ) -> Active {
+        let dark = is_dark_mode(settings.appearance, system_dark);
+        let term = theme_file::active(themes, settings, dark);
+        let chrome = derive_chrome(
+            &term,
+            accent_color(&settings.accent, system_accent),
+            settings.sidebar_background,
+            settings.sidebar_color,
+        );
+        Active { chrome, term }
+    }
+}
+
+/// The active theme and how many times it was replaced (a terminal compares the count with the
+/// one it last took its colours at).
+struct Current {
+    active: Active,
+    generation: u64,
+}
+
+/// Until the settings are read (and in `--smoke`): the default settings' theme, ShellX.
+static CURRENT: LazyLock<RwLock<Current>> = LazyLock::new(|| {
+    let active = Active::resolve(&Settings::default(), &ThemeSet::new(Vec::new()), true, None);
+    RwLock::new(Current {
+        active,
+        generation: 0,
+    })
+});
+
+fn read<T>(f: impl FnOnce(&Current) -> T) -> T {
+    f(&CURRENT.read().unwrap_or_else(PoisonError::into_inner))
+}
+
+/// A copy of the process-wide current theme.
+pub fn active() -> Active {
+    read(|current| current.active.clone())
+}
+
+/// Replaces the current theme. The caller then refreshes every window; each terminal takes the
+/// new colours on its next frame (`generation`).
+pub fn set_active(active: Active) {
+    let mut current = CURRENT.write().unwrap_or_else(PoisonError::into_inner);
+    current.active = active;
+    current.generation += 1;
+}
+
+/// Counts `set_active` calls.
+pub fn generation() -> u64 {
+    read(|current| current.generation)
+}
+
+fn chrome() -> Chrome {
+    read(|current| current.active.chrome)
+}
 
 pub fn hsla(c: Rgba) -> Hsla {
     gpui::Rgba {
@@ -40,55 +114,123 @@ pub fn hsla(c: Rgba) -> Hsla {
 }
 
 pub fn bg() -> Hsla {
-    hsla(palette::BG)
+    hsla(chrome().bg)
 }
 pub fn panel() -> Hsla {
-    hsla(palette::PANEL)
+    hsla(chrome().panel)
 }
 pub fn raise() -> Hsla {
-    hsla(palette::RAISE)
+    hsla(chrome().raise)
 }
 pub fn line() -> Hsla {
-    hsla(palette::LINE)
+    hsla(chrome().line)
 }
 pub fn border() -> Hsla {
-    hsla(palette::BORDER)
+    hsla(chrome().border)
 }
 pub fn text() -> Hsla {
-    hsla(palette::TEXT)
+    hsla(chrome().text)
 }
 pub fn text_hi() -> Hsla {
-    hsla(palette::TEXT_HI)
+    hsla(chrome().text_hi)
 }
 pub fn muted() -> Hsla {
-    hsla(palette::MUTED)
-}
-pub fn done() -> Hsla {
-    hsla(palette::DONE)
+    hsla(chrome().muted)
 }
 pub fn primary() -> Hsla {
-    hsla(palette::PRIMARY)
+    hsla(chrome().primary)
 }
 pub fn primary_soft() -> Hsla {
-    hsla(palette::PRIMARY_SOFT)
+    hsla(chrome().primary_soft)
 }
 pub fn primary_line() -> Hsla {
-    hsla(palette::PRIMARY_LINE)
+    hsla(chrome().primary_line)
 }
+/// The accent as text on the window's surfaces.
 pub fn primary_text() -> Hsla {
-    hsla(palette::PRIMARY_TEXT)
+    hsla(chrome().primary_text)
 }
 /// The primary colour as a colour well takes it (a Settings colour row with no colour of its
 /// own, Selection Highlight's "Default", shows it).
 pub fn primary_rgba() -> Rgba {
-    palette::PRIMARY
+    chrome().primary
+}
+/// Status dots and fills: the same hues on every theme.
+pub fn running() -> Hsla {
+    hsla(chrome().running)
+}
+pub fn done() -> Hsla {
+    hsla(chrome().done)
 }
 pub fn error() -> Hsla {
-    hsla(palette::ERROR)
+    hsla(chrome().error)
 }
-/// Close caption button hover: ERROR at 0.9 (solid, no glow).
+/// Status hues as text on the window's surfaces (no text is drawn in the running hue).
+pub fn done_text() -> Hsla {
+    hsla(chrome().done_text)
+}
+pub fn error_text() -> Hsla {
+    hsla(chrome().error_text)
+}
+/// Close caption button hover: the error hue at 0.9 (solid, no glow).
 pub fn close_hover() -> Hsla {
-    hsla(palette::ERROR.with_alpha(0.9))
+    hsla(chrome().error.with_alpha(0.9))
+}
+/// The title of the selected tab in the focused region.
+pub fn selection_title() -> Hsla {
+    hsla(chrome().selection_title)
+}
+/// The bar under the selected tab of a region that is not focused.
+pub fn indicator_unfocused() -> Hsla {
+    hsla(chrome().indicator_unfocused)
+}
+/// Hover fill on the window's surfaces: tab bar, menus, the machine list.
+pub fn panel_hover() -> Hsla {
+    hsla(chrome().panel_hover)
+}
+/// Selected text in a text field.
+pub fn field_selection() -> Hsla {
+    hsla(chrome().field_selection)
+}
+/// The sidebar and what is drawn on it.
+pub fn sidebar_bg() -> Hsla {
+    hsla(chrome().sidebar_bg)
+}
+pub fn sidebar_text() -> Hsla {
+    hsla(chrome().sidebar_text)
+}
+pub fn sidebar_muted() -> Hsla {
+    hsla(chrome().sidebar_muted)
+}
+/// The selected workspace card's fill and title.
+pub fn session_selected() -> Hsla {
+    hsla(chrome().session_selected)
+}
+pub fn sidebar_selection_title() -> Hsla {
+    hsla(chrome().sidebar_selection_title)
+}
+/// A workspace card under the pointer.
+pub fn session_hover() -> Hsla {
+    hsla(chrome().session_hover)
+}
+/// The accent as text on the sidebar: the pairing code, the update pill, a primary button.
+pub fn sidebar_primary_text() -> Hsla {
+    hsla(chrome().sidebar_primary_text)
+}
+/// An icon under the pointer on the sidebar.
+pub fn sidebar_icon_hover() -> Hsla {
+    hsla(chrome().sidebar_icon_hover)
+}
+/// The purple rail of a workspace card, at 0.95 (the same on every theme, spec §5.4).
+pub fn rail_purple() -> Hsla {
+    hsla(palette::RAIL_PURPLE.with_alpha(0.95))
+}
+/// The terminal's default background and text.
+pub fn term_bg() -> Hsla {
+    hsla(read(|current| current.active.term.background))
+}
+pub fn term_fg() -> Hsla {
+    hsla(read(|current| current.active.term.foreground))
 }
 
 fn with_fallback(family: &str, fallback: &str) -> Font {
@@ -115,6 +257,66 @@ pub fn wordmark_font() -> Font {
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
+
+    use shellx_model::chrome::chrome;
+    use shellx_model::settings::{Accent, Appearance, Settings, SidebarBackground};
+    use shellx_model::theme_file::{ThemeSet, shellx};
+
+    use super::{Active, Rgba, palette};
+
+    #[test]
+    fn the_default_settings_give_the_shellx_theme() {
+        let themes = ThemeSet::new(Vec::new());
+        let defaults = Active::resolve(&Settings::default(), &themes, false, None);
+        assert_eq!(defaults.term, shellx());
+        assert_eq!(
+            defaults.chrome,
+            chrome(
+                &shellx(),
+                palette::PRIMARY,
+                SidebarBackground::FollowTheme,
+                palette::PANEL
+            )
+        );
+        assert_eq!(defaults.chrome.bg, palette::BG);
+        // Nothing has replaced the process-wide theme in the tests.
+        assert_eq!(super::active(), defaults);
+    }
+
+    #[test]
+    fn the_settings_choose_the_theme_the_accent_and_the_sidebar() {
+        let themes = ThemeSet::new(Vec::new());
+        let mut s = Settings {
+            theme_dark: "Dracula".into(),
+            ..Settings::default()
+        };
+        assert_eq!(
+            Active::resolve(&s, &themes, false, None).term.name,
+            "Dracula"
+        );
+        s.appearance = Appearance::Light;
+        assert_eq!(
+            Active::resolve(&s, &themes, true, None).term.name,
+            "Catppuccin Latte"
+        );
+        // System follows the window's appearance.
+        s.appearance = Appearance::System;
+        assert_eq!(
+            Active::resolve(&s, &themes, true, None).term.name,
+            "Dracula"
+        );
+        let light = Active::resolve(&s, &themes, false, None);
+        assert_eq!(light.term.name, "Catppuccin Latte");
+        assert_eq!(light.chrome.bg, light.term.background);
+        // Accent System takes the Windows accent; Custom sidebar its colour.
+        let windows_blue = Rgba::rgb(0x0078d7);
+        s.accent = Accent::System;
+        s.sidebar_background = SidebarBackground::Custom;
+        s.sidebar_color = Rgba::rgb(0x123456);
+        let chosen = Active::resolve(&s, &themes, false, Some(windows_blue));
+        assert_eq!(chosen.chrome.primary, windows_blue);
+        assert_eq!(chosen.chrome.sidebar_bg, Rgba::rgb(0x123456));
+    }
 
     /// Every `.rs` file under `dir`, sorted.
     fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -184,7 +386,11 @@ mod tests {
         for file in files.iter().filter(|f| !exempt.contains(f)) {
             let text = std::fs::read_to_string(file).unwrap();
             let name = file.strip_prefix(&src).unwrap().display().to_string();
-            uses.extend(colour_uses(&text).into_iter().map(|u| format!("{name}:{u}")));
+            uses.extend(
+                colour_uses(&text)
+                    .into_iter()
+                    .map(|u| format!("{name}:{u}")),
+            );
         }
         assert!(
             uses.is_empty(),

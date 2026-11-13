@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Result};
 use ghostty_vt::{Callbacks, KeyEncoder, RenderFrame, RenderState, Rgb, Terminal};
-use shellx_model::palette::{ANSI, Rgba, TERM_BG, TERM_CURSOR, TERM_FG};
+use shellx_model::palette::Rgba;
 use shellx_model::paste::encode_paste;
 use shellx_model::selection::Viewport;
 use shellx_model::theme_file::TermTheme;
@@ -28,6 +28,15 @@ pub fn rgb(c: Rgba) -> Rgb {
         g: c.g,
         b: c.b,
     }
+}
+
+/// The theme a new terminal starts with: the window's active one (`ui::theme`); ShellX in a
+/// build without the window.
+fn starting_theme() -> TermTheme {
+    #[cfg(any(windows, target_os = "macos"))]
+    return crate::ui::theme::active().term;
+    #[cfg(not(any(windows, target_os = "macos")))]
+    shellx_model::theme_file::shellx()
 }
 
 pub struct TermCore {
@@ -68,28 +77,20 @@ impl TermCore {
             },
             ..Default::default()
         };
-        let mut terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)
+        let terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)
             .context("failed to create libghostty-vt terminal")?;
-        terminal.set_default_colors(
-            Some(rgb(TERM_FG)),
-            Some(rgb(TERM_BG)),
-            Some(rgb(TERM_CURSOR)),
-        );
-        let mut overrides: [Option<Rgb>; 256] = [None; 256];
-        for (slot, color) in overrides.iter_mut().zip(ANSI.iter()) {
-            *slot = Some(rgb(*color));
-        }
-        terminal.set_default_palette(&overrides);
         let render = RenderState::new().context("failed to create render state")?;
         let encoder = KeyEncoder::new().context("failed to create key encoder")?;
-        Ok(TermCore {
+        let mut core = TermCore {
             terminal,
             render,
             encoder,
             link,
             cols,
             rows,
-        })
+        };
+        core.set_theme(&starting_theme());
+        Ok(core)
     }
 
     pub fn size(&self) -> (u16, u16) {
@@ -243,10 +244,19 @@ impl TermCore {
     }
 
     /// Default foreground, background and cursor, and the 16 palette slots, from `theme`; at any
-    /// time, so a live terminal recolours on its next frame.
-    #[allow(dead_code)] // T3: the window calls it once the theme is live
-    pub fn set_theme(&mut self, _theme: &TermTheme) {
-        todo!("T3")
+    /// time, so a live terminal recolours on its next frame. Slots 16-255 keep Ghostty's, and a
+    /// slot the program set itself (OSC 4) stays in effect.
+    pub fn set_theme(&mut self, theme: &TermTheme) {
+        self.terminal.set_default_colors(
+            Some(rgb(theme.foreground)),
+            Some(rgb(theme.background)),
+            Some(rgb(theme.cursor)),
+        );
+        let mut overrides: [Option<Rgb>; 256] = [None; 256];
+        for (slot, color) in overrides.iter_mut().zip(theme.ansi.iter()) {
+            *slot = Some(rgb(*color));
+        }
+        self.terminal.set_default_palette(&overrides);
     }
 
     #[allow(dead_code)] // used by later tasks (selection copy, pane close)
@@ -326,7 +336,10 @@ mod tests {
             (rgb(dracula.background), rgb(dracula.foreground))
         );
         assert_eq!(frame.cursor_color, Some(rgb(dracula.cursor)));
-        assert_eq!(frame.styled_rows()[0][0].resolved_fg, Some(rgb(dracula.ansi[1])));
+        assert_eq!(
+            frame.styled_rows()[0][0].resolved_fg,
+            Some(rgb(dracula.ansi[1]))
+        );
         for slot in 0..16u8 {
             assert_eq!(
                 t.render.palette_color(slot),

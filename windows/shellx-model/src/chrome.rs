@@ -26,6 +26,9 @@ const SIDEBAR_PRESS: f32 = 0.03;
 const LABEL: f32 = 0.85;
 const SECONDARY_LABEL: f32 = 0.5;
 
+/// Selected text in a text field: the accent at the strength ShellX 1.7.1 draws it.
+const FIELD_SELECTION_ALPHA: f32 = 0.3;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Chrome {
     /// The theme is dark (`theme_file::is_dark`).
@@ -133,6 +136,10 @@ pub fn chrome(
     let sidebar_bg = sidebar_background(theme, sidebar, sidebar_color);
     let (sidebar_text, sidebar_muted) = sidebar_text(&s, sidebar_bg);
     let (session_selected, session_hover) = session_fills(sidebar_bg, sidebar_text);
+    // The sidebar reads with the window's end: it keeps the window's colours, pushed until they
+    // read on it; otherwise its own label colour stands in for them.
+    let same_side = best_end(sidebar_bg) == best_end(s.bg);
+    let on_sidebar = |window: Rgba| if same_side { window } else { sidebar_text };
     Chrome {
         dark: is_dark(theme),
         bg: s.bg,
@@ -160,11 +167,15 @@ pub fn chrome(
         sidebar_bg,
         sidebar_text,
         sidebar_muted,
-        panel_hover: BLACK,
-        field_selection: BLACK,
-        sidebar_selection_title: BLACK,
-        sidebar_primary_text: BLACK,
-        sidebar_icon_hover: BLACK,
+        panel_hover: session_fills(s.panel, s.text_hi).1,
+        field_selection: accent.with_alpha(FIELD_SELECTION_ALPHA),
+        sidebar_selection_title: ensure_contrast(
+            on_sidebar(s.selection_title),
+            session_selected,
+            TEXT_MIN,
+        ),
+        sidebar_primary_text: primary_text(accent, sidebar_bg),
+        sidebar_icon_hover: ensure_contrast(on_sidebar(s.text), sidebar_bg, TEXT_MIN),
     }
 }
 
@@ -256,19 +267,13 @@ fn sidebar_text(s: &Surfaces, sidebar_bg: Rgba) -> (Rgba, Rgba) {
     )
 }
 
-/// The selected and hovered session rows: ShellX's own fills on ShellX's sidebar, otherwise the
-/// same steps from the sidebar towards its text.
-fn session_fills(sidebar_bg: Rgba, sidebar_text: Rgba) -> (Rgba, Rgba) {
-    if sidebar_bg == palette::PANEL && sidebar_text == palette::TEXT_HI {
+/// The selected and hovered rows on a surface (the sidebar, or the window's panels): ShellX's own
+/// fills on ShellX's panel, otherwise the same steps from the surface towards its text.
+fn session_fills(surface: Rgba, text: Rgba) -> (Rgba, Rgba) {
+    if surface == palette::PANEL && text == palette::TEXT_HI {
         return (palette::SESSION_SELECTED, palette::SESSION_HOVER);
     }
-    let at = |stop: Rgba| {
-        mix(
-            sidebar_bg,
-            sidebar_text,
-            step(palette::PANEL, stop, palette::TEXT_HI),
-        )
-    };
+    let at = |stop: Rgba| mix(surface, text, step(palette::PANEL, stop, palette::TEXT_HI));
     (at(palette::SESSION_SELECTED), at(palette::SESSION_HOVER))
 }
 

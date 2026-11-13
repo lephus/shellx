@@ -27,7 +27,6 @@ use gpui::{
 };
 use shellx_model::core_api::CoreCall;
 use shellx_model::links::Links;
-use shellx_model::palette;
 use shellx_model::remote_state::PairState;
 use shellx_model::sidebar::Access;
 use shellx_model::strings::{
@@ -339,8 +338,8 @@ impl Render for PairingPanel {
             .as_ref()
             .map(|(_, name)| name.clone())
             .unwrap_or_default();
-        let running = theme::hsla(palette::RUNNING);
-        let error = theme::hsla(palette::ERROR);
+        let running = theme::running();
+        let error = theme::error();
         let buttons = div()
             .flex()
             .flex_row()
@@ -397,13 +396,13 @@ impl Render for PairingPanel {
                 .child(Self::status_line(
                     theme::done(),
                     t(lang, Str::Approved),
-                    theme::done(),
+                    theme::done_text(),
                 ))
                 // The sentence alone, never the system's text (review m9).
                 .children(self.snap.save_error.as_ref().map(|_| {
                     div()
                         .text_size(theme::SMALL_SIZE)
-                        .text_color(error)
+                        .text_color(theme::error_text())
                         .child(access_not_saved(lang))
                 }))
                 .child(
@@ -412,7 +411,11 @@ impl Render for PairingPanel {
                         .child(self.open_button(lang, cx)),
                 ),
             PairState::Denied => card
-                .child(Self::status_line(error, t(lang, Str::Denied), error))
+                .child(Self::status_line(
+                    error,
+                    t(lang, Str::Denied),
+                    theme::error_text(),
+                ))
                 .child(
                     buttons
                         .child(Self::close_button(lang, cx))
@@ -434,7 +437,7 @@ impl Render for PairingPanel {
                 .child(Self::status_line(
                     error,
                     pairing_failure_sentence(lang, &e.code),
-                    error,
+                    theme::error_text(),
                 ))
                 .child(
                     buttons

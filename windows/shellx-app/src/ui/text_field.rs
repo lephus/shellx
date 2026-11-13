@@ -24,7 +24,6 @@ use gpui::{
     MouseUpEvent, PaintQuad, Pixels, Point, ShapedLine, SharedString, Style, TextRun,
     UTF16Selection, UnderlineStyle, Window, div, fill, point, prelude::*, px, relative, size,
 };
-use shellx_model::palette;
 use shellx_model::text_edit::TextEdit;
 
 use super::theme;
@@ -531,7 +530,7 @@ impl Element for TextElement {
                         point(origin_x + cursor_x, bounds.top()),
                         size(px(1.5), bounds.bottom() - bounds.top()),
                     ),
-                    theme::hsla(palette::PRIMARY),
+                    theme::primary(),
                 )),
             )
         } else {
@@ -542,7 +541,7 @@ impl Element for TextElement {
                         point(origin_x + line.x_for_index(range.start), bounds.top()),
                         point(origin_x + line.x_for_index(range.end), bounds.bottom()),
                     ),
-                    theme::hsla(palette::PRIMARY.with_alpha(0.3)),
+                    theme::field_selection(),
                 )),
                 None,
             )
@@ -604,7 +603,7 @@ impl Render for TextField {
         let border = if self.invalid {
             theme::error()
         } else if focused {
-            theme::hsla(palette::PRIMARY_LINE)
+            theme::primary_line()
         } else {
             theme::border()
         };

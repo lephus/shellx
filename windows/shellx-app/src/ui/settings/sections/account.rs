@@ -82,7 +82,7 @@ fn body(view: &SettingsView, lang: Lang, cx: &mut Context<SettingsView>) -> Div 
         .children(account_view.error.map(|m| {
             div()
                 .text_size(theme::SMALL_SIZE)
-                .text_color(theme::error())
+                .text_color(theme::error_text())
                 .child(m)
         }))
         .when(account_view.session_expired, |s| {

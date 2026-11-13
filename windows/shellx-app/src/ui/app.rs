@@ -129,6 +129,7 @@ pub fn run() {
         };
         window
             .update(cx, |root, window, cx| {
+                SettingsService::follow_window_appearance(window, cx);
                 root.focus_terminal(window, cx);
                 if !background {
                     cx.activate(true);

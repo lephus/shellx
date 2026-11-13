@@ -3,7 +3,10 @@
 // The window (cfg(windows)) is the main user; the Mac build only tests it.
 #![cfg_attr(not(windows), allow(dead_code))]
 
+#[cfg(windows)]
+use shellx_model::chrome::accent_from_dwm;
 use shellx_model::first_window::{FirstWindow, WorkArea, first_window};
+use shellx_model::palette::Rgba;
 
 /// Windows version like `10.0.26100` (Ruling 28): `RtlGetVersion`, then the registry, then
 /// `10.0`; never `unknown`, which the relay refuses. `10.0` off Windows.
@@ -99,6 +102,25 @@ pub fn ui_language_id() -> Option<u16> {
     {
         // SAFETY: takes no arguments and returns the id by value.
         Some(unsafe { windows_sys::Win32::Globalization::GetUserDefaultUILanguage() })
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// The Windows accent colour (`HKCU\Software\Microsoft\Windows\DWM\AccentColor`, a DWORD laid out
+/// 0xAABBGGRR), for Accent "System"; `None` off Windows or when it cannot be read.
+pub fn system_accent() -> Option<Rgba> {
+    #[cfg(windows)]
+    {
+        use winreg::RegKey;
+        use winreg::enums::HKEY_CURRENT_USER;
+        let key = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"Software\Microsoft\Windows\DWM")
+            .ok()?;
+        let abgr: u32 = key.get_value("AccentColor").ok()?;
+        Some(accent_from_dwm(abgr))
     }
     #[cfg(not(windows))]
     {

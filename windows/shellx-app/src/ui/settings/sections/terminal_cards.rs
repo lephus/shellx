@@ -326,7 +326,7 @@ impl SettingsView {
                 Some(Err(error)) => Some(
                     div()
                         .text_size(theme::SMALL_SIZE)
-                        .text_color(theme::error())
+                        .text_color(theme::error_text())
                         .child(custom_shell_error(lang, error)),
                 ),
                 Some(Ok(program)) => Some(muted(will_run(lang, program))),
@@ -353,7 +353,7 @@ impl SettingsView {
                 s.child(
                     div()
                         .text_size(theme::SMALL_SIZE)
-                        .text_color(theme::error())
+                        .text_color(theme::error_text())
                         .child(t(lang, Str::ShellChoiceNotSaved)),
                 )
             })

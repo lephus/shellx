@@ -4,17 +4,21 @@
 //! background executor, key by key (`settings_store`). `startup::orderly_quit` writes what
 //! still waits. A failed write is one log line naming the error's kind (no path, no value);
 //! the change then lives in memory until ShellX quits. Nothing here panics or blocks the UI
-//! on the file.
+//! on the file. The theme settings (and, for Appearance System, the main window's appearance)
+//! choose the active theme (`theme::set_active`); a change to them redraws every window.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use gpui::{App, AppContext as _, Context, Entity, Global, Task};
+use gpui::{App, AppContext as _, Context, Entity, Global, Task, Window, WindowAppearance};
 use serde_json::Value;
-use shellx_model::settings::{Key, Settings};
+use shellx_model::settings::{Accent, Key, Settings};
+use shellx_model::theme_file::ThemeSet;
 
+use super::theme::{self, Active};
+use crate::os_info;
 use crate::settings_store::SettingsStore;
 use crate::startup;
 
@@ -22,12 +26,26 @@ use crate::startup;
 /// writes once, when it stops.
 const WRITE_DELAY: Duration = Duration::from_millis(300);
 
+/// The settings the active theme depends on (`theme::Active::resolve`).
+const THEME_KEYS: [Key; 6] = [
+    Key::Appearance,
+    Key::Accent,
+    Key::ThemeLight,
+    Key::ThemeDark,
+    Key::SidebarBackground,
+    Key::SidebarColor,
+];
+
 pub struct SettingsService {
     settings: Settings,
     writes: Arc<PendingWrites>,
     /// The timer of each key that waits for its write; a new change to the key drops
     /// (cancels) it and starts another.
     timers: HashMap<Key, Task<()>>,
+    /// The bundled theme files the pair's names are looked up in.
+    themes: ThemeSet,
+    /// The main window's appearance is dark: what Appearance System follows.
+    system_dark: bool,
 }
 
 struct SharedSettings(Entity<SettingsService>);
@@ -35,8 +53,8 @@ struct SharedSettings(Entity<SettingsService>);
 impl Global for SharedSettings {}
 
 impl SettingsService {
-    /// Loads `settings.json`, keeps the service in a `Global` and has `orderly_quit` write
-    /// what still waits. Called before the first window opens.
+    /// Loads `settings.json`, makes its theme the active one, keeps the service in a `Global`
+    /// and has `orderly_quit` write what still waits. Called before the first window opens.
     pub fn init(cx: &mut App) {
         let store = SettingsStore::at_native_dir();
         let settings = store.load();
@@ -45,12 +63,34 @@ impl SettingsService {
             let writes = writes.clone();
             move || writes.flush()
         });
-        let service = cx.new(|_| SettingsService {
+        let service = SettingsService {
             settings,
             writes,
             timers: HashMap::new(),
-        });
+            themes: ThemeSet::new(Vec::new()),
+            system_dark: is_dark(cx.window_appearance()),
+        };
+        theme::set_active(service.resolve_theme());
+        let service = cx.new(|_| service);
         cx.set_global(SharedSettings(service));
+    }
+
+    /// Appearance System follows `window` (the main window), now and whenever its appearance
+    /// changes.
+    pub fn follow_window_appearance(window: &Window, cx: &mut App) {
+        let follow = |window: &Window, cx: &mut App| {
+            let dark = is_dark(window.appearance());
+            SettingsService::entity(cx).update(cx, |service, cx| {
+                if service.system_dark != dark {
+                    service.system_dark = dark;
+                    service.apply_theme(cx);
+                }
+            });
+        };
+        follow(window, cx);
+        window
+            .observe_window_appearance(move |window, cx| follow(window, cx))
+            .detach();
     }
 
     pub fn entity(cx: &App) -> Entity<SettingsService> {
@@ -82,6 +122,7 @@ impl SettingsService {
     pub fn reset_all(&mut self, cx: &mut Context<Self>) {
         self.settings = Settings::default();
         self.timers.clear();
+        self.apply_theme(cx);
         for key in Key::ALL {
             self.writes.wait(key.path(), None);
         }
@@ -99,8 +140,42 @@ impl SettingsService {
             writes.write(key.path());
         });
         self.timers.insert(key, timer);
+        if THEME_KEYS.contains(&key) {
+            self.apply_theme(cx);
+        }
         cx.notify();
     }
+
+    /// The theme the settings choose now (the Windows accent is read only for Accent System).
+    fn resolve_theme(&self) -> Active {
+        let system_accent = match self.settings.accent {
+            Accent::System => os_info::system_accent(),
+            _ => None,
+        };
+        Active::resolve(
+            &self.settings,
+            &self.themes,
+            self.system_dark,
+            system_accent,
+        )
+    }
+
+    /// Makes the settings' theme the active one and redraws every window (Settings included);
+    /// each terminal takes the new colours on its next frame.
+    fn apply_theme(&self, cx: &mut App) {
+        let active = self.resolve_theme();
+        if active != theme::active() {
+            theme::set_active(active);
+            cx.refresh_windows();
+        }
+    }
+}
+
+fn is_dark(appearance: WindowAppearance) -> bool {
+    matches!(
+        appearance,
+        WindowAppearance::Dark | WindowAppearance::VibrantDark
+    )
 }
 
 /// The current settings, for any view: `current(cx).font_size`.
