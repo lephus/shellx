@@ -187,6 +187,8 @@ Làm trên bản cài thử có Cài đặt mới. Cài đặt giờ là **cửa
 - [ ] **X12. Ứng dụng.** Phiên mới bắt đầu ở thư mục của terminal đang chọn; đổi Ngôn ngữ thì mọi cửa sổ đang mở đổi ngay; "Ẩn nút đóng tab" chỉ ẩn dấu ×; "Cân bằng các khung khi tạo" cho ba khung bằng nhau.
 - [ ] **X13. Màu phiên.** Rê chuột vào thẻ Tô đặc màu xanh lá: chữ vẫn đọc được; bấm chuột phải thẻ gần góc dưới phải: menu nằm gọn trong cửa sổ.
 - [ ] **X14. Tìm kiếm.** Gõ `phím` bằng Unikey (Telex) và bằng bàn phím Vietnamese của Windows; bấm một kết quả: mục mở ra, dòng cuộn về giữa và nhấp sáng 2 giây.
+- [ ] **X15. Lần đầu mở mục Terminal.** Mở ShellX mới, mở Cài đặt › Terminal lần đầu (máy cài nhiều phông càng tốt).
+  - Đạt: mục hiện ra trong khoảng một giây, cửa sổ chính không đứng hình; ghi lại số giây nếu lâu hơn (danh sách phông được đo một lần lúc này).
 
 ---
 
