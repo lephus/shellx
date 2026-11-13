@@ -1044,7 +1044,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
                 "Màu nền của phiên đang chọn trong thanh bên."
             }
             Str::SettingsPaletteNote => {
-                "Sửa shellx.json để thêm hoặc xóa các màu có tên. \"Choose Custom Color...\" vẫn thêm các mục Custom N cục bộ."
+                "Chọn các màu này trong menu chuột phải của phiên. Đổi một màu ở đây thì mọi phiên dùng màu đó đổi theo."
             }
             Str::SettingsColorRed => "Đỏ",
             Str::SettingsColorCrimson => "Đỏ thẫm",
@@ -1121,7 +1121,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::SettingsRestoreShortcut => "Khôi phục phím tắt trước đó",
             Str::SettingsResetDefaultShortcuts => "Đặt lại phím tắt mặc định",
             Str::SettingsResetDefaultShortcutsSubtitle => {
-                "Khôi phục giá trị phím tắt tích hợp cho các phím tắt được quản lý trong cài đặt ứng dụng."
+                "Khôi phục giá trị tích hợp của mọi phím tắt."
             }
             Str::SettingsResetDefaults => "Đặt lại mặc định",
             Str::SettingsShortcutsFooter => {
@@ -1438,7 +1438,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
                 "Background color of the selected workspace in the sidebar."
             }
             Str::SettingsPaletteNote => {
-                "Edit shellx.json to add or remove named colors. \"Choose Custom Color...\" still adds local Custom N entries."
+                "Pick these colors from a workspace's right-click menu. Changing a color here changes every workspace that uses it."
             }
             Str::SettingsColorRed => "Red",
             Str::SettingsColorCrimson => "Crimson",
@@ -1517,7 +1517,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::SettingsRestoreShortcut => "Restore previous shortcut",
             Str::SettingsResetDefaultShortcuts => "Reset Default Shortcuts",
             Str::SettingsResetDefaultShortcutsSubtitle => {
-                "Restore built-in shortcut values for shortcuts managed in app settings."
+                "Restore the built-in value of every shortcut."
             }
             Str::SettingsResetDefaults => "Reset Defaults",
             Str::SettingsShortcutsFooter => {
