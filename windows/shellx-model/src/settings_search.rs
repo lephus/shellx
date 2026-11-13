@@ -1,7 +1,7 @@
 //! Settings search (spec §5.7): sections and wired rows, matched without case or Vietnamese
 //! marks. Every word of the query must match somewhere in the row; the best hits come first.
 
-use crate::settings_catalog::{Row, Section, groups, rows, section_title};
+use crate::settings_catalog::{Row, Section, groups, row, rows, section_title};
 use crate::strings::{Lang, t};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,6 +78,11 @@ fn search_rows(query: &str, lang: Lang, include: impl Fn(&Row) -> bool) -> Vec<H
         }
         for row in shown {
             let title = fold(t(lang, row.title));
+            // A row titled like its section (Updates, About, Keyboard Shortcuts) is the section:
+            // its section hit is the only hit.
+            if title == section_name {
+                continue;
+            }
             let alias = fold(t(other, row.title));
             let subtitle = row.subtitle.map(|s| fold(t(lang, s))).unwrap_or_default();
             let aliases = [alias.as_str(), subtitle.as_str(), row.synonyms];
@@ -97,23 +102,39 @@ fn search_rows(query: &str, lang: Lang, include: impl Fn(&Row) -> bool) -> Vec<H
 
 /// The text of a hit list item: its title, and for a row the title of its section as a caption.
 pub fn hit_label(hit: &Hit, lang: Lang) -> (String, Option<String>) {
-    let _ = (hit, lang);
-    (String::new(), None)
+    let section = t(lang, section_title(hit.section)).to_string();
+    match hit.row.and_then(row) {
+        Some(row) => (t(lang, row.title).to_string(), Some(section)),
+        None => (section, None),
+    }
 }
 
 /// How far to scroll (down from the top, 0 or more) to put a row in the vertical centre of the
 /// pane: the row's top in the content, its height, the pane's height and the most the content
 /// scrolls. A row that does not fit the pane shows its top.
 pub fn centred_scroll(row_top: f32, row_height: f32, viewport: f32, max: f32) -> f32 {
-    let _ = (row_top, row_height, viewport, max);
-    -1.0
+    let target = if row_height >= viewport {
+        row_top
+    } else {
+        row_top + (row_height - viewport) / 2.0
+    };
+    target.clamp(0.0, max.max(0.0))
 }
+
+/// The highlight of a row found by search holds this long, then fades out.
+pub const HIGHLIGHT_HOLD_MS: u64 = 2000;
+pub const HIGHLIGHT_FADE_MS: u64 = 400;
 
 /// How much of the highlight of a row found by search shows, 1.0 to 0.0, `elapsed_ms` after the
 /// click: full for 2 s, then it fades out in 400 ms.
 pub fn highlight_alpha(elapsed_ms: u64) -> f32 {
-    let _ = elapsed_ms;
-    -1.0
+    match elapsed_ms.checked_sub(HIGHLIGHT_HOLD_MS) {
+        None => 1.0,
+        Some(fading) if fading < HIGHLIGHT_FADE_MS => {
+            1.0 - fading as f32 / HIGHLIGHT_FADE_MS as f32
+        }
+        Some(_) => 0.0,
+    }
 }
 
 struct Query<'a> {
