@@ -58,6 +58,17 @@ pub struct Chrome {
     pub sidebar_bg: Rgba,
     pub sidebar_text: Rgba,
     pub sidebar_muted: Rgba,
+    /// Hover fill on the window's own surfaces (tab bar, menus, the machine list), stepped from
+    /// `panel` whatever the sidebar is.
+    pub panel_hover: Rgba,
+    /// Selected text in a text field: the accent at 30%.
+    pub field_selection: Rgba,
+    /// The selected workspace card's title, on `session_selected`.
+    pub sidebar_selection_title: Rgba,
+    /// The accent as text on the sidebar: the pairing code, the update pill, a primary button.
+    pub sidebar_primary_text: Rgba,
+    /// An icon under the pointer on the sidebar (the machines header's "+").
+    pub sidebar_icon_hover: Rgba,
 }
 
 /// WCAG 2 contrast ratio of two opaque colours, 1.0 to 21.0 (alpha is ignored).
@@ -149,6 +160,11 @@ pub fn chrome(
         sidebar_bg,
         sidebar_text,
         sidebar_muted,
+        panel_hover: BLACK,
+        field_selection: BLACK,
+        sidebar_selection_title: BLACK,
+        sidebar_primary_text: BLACK,
+        sidebar_icon_hover: BLACK,
     }
 }
 
@@ -375,9 +391,28 @@ mod tests {
         }
     }
 
-    /// The pairs spec §5.5 requires: text colours at 4.5:1, muted text at 3:1.
-    fn readable_pairs(c: &Chrome) -> [(&'static str, Rgba, Rgba, f32); 8] {
+    /// The pairs spec §5.5 requires: text colours at 4.5:1, muted text at 3:1, each on the surface
+    /// it is drawn on.
+    fn readable_pairs(c: &Chrome) -> [(&'static str, Rgba, Rgba, f32); 11] {
         [
+            (
+                "sidebar_selection_title on session_selected",
+                c.sidebar_selection_title,
+                c.session_selected,
+                4.5,
+            ),
+            (
+                "sidebar_primary_text on sidebar_bg",
+                c.sidebar_primary_text,
+                c.sidebar_bg,
+                4.5,
+            ),
+            (
+                "sidebar_icon_hover on sidebar_bg",
+                c.sidebar_icon_hover,
+                c.sidebar_bg,
+                4.5,
+            ),
             ("text on bg", c.text, c.bg, 4.5),
             (
                 "sidebar_text on sidebar_bg",
@@ -449,6 +484,13 @@ mod tests {
                 sidebar_bg: palette::PANEL,
                 sidebar_text: palette::TEXT_HI,
                 sidebar_muted: palette::MUTED,
+                // The tab bar and menus hover with the session row's fill today.
+                panel_hover: palette::SESSION_HOVER,
+                field_selection: palette::PRIMARY.with_alpha(0.3),
+                sidebar_selection_title: palette::SELECTION_TITLE,
+                sidebar_primary_text: palette::PRIMARY_TEXT,
+                // The machines header's "+" turns TEXT under the pointer.
+                sidebar_icon_hover: palette::TEXT,
             }
         );
     }
@@ -577,6 +619,55 @@ mod tests {
     }
 
     #[test]
+    fn text_on_the_sidebar_reads_on_the_sidebar() {
+        let dracula = named("Dracula");
+        // A white sidebar on a dark theme: the window's own colours do not read on it (the
+        // selected title was 1.11:1), the sidebar's do.
+        let white = chrome(
+            &dracula,
+            palette::PRIMARY,
+            SidebarBackground::Custom,
+            rgb(0xffffff),
+        );
+        assert!(contrast(white.selection_title, white.session_selected) < 4.5);
+        assert!(contrast(white.primary_text, white.sidebar_bg) < 4.5);
+        assert!(contrast(white.sidebar_selection_title, white.session_selected) >= 4.5);
+        assert!(contrast(white.sidebar_primary_text, white.sidebar_bg) >= 4.5);
+        assert!(contrast(white.sidebar_icon_hover, white.sidebar_bg) >= 4.5);
+        // A sidebar on the theme's own side keeps the window's colours.
+        let follow = chrome(
+            &dracula,
+            palette::PRIMARY,
+            SidebarBackground::FollowTheme,
+            palette::PANEL,
+        );
+        assert_eq!(follow.sidebar_selection_title, follow.selection_title);
+        assert_eq!(follow.sidebar_primary_text, follow.primary_text);
+        assert_eq!(follow.sidebar_icon_hover, follow.text);
+    }
+
+    #[test]
+    fn the_panels_hover_does_not_follow_the_sidebar() {
+        let dracula = named("Dracula");
+        let with = |sidebar, color| chrome(&dracula, palette::PRIMARY, sidebar, color);
+        let follow = with(SidebarBackground::FollowTheme, palette::PANEL);
+        let white = with(SidebarBackground::Custom, rgb(0xffffff));
+        assert_eq!(follow.panel_hover, white.panel_hover);
+        assert_ne!(white.panel_hover, white.session_hover);
+        // A small step from the panel towards the text: lighter than the panel on a dark theme,
+        // still far from the text.
+        assert!(luminance(follow.panel_hover) > luminance(follow.panel));
+        assert!(contrast(follow.panel_hover, follow.panel) < 1.3);
+        let latte = chrome(
+            &named("Catppuccin Latte"),
+            palette::PRIMARY,
+            SidebarBackground::FollowTheme,
+            palette::PANEL,
+        );
+        assert!(luminance(latte.panel_hover) < luminance(latte.panel));
+    }
+
+    #[test]
     fn a_custom_accent_colours_primary_only() {
         let orange = rgb(0xff8800);
         for theme in [shellx(), named("Dracula"), named("Catppuccin Latte")] {
@@ -601,12 +692,21 @@ mod tests {
                 (custom.running, custom.done, custom.error),
                 (palette::RUNNING, palette::DONE, palette::ERROR)
             );
+            assert_eq!(custom.field_selection, orange.with_alpha(0.3));
+            assert_ne!(
+                custom.sidebar_primary_text, blue.sidebar_primary_text,
+                "{}",
+                theme.name
+            );
+            assert!(contrast(custom.sidebar_primary_text, custom.sidebar_bg) >= 4.5);
             assert_eq!(
                 Chrome {
                     primary: blue.primary,
                     primary_soft: blue.primary_soft,
                     primary_line: blue.primary_line,
                     primary_text: blue.primary_text,
+                    field_selection: blue.field_selection,
+                    sidebar_primary_text: blue.sidebar_primary_text,
                     ..custom
                 },
                 blue,
