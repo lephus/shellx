@@ -1,4 +1,6 @@
 //! ShellX palette (spec §7.4). Soft colors only: no gradients, glows or colored shadows.
+//! The chrome constants are the ShellX theme's chrome; `chrome::chrome` derives every other
+//! theme's from them.
 
 use crate::strings::Str;
 
@@ -51,6 +53,10 @@ pub const SELECTION_TITLE: Rgba = Rgba::rgb(0xf1f5ff);
 pub const INDICATOR_UNFOCUSED: Rgba = Rgba::rgb(0x5b5478);
 /// The purple of a new workspace's rail.
 pub const RAIL_PURPLE: Rgba = Rgba::rgb(0x6a1b9a);
+/// Fill of the selected sidebar session row (mockup `.sess.cur`).
+pub const SESSION_SELECTED: Rgba = Rgba::rgb(0x1a1430);
+/// Fill of a sidebar session row under the pointer (mockup `.sess:hover`).
+pub const SESSION_HOVER: Rgba = Rgba::rgb(0x161026);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -152,6 +158,8 @@ mod tests {
             (SELECTION_TITLE, "#f1f5ff"),
             (INDICATOR_UNFOCUSED, "#5b5478"),
             (RAIL_PURPLE, "#6a1b9a"),
+            (SESSION_SELECTED, "#1a1430"),
+            (SESSION_HOVER, "#161026"),
         ];
         for (c, h) in cases {
             assert_eq!(c.hex(), h);

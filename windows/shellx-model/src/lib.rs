@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod account_view;
+pub mod chrome;
 pub mod controls;
 pub mod core_api;
 pub mod crash_report;
