@@ -228,6 +228,35 @@ pub fn matching(folded_names: &[String], query: &str) -> Vec<usize> {
         .collect()
 }
 
+/// Whether a gallery card named `card` is the theme the pair's side stores as `stored`: the
+/// same case rule as the lookup (`ThemeSet::get`).
+pub fn is_current_theme(card: &str, stored: &str) -> bool {
+    card.to_lowercase() == stored.to_lowercase()
+}
+
+/// The grid's top edge (window coordinates) moved by more than half a row since the frame
+/// was built: the rows built are for the old place, so another frame is needed.
+pub fn top_moved(old: f32, new: f32, row: f32) -> bool {
+    (new - old).abs() > row / 2.0
+}
+
+/// Which of the grid's items (top and height, in grid coordinates) to build: those that meet
+/// the viewport (`view` = top and bottom in window coordinates) or lie within `margin` of it,
+/// for a grid whose top edge is at `grid_top`. A span of indices; empty when none does.
+pub fn visible_span(
+    items: &[(f32, f32)],
+    view: (f32, f32),
+    grid_top: f32,
+    margin: f32,
+) -> std::ops::Range<usize> {
+    let (low, high) = (view.0 - grid_top - margin, view.1 - grid_top + margin);
+    let meets = |&(y, h): &(f32, f32)| y + h >= low && y <= high;
+    match (items.iter().position(meets), items.iter().rposition(meets)) {
+        (Some(first), Some(last)) => first..last + 1,
+        _ => 0..0,
+    }
+}
+
 /// The theme in use: the pair's side for `dark`; an empty or unknown name takes that side's
 /// default ("ShellX" dark, "Catppuccin Latte" light), then ShellX.
 pub fn active(set: &ThemeSet, settings: &Settings, dark: bool) -> TermTheme {
@@ -431,7 +460,6 @@ mod tests {
         assert!(!top_moved(500.0, 520.0, 64.0));
         assert!(top_moved(500.0, 540.0, 64.0));
         assert!(top_moved(500.0, 100.0, 64.0));
-        assert!(top_moved(0.0, f32::NAN, 64.0) || !top_moved(0.0, f32::NAN, 64.0));
     }
 
     #[test]
@@ -443,7 +471,7 @@ mod tests {
         // Grid top at 100, viewport 80..400: rows 0..=4 (y 0..320), plus a margin row.
         assert_eq!(visible_span(&rows, (80.0, 400.0), 100.0, 64.0), 0..6);
         // Scrolled far down: grid top at -300, viewport 80..400 -> y 380..700.
-        assert_eq!(visible_span(&rows, (80.0, 400.0), -300.0, 64.0), 5..10);
+        assert_eq!(visible_span(&rows, (80.0, 400.0), -300.0, 64.0), 4..10);
         assert_eq!(visible_span(&[], (0.0, 10.0), 0.0, 64.0), 0..0);
     }
 }

@@ -29,7 +29,10 @@ use shellx_model::settings::{Accent, Key, accent_value, choice_value, theme_valu
 use shellx_model::settings_catalog::{Row, Section, row, section_title};
 use shellx_model::settings_search::fold;
 use shellx_model::strings::{Lang, Str, t, theme_pair_summary};
-use shellx_model::theme_file::{TermTheme, gallery_grid, is_dark, matching, shellx, sides_first};
+use shellx_model::theme_file::{
+    TermTheme, gallery_grid, is_current_theme, is_dark, matching, shellx, sides_first, top_moved,
+    visible_span,
+};
 
 use super::super::{SettingsView, stack};
 use crate::fonts;
@@ -136,6 +139,7 @@ pub fn render(view: &mut SettingsView, cx: &mut Context<SettingsView>) -> Div {
     // The pane's width at its last paint, less its padding, the card's borders and the
     // gallery's padding.
     let pane = f32::from(view.detail_scroll.bounds().size.width);
+    let card_width = pane - 2.0 * super::super::PANE_PADDING;
     let width = (pane - 2.0 * super::super::PANE_PADDING - 2.0 - 2.0 * GALLERY_PAD)
         .max(0.0)
         .round();
@@ -168,13 +172,26 @@ pub fn render(view: &mut SettingsView, cx: &mut Context<SettingsView>) -> Div {
     let first = appearance.is_some() || accent.is_some();
     let second = pair.is_some() || grid.is_some();
     stack()
+        .w_full()
         .child(section_header(
             t(lang, section_title(Section::Themes)).into(),
         ))
         .when(first, |s| {
-            s.child(card().children(appearance).children(accent))
+            s.child(
+                equal(card(), card_width)
+                    .children(appearance)
+                    .children(accent),
+            )
         })
-        .when(second, |s| s.child(card().children(pair).children(grid)))
+        .when(second, |s| {
+            s.child(equal(card(), card_width).children(pair).children(grid))
+        })
+}
+
+/// Both cards are as wide as the pane allows: the gallery's fixed-width cards would otherwise
+/// size one card to its content (the width is the pane's at its last paint; 0 before it).
+fn equal(card: Div, width: f32) -> Div {
+    if width > 0.0 { card.w(px(width)) } else { card }
 }
 
 fn appearance_row(
@@ -456,8 +473,7 @@ impl ThemeGallery {
             set.themes().into_iter().partition(is_dark);
         let fallback = shellx().background;
         self.preview = (
-            set.get("ShellX")
-                .map_or(Rgba::rgb(0), |theme| theme.background),
+            set.get("ShellX").map_or(fallback, |theme| theme.background),
             set.get("Catppuccin Latte")
                 .map_or(fallback, |theme| theme.background),
         );
@@ -730,18 +746,14 @@ impl Render for ThemeGallery {
             (0.0, f32::from(window.viewport_size().height))
         };
         let top = self.top.get();
-        let (low, high) = (view_top - top - ROW_H, view_bottom - top + ROW_H);
-        let visible: Vec<&(Item, f32, f32)> = items
-            .iter()
-            .filter(|(_, y, h)| y + h >= low && *y <= high)
-            .collect();
+        let spans: Vec<(f32, f32)> = items.iter().map(|(_, y, h)| (*y, *h)).collect();
+        let visible = &items[visible_span(&spans, (view_top, view_bottom), top, ROW_H)];
         let spacer = visible.first().map_or(0.0, |(_, y, _)| *y);
 
         let settings = current(cx);
-        let pair = [
-            settings.theme_dark.to_lowercase(),
-            settings.theme_light.to_lowercase(),
-        ];
+        let (stored_dark, stored_light) =
+            (settings.theme_dark.clone(), settings.theme_light.clone());
+        let stored = |dark: bool| if dark { &stored_dark } else { &stored_light };
         let ring = self.focus.is_focused(window);
         let ringed = self.at_cursor(order);
         let mut body = div().flex().flex_col().w_full().pt(px(spacer));
@@ -759,7 +771,7 @@ impl Render for ThemeGallery {
                     for place in first..(first + columns).min(side.shown.len()) {
                         let theme_ix = side.shown[place];
                         let theme = &side.themes[theme_ix];
-                        let chosen = theme.name.to_lowercase() == pair[side_ix(!dark)];
+                        let chosen = is_current_theme(&theme.name, stored(dark));
                         let at = ring && ringed == Some((dark, place));
                         let id = before + place;
                         cards = cards.child(self.card(
@@ -777,8 +789,18 @@ impl Render for ThemeGallery {
         }
 
         let top_cell = self.top.clone();
+        let gallery = cx.entity();
         let measure = canvas(
-            move |bounds, _, _| top_cell.set(f32::from(bounds.origin.y)),
+            move |bounds, window, _| {
+                let new = f32::from(bounds.origin.y);
+                let old = top_cell.replace(new);
+                // The rows were built for the old top: draw the gallery again next frame
+                // (not a refresh, and not a notify, during the parent's draw).
+                if top_moved(old, new, ROW_H) {
+                    let gallery = gallery.clone();
+                    window.on_next_frame(move |_, cx| gallery.update(cx, |_, cx| cx.notify()));
+                }
+            },
             |_, _, _, _| {},
         )
         .absolute()
