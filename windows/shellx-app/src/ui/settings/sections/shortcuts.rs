@@ -63,7 +63,9 @@ pub struct ShortcutList {
 pub fn new(cx: &mut Context<SettingsView>) -> (Entity<ShortcutList>, Vec<Subscription>) {
     let list = cx.new(ShortcutList::new);
     let search = list.read(cx).search.clone();
-    let subscription = cx.subscribe(&search, |view, _, event, cx| view.field_event(*event, cx));
+    let subscription = cx.subscribe(&search, |view, search, event, cx| {
+        view.search_event(&search, *event, cx)
+    });
     (list, vec![subscription])
 }
 
@@ -271,6 +273,9 @@ impl ShortcutList {
 impl Render for ShortcutList {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
+        self.search.update(cx, |search, cx| {
+            search.set_placeholder(t(lang, Str::SettingsSearchShortcuts), cx)
+        });
         let keymap = current_keymap(cx).clone();
         let filter = match &self.detected {
             Some(chord) => ListFilter::Chord(chord),

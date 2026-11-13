@@ -100,8 +100,8 @@ pub fn catalogue_row(
     }
     let lang = cx.global::<Services>().lang;
     // `SHELLX_LANG` decides the language while it is set: the Language row can change nothing.
-    let env_decides = key == Key::Language
-        && Lang::env_decides(std::env::var("SHELLX_LANG").ok().as_deref());
+    let env_decides =
+        key == Key::Language && Lang::env_decides(std::env::var("SHELLX_LANG").ok().as_deref());
     let disabled = !shown.enabled || env_decides;
     let control: AnyElement = match row.control {
         // Drawn by its section file.
@@ -478,6 +478,28 @@ fn restore_number(
     }
     field.update(cx, |field, cx| field.set_text(&number_text(stored), cx));
     true
+}
+
+/// Reset All: a number field drops what was typed and shows the stored value again.
+pub(super) fn discard_pending_numbers(view: &mut SettingsView, cx: &mut Context<SettingsView>) {
+    let ids: Vec<&'static str> = view
+        .controls
+        .iter()
+        .filter(|(_, entry)| matches!(entry.control, RowControl::Number { .. }))
+        .map(|(id, _)| *id)
+        .collect();
+    for id in ids {
+        if let Some(RowEntry {
+            control: RowControl::Number { editing, .. },
+            ..
+        }) = view.controls.get_mut(id)
+        {
+            *editing = false;
+        }
+        if let Some((field, stored, ..)) = number_row(id, view, cx) {
+            field.update(cx, |field, cx| field.set_text(&number_text(stored), cx));
+        }
+    }
 }
 
 /// Settings is closing: a number field holding an edit commits it (clamped).

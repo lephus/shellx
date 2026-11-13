@@ -409,6 +409,9 @@ impl SettingsView {
                 None => None,
             }
         };
+        self.terminal.shell_field.update(cx, |field, cx| {
+            field.set_placeholder(t(lang, Str::CustomShellPlaceholder), cx)
+        });
         card_body()
             .child(card_title(t(lang, Str::SettingsShell)))
             .children(rows)

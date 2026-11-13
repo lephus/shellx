@@ -122,7 +122,9 @@ pub fn new(
 ) -> (Entity<ThemeGallery>, Vec<Subscription>) {
     let gallery = cx.new(|cx| ThemeGallery::new(scroll, cx));
     let search = gallery.read(cx).search.clone();
-    let subscription = cx.subscribe(&search, |view, _, event, cx| view.field_event(*event, cx));
+    let subscription = cx.subscribe(&search, |view, search, event, cx| {
+        view.search_event(&search, *event, cx)
+    });
     (gallery, vec![subscription])
 }
 
@@ -728,6 +730,9 @@ fn set_accent(accent: Accent, cx: &mut gpui::App) {
 impl Render for ThemeGallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
+        self.search.update(cx, |search, cx| {
+            search.set_placeholder(t(lang, Str::SettingsSearchAllThemes), cx)
+        });
         let order = self.order(cx);
         let width = self.width.filter(|w| *w > 0.0).unwrap_or(FIRST_WIDTH);
         let (columns, card_width) = gallery_grid(width);

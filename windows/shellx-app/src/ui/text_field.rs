@@ -101,6 +101,14 @@ impl TextField {
         cx.notify();
     }
 
+    /// The hint shown while the field is empty (drawn again when the language changes).
+    pub fn set_placeholder(&mut self, placeholder: &str, cx: &mut Context<Self>) {
+        if self.placeholder.as_ref() != placeholder {
+            self.placeholder = placeholder.to_string().into();
+            cx.notify();
+        }
+    }
+
     /// A disabled field keeps its text and ignores edits (while signing in).
     pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
         if self.disabled != disabled {

@@ -657,9 +657,8 @@ impl SignInDialog {
             transparent_black()
         };
         let element = if enabled {
-            element
-                .track_focus(&handle)
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            element.track_focus(&handle).on_click(cx.listener(
+                move |this, _: &ClickEvent, _, cx| {
                     // The press already gave this button the keyboard, but `on_focus` runs only
                     // at the end of the next draw, and a touchpad tap delivers press and release
                     // with no draw between them. Record the holder now, so the sync this click
@@ -667,7 +666,8 @@ impl SignInDialog {
                     // (re-review of I-A).
                     this.focused = control;
                     on_click(this, cx)
-                }))
+                },
+            ))
         } else {
             element
         };
@@ -965,6 +965,12 @@ impl EventEmitter<SignInEvent> for SignInDialog {}
 impl Render for SignInDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang: Lang = cx.global::<Services>().lang;
+        self.email_field.update(cx, |field, cx| {
+            field.set_placeholder(t(lang, Str::EmailAddress), cx)
+        });
+        self.code_field.update(cx, |field, cx| {
+            field.set_placeholder(t(lang, Str::CodePlaceholder), cx)
+        });
         let items = match self.purpose {
             GooglePurpose::SignIn => self.sign_in_children(lang, window, cx),
             GooglePurpose::Link => self.link_children(lang, cx),

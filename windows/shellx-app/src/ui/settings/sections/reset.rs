@@ -43,6 +43,7 @@ pub fn render(view: &mut SettingsView, cx: &mut Context<SettingsView>) -> Div {
 /// Every setting back to its default, now. An open banner or edit line goes with it.
 fn reset_all(view: &mut SettingsView, cx: &mut Context<SettingsView>) {
     SettingsService::entity(cx).update(cx, |service, cx| service.reset_all(cx));
+    super::super::rows::discard_pending_numbers(view, cx);
     super::terminal_cards::reset_shell(view, cx);
     view.shortcuts.update(cx, |list, cx| list.close_notice(cx));
     cx.notify();

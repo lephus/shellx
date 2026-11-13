@@ -40,7 +40,7 @@ use gpui::{
     Focusable, FontWeight, IntoElement, KeyDownEvent, Pixels, Render, ScrollHandle, SharedString,
     Stateful, Subscription, Window, canvas, div, point, prelude::*, px, relative, svg,
 };
-use shellx_model::controls::{ViewKey, view_key, view_takes_focus};
+use shellx_model::controls::{SearchEsc, ViewKey, search_escape, view_key, view_takes_focus};
 use shellx_model::core_api::GooglePurpose;
 use shellx_model::settings_catalog::{
     Group, Row, Section, group_title, groups, row, rows, section_title,
@@ -144,7 +144,9 @@ impl SettingsView {
             cx.observe(&account, |_, _, cx| cx.notify()),
             // A setting changed here or in the other window: the rows show it.
             cx.observe(&SettingsService::entity(cx), |_, _, cx| cx.notify()),
-            cx.subscribe(&search, |this, _, event, cx| this.field_event(*event, cx)),
+            cx.subscribe(&search, |this, search, event, cx| {
+                this.search_event(&search, *event, cx)
+            }),
             // Typing changes the hit list; it never changes the section.
             cx.observe(&search, |this, search, cx| {
                 let query = search.read(cx).text().trim().to_string();
@@ -354,6 +356,23 @@ impl SettingsView {
     /// Settings is closing (by any way): a number field holding an edit keeps it.
     fn commit_edits(&mut self, cx: &mut Context<Self>) {
         rows::commit_pending_numbers(self, cx);
+    }
+
+    /// A search field's events: Esc clears the text first, and closes Settings only on an empty
+    /// field (the Mac's search field does the same).
+    pub(super) fn search_event(
+        &mut self,
+        field: &Entity<TextField>,
+        event: TextFieldEvent,
+        cx: &mut Context<Self>,
+    ) {
+        if event == TextFieldEvent::Cancel
+            && search_escape(field.read(cx).text()) == SearchEsc::Clear
+        {
+            field.update(cx, |field, cx| field.clear(cx));
+            return;
+        }
+        self.field_event(event, cx);
     }
 
     /// Esc, Tab or Shift+Tab in one of the view's text fields (the field stops them).
@@ -621,6 +640,9 @@ impl Render for SettingsView {
             window.focus(&self.focus);
         }
         self.drawn_section = Some(self.section);
+        self.search.update(cx, |search, cx| {
+            search.set_placeholder(t(lang, Str::SettingsSearch), cx)
+        });
         let listed = listed_sections();
         let sidebar = self.sidebar(&listed, lang, cx);
         let content = self.section_content(cx);

@@ -121,6 +121,22 @@ pub fn number_escape(text: &str, stored: f32) -> NumberEsc {
     }
 }
 
+/// What Esc does in a Settings search field: with text in it, the text goes and the window
+/// stays; on an empty field, the key is the window's (it closes).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchEsc {
+    Clear,
+    Close,
+}
+
+pub fn search_escape(text: &str) -> SearchEsc {
+    if text.is_empty() {
+        SearchEsc::Close
+    } else {
+        SearchEsc::Clear
+    }
+}
+
 /// The value to write when the window closes with `text` in the field: its clamped number,
 /// only when it differs from the stored one.
 pub fn number_pending(text: &str, stored: f32, min: f32, max: f32) -> Option<f32> {
