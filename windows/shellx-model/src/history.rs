@@ -188,4 +188,14 @@ mod tests {
         assert_eq!(h.forward(p(1), &all), Some(p(2)));
         assert_eq!(h.forward(p(2), &all), Some(p(3)));
     }
+
+    #[test]
+    fn focus_history_skips_moves_inside_a_workspace_by_default() {
+        // Off: only a move to another workspace is recorded.
+        assert!(!records(false, true));
+        assert!(records(false, false));
+        // On: every move is.
+        assert!(records(true, true));
+        assert!(records(true, false));
+    }
 }

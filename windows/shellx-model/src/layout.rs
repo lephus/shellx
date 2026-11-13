@@ -408,4 +408,59 @@ mod tests {
         }
         assert_eq!(l.neighbor(s(1), Dir::Right, B, 1.0), Some(s(3)));
     }
+
+    fn widths(l: &Layout) -> Vec<f32> {
+        let b = Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 903.0,
+            h: 100.0,
+        };
+        l.rects(b, 1.0).iter().map(|(_, r)| r.w).collect()
+    }
+
+    #[test]
+    fn equalize_gives_three_regions_a_third_each() {
+        let mut l = Layout::new(s(1));
+        assert!(l.split_with(s(1), Axis::Row, s(2), true));
+        assert!(l.split_with(s(2), Axis::Row, s(3), true));
+        let w = widths(&l);
+        assert_eq!(w.len(), 3);
+        for pair in w.windows(2) {
+            assert!((pair[0] - pair[1]).abs() <= 1.0, "{w:?}");
+        }
+        // Splitting the first one of the run evens it out again.
+        assert!(l.split_with(s(1), Axis::Row, s(4), true));
+        let w = widths(&l);
+        assert_eq!(w.len(), 4);
+        for pair in w.windows(2) {
+            assert!((pair[0] - pair[1]).abs() <= 1.0, "{w:?}");
+        }
+    }
+
+    #[test]
+    fn equalize_leaves_the_other_axis_alone() {
+        let mut l = Layout::new(s(1));
+        l.split_with(s(1), Axis::Row, s(2), true);
+        l.split_with(s(2), Axis::Column, s(3), true);
+        // The column split halves region 2; region 1 keeps its half.
+        let w = widths(&l);
+        assert_eq!(w, [451.0, 451.0, 451.0]);
+        let Node::Split { ratio, .. } = l.root() else {
+            panic!("a split")
+        };
+        assert_eq!(*ratio, 0.5);
+    }
+
+    #[test]
+    fn without_equalize_the_new_region_halves_its_parent() {
+        let mut l = Layout::new(s(1));
+        assert!(l.split_with(s(1), Axis::Row, s(2), false));
+        assert!(l.split_with(s(2), Axis::Row, s(3), false));
+        let w = widths(&l);
+        assert!((w[0] - 451.0).abs() <= 1.0, "{w:?}");
+        assert!((w[1] - w[2]).abs() <= 1.0, "{w:?}");
+        assert!((w[1] - w[0] / 2.0).abs() <= 1.0, "{w:?}");
+        assert!(!l.split_with(s(9), Axis::Row, s(5), true));
+    }
 }

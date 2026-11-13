@@ -853,4 +853,77 @@ mod tests {
         assert_eq!(t.active().panes(), vec![c]);
         assert!(t.contains(b2));
     }
+
+    fn ids(t: &Tabs) -> Vec<TabId> {
+        t.tabs().iter().map(|tab| tab.id).collect()
+    }
+
+    #[test]
+    fn a_new_workspace_lands_at_top_after_current_or_end() {
+        use crate::settings::Placement;
+        let (mut t, _) = Tabs::new();
+        let (b, _) = t.new_tab(PaneTarget::Local);
+        let (c, _) = t.new_tab(PaneTarget::Local);
+        let a = ids(&t)[0];
+        assert_eq!(ids(&t), [a, b, c]);
+        // Active is the first one: After current goes between a and b.
+        assert!(t.select(a));
+        let (d, _) = t.new_tab_at(PaneTarget::Local, Placement::AfterCurrent);
+        assert_eq!(ids(&t), [a, d, b, c]);
+        assert_eq!(t.active().id, d);
+        // Top goes before everything, End after everything, each made active.
+        let (e, _) = t.new_tab_at(PaneTarget::Local, Placement::Top);
+        assert_eq!(ids(&t), [e, a, d, b, c]);
+        assert_eq!(t.active().id, e);
+        assert!(t.select(b));
+        let (f, _) = t.new_tab_at(PaneTarget::Local, Placement::End);
+        assert_eq!(ids(&t), [e, a, d, b, c, f]);
+        assert_eq!(t.active().id, f);
+    }
+
+    #[test]
+    fn closing_the_last_terminal_keeps_the_workspace_when_asked() {
+        let (mut t, first) = Tabs::new();
+        let (second, only) = t.new_tab(PaneTarget::Local);
+        let before = ids(&t);
+        let out = t.close_pane_with(only, true);
+        let CloseOutcome::Respawned { tab, pane } = out else {
+            panic!("{out:?}")
+        };
+        assert_eq!(tab, second);
+        assert_ne!(pane, only);
+        assert_eq!(ids(&t), before, "the workspace stays where it was");
+        assert_eq!(t.active().id, second);
+        assert_eq!(t.active().panes(), vec![pane]);
+        assert_eq!(t.active().focused, pane);
+        assert!(!t.contains(only));
+        assert_eq!(t.target(pane), Some(&PaneTarget::Local));
+        // Without the setting the workspace closes, as before.
+        let out = t.close_pane_with(pane, false);
+        assert!(matches!(out, CloseOutcome::TabClosed { closed, .. } if closed == second));
+        assert!(t.contains(first));
+    }
+
+    #[test]
+    fn keeping_the_workspace_leaves_a_split_workspace_alone() {
+        let (mut t, first) = Tabs::new();
+        let second = t.split_focused(Axis::Row, PaneTarget::Local);
+        let out = t.close_pane_with(second, true);
+        assert!(matches!(out, CloseOutcome::PaneClosed { focus, .. } if focus == first));
+    }
+
+    #[test]
+    fn the_last_workspace_is_always_refilled() {
+        let (mut t, only) = Tabs::new();
+        for keep in [true, false] {
+            let pane = t.active().focused;
+            let out = t.close_pane_with(pane, keep);
+            let CloseOutcome::Respawned { pane: fresh, .. } = out else {
+                panic!("{out:?}")
+            };
+            assert_eq!(t.tabs().len(), 1, "keep {keep}");
+            assert_eq!(t.active().panes(), vec![fresh], "keep {keep}");
+            assert_ne!(fresh, only);
+        }
+    }
 }
