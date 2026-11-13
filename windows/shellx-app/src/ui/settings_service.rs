@@ -213,6 +213,29 @@ mod tests {
         assert_eq!(json_at(&path), json!({}));
     }
 
+    /// A tooltip or menu line shows the action's current chord: the default, the one the
+    /// user bound (the keymap follows `shortcuts.bindings` when it changes), or none at all
+    /// once the action is unbound.
+    #[test]
+    fn a_shortcut_label_shows_the_current_binding_or_none() {
+        let store = SettingsStore::new(std::path::PathBuf::from("settings.json"));
+        let mut service =
+            SettingsService::new(Settings::default(), Arc::new(PendingWrites::new(store)));
+        let new_workspace =
+            |service: &SettingsService| label(service.keymap(), Action::NewWorkspace);
+        assert_eq!(new_workspace(&service).as_deref(), Some("Ctrl+Shift+N"));
+
+        let bindings = json!({"newTab": "ctrl+shift+k"});
+        assert!(service.settings.set_from_value(Key::Bindings, &bindings));
+        service.follow(Key::Bindings);
+        assert_eq!(new_workspace(&service).as_deref(), Some("Ctrl+Shift+K"));
+
+        let bindings = json!({"newTab": null});
+        assert!(service.settings.set_from_value(Key::Bindings, &bindings));
+        service.follow(Key::Bindings);
+        assert_eq!(new_workspace(&service), None);
+    }
+
     #[test]
     fn a_failed_write_is_dropped_without_a_panic() {
         // the folder cannot be made (a file has its name): the value lives in memory only
