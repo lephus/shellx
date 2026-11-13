@@ -875,6 +875,13 @@ mod tests {
     }
 
     #[test]
+    fn esc_in_a_search_field_clears_its_text_and_on_an_empty_field_closes() {
+        assert_eq!(search_escape("font"), SearchEsc::Clear);
+        assert_eq!(search_escape(" "), SearchEsc::Clear);
+        assert_eq!(search_escape(""), SearchEsc::Close);
+    }
+
+    #[test]
     fn closing_with_an_edit_in_a_number_field_commits_it_clamped() {
         assert_eq!(number_pending("75", 50.0, 0.0, 100_000.0), Some(75.0));
         assert_eq!(
