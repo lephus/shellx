@@ -339,8 +339,7 @@ pub fn word_at(line: &str, col: u16) -> (u16, u16) {
 /// something is selected. Only a release asks, so a selection that merely moves with the
 /// scrollback is never copied again.
 pub fn copies_on_release(copy_on_select: bool, selection_visible: bool) -> bool {
-    let _ = (copy_on_select, selection_visible);
-    unimplemented!()
+    copy_on_select && selection_visible
 }
 
 #[cfg(test)]

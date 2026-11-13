@@ -394,34 +394,43 @@ static ROWS: &[Row] = &[
             "tab bar font size title text points pt bigger smaller co chu thanh tab",
         )
     },
-    setting(
-        Key::ScrollSpeed,
-        Section::Terminal,
-        Str::SettingsScrollSpeed,
-        Some(Str::SettingsScrollSpeedSubtitle),
-        Control::Slider {
-            min: 0.25,
-            max: 3.0,
-            step: 0.05,
-            unit: Unit::Times,
-            reset: true,
-        },
-        "scroll speed multiplier wheel mouse touchpad trackpad sensitivity faster slower toc do cuon con lan",
-    ),
-    toggle(
-        Key::CopyOnSelect,
-        Section::Terminal,
-        Str::SettingsCopyOnSelect,
-        Str::SettingsCopyOnSelectSubtitle,
-        "copy on selection select clipboard mouse sao chep khi chon bo nho tam",
-    ),
-    toggle(
-        Key::ConfirmUnsafePaste,
-        Section::Terminal,
-        Str::SettingsConfirmUnsafePaste,
-        Str::SettingsConfirmUnsafePasteSubtitleOn,
-        "confirm unsafe paste protection warning multi-line multiple lines newline clipboard xac nhan dan nhieu dong",
-    ),
+    Row {
+        wired: true,
+        ..setting(
+            Key::ScrollSpeed,
+            Section::Terminal,
+            Str::SettingsScrollSpeed,
+            Some(Str::SettingsScrollSpeedSubtitle),
+            Control::Slider {
+                min: 0.25,
+                max: 3.0,
+                step: 0.05,
+                unit: Unit::Times,
+                reset: true,
+            },
+            "scroll speed multiplier wheel mouse touchpad trackpad sensitivity faster slower toc do cuon con lan",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::CopyOnSelect,
+            Section::Terminal,
+            Str::SettingsCopyOnSelect,
+            Str::SettingsCopyOnSelectSubtitle,
+            "copy on selection select clipboard mouse sao chep khi chon bo nho tam",
+        )
+    },
+    Row {
+        wired: true,
+        ..toggle(
+            Key::ConfirmUnsafePaste,
+            Section::Terminal,
+            Str::SettingsConfirmUnsafePaste,
+            Str::SettingsConfirmUnsafePasteSubtitleOn,
+            "confirm unsafe paste protection warning multi-line multiple lines newline clipboard xac nhan dan nhieu dong",
+        )
+    },
     // "Default" plus the installed monospaced families, known only at run time.
     Row {
         wired: true,
@@ -510,13 +519,16 @@ static ROWS: &[Row] = &[
             "scrollback limit history buffer lines memory megabytes mb gioi han lich su bo nho",
         )
     },
-    toggle(
-        Key::MiddleClickPaste,
-        Section::Terminal,
-        Str::SettingsMiddleClickPaste,
-        Str::SettingsMiddleClickPasteSubtitle,
-        "middle click paste mouse button wheel primary selection dan nut giua chuot",
-    ),
+    Row {
+        wired: true,
+        ..toggle(
+            Key::MiddleClickPaste,
+            Section::Terminal,
+            Str::SettingsMiddleClickPaste,
+            Str::SettingsMiddleClickPasteSubtitle,
+            "middle click paste mouse button wheel primary selection dan nut giua chuot",
+        )
+    },
     // Workspace Colors.
     setting(
         Key::IndicatorStyle,
@@ -1316,12 +1328,16 @@ mod tests {
                 "shell",
                 "display",
                 "terminalConfig.surface-tab-bar-font-size",
+                "terminal.scrollSpeed",
+                "terminal.copyOnSelect",
+                "terminal.confirmUnsafePaste",
                 "terminalConfig.font-family",
                 "terminalConfig.font-size",
                 "terminalConfig.cursor-style",
                 "terminalConfig.window-padding-x",
                 "terminalConfig.window-padding-y",
                 "terminalConfig.scrollback-limit",
+                "terminalConfig.middle-click-action",
                 "resetShortcuts",
                 "shortcutList",
                 "updates",

@@ -120,6 +120,7 @@ pub fn secondary_click(
     match button {
         SecondaryButton::Right if has_selection => PaneClick::CopySelection,
         SecondaryButton::Right => PaneClick::Paste,
+        SecondaryButton::Middle if middle_pastes => PaneClick::Paste,
         SecondaryButton::Middle => PaneClick::Nothing,
     }
 }
@@ -127,8 +128,7 @@ pub fn secondary_click(
 /// A wheel or touchpad distance in lines, times the Scroll Speed setting. Applied before the
 /// fractional accumulator, so 0.25x of 4 lines collects to exactly one line.
 pub fn scaled_scroll(lines: f64, speed: f32) -> f64 {
-    let _ = (lines, speed);
-    unimplemented!()
+    lines * f64::from(speed)
 }
 
 #[cfg(test)]

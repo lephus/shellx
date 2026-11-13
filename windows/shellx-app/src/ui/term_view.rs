@@ -64,11 +64,11 @@ use shellx_model::layout::Rect;
 use shellx_model::modal::{StoppedPaneKey, stopped_pane_key};
 use shellx_model::mouse::{
     PaneClick, ScreenModes, ScrollAccumulator, SecondaryButton, WheelAction, cap_to_screen,
-    secondary_click, wheel_action,
+    scaled_scroll, secondary_click, wheel_action,
 };
-use shellx_model::paste::{ConfirmKey, PendingPaste, confirm_key, needs_paste_confirmation};
+use shellx_model::paste::{ConfirmKey, PendingPaste, asks_first, confirm_key};
 use shellx_model::selection::{
-    Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
+    Cell, Follow, Selection, cell_at, copies_on_release, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
 use shellx_model::settings::{CursorPaint, CursorStyle, cursor_paint, cursor_shape};
@@ -624,6 +624,13 @@ impl TermView {
     /// The selected cells' text to the clipboard (CRLF row joins), then the
     /// selection is cleared. No selection: nothing happens.
     fn copy_selection(&mut self, cx: &mut Context<Self>) {
+        self.write_selection_to_clipboard(cx);
+        self.clear_selection(cx);
+    }
+
+    /// Writes the selected text to the clipboard and leaves the selection as it is.
+    /// Nothing else gets the text: it is not logged.
+    fn write_selection_to_clipboard(&mut self, cx: &mut Context<Self>) {
         let (Some(sel), Some(grid)) = (self.selection, self.grid) else {
             return;
         };
@@ -640,7 +647,6 @@ impl TermView {
         if !text.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
         }
-        self.clear_selection(cx);
     }
 
     /// The one way a paste starts (Ctrl+Shift+V, Shift+Insert, right click,
@@ -659,7 +665,7 @@ impl TermView {
         let Some(bracketed) = self.backend.core().map(|core| core.bracketed_paste()) else {
             return;
         };
-        if needs_paste_confirmation(&text, bracketed) {
+        if asks_first(&text, bracketed, current(cx).confirm_unsafe_paste) {
             self.pending_paste = Some(PendingPaste::new(text));
             cx.notify();
         } else {
@@ -846,8 +852,13 @@ impl TermView {
         }
     }
 
-    fn select_mouse_up(&mut self) {
+    /// Letting go of the left button ends the drag; with Copy on Selection on, what is
+    /// selected goes to the clipboard once, and stays selected.
+    fn select_mouse_up(&mut self, cx: &mut Context<Self>) {
         self.drag = None;
+        if copies_on_release(current(cx).copy_on_select, self.selection.is_some()) {
+            self.write_selection_to_clipboard(cx);
+        }
     }
 
     /// Right and middle clicks as in the Windows console (`mouse::secondary_click`,
@@ -861,7 +872,12 @@ impl TermView {
         cx: &mut Context<Self>,
     ) {
         let focused = self.focus_handle.is_focused(window);
-        match secondary_click(button, focused, self.has_selection(), false) {
+        match secondary_click(
+            button,
+            focused,
+            self.has_selection(),
+            current(cx).middle_click_paste,
+        ) {
             PaneClick::FocusOnly => window.focus(&self.focus_handle),
             PaneClick::Paste => self.paste_clipboard(cx),
             PaneClick::CopySelection => self.copy_selection(cx),
@@ -965,7 +981,14 @@ impl TermView {
         let delta = event.delta.pixel_delta(self.line_height);
         let lines = f64::from(f32::from(delta.y) / f32::from(self.line_height));
         // at most one screen per event (review M8)
-        match cap_to_screen(wheel_action(self.scroll.add(lines), modes), rows) {
+        match cap_to_screen(
+            wheel_action(
+                self.scroll
+                    .add(scaled_scroll(lines, current(cx).scroll_speed)),
+                modes,
+            ),
+            rows,
+        ) {
             WheelAction::None => {}
             WheelAction::Scrollback(n) => {
                 self.follow_viewport(false, |backend| {
@@ -1879,7 +1902,7 @@ impl Element for TermElement {
                     && event.button == MouseButton::Left
                     && view.read(cx).drag.is_some()
                 {
-                    view.update(cx, |view, _| view.select_mouse_up());
+                    view.update(cx, |view, cx| view.select_mouse_up(cx));
                 }
             });
         }

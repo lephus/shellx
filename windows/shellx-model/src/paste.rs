@@ -55,8 +55,7 @@ pub fn needs_paste_confirmation(text: &str, bracketed: bool) -> bool {
 /// text is several command lines for a pane that is not in bracketed-paste mode
 /// ([`needs_paste_confirmation`]). With the setting off nothing asks.
 pub fn asks_first(text: &str, bracketed: bool, confirm_unsafe: bool) -> bool {
-    let _ = (text, bracketed, confirm_unsafe);
-    unimplemented!()
+    confirm_unsafe && needs_paste_confirmation(text, bracketed)
 }
 
 /// How many command lines `text` holds, as the confirmation counts them: segments split at
