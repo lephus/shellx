@@ -540,4 +540,199 @@ mod tests {
         ));
         assert!(!view_takes_focus(None, Section::Account));
     }
+
+    /// Every key a person may type while Settings is open, plain and as chords.
+    fn every_key() -> Vec<String> {
+        let named = [
+            "space",
+            "enter",
+            "tab",
+            "escape",
+            "backspace",
+            "delete",
+            "left",
+            "right",
+            "up",
+            "down",
+            "home",
+            "end",
+            "pageup",
+            "pagedown",
+            "insert",
+            "f1",
+            "f4",
+            "f5",
+            "f12",
+            "f13",
+            ",",
+            ".",
+            "=",
+            "+",
+            "-",
+            "_",
+            "/",
+            "[",
+            "]",
+            "shift",
+            "control",
+            "alt",
+        ];
+        ('a'..='z')
+            .chain('0'..='9')
+            .map(String::from)
+            .chain(named.map(String::from))
+            .collect()
+    }
+
+    fn with(k: KeyIn<'_>, ctrl: bool, alt: bool, shift: bool) -> KeyIn<'_> {
+        KeyIn {
+            ctrl,
+            alt,
+            shift,
+            ..k
+        }
+    }
+
+    /// The key rule of this app: on Windows a stopped key-down yields no WM_CHAR. A recorder
+    /// (a row's, or "Detect Shortcut") that is not listening stops nothing: a letter typed
+    /// into the search field next to it always arrives. Only a fresh Space or Enter on the
+    /// recorder itself starts it listening, and even that key goes on.
+    #[test]
+    fn an_idle_recorder_stops_no_key() {
+        for key in every_key() {
+            let plain_key = plain(&key);
+            for k in std::iter::once(plain_key).chain(chords(&key)) {
+                assert!(!recorder_stops_key(false, &k), "{k:?}");
+                let expected = if activates(&k) {
+                    RecorderKey::Listen
+                } else {
+                    RecorderKey::Pass
+                };
+                assert_eq!(recorder_key(false, &k, false), expected, "{k:?}");
+                // A held key never starts it.
+                assert_eq!(recorder_key(false, &k, true), RecorderKey::Pass, "{k:?}");
+            }
+        }
+        assert_eq!(
+            recorder_key(false, &plain("enter"), false),
+            RecorderKey::Listen
+        );
+        assert_eq!(
+            recorder_key(false, &plain("space"), false),
+            RecorderKey::Listen
+        );
+    }
+
+    /// A listening recorder uses every key-down, so it stops them all (no app command runs,
+    /// Esc does not close Settings), except the ones Windows keeps: Alt+F4, Alt+Space and
+    /// anything with the Windows key still reach Windows. It waits past a modifier alone and an
+    /// auto-repeat, Esc ends it with nothing recorded, and the first other key is the chord,
+    /// read through `Chord::of` as the keymap reads it, with `accept`'s verdict.
+    #[test]
+    fn a_listening_recorder_takes_one_chord_and_waits_past_modifiers() {
+        let chord = |text: &str| Chord::parse(text).unwrap();
+        let pressed = |k: KeyIn<'_>| recorder_key(true, &k, false);
+        for key in every_key() {
+            for (ctrl, alt, shift) in [
+                (false, false, false),
+                (true, false, false),
+                (false, true, false),
+                (false, false, true),
+                (true, false, true),
+                (false, true, true),
+                (true, true, false),
+            ] {
+                let k = with(plain(&key), ctrl, alt, shift);
+                let windows_keeps = alt && !ctrl && !shift && matches!(key.as_str(), "f4" | "space");
+                assert_eq!(recorder_stops_key(true, &k), !windows_keeps, "{k:?}");
+            }
+            let win = KeyIn {
+                win: true,
+                ..plain(&key)
+            };
+            assert!(!recorder_stops_key(true, &win), "{key}");
+        }
+
+        // A modifier alone (GPUI-Windows sends none, other platforms may) and an auto-repeat.
+        for name in ["shift", "control", "alt", "platform", "capslock"] {
+            let k = with(plain(name), name == "control", name == "alt", name == "shift");
+            assert_eq!(pressed(k), RecorderKey::Wait, "{name}");
+        }
+        assert_eq!(
+            recorder_key(true, &with(plain("k"), true, false, false), true),
+            RecorderKey::Wait
+        );
+
+        // Esc ends listening; with a modifier it is a chord like any other.
+        assert_eq!(pressed(plain("escape")), RecorderKey::Cancel);
+        assert_eq!(
+            pressed(with(plain("escape"), true, false, false)),
+            RecorderKey::Pressed(chord("ctrl+escape"), Ok(()))
+        );
+        assert_eq!(
+            pressed(with(plain("escape"), false, false, true)),
+            RecorderKey::Pressed(chord("shift+escape"), Err(Refused::NeedsModifier))
+        );
+
+        // The chord and why it may not be a shortcut.
+        assert_eq!(
+            pressed(with(plain("k"), true, false, true)),
+            RecorderKey::Pressed(chord("ctrl+shift+k"), Ok(()))
+        );
+        assert_eq!(
+            pressed(plain("f5")),
+            RecorderKey::Pressed(chord("f5"), Ok(()))
+        );
+        assert_eq!(
+            pressed(plain("a")),
+            RecorderKey::Pressed(chord("a"), Err(Refused::NeedsModifier))
+        );
+        assert_eq!(
+            pressed(plain("tab")),
+            RecorderKey::Pressed(chord("tab"), Err(Refused::NeedsModifier))
+        );
+        assert_eq!(
+            pressed(with(plain("a"), true, true, false)),
+            RecorderKey::Pressed(chord("ctrl+alt+a"), Err(Refused::AltGr))
+        );
+        assert_eq!(
+            pressed(with(plain("f4"), false, true, false)),
+            RecorderKey::Pressed(chord("alt+f4"), Err(Refused::SystemKey))
+        );
+        assert_eq!(
+            pressed(KeyIn {
+                win: true,
+                ..with(plain("k"), true, false, false)
+            }),
+            RecorderKey::Pressed(chord("ctrl+k"), Err(Refused::WindowsKey))
+        );
+
+        // GPUI-Windows' shapes: Alt+Shift+= arrives as Alt and "+", Ctrl+Shift+= as Ctrl and
+        // "+". Recording reads them as matching does, and the label is what `label` gives.
+        assert_eq!(
+            pressed(with(plain("+"), false, true, false)),
+            RecorderKey::Pressed(chord("alt+shift+="), Ok(()))
+        );
+        let ctrl_plus = Chord::of(&with(plain("+"), true, false, false));
+        assert_eq!(
+            pressed(with(plain("+"), true, false, false)),
+            RecorderKey::Pressed(ctrl_plus.clone(), Ok(()))
+        );
+        assert_eq!(ctrl_plus.label(), "Ctrl++");
+    }
+
+    /// A recorder left listening would swallow the next keys, so it listens only while it has
+    /// the keyboard in the active window: a click elsewhere that takes the focus, another
+    /// section (the view takes the keyboard), Settings closing or going to the background
+    /// each end it. An idle recorder never starts listening on its own.
+    #[test]
+    fn listening_ends_once_the_recorder_loses_the_keyboard() {
+        assert!(still_listening(true, true, true));
+        for (focused, active) in [(false, true), (true, false), (false, false)] {
+            assert!(!still_listening(true, focused, active), "{focused} {active}");
+        }
+        for (focused, active) in [(true, true), (false, true), (true, false), (false, false)] {
+            assert!(!still_listening(false, focused, active), "{focused} {active}");
+        }
+    }
 }

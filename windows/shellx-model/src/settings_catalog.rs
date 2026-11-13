@@ -1284,7 +1284,18 @@ mod tests {
     #[test]
     fn only_the_migrated_rows_start_wired() {
         let wired: Vec<&str> = all_rows().filter(|r| r.wired).map(|r| r.id).collect();
-        assert_eq!(wired, ["account", "shell", "display", "updates", "about"]);
+        assert_eq!(
+            wired,
+            [
+                "account",
+                "shell",
+                "display",
+                "resetShortcuts",
+                "shortcutList",
+                "updates",
+                "about"
+            ]
+        );
     }
 
     #[test]

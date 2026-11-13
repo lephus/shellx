@@ -988,4 +988,170 @@ mod tests {
             app(AppCommand::NewWorkspace)
         );
     }
+
+    fn stored(entries: &[(&str, Option<&str>)]) -> BTreeMap<String, Option<String>> {
+        entries
+            .iter()
+            .map(|(id, c)| (id.to_string(), c.map(str::to_string)))
+            .collect()
+    }
+
+    /// The search bar of Settings › Keyboard Shortcuts: every word typed must be in the
+    /// action's title, in the language shown or the other one, without case or Vietnamese
+    /// marks. Blank text lists every action, in list order.
+    #[test]
+    fn the_list_filters_by_text_in_either_language() {
+        let km = defaults();
+        let text = |q: &str, lang: Lang| listed(&km, Some(ListFilter::Text(q)), lang);
+        assert_eq!(listed(&km, None, Lang::En), Action::ALL);
+        assert_eq!(listed(&km, None, Lang::Vi), Action::ALL);
+        assert_eq!(text("", Lang::En), Action::ALL);
+        assert_eq!(text("   ", Lang::Vi), Action::ALL);
+        // The language shown, any case, in list order.
+        assert_eq!(
+            text("split", Lang::En),
+            [Action::SplitRight, Action::SplitDown]
+        );
+        assert_eq!(text("SPLIT right", Lang::En), [Action::SplitRight]);
+        assert_eq!(text("settings", Lang::En), [Action::OpenSettings]);
+        // Vietnamese typed with or without its marks ("Chia sang phải").
+        assert_eq!(text("Chia sang phải", Lang::Vi), [Action::SplitRight]);
+        assert_eq!(text("chia phai", Lang::Vi), [Action::SplitRight]);
+        assert_eq!(text("CHIA", Lang::Vi), [Action::SplitRight, Action::SplitDown]);
+        assert_eq!(
+            text("phai", Lang::Vi),
+            [Action::SplitRight, Action::FocusRight]
+        );
+        assert_eq!(text("dan", Lang::Vi), [Action::Paste]);
+        // Decomposed marks fold the same way.
+        assert_eq!(text("pha\u{0309}i", Lang::Vi), text("phai", Lang::Vi));
+        // The other language's title finds it too.
+        assert_eq!(text("split right", Lang::Vi), [Action::SplitRight]);
+        assert_eq!(text("chia sang phai", Lang::En), [Action::SplitRight]);
+        assert_eq!(text("cài đặt", Lang::En), [Action::OpenSettings]);
+        // Every word must match.
+        assert!(text("split zzz", Lang::En).is_empty());
+        assert!(text("zzz", Lang::Vi).is_empty());
+    }
+
+    /// "Detect Shortcut": the list shows the actions the chord pressed runs now (the user's
+    /// binding, not the default), however GPUI-Windows reports it. An alias has no row.
+    #[test]
+    fn the_list_filters_by_chord() {
+        let by = |km: &Keymap, c: &Chord, lang: Lang| listed(km, Some(ListFilter::Chord(c)), lang);
+        let km = defaults();
+        assert_eq!(
+            by(&km, &chord("ctrl+shift+n"), Lang::En),
+            [Action::NewWorkspace]
+        );
+        assert!(by(&km, &chord("f5"), Lang::En).is_empty());
+        // Alt+Shift+= as GPUI-Windows sends it: Alt and "+".
+        assert_eq!(
+            by(&km, &Chord::of(&key("+", false, true, false)), Lang::Vi),
+            [Action::SplitRight]
+        );
+        for nobody in ["ctrl+shift+k", "ctrl+pagedown", "shift+insert", "ctrl+c", "a"] {
+            assert!(by(&km, &chord(nobody), Lang::En).is_empty(), "{nobody}");
+        }
+        // The current binding: the rebound chord, not the old one; an unbound action never.
+        let km = with(&[("splitRight", Some("ctrl+shift+k")), ("newTab", None)]);
+        assert_eq!(
+            by(&km, &chord("ctrl+shift+k"), Lang::En),
+            [Action::SplitRight]
+        );
+        assert!(by(&km, &chord("alt+shift+="), Lang::En).is_empty());
+        assert!(by(&km, &chord("ctrl+shift+n"), Lang::En).is_empty());
+        // A hand-edited file giving one chord to two actions: both are shown.
+        let km = with(&[("newTab", Some("ctrl+shift+t"))]);
+        assert_eq!(
+            by(&km, &chord("ctrl+shift+t"), Lang::En),
+            [Action::NewWorkspace, Action::NewTerminal]
+        );
+    }
+
+    /// A recorded chord another action holds is not saved: the holder is named and the
+    /// bindings stay as they were. Any other chord replaces the action's entry and keeps
+    /// every other entry, ids this version does not know included.
+    #[test]
+    fn a_chord_another_action_holds_is_not_saved() {
+        let none = BTreeMap::new();
+        let km = defaults();
+        assert_eq!(
+            rebound(&km, &none, Action::SplitRight, Some(&chord("ctrl+shift+k"))),
+            Ok(stored(&[("splitRight", Some("ctrl+shift+k"))]))
+        );
+        assert_eq!(
+            rebound(&km, &none, Action::SplitRight, Some(&chord("ctrl+shift+n"))),
+            Err(Action::NewWorkspace)
+        );
+        assert_eq!(
+            rebound(&km, &none, Action::Copy, Some(&chord("ctrl+tab"))),
+            Err(Action::NextWorkspace)
+        );
+        // Its own chord again changes nothing.
+        assert_eq!(
+            rebound(&km, &none, Action::NewWorkspace, Some(&chord("ctrl+shift+n"))),
+            Ok(none.clone())
+        );
+        // An alias yields to a binding: Shift+Insert can be bound.
+        assert_eq!(
+            rebound(&km, &none, Action::SplitDown, Some(&chord("shift+insert"))),
+            Ok(stored(&[("splitDown", Some("shift+insert"))]))
+        );
+        // A chord a rebind freed can be taken; the other entries stay.
+        let b = stored(&[("newTab", Some("ctrl+shift+k")), ("futureAction", Some("ctrl+q"))]);
+        let km = Keymap::from_bindings(&b);
+        assert_eq!(
+            rebound(&km, &b, Action::SplitRight, Some(&chord("ctrl+shift+n"))),
+            Ok(stored(&[
+                ("newTab", Some("ctrl+shift+k")),
+                ("futureAction", Some("ctrl+q")),
+                ("splitRight", Some("ctrl+shift+n")),
+            ]))
+        );
+        assert_eq!(
+            rebound(&km, &b, Action::SplitRight, Some(&chord("ctrl+shift+k"))),
+            Err(Action::NewWorkspace)
+        );
+    }
+
+    /// The X beside a recorder unbinds; once the action is unbound it is a restore arrow that
+    /// puts the default back (and is refused like any chord when another action took the
+    /// default meanwhile). Back and Forward have no default: unbound, their X does nothing.
+    #[test]
+    fn x_unbinds_and_then_restores_the_default() {
+        let km = defaults();
+        let none = BTreeMap::new();
+        let default = Action::SplitRight.default_chord();
+        assert_eq!(clear_button(&km, Action::SplitRight), ClearButton::Clear);
+        let cleared = rebound(&km, &none, Action::SplitRight, None).unwrap();
+        assert_eq!(cleared, stored(&[("splitRight", None)]));
+        let km = Keymap::from_bindings(&cleared);
+        assert_eq!(km.chord(Action::SplitRight), None);
+        assert_eq!(clear_button(&km, Action::SplitRight), ClearButton::Restore);
+        assert_eq!(
+            rebound(&km, &cleared, Action::SplitRight, default.as_ref()),
+            Ok(none.clone())
+        );
+        // A rebound action: X unbinds it, and restore gives the default, not the old chord.
+        let b = stored(&[("splitRight", Some("ctrl+shift+k"))]);
+        let km = Keymap::from_bindings(&b);
+        assert_eq!(clear_button(&km, Action::SplitRight), ClearButton::Clear);
+        let cleared = rebound(&km, &b, Action::SplitRight, None).unwrap();
+        assert_eq!(cleared, stored(&[("splitRight", None)]));
+        // Another action took the default meanwhile: restoring it is a conflict.
+        let b = stored(&[("splitRight", None), ("splitDown", Some("alt+shift+="))]);
+        let km = Keymap::from_bindings(&b);
+        assert_eq!(clear_button(&km, Action::SplitRight), ClearButton::Restore);
+        assert_eq!(
+            rebound(&km, &b, Action::SplitRight, default.as_ref()),
+            Err(Action::SplitDown)
+        );
+        // Back: nothing to unbind or restore until it is bound; unbinding it removes its entry.
+        assert_eq!(clear_button(&defaults(), Action::FocusBack), ClearButton::Off);
+        let b = stored(&[("focusHistoryBack", Some("f6"))]);
+        let km = Keymap::from_bindings(&b);
+        assert_eq!(clear_button(&km, Action::FocusBack), ClearButton::Clear);
+        assert_eq!(rebound(&km, &b, Action::FocusBack, None), Ok(none));
+    }
 }
