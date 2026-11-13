@@ -159,11 +159,7 @@ fn font_row(
                 t(lang, Str::SettingsDefault).into(),
                 SharedString::default(),
             )];
-            if !stored.is_empty()
-                && !families
-                    .iter()
-                    .any(|family| family.as_ref() == stored.as_str())
-            {
+            if !stored.is_empty() && !fonts::is_installed(&stored, cx) {
                 let label = format!("{stored} {}", t(lang, Str::SettingsFontNotInstalled));
                 options.push((label.into(), stored.clone().into()));
             }

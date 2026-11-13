@@ -517,6 +517,7 @@ impl SignInDialog {
             TextFieldEvent::Cancel => self.close(cx),
             TextFieldEvent::Next => self.move_focus(false, window, cx),
             TextFieldEvent::Prev => self.move_focus(true, window, cx),
+            TextFieldEvent::Blur => {}
         }
     }
 

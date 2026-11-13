@@ -14,10 +14,12 @@ use shellx_model::selection::Viewport;
 use shellx_model::settings::Settings;
 use shellx_model::theme_file::TermTheme;
 
-/// The scrollback of terminals made from now on, in bytes (0: not set, the setting's default).
+/// The scrollback of terminals made from now on, in bytes (`UNSET`: the setting's default; 0 is a
+/// real limit: no scrollback).
 /// Settings › Terminal › Scrollback Limit sets it (`set_scrollback_bytes`); a terminal already
 /// open keeps the limit it was made with.
-static SCROLLBACK_BYTES: AtomicUsize = AtomicUsize::new(0);
+const UNSET: usize = usize::MAX;
+static SCROLLBACK_BYTES: AtomicUsize = AtomicUsize::new(UNSET);
 
 pub fn set_scrollback_bytes(bytes: usize) {
     SCROLLBACK_BYTES.store(bytes, Ordering::Relaxed);
@@ -25,7 +27,7 @@ pub fn set_scrollback_bytes(bytes: usize) {
 
 fn scrollback_bytes() -> usize {
     match SCROLLBACK_BYTES.load(Ordering::Relaxed) {
-        0 => shellx_model::settings::scrollback_bytes(Settings::default().scrollback_mb),
+        UNSET => shellx_model::settings::scrollback_bytes(Settings::default().scrollback_mb),
         set => set,
     }
 }

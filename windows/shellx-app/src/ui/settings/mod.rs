@@ -204,7 +204,7 @@ impl SettingsView {
             TextFieldEvent::Cancel => self.request_close(cx),
             TextFieldEvent::Next => self.move_focus(false, cx),
             TextFieldEvent::Prev => self.move_focus(true, cx),
-            TextFieldEvent::Submit => {}
+            TextFieldEvent::Submit | TextFieldEvent::Blur => {}
         }
     }
 
@@ -368,7 +368,6 @@ impl Render for SettingsView {
             window.focus(&self.focus);
         }
         self.drawn_section = Some(self.section);
-        rows::commit_left_numbers(self, window, cx);
         self.anchors.clear();
         let listed = listed_sections();
         let sidebar = self.sidebar(&listed, lang, cx);

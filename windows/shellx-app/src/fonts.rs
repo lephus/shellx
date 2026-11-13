@@ -30,11 +30,16 @@ pub fn embedded() -> Vec<&'static [u8]> {
     fonts
 }
 
+/// Whether `family` is installed (or embedded): the one test both the terminal's font and the
+/// Font picker's "(not installed)" use.
+pub fn is_installed(family: &str, cx: &App) -> bool {
+    cx.text_system().all_font_names().iter().any(|n| n == family)
+}
+
 /// The font a terminal draws with: `family` when it is installed (or embedded), otherwise the
 /// default (JetBrains Mono), with system fallbacks for glyphs the family lacks.
 pub fn terminal_font(family: Option<&str>, cx: &App) -> Font {
-    let system = cx.text_system();
-    let installed = family.filter(|name| system.all_font_names().iter().any(|n| n == name));
+    let installed = family.filter(|name| is_installed(name, cx));
     let mut f = font(installed.unwrap_or(TERMINAL_FAMILY).to_string());
     f.fallbacks = Some(FontFallbacks::from_fonts(vec![
         "Cascadia Mono".into(),
