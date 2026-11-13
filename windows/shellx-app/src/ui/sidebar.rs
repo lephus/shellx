@@ -56,7 +56,9 @@ use super::update_banner::open_https;
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
 /// The width a card's text has: the sidebar less the card's margins, edge and padding.
-const CARD_TEXT_WIDTH: f32 = crate::workspace::SIDEBAR_W - 16.0 - 2.0 - 12.0 - 8.0 - 1.0;
+fn card_text_width(settings: &Settings) -> f32 {
+    crate::workspace::SIDEBAR_W - 16.0 - 2.0 * border_width(settings) - 12.0 - 8.0 - 1.0
+}
 
 /// One workspace card: one per tab, under the machine its panes run on.
 pub struct SessionRow {
@@ -522,6 +524,10 @@ fn workspace_card(
     let colour = workspace_color(settings, row.color.as_deref());
     let style = theme::card_style(settings, colour, selected);
     let (title_color, muted_color) = theme::card_text(style.fill, selected);
+    // An unselected card's fill gives way to the hover fill under the pointer, so its text
+    // changes with it (`group_hover` on the card).
+    let group = SharedString::from(format!("sidebar-card-{ix}"));
+    let hover_text = (!selected).then(theme::hover_card_text);
     let outline = border_width(settings);
     let lines = card_lines(settings, row.branch.as_deref(), row.path.as_deref());
     let title_line = div()
@@ -536,6 +542,9 @@ fn workspace_card(
                 .text_size(px(sz.card_title))
                 .font_weight(FontWeight::SEMIBOLD)
                 .text_color(title_color)
+                .when_some(hover_text, |el, (title, _)| {
+                    el.group_hover(group.clone(), move |s| s.text_color(title))
+                })
                 .child(row.title.clone()),
         )
         .when_some(row.status.pill(), |el, pill| {
@@ -550,18 +559,35 @@ fn workspace_card(
         .py(px(6.0))
         .child(title_line)
         .when_some(lines.branch, |el, branch| {
-            el.child(card_line(format!("\u{2387} {branch}"), sz, muted_color))
+            el.child(card_line(
+                format!("\u{2387} {branch}"),
+                sz,
+                muted_color,
+                hover_text.map(|t| t.1),
+                &group,
+            ))
         })
         .when_some(lines.directory, |el, path| {
             let path = if settings.truncate_path_from_start {
-                shorten_path(&path, chars_that_fit(CARD_TEXT_WIDTH, sz.small), true)
+                shorten_path(
+                    &path,
+                    chars_that_fit(card_text_width(settings), sz.small),
+                    true,
+                )
             } else {
                 path
             };
-            el.child(card_line(path, sz, muted_color))
+            el.child(card_line(
+                path,
+                sz,
+                muted_color,
+                hover_text.map(|t| t.1),
+                &group,
+            ))
         });
     div()
         .id(("sidebar-session", ix))
+        .group(group.clone())
         .relative()
         .flex()
         .flex_col()
@@ -679,7 +705,13 @@ const MARGIN: f32 = 8.0;
 /// The text sits in a row as a `flex_1` child, like the title: as a plain
 /// child of the column GPUI measures it at width 0 first and keeps that
 /// (the line would show only "…").
-fn card_line(text: String, sz: SidebarSizes, color: gpui::Hsla) -> Div {
+fn card_line(
+    text: String,
+    sz: SidebarSizes,
+    color: gpui::Hsla,
+    hover: Option<gpui::Hsla>,
+    group: &SharedString,
+) -> Div {
     div().flex().child(
         div()
             .flex_1()
@@ -687,6 +719,9 @@ fn card_line(text: String, sz: SidebarSizes, color: gpui::Hsla) -> Div {
             .truncate()
             .text_size(px(sz.small))
             .text_color(color)
+            .when_some(hover, |el, hover| {
+                el.group_hover(group.clone(), move |s| s.text_color(hover))
+            })
             .child(text),
     )
 }

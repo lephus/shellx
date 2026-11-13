@@ -219,6 +219,11 @@ pub fn sidebar_icon_hover() -> Hsla {
 pub fn card_style(settings: &Settings, color: Rgba, selected: bool) -> CardStyle {
     workspace_colors::card_style(settings, &chrome(), color, selected)
 }
+/// The title and secondary text of an unselected card under the pointer (on the hover fill).
+pub fn hover_card_text() -> (Hsla, Hsla) {
+    let (title, muted) = workspace_colors::hover_card_text(&chrome());
+    (hsla(title), hsla(muted))
+}
 /// The title and secondary text of a card with `fill`, made to read on it.
 pub fn card_text(fill: Option<Rgba>, selected: bool) -> (Hsla, Hsla) {
     let (title, muted) = workspace_colors::card_text(&chrome(), fill, selected);
