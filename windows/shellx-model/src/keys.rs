@@ -145,6 +145,13 @@ pub fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keymap::Keymap;
+    use std::collections::BTreeMap;
+
+    /// The rules of 1.7.1: every test below runs against the default keymap.
+    fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
+        super::map_key(k, &Keymap::from_bindings(&BTreeMap::new()), ctx)
+    }
 
     fn k(key: &str) -> KeyIn<'_> {
         KeyIn {

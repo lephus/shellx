@@ -194,6 +194,16 @@ pub fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keymap::Keymap;
+    use std::collections::BTreeMap;
+
+    // The rules of 1.7.1: the tests below run against the default keymap.
+    fn map_key(k: &KeyIn, ctx: &KeyCtx) -> KeyAction {
+        crate::keys::map_key(k, &Keymap::from_bindings(&BTreeMap::new()), ctx)
+    }
+    fn stopped_pane_key(k: &KeyIn, ctx: &KeyCtx, repeat: bool) -> StoppedPaneKey {
+        super::stopped_pane_key(k, &Keymap::from_bindings(&BTreeMap::new()), ctx, repeat)
+    }
 
     #[test]
     fn composing_and_text_keys_pass_while_a_panel_is_open() {
@@ -275,7 +285,7 @@ mod tests {
 
     #[test]
     fn alt_f4_reaches_windows_under_every_panel() {
-        use crate::keys::{KeyCtx, KeyIn, map_key};
+        use crate::keys::{KeyCtx, KeyIn};
         let alt_f4 = KeyIn {
             key: "f4",
             ctrl: false,
